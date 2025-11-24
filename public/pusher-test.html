@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Pusher Test - WhatsApp Dashboard</title>
+  <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+  <script>
+    // Enable pusher logging - don't include this in production
+    Pusher.logToConsole = true;
+
+    // Initialize Pusher
+    var pusher = new Pusher('5e011e24b7fe71be40c7', {
+      cluster: 'ap1',
+      forceTLS: true
+    });
+
+    // Test public channel first
+    console.log('Testing public channel...');
+    var publicChannel = pusher.subscribe('test-channel');
+    publicChannel.bind('test-event', function(data) {
+      console.log('Public channel event received:', data);
+      alert('Public: ' + JSON.stringify(data));
+    });
+
+    // Test private channel with auth
+    console.log('Testing private channel with auth...');
+
+    // Get token from localStorage (must login first)
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.error('No token found! Please login first at /login');
+      document.getElementById('status').innerHTML = '<span style="color: red;">❌ No token found! Please <a href="/login">login</a> first.</span>';
+    } else {
+      console.log('Token found:', token.substring(0, 20) + '...');
+
+      // Configure Pusher with authentication
+      pusher.config.auth = {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      };
+      pusher.config.authEndpoint = 'https://api.qashierwise.com/api/broadcasting/auth';
+
+      // Get user ID
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const userId = user.id || 1;
+
+      console.log('Subscribing to private-whatsapp.' + userId);
+
+      // Subscribe to private channel
+      var privateChannel = pusher.subscribe('private-whatsapp.' + userId);
+
+      privateChannel.bind('pusher:subscription_succeeded', function() {
+        console.log('✅ Successfully subscribed to private channel!');
+        document.getElementById('status').innerHTML = '<span style="color: green;">✅ Connected to private-whatsapp.' + userId + '</span>';
+      });
+
+      privateChannel.bind('pusher:subscription_error', function(status) {
+        console.error('❌ Subscription error:', status);
+        document.getElementById('status').innerHTML = '<span style="color: red;">❌ Subscription failed: ' + status + '</span>';
+      });
+
+      // Listen for new message events
+      privateChannel.bind('Illuminate\\Notifications\\Events\\BroadcastNotificationCreated', function(data) {
+        console.log('Notification event received:', data);
+      });
+
+      privateChannel.bind('.message.new', function(data) {
+        console.log('🔔 New message event received:', data);
+        alert('New Message: ' + JSON.stringify(data));
+
+        // Update UI
+        const messagesDiv = document.getElementById('messages');
+        const messageEl = document.createElement('div');
+        messageEl.style.padding = '10px';
+        messageEl.style.margin = '5px 0';
+        messageEl.style.background = '#e8f5e9';
+        messageEl.style.borderRadius = '5px';
+        messageEl.innerHTML = `
+          <strong>From:</strong> ${data.contact?.name || 'Unknown'}<br>
+          <strong>Message:</strong> ${data.message?.content || data.message?.body || 'N/A'}<br>
+          <strong>Time:</strong> ${new Date().toLocaleTimeString()}
+        `;
+        messagesDiv.insertBefore(messageEl, messagesDiv.firstChild);
+      });
+    }
+
+    // Connection state
+    pusher.connection.bind('state_change', function(states) {
+      console.log('Pusher state:', states.previous, '->', states.current);
+      document.getElementById('connection').textContent = 'Connection: ' + states.current;
+    });
+
+    pusher.connection.bind('connected', function() {
+      console.log('✅ Pusher connected!');
+    });
+
+    pusher.connection.bind('error', function(err) {
+      console.error('❌ Pusher error:', err);
+    });
+  </script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    h1 {
+      color: #25D366;
+    }
+    code {
+      background: #f5f5f5;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    #status {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 5px;
+      background: #fff3cd;
+    }
+    #connection {
+      padding: 5px 10px;
+      background: #e3f2fd;
+      border-radius: 3px;
+      display: inline-block;
+      margin: 10px 0;
+    }
+    #messages {
+      margin-top: 20px;
+      border: 1px solid #ddd;
+      padding: 10px;
+      min-height: 200px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 Pusher Test - WhatsApp Dashboard</h1>
+
+  <div id="connection">Connection: initializing...</div>
+  <div id="status">Checking authentication...</div>
+
+  <h2>Instructions:</h2>
+  <ol>
+    <li>Make sure you're logged in at <a href="/login" target="_blank">/login</a></li>
+    <li>This page will automatically subscribe to <code>private-whatsapp.{userId}</code></li>
+    <li>Send a message from WhatsApp to your business number</li>
+    <li>The message should appear below in real-time</li>
+  </ol>
+
+  <h2>📨 Received Messages:</h2>
+  <div id="messages">
+    <em style="color: #999;">Waiting for messages...</em>
+  </div>
+
+  <h2>🔧 Debug Info:</h2>
+  <p>Open browser console (F12) to see detailed logs</p>
+  <p>Pusher App Key: <code>5e011e24b7fe71be40c7</code></p>
+  <p>Cluster: <code>ap1</code></p>
+  <p>Auth Endpoint: <code>/api/broadcasting/auth</code></p>
+</body>
+</html>

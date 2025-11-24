@@ -12,48 +12,80 @@ class WhatsAppMessage extends Model
     protected $table = 'whatsapp_messages';
 
     protected $fillable = [
-        'whatsapp_account_id',
-        'whatsapp_contact_id',
+        'user_id',
+        'contact_id',
         'message_id',
-        'wam_id',
         'direction',
-        'status',
         'type',
         'content',
-        'media',
         'metadata',
-        'context_message_id',
-        'template_name',
-        'template_language',
-        'error_code',
-        'error_message',
+        'status',
+        'is_read',
         'sent_at',
         'delivered_at',
-        'read_at',
-        'failed_at'
+        'read_at'
     ];
 
     protected $casts = [
-        'media' => 'array',
         'metadata' => 'array',
+        'is_read' => 'boolean',
         'sent_at' => 'datetime',
         'delivered_at' => 'datetime',
         'read_at' => 'datetime',
-        'failed_at' => 'datetime',
     ];
 
-    public function account()
+    public function user()
     {
-        return $this->belongsTo(WhatsAppAccount::class, 'whatsapp_account_id');
+        return $this->belongsTo(User::class);
     }
 
     public function contact()
     {
-        return $this->belongsTo(WhatsAppContact::class, 'whatsapp_contact_id');
+        return $this->belongsTo(WhatsAppContact::class, 'contact_id');
     }
 
-    public function mediaFiles()
+    // Accessors for frontend
+    public function getBodyAttribute()
     {
-        return $this->hasMany(WhatsAppMedia::class, 'whatsapp_message_id');
+        // For text messages, return content directly
+        if ($this->type === 'text') {
+            return $this->content ?? '';
+        }
+        // For template messages, extract template info
+        if ($this->type === 'template') {
+            $templateName = $this->metadata['template_name'] ?? 'Unknown template';
+            return "Template: {$templateName}";
+        }
+        // For other message types, return content or empty string
+        return $this->content ?? '';
     }
+
+    public function getMediaUrlAttribute()
+    {
+        if (in_array($this->type, ['image', 'video', 'audio', 'document'])) {
+            $content = is_string($this->content) ? json_decode($this->content, true) : $this->content;
+            return $content['media_url'] ?? null;
+        }
+        return null;
+    }
+
+    public function getCaptionAttribute()
+    {
+        if ($this->type === 'image') {
+            $content = is_string($this->content) ? json_decode($this->content, true) : $this->content;
+            return $content['caption'] ?? null;
+        }
+        return null;
+    }
+
+    public function getFilenameAttribute()
+    {
+        if ($this->type === 'document') {
+            $content = is_string($this->content) ? json_decode($this->content, true) : $this->content;
+            return $content['filename'] ?? 'document';
+        }
+        return null;
+    }
+
+    protected $appends = ['body', 'media_url', 'caption', 'filename'];
 }

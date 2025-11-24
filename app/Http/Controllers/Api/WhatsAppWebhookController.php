@@ -2,7 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\MessageStatusUpdated;
+use App\Events\NewWhatsAppMessage;
 use App\Http\Controllers\Controller;
+use App\Models\WhatsAppAccount;
+use App\Models\WhatsAppContact;
+use App\Models\WhatsAppMessage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -41,27 +46,45 @@ class WhatsAppWebhookController extends Controller
     {
         try {
             $body = $request->all();
-            
+
             Log::info('Webhook received', ['body' => $body]);
 
             // Check if this is a WhatsApp webhook event
             if (isset($body['object']) && $body['object'] === 'whatsapp_business_account') {
-                
+
                 // Iterate through entries
                 foreach ($body['entry'] as $entry) {
                     foreach ($entry['changes'] as $change) {
-                        
+
+                        $phoneNumberId = $change['value']['metadata']['phone_number_id'] ?? null;
+
+                        if (!$phoneNumberId) {
+                            continue;
+                        }
+
+                        // Find WhatsApp account and user
+                        $whatsappAccount = WhatsAppAccount::where('phone_number_id', $phoneNumberId)
+                            ->where('is_active', true)
+                            ->first();
+
+                        if (!$whatsappAccount) {
+                            Log::warning('WhatsApp account not found', ['phone_number_id' => $phoneNumberId]);
+                            continue;
+                        }
+
+                        $userId = $whatsappAccount->user_id;
+
                         // Handle message events
                         if (isset($change['value']['messages'])) {
                             foreach ($change['value']['messages'] as $message) {
-                                $this->handleIncomingMessage($message, $change['value']);
+                                $this->handleIncomingMessage($message, $change['value'], $userId);
                             }
                         }
 
                         // Handle status updates
                         if (isset($change['value']['statuses'])) {
                             foreach ($change['value']['statuses'] as $status) {
-                                $this->handleMessageStatus($status);
+                                $this->handleMessageStatus($status, $userId);
                             }
                         }
                     }
@@ -85,11 +108,34 @@ class WhatsAppWebhookController extends Controller
     /**
      * Handle incoming message
      */
-    protected function handleIncomingMessage($message, $value)
+    protected function handleIncomingMessage($message, $value, $userId)
     {
         $from = $message['from'];
         $messageId = $message['id'];
         $timestamp = $message['timestamp'];
+        $type = $message['type'];
+
+        Log::info("Incoming $type message from $from", [
+            'message_id' => $messageId,
+            'user_id' => $userId
+        ]);
+
+        // Get or create contact
+        $contactName = $value['contacts'][0]['profile']['name'] ?? $from;
+
+        $contact = WhatsAppContact::firstOrCreate(
+            [
+                'user_id' => $userId,
+                'wa_id' => $from,
+            ],
+            [
+                'name' => $contactName,
+            ]
+        );
+
+        // Extract message content based on type
+        $content = null;
+        $metadata = [];
 
         $messageData = [
             'message_id' => $messageId,
@@ -99,91 +145,112 @@ class WhatsAppWebhookController extends Controller
         ];
 
         // Handle different message types
-        switch ($message['type']) {
+        switch ($type) {
             case 'text':
-                $messageData['text'] = $message['text']['body'];
-                Log::info('Text message received', $messageData);
-                // TODO: Save to database and process
+                $content = $message['text']['body'];
                 break;
 
             case 'image':
-                $messageData['image_id'] = $message['image']['id'];
-                $messageData['caption'] = $message['image']['caption'] ?? null;
-                $messageData['mime_type'] = $message['image']['mime_type'];
-                Log::info('Image message received', $messageData);
-                // TODO: Download and save image
+                $content = $message['image']['caption'] ?? 'Image';
+                $metadata = [
+                    'media_id' => $message['image']['id'],
+                    'mime_type' => $message['image']['mime_type'] ?? null,
+                ];
                 break;
 
             case 'document':
-                $messageData['document_id'] = $message['document']['id'];
-                $messageData['filename'] = $message['document']['filename'];
-                $messageData['caption'] = $message['document']['caption'] ?? null;
-                $messageData['mime_type'] = $message['document']['mime_type'];
-                Log::info('Document message received', $messageData);
-                // TODO: Download and save document
+                $content = $message['document']['filename'] ?? 'Document';
+                $metadata = [
+                    'media_id' => $message['document']['id'],
+                    'mime_type' => $message['document']['mime_type'] ?? null,
+                    'caption' => $message['document']['caption'] ?? null,
+                ];
                 break;
 
             case 'audio':
-                $messageData['audio_id'] = $message['audio']['id'];
-                $messageData['mime_type'] = $message['audio']['mime_type'];
-                Log::info('Audio message received', $messageData);
-                // TODO: Download and save audio
+                $content = 'Audio message';
+                $metadata = [
+                    'media_id' => $message['audio']['id'],
+                    'mime_type' => $message['audio']['mime_type'] ?? null,
+                ];
                 break;
 
             case 'video':
-                $messageData['video_id'] = $message['video']['id'];
-                $messageData['caption'] = $message['video']['caption'] ?? null;
-                $messageData['mime_type'] = $message['video']['mime_type'];
-                Log::info('Video message received', $messageData);
-                // TODO: Download and save video
+                $content = $message['video']['caption'] ?? 'Video';
+                $metadata = [
+                    'media_id' => $message['video']['id'],
+                    'mime_type' => $message['video']['mime_type'] ?? null,
+                ];
                 break;
 
             case 'location':
-                $messageData['latitude'] = $message['location']['latitude'];
-                $messageData['longitude'] = $message['location']['longitude'];
-                $messageData['name'] = $message['location']['name'] ?? null;
-                $messageData['address'] = $message['location']['address'] ?? null;
-                Log::info('Location message received', $messageData);
-                // TODO: Save location
+                $location = $message['location'];
+                $content = "Location: {$location['latitude']}, {$location['longitude']}";
+                $metadata = $location;
                 break;
 
             case 'contacts':
-                $messageData['contacts'] = $message['contacts'];
-                Log::info('Contact message received', $messageData);
-                // TODO: Save contacts
+                $content = 'Contact shared';
+                $metadata = $message['contacts'];
                 break;
 
             case 'button':
-                $messageData['button_text'] = $message['button']['text'];
-                $messageData['button_payload'] = $message['button']['payload'];
-                Log::info('Button reply received', $messageData);
-                // TODO: Process button response
+                $content = $message['button']['text'] ?? 'Button clicked';
+                $metadata = [
+                    'payload' => $message['button']['payload'] ?? null,
+                ];
                 break;
 
             case 'interactive':
-                if (isset($message['interactive']['button_reply'])) {
-                    $messageData['button_reply'] = $message['interactive']['button_reply'];
+                if (isset($message['interactive']['type'])) {
+                    $interactiveType = $message['interactive']['type'];
+                    if ($interactiveType === 'button_reply') {
+                        $content = $message['interactive']['button_reply']['title'] ?? 'Button';
+                        $metadata = $message['interactive']['button_reply'];
+                    } elseif ($interactiveType === 'list_reply') {
+                        $content = $message['interactive']['list_reply']['title'] ?? 'List item';
+                        $metadata = $message['interactive']['list_reply'];
+                    }
                 }
-                if (isset($message['interactive']['list_reply'])) {
-                    $messageData['list_reply'] = $message['interactive']['list_reply'];
-                }
-                Log::info('Interactive message received', $messageData);
-                // TODO: Process interactive response
                 break;
 
             default:
-                Log::warning('Unknown message type', $messageData);
+                $content = "Unsupported message type: $type";
+                $metadata = $message;
                 break;
         }
 
-        // Check if message has context (is a reply)
-        if (isset($message['context'])) {
-            $messageData['context'] = [
-                'message_id' => $message['context']['id'],
-                'from' => $message['context']['from'] ?? null,
-            ];
-            Log::info('Message is a reply', ['context' => $messageData['context']]);
-        }
+        // Save message to database (use updateOrCreate to prevent duplicate errors)
+        $whatsappMessage = WhatsAppMessage::updateOrCreate(
+            ['message_id' => $messageId],
+            [
+                'user_id' => $userId,
+                'contact_id' => $contact->id,
+                'direction' => 'incoming',
+                'type' => $type,
+                'content' => $content,
+                'metadata' => $metadata,
+                'status' => 'delivered',
+                'is_read' => false,
+                'sent_at' => now()->timestamp($timestamp),
+                'delivered_at' => now(),
+            ]
+        );
+
+        // Update contact's last message info
+        $contact->update([
+            'last_message_at' => now(),
+            'last_message_text' => $content,
+            'unread_count' => $contact->unread_count + 1,
+        ]);
+
+        // Broadcast event to frontend
+        broadcast(new NewWhatsAppMessage($whatsappMessage, $contact));
+
+        Log::info('Message saved and broadcasted', [
+            'message_id' => $messageId,
+            'contact_id' => $contact->id
+        ]);
 
         return $messageData;
     }
@@ -191,27 +258,49 @@ class WhatsAppWebhookController extends Controller
     /**
      * Handle message status updates
      */
-    protected function handleMessageStatus($status)
+    protected function handleMessageStatus($status, $userId)
     {
-        $statusData = [
-            'message_id' => $status['id'],
-            'status' => $status['status'],
-            'timestamp' => $status['timestamp'],
-            'recipient_id' => $status['recipient_id'],
-        ];
+        $messageId = $status['id'];
+        $statusValue = $status['status']; // sent, delivered, read, failed
+        $timestamp = $status['timestamp'];
 
-        // Status types: sent, delivered, read, failed
-        Log::info('Message status update', $statusData);
+        Log::info("Status update: $messageId -> $statusValue");
 
-        // TODO: Update message status in database
+        // Find message in database
+        $message = WhatsAppMessage::where('message_id', $messageId)
+            ->where('user_id', $userId)
+            ->first();
 
-        if ($status['status'] === 'failed' && isset($status['errors'])) {
+        if (!$message) {
+            Log::warning('Message not found for status update', ['message_id' => $messageId]);
+            return;
+        }
+
+        // Update message status
+        $updateData = ['status' => $statusValue];
+
+        if ($statusValue === 'delivered') {
+            $updateData['delivered_at'] = now()->timestamp($timestamp);
+        } elseif ($statusValue === 'read') {
+            $updateData['read_at'] = now()->timestamp($timestamp);
+            $updateData['delivered_at'] = $updateData['delivered_at'] ?? now();
+        }
+
+        $message->update($updateData);
+
+        // Broadcast status update to frontend
+        broadcast(new MessageStatusUpdated($message));
+
+        Log::info('Message status updated and broadcasted', [
+            'message_id' => $messageId,
+            'status' => $statusValue
+        ]);
+
+        if ($statusValue === 'failed' && isset($status['errors'])) {
             Log::error('Message delivery failed', [
-                'message_id' => $status['id'],
+                'message_id' => $messageId,
                 'errors' => $status['errors']
             ]);
         }
-
-        return $statusData;
     }
 }
