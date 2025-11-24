@@ -146,20 +146,20 @@
                                 <p class="text-xs text-gray-500" x-text="formatTime(message?.created_at)">-</p>
                                 <div x-show="message?.direction === 'outgoing'" class="flex items-center space-x-1">
                                     <span class="text-xs capitalize"
-                                          :class="{
-                                              'text-gray-500': message?.status === 'sent',
-                                              'text-blue-600': message?.status === 'delivered',
-                                              'text-green-600': message?.status === 'read',
-                                              'text-red-600': message?.status === 'failed'
-                                          }"
-                                          x-text="message?.status">-</span>
+                                        :class="{
+                                            'text-gray-500': message?.status === 'sent',
+                                            'text-blue-600': message?.status === 'delivered',
+                                            'text-green-600': message?.status === 'read',
+                                            text-red-600': message?.status === 'failed'
+                                        }"
+                                        x-text="message?.status">-</span>
                                     <i class="text-xs"
-                                       :class="{
-                                           'fas fa-check text-gray-500': message?.status === 'sent',
-                                           'fas fa-check-double text-blue-600': message?.status === 'delivered',
-                                           'fas fa-check-double text-green-600': message?.status === 'read',
-                                           'fas fa-exclamation-triangle text-red-600': message?.status === 'failed'
-                                       }"></i>
+                                    :class="{
+                                        'fas fa-check text-gray-500': message?.status === 'sent',
+                                        'fas fa-check-double text-blue-600': message?.status === 'delivered',
+                                        'fas fa-check-double text-green-600': message?.status === 'read',
+                                        'fas fa-exclamation-triangle text-red-600': message?.status === 'failed'
+                                    }"></i>
                                 </div>
                             </div>
                         </div>

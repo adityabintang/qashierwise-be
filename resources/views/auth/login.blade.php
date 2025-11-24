@@ -32,8 +32,8 @@
                             <i class="fas fa-envelope text-gray-400"></i>
                         </div>
                         <input x-model="formData.email" id="email" name="email" type="email" required
-                               class="appearance-none block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500"
-                               placeholder="you@example.com">
+                            class="appearance-none block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                            placeholder="you@example.com">
                     </div>
                 </div>
 
@@ -44,8 +44,8 @@
                             <i class="fas fa-lock text-gray-400"></i>
                         </div>
                         <input x-model="formData.password" id="password" name="password" :type="showPassword ? 'text' : 'password'" required
-                               class="appearance-none block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500"
-                               placeholder="••••••••">
+                            class="appearance-none block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                            placeholder="••••••••">
                         <button type="button" @click="showPassword = !showPassword" class="absolute inset-y-0 right-0 pr-3 flex items-center">
                             <i :class="showPassword ? 'fa-eye-slash' : 'fa-eye'" class="fas text-gray-400"></i>
                         </button>
@@ -55,7 +55,7 @@
                 <div class="flex items-center justify-between">
                     <div class="flex items-center">
                         <input x-model="formData.remember" id="remember" type="checkbox"
-                               class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded">
+                            class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded">
                         <label for="remember" class="ml-2 block text-sm text-gray-900">Remember me</label>
                     </div>
                 </div>

@@ -77,17 +77,17 @@
                             <h3 class="text-lg font-semibold text-gray-900 mb-1" x-text="template.name"></h3>
                             <div class="flex items-center gap-2">
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                                      :class="{
-                                          'bg-green-100 text-green-800': template.status === 'APPROVED',
-                                          'bg-yellow-100 text-yellow-800': template.status === 'PENDING',
-                                          'bg-red-100 text-red-800': template.status === 'REJECTED'
-                                      }">
+                                    :class="{
+                                        'bg-green-100 text-green-800': template.status === 'APPROVED',
+                                        'bg-yellow-100 text-yellow-800': template.status === 'PENDING',
+                                        'bg-red-100 text-red-800': template.status === 'REJECTED'
+                                    }">
                                     <i class="mr-1"
-                                       :class="{
-                                           'fas fa-check-circle': template.status === 'APPROVED',
-                                           'fas fa-clock': template.status === 'PENDING',
-                                           'fas fa-times-circle': template.status === 'REJECTED'
-                                       }"></i>
+                                    :class="{
+                                        'fas fa-check-circle': template.status === 'APPROVED',
+                                        'fas fa-clock': template.status === 'PENDING',
+                                        'fas fa-times-circle': template.status === 'REJECTED'
+                                    }"></i>
                                     <span x-text="template.status">Status</span>
                                 </span>
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
@@ -267,11 +267,11 @@
                             <h4 class="text-lg font-semibold text-gray-900 mb-3" x-text="selectedTemplate?.name"></h4>
                             <div class="flex gap-2 mb-4">
                                 <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
-                                      :class="{
-                                          'bg-green-100 text-green-800': selectedTemplate?.status === 'APPROVED',
-                                          'bg-yellow-100 text-yellow-800': selectedTemplate?.status === 'PENDING',
-                                          'bg-red-100 text-red-800': selectedTemplate?.status === 'REJECTED'
-                                      }">
+                                    :class="{
+                                        'bg-green-100 text-green-800': selectedTemplate?.status === 'APPROVED',
+                                        'bg-yellow-100 text-yellow-800': selectedTemplate?.status === 'PENDING',
+                                        'bg-red-100 text-red-800': selectedTemplate?.status === 'REJECTED'
+                                    }">
                                     <span x-text="selectedTemplate?.status">Status</span>
                                 </span>
                                 <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
