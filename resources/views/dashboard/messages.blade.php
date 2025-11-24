@@ -15,7 +15,7 @@
                         x-model="contactSearch"
                         @input="filterContactList"
                         placeholder="Search contacts..."
-                        class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                        class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <i class="fas fa-search text-gray-400"></i>
                     </div>
@@ -28,40 +28,20 @@
                     <div
                         @click="selectContact(contact)"
                         class="flex items-center space-x-3 p-4 hover:bg-gray-50 cursor-pointer transition border-b border-gray-100"
-                        :class="{'bg-green-50': selectedContact?.id === contact.id}">
+                        :class="{'bg-purple-50': selectedContact?.id === contact.id}">
                         <div class="relative flex-shrink-0">
-                            <div class="w-12 h-12 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center text-white font-bold">
+                            <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold">
                                 <span x-text="contact.name ? contact.name.charAt(0).toUpperCase() : '?'">?</span>
                             </div>
                             <div x-show="contact.unread_count > 0" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold" x-text="contact.unread_count">0</div>
                         </div>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center justify-between">
-                                <p class="text-sm font-semibold text-gray-900 truncate" x-text="contact.name || 'Unknown'">Unknown</p>
-                                <p class="text-xs text-gray-500" x-text="formatTime(contact.last_message_at)">-</p>
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold">
+                                <span x-text="selectedContact?.name ? selectedContact.name.charAt(0).toUpperCase() : '?'">?</span>
                             </div>
-                            <p class="text-xs text-gray-600 truncate" x-text="contact.phone_number">-</p>
-                        </div>
-                    </div>
-                </template>
-
-                <div x-show="filteredContactList.length === 0" class="text-center py-12 text-gray-500">
-                    <i class="fas fa-inbox text-4xl mb-4"></i>
-                    <p>No contacts found</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Chat Area -->
-        <div class="flex-1 flex flex-col" x-show="selectedContact">
-            <!-- Chat Header -->
-            <div class="p-4 border-b border-gray-200 bg-gray-50">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-                            <span x-text="selectedContact?.name ? selectedContact.name.charAt(0).toUpperCase() : '?'">?</span>
-                        </div>
-                        <div>
+                            <div>
                             <p class="font-semibold text-gray-900" x-text="selectedContact?.name || 'Unknown'">Unknown</p>
                             <p class="text-xs text-gray-600" x-text="selectedContact?.phone_number">-</p>
                         </div>
@@ -81,7 +61,7 @@
                         <div class="max-w-xs md:max-w-md lg:max-w-lg">
                             <!-- Message Bubble -->
                             <div class="rounded-lg p-3 shadow"
-                                 :class="message?.direction === 'outgoing' ? 'bg-green-500 text-white' : 'bg-white text-gray-900'">
+                                 :class="message?.direction === 'outgoing' ? 'bg-purple-600 text-white' : 'bg-white text-gray-900'">
 
                                 <!-- Text Message -->
                                 <template x-if="message?.type === 'text'">
@@ -149,7 +129,7 @@
                                           :class="{
                                               'text-gray-500': message?.status === 'sent',
                                               'text-blue-600': message?.status === 'delivered',
-                                              'text-green-600': message?.status === 'read',
+                                              'text-purple-600': message?.status === 'read',
                                               'text-red-600': message?.status === 'failed'
                                           }"
                                           x-text="message?.status">-</span>
@@ -157,7 +137,7 @@
                                        :class="{
                                            'fas fa-check text-gray-500': message?.status === 'sent',
                                            'fas fa-check-double text-blue-600': message?.status === 'delivered',
-                                           'fas fa-check-double text-green-600': message?.status === 'read',
+                                           'fas fa-check-double text-purple-600': message?.status === 'read',
                                            'fas fa-exclamation-triangle text-red-600': message?.status === 'failed'
                                        }"></i>
                                 </div>
@@ -194,13 +174,13 @@
                             @keydown.enter.prevent="$event.shiftKey ? (newMessage += '\n') : sendTextMessage()"
                             placeholder="Type a message..."
                             rows="2"
-                            class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"></textarea>
+                            class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"></textarea>
 
                         <!-- Send Button -->
                         <button
                             type="submit"
                             :disabled="!newMessage.trim() || sending"
-                            class="p-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                            class="p-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
                             <i class="fas" :class="sending ? 'fa-spinner fa-spin' : 'fa-paper-plane'"></i>
                         </button>
                     </div>
@@ -234,10 +214,10 @@
 
                     <div class="space-y-4">
                         <template x-for="template in templates" :key="template.id">
-                            <div class="border border-gray-200 rounded-lg p-4 hover:border-green-500 cursor-pointer transition" @click="sendTemplate(template)">
+                            <div class="border border-gray-200 rounded-lg p-4 hover:border-purple-500 cursor-pointer transition" @click="sendTemplate(template)">
                                 <div class="flex items-center justify-between mb-2">
                                     <h4 class="font-semibold text-gray-900" x-text="template.name"></h4>
-                                    <span class="text-xs px-2 py-1 rounded-full" :class="template.status === 'APPROVED' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'" x-text="template.status"></span>
+                                    <span class="text-xs px-2 py-1 rounded-full" :class="template.status === 'APPROVED' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'" x-text="template.status"></span>
                                 </div>
                                 <p class="text-sm text-gray-600 mb-2" x-text="template.category"></p>
                                 <p class="text-sm text-gray-700" x-text="template.body || template.header"></p>

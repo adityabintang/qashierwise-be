@@ -26,7 +26,7 @@
                 <select
                     x-model="filters.status"
                     @change="filterTemplates"
-                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
                     <option value="">All Statuses</option>
                     <option value="APPROVED">Approved</option>
                     <option value="PENDING">Pending</option>
@@ -40,7 +40,7 @@
                 <select
                     x-model="filters.category"
                     @change="filterTemplates"
-                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
                     <option value="">All Categories</option>
                     <option value="MARKETING">Marketing</option>
                     <option value="UTILITY">Utility</option>
@@ -57,7 +57,7 @@
                         x-model="filters.search"
                         @input="filterTemplates"
                         placeholder="Search by name..."
-                        class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                        class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <i class="fas fa-search text-gray-400"></i>
                     </div>
@@ -78,7 +78,7 @@
                             <div class="flex items-center gap-2">
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
                                       :class="{
-                                          'bg-green-100 text-green-800': template.status === 'APPROVED',
+                                          'bg-purple-100 text-purple-800': template.status === 'APPROVED',
                                           'bg-yellow-100 text-yellow-800': template.status === 'PENDING',
                                           'bg-red-100 text-red-800': template.status === 'REJECTED'
                                       }">
@@ -137,7 +137,7 @@
                         <!-- Buttons Component -->
                         <div x-show="template.buttons && template.buttons.length > 0" class="mt-3 space-y-1">
                             <template x-for="button in template.buttons" :key="button.text">
-                                <div class="flex items-center justify-center py-2 px-3 bg-white border border-gray-300 rounded text-xs text-blue-600">
+                                <div class="flex items-center justify-center py-2 px-3 bg-white border border-gray-300 rounded text-xs text-purple-600">
                                     <i class="mr-2" :class="{
                                         'fas fa-phone': button.type === 'PHONE_NUMBER',
                                         'fas fa-external-link-alt': button.type === 'URL',
@@ -171,7 +171,7 @@
                         <button
                             x-show="template.status === 'APPROVED'"
                             @click="sendTemplateModal(template)"
-                            class="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg text-sm font-medium transition">
+                            class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition">
                             <i class="fas fa-paper-plane mr-2"></i>Send
                         </button>
                     </div>
@@ -210,7 +210,7 @@
                             <select
                                 x-model="sendForm.contactId"
                                 required
-                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
                                 <option value="">Choose a contact...</option>
                                 <template x-for="contact in contacts" :key="contact.id">
                                     <option :value="contact.id" x-text="`${contact.name} (${contact.phone_number})`"></option>
@@ -236,7 +236,7 @@
                             <button
                                 type="submit"
                                 :disabled="sending"
-                                class="flex-1 bg-green-500 hover:bg-green-600 text-white py-3 px-4 rounded-lg text-sm font-medium transition disabled:opacity-50">
+                                class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-lg text-sm font-medium transition disabled:opacity-50">
                                 <i class="fas mr-2" :class="sending ? 'fa-spinner fa-spin' : 'fa-paper-plane'"></i>
                                 <span x-text="sending ? 'Sending...' : 'Send'"></span>
                             </button>
@@ -268,7 +268,7 @@
                             <div class="flex gap-2 mb-4">
                                 <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
                                       :class="{
-                                          'bg-green-100 text-green-800': selectedTemplate?.status === 'APPROVED',
+                                          'bg-purple-100 text-purple-800': selectedTemplate?.status === 'APPROVED',
                                           'bg-yellow-100 text-yellow-800': selectedTemplate?.status === 'PENDING',
                                           'bg-red-100 text-red-800': selectedTemplate?.status === 'REJECTED'
                                       }">

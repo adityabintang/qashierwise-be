@@ -43,9 +43,9 @@
     }
 " class="min-h-screen flex">
     <!-- Sidebar -->
-    <aside :class="sidebarOpen ? 'w-64' : 'w-20'" class="bg-gradient-to-b from-green-600 to-green-700 text-white transition-all duration-300 flex flex-col">
+    <aside :class="sidebarOpen ? 'w-64' : 'w-20'" class="bg-gradient-to-b from-purple-700 via-purple-600 to-indigo-700 text-white transition-all duration-300 flex flex-col">
         <!-- Logo -->
-        <div class="p-6 flex items-center justify-between border-b border-green-500">
+        <div class="p-6 flex items-center justify-between border-b border-purple-500">
             <div x-show="sidebarOpen" class="flex items-center space-x-3">
                 <i class="fab fa-whatsapp text-3xl"></i>
                 <span class="text-xl font-bold">QashierWise</span>
@@ -55,31 +55,31 @@
 
         <!-- Navigation -->
         <nav class="flex-1 py-6">
-            <a href="/dashboard" class="flex items-center space-x-3 px-6 py-3 hover:bg-green-500 transition">
+            <a href="/dashboard" class="flex items-center space-x-3 px-6 py-3 hover:bg-purple-600 transition">
                 <i class="fas fa-home text-xl w-6"></i>
                 <span x-show="sidebarOpen">Dashboard</span>
             </a>
-            <a href="/dashboard/contacts" class="flex items-center space-x-3 px-6 py-3 hover:bg-green-500 transition">
+            <a href="/dashboard/contacts" class="flex items-center space-x-3 px-6 py-3 hover:bg-purple-600 transition">
                 <i class="fas fa-address-book text-xl w-6"></i>
                 <span x-show="sidebarOpen">Contacts</span>
             </a>
-            <a href="/dashboard/messages" class="flex items-center space-x-3 px-6 py-3 hover:bg-green-500 transition">
+            <a href="/dashboard/messages" class="flex items-center space-x-3 px-6 py-3 hover:bg-purple-600 transition">
                 <i class="fas fa-comments text-xl w-6"></i>
                 <span x-show="sidebarOpen">Messages</span>
             </a>
-            <a href="/dashboard/templates" class="flex items-center space-x-3 px-6 py-3 hover:bg-green-500 transition">
+            <a href="/dashboard/templates" class="flex items-center space-x-3 px-6 py-3 hover:bg-purple-600 transition">
                 <i class="fas fa-file-alt text-xl w-6"></i>
                 <span x-show="sidebarOpen">Templates</span>
             </a>
-            <a href="/dashboard/profile" class="flex items-center space-x-3 px-6 py-3 hover:bg-green-500 transition">
+            <a href="/dashboard/profile" class="flex items-center space-x-3 px-6 py-3 hover:bg-purple-600 transition">
                 <i class="fas fa-building text-xl w-6"></i>
                 <span x-show="sidebarOpen">Business Profile</span>
             </a>
         </nav>
 
         <!-- Toggle Sidebar -->
-        <div class="p-4 border-t border-green-500">
-            <button @click="sidebarOpen = !sidebarOpen" class="w-full flex items-center justify-center py-2 hover:bg-green-500 rounded transition">
+        <div class="p-4 border-t border-purple-500">
+            <button @click="sidebarOpen = !sidebarOpen" class="w-full flex items-center justify-center py-2 hover:bg-purple-600 rounded transition">
                 <i class="fas" :class="sidebarOpen ? 'fa-chevron-left' : 'fa-chevron-right'"></i>
             </button>
         </div>
@@ -126,7 +126,7 @@
                     <!-- User Menu -->
                     <div x-data="{ open: false }" class="relative">
                         <button @click="open = !open" class="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded-lg transition">
-                            <div class="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
+                            <div class="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
                                 <span class="text-white font-semibold" x-text="user ? user.name.charAt(0).toUpperCase() : 'U'"></span>
                             </div>
                             <span class="text-sm font-medium text-gray-900" x-text="user ? user.name : 'User'"></span>
@@ -144,7 +144,7 @@
         </header>
 
         <!-- Page Content -->
-        <main class="flex-1 overflow-auto bg-gray-50">
+        <main class="flex-1 overflow-auto bg-gradient-to-b from-white via-purple-50 to-indigo-50">
             <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                 @yield('content')
             </div>

@@ -37,13 +37,13 @@
         </div>
 
         <!-- Total Messages -->
-        <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-5 lg:p-6 text-white transform hover:scale-105 transition-transform">
+        <div class="bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl shadow-lg p-5 lg:p-6 text-white transform hover:scale-105 transition-transform">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-green-100 text-xs sm:text-sm font-medium">Total Messages</p>
+                    <p class="text-purple-100 text-xs sm:text-sm font-medium">Total Messages</p>
                     <p class="text-2xl sm:text-3xl font-bold mt-2" x-text="stats.totalMessages || '0'">0</p>
                 </div>
-                <div class="bg-green-400 bg-opacity-30 rounded-full p-2 sm:p-3">
+                <div class="bg-purple-400 bg-opacity-30 rounded-full p-2 sm:p-3">
                     <i class="fas fa-comment-dots text-xl sm:text-2xl"></i>
                 </div>
             </div>
@@ -92,14 +92,14 @@
         <div class="lg:col-span-2 bg-white rounded-xl shadow-md p-4 sm:p-6" x-data="recentMessages()">
             <div class="flex items-center justify-between mb-4 sm:mb-6">
                 <h2 class="text-lg sm:text-xl font-bold text-gray-900">Recent Messages</h2>
-                <a href="/dashboard/messages" class="text-xs sm:text-sm text-green-600 hover:text-green-700 font-medium">View all →</a>
+                <a href="/dashboard/messages" class="text-xs sm:text-sm text-purple-600 hover:text-purple-700 font-medium">View all →</a>
             </div>
 
             <div class="space-y-3 sm:space-y-4">
                 <template x-for="message in messages" :key="message.id">
                     <div class="flex items-start space-x-3 sm:space-x-4 p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition cursor-pointer" @click="viewMessage(message)">
                         <div class="flex-shrink-0">
-                            <div class="w-10 h-10 sm:w-12 sm:h-12 bg-green-500 rounded-full flex items-center justify-center text-white font-semibold">
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-full flex items-center justify-center text-white font-semibold">
                                 <span x-text="message.contact_name ? message.contact_name.charAt(0).toUpperCase() : '?'">?</span>
                             </div>
                         </div>
@@ -143,8 +143,8 @@
                 <h2 class="text-lg sm:text-xl font-bold text-gray-900 mb-4">Phone Information</h2>
                 <div class="space-y-3 sm:space-y-4">
                     <div class="flex items-center space-x-3">
-                        <div class="bg-green-100 rounded-full p-2">
-                            <i class="fas fa-phone text-green-600"></i>
+                        <div class="bg-purple-50 rounded-full p-2">
+                            <i class="fas fa-phone text-purple-600"></i>
                         </div>
                         <div>
                             <p class="text-xs text-gray-500">Phone Number</p>
@@ -157,7 +157,7 @@
                         </div>
                         <div>
                             <p class="text-xs text-gray-500">Verified</p>
-                            <p class="text-sm font-semibold" :class="info.verified_name ? 'text-green-600' : 'text-gray-400'">
+                            <p class="text-sm font-semibold" :class="info.verified_name ? 'text-purple-600' : 'text-gray-400'">
                                 <span x-text="info.verified_name || 'Not Verified'">Not Verified</span>
                             </p>
                         </div>
@@ -187,8 +187,8 @@
                             <p class="text-xs text-gray-500">View and organize contacts</p>
                         </div>
                     </a>
-                    <a href="/dashboard/messages" class="flex items-center space-x-3 p-3 bg-green-50 rounded-lg hover:bg-green-100 transition">
-                        <div class="bg-green-500 rounded-full p-2 text-white">
+                    <a href="/dashboard/messages" class="flex items-center space-x-3 p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition">
+                        <div class="bg-purple-600 rounded-full p-2 text-white">
                             <i class="fas fa-paper-plane"></i>
                         </div>
                         <div>

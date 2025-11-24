@@ -18,7 +18,7 @@
         <div class="lg:col-span-2 bg-white rounded-xl shadow-lg p-6">
             <div class="flex items-center justify-between mb-6">
                 <h2 class="text-xl font-bold text-gray-900">Profile Information</h2>
-                <button @click="toggleEdit" class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition text-sm font-medium">
+                <button @click="toggleEdit" class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm font-medium">
                     <i class="fas mr-2" :class="editMode ? 'fa-times' : 'fa-edit'"></i>
                     <span x-text="editMode ? 'Cancel' : 'Edit'"></span>
                 </button>
@@ -32,7 +32,7 @@
                         x-model="profile.about"
                         :disabled="!editMode"
                         rows="3"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-600"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-50 disabled:text-gray-600"
                         placeholder="Tell customers about your business..."></textarea>
                 </div>
 
@@ -43,7 +43,7 @@
                         type="text"
                         x-model="profile.address"
                         :disabled="!editMode"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-600"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-50 disabled:text-gray-600"
                         placeholder="Business address">
                 </div>
 
@@ -54,7 +54,7 @@
                         x-model="profile.description"
                         :disabled="!editMode"
                         rows="4"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-600"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-50 disabled:text-gray-600"
                         placeholder="Detailed business description..."></textarea>
                 </div>
 
@@ -65,7 +65,7 @@
                         type="email"
                         x-model="profile.email"
                         :disabled="!editMode"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-600"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-50 disabled:text-gray-600"
                         placeholder="business@example.com">
                 </div>
 
@@ -75,7 +75,7 @@
                     <select
                         x-model="profile.vertical"
                         :disabled="!editMode"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-600">
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-50 disabled:text-gray-600">
                         <option value="">Select industry...</option>
                         <option value="Automotive">Automotive</option>
                         <option value="Beauty">Beauty, Spa and Salon</option>
@@ -105,7 +105,7 @@
                                     type="url"
                                     x-model="profile.websites[index]"
                                     :disabled="!editMode"
-                                    class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-600"
+                                    class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-50 disabled:text-gray-600"
                                     placeholder="https://example.com">
                                 <button
                                     x-show="editMode && profile.websites.length > 1"
@@ -120,7 +120,7 @@
                             x-show="editMode"
                             type="button"
                             @click="addWebsite"
-                            class="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-green-500 hover:text-green-600 transition">
+                            class="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-purple-500 hover:text-purple-600 transition">
                             <i class="fas fa-plus mr-2"></i> Add Website
                         </button>
                     </div>
@@ -131,7 +131,7 @@
                     <button
                         type="submit"
                         :disabled="saving"
-                        class="flex-1 bg-green-500 hover:bg-green-600 text-white py-3 px-6 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed">
+                        class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 px-6 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed">
                         <i class="fas mr-2" :class="saving ? 'fa-spinner fa-spin' : 'fa-save'"></i>
                         <span x-text="saving ? 'Saving...' : 'Save Changes'"></span>
                     </button>
@@ -153,8 +153,8 @@
                 <h2 class="text-xl font-bold text-gray-900 mb-4">Phone Information</h2>
                 <div class="space-y-4">
                     <div class="flex items-center space-x-3">
-                        <div class="bg-green-100 rounded-full p-3">
-                            <i class="fas fa-phone text-green-600 text-xl"></i>
+                        <div class="bg-purple-50 rounded-full p-3">
+                            <i class="fas fa-phone text-purple-600 text-xl"></i>
                         </div>
                         <div class="flex-1">
                             <p class="text-xs text-gray-500">Phone Number</p>
@@ -168,7 +168,7 @@
                         </div>
                         <div class="flex-1">
                             <p class="text-xs text-gray-500">Verified Name</p>
-                            <p class="text-sm font-semibold" :class="phoneInfo.verified_name ? 'text-green-600' : 'text-gray-400'">
+                            <p class="text-sm font-semibold" :class="phoneInfo.verified_name ? 'text-purple-600' : 'text-gray-400'">
                                 <span x-text="phoneInfo.verified_name || 'Not Verified'">Not Verified</span>
                             </p>
                         </div>
@@ -200,7 +200,7 @@
             <div class="bg-white rounded-xl shadow-lg p-6">
                 <h2 class="text-xl font-bold text-gray-900 mb-4">Profile Picture</h2>
                 <div class="text-center">
-                    <div class="w-32 h-32 mx-auto bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center text-white text-4xl font-bold mb-4">
+                    <div class="w-32 h-32 mx-auto bg-gradient-to-br from-purple-500 to-indigo-500 rounded-full flex items-center justify-center text-white text-4xl font-bold mb-4">
                         <i class="fas fa-building"></i>
                     </div>
                     <p class="text-sm text-gray-600 mb-4">Upload or change your business profile picture</p>
@@ -213,9 +213,9 @@
             </div>
 
             <!-- Help Card -->
-            <div class="bg-gradient-to-br from-blue-50 to-green-50 rounded-xl shadow-lg p-6">
+            <div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl shadow-lg p-6">
                 <div class="flex items-start space-x-3">
-                    <div class="bg-blue-500 rounded-full p-2 text-white">
+                    <div class="bg-purple-600 rounded-full p-2 text-white">
                         <i class="fas fa-info-circle"></i>
                     </div>
                     <div>
