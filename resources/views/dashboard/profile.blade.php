@@ -3,17 +3,146 @@
 @section('title', 'Business Profile - WhatsApp Business API')
 
 @section('content')
-<div class="space-y-6">
-    <!-- Page Header -->
-    <div class="flex justify-between items-center">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-900">Business Profile</h1>
-            <p class="mt-1 text-sm text-gray-600">Manage your WhatsApp Business profile information</p>
-        </div>
-    </div>
+<div x-data="{
+    sidebarOpen: true,
+    user: null,
+    notifications: [],
 
+    logout() {
+        const API_BASE_URL = 'https://api.qashierwise.com/api';
+        const token = localStorage.getItem('token');
+
+        if (token) {
+            fetch(`${API_BASE_URL}/logout`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json'
+                }
+            }).then(() => {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                localStorage.removeItem('sidebarOpen');
+                window.location.href = '/login';
+            }).catch(() => {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                localStorage.removeItem('sidebarOpen');
+                window.location.href = '/login';
+            });
+        } else {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('sidebarOpen');
+            window.location.href = '/login';
+        }
+    }
+}" x-init="
+    // Load sidebar state from localStorage
+    const savedSidebarState = localStorage.getItem('sidebarOpen');
+    if (savedSidebarState !== null) {
+        sidebarOpen = JSON.parse(savedSidebarState);
+    }
+
+    // Watch for sidebarOpen changes and save to localStorage
+    $watch('sidebarOpen', value => {
+        localStorage.setItem('sidebarOpen', JSON.stringify(value));
+    });
+
+    // Load user info
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+        try {
+            user = JSON.parse(storedUser);
+        } catch (e) {
+            user = { name: 'User', email: 'user@example.com' };
+        }
+    } else {
+        user = { name: 'User', email: 'user@example.com' };
+    }
+" class="min-h-screen flex">
+    <!-- Sidebar -->
+    <aside :class="sidebarOpen ? 'w-64' : 'w-20'" class="bg-gradient-to-b from-green-600 to-green-700 text-white transition-all duration-300 flex flex-col fixed lg:static inset-y-0 left-0 z-50">
+        <!-- Logo -->
+        <div class="p-6 flex items-center justify-between border-b border-green-500">
+            <div x-show="sidebarOpen" class="flex items-center space-x-3">
+                <i class="fab fa-whatsapp text-3xl"></i>
+                <span class="text-xl font-bold">QashierWise</span>
+            </div>
+            <i x-show="!sidebarOpen" class="fab fa-whatsapp text-3xl mx-auto"></i>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="flex-1 py-6">
+            <a href="/dashboard" class="flex items-center space-x-3 px-6 py-3 hover:bg-green-500 transition">
+                <i class="fas fa-home text-xl w-6"></i>
+                <span x-show="sidebarOpen">Dashboard</span>
+            </a>
+            <a href="/dashboard/contacts" class="flex items-center space-x-3 px-6 py-3 hover:bg-green-500 transition">
+                <i class="fas fa-address-book text-xl w-6"></i>
+                <span x-show="sidebarOpen">Contacts</span>
+            </a>
+            <a href="/dashboard/messages" class="flex items-center space-x-3 px-6 py-3 hover:bg-green-500 transition">
+                <i class="fas fa-comments text-xl w-6"></i>
+                <span x-show="sidebarOpen">Messages</span>
+            </a>
+            <a href="/dashboard/templates" class="flex items-center space-x-3 px-6 py-3 hover:bg-green-500 transition">
+                <i class="fas fa-file-alt text-xl w-6"></i>
+                <span x-show="sidebarOpen">Templates</span>
+            </a>
+            <a href="/dashboard/profile" class="flex items-center space-x-3 px-6 py-3 bg-green-500 transition">
+                <i class="fas fa-building text-xl w-6"></i>
+                <span x-show="sidebarOpen">Business Profile</span>
+            </a>
+        </nav>
+
+        <!-- User Info & Logout -->
+        <div class="p-4 border-t border-green-500">
+            <div x-show="sidebarOpen" class="mb-3">
+                <div class="flex items-center space-x-3 px-2 py-2 bg-green-500 bg-opacity-30 rounded-lg mb-2">
+                    <div class="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                        <span class="text-white font-bold text-lg" x-text="user ? user.name.charAt(0).toUpperCase() : 'U'"></span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-white font-semibold text-sm truncate" x-text="user ? user.name : 'User'"></p>
+                        <p class="text-green-100 text-xs truncate" x-text="user ? user.email : ''"></p>
+                    </div>
+                </div>
+                <button @click="logout()" class="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg transition text-white font-medium">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </button>
+            </div>
+
+            <!-- Toggle & Collapsed Actions -->
+            <div class="flex items-center justify-between">
+                <button x-show="!sidebarOpen" @click="logout()" class="p-2 hover:bg-red-500 rounded transition" title="Logout">
+                    <i class="fas fa-sign-out-alt text-xl"></i>
+                </button>
+                <button @click="sidebarOpen = !sidebarOpen" class="p-2 hover:bg-green-500 rounded transition">
+                    <i class="fas" :class="sidebarOpen ? 'fa-chevron-left' : 'fa-chevron-right'"></i>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col">
+        <!-- Top Navigation -->
+        <header class="bg-white shadow-sm">
+            <div class="px-6 py-4 flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">Business Profile</h1>
+                    <p class="text-sm text-gray-600">Manage your WhatsApp Business profile information</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Page Content -->
+        <main class="flex-1 overflow-auto p-6">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <!-- Main Content Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" x-data="profileManager()">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" x-data="profileManager()">\
         <!-- Profile Form -->
         <div class="lg:col-span-2 bg-white rounded-xl shadow-lg p-6">
             <div class="flex items-center justify-between mb-6">
@@ -352,4 +481,8 @@
         }
     }
 </script>
+            </div>
+        </main>
+    </div>
+</div>
 @endsection

@@ -3,20 +3,183 @@
 @section('title', 'Dashboard - WhatsApp Business API')
 
 @section('content')
-<div class="max-w-7xl mx-auto space-y-6">
-    <!-- Page Header -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-            <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p class="mt-1 text-sm text-gray-600">Welcome back! Here's your WhatsApp Business overview.</p>
-        </div>
-        <div>
-            <button onclick="location.reload()" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition shadow-sm">
-                <i class="fas fa-sync-alt mr-2"></i> Refresh
-            </button>
-        </div>
-    </div>
+<div x-data="{
+    sidebarOpen: true,
+    user: null,
+    notifications: [],
 
+    logout() {
+        const API_BASE_URL = 'https://api.qashierwise.com/api';
+        const token = localStorage.getItem('token');
+
+        if (token) {
+            fetch(`${API_BASE_URL}/logout`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json'
+                }
+            }).then(() => {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                localStorage.removeItem('sidebarOpen');
+                window.location.href = '/login';
+            }).catch(() => {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                localStorage.removeItem('sidebarOpen');
+                window.location.href = '/login';
+            });
+        } else {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('sidebarOpen');
+            window.location.href = '/login';
+        }
+    }
+}" x-init="
+    // Load sidebar state from localStorage
+    const savedSidebarState = localStorage.getItem('sidebarOpen');
+    if (savedSidebarState !== null) {
+        sidebarOpen = JSON.parse(savedSidebarState);
+    }
+
+    // Watch for sidebarOpen changes and save to localStorage
+    $watch('sidebarOpen', value => {
+        localStorage.setItem('sidebarOpen', JSON.stringify(value));
+    });
+
+    // Load user info
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+        try {
+            user = JSON.parse(storedUser);
+        } catch (e) {
+            user = { name: 'User', email: 'user@example.com' };
+        }
+    } else {
+        user = { name: 'User', email: 'user@example.com' };
+    }
+
+    // Listen for new WhatsApp messages
+    window.addEventListener('whatsapp-message-received', (event) => {
+        console.log('📩 Dashboard - New message notification:', event.detail);
+        notifications.unshift({
+            message: `New message from ${event.detail.contact?.name || 'Unknown'}`,
+            time: new Date().toLocaleTimeString()
+        });
+    });
+" class="min-h-screen flex">
+    <!-- Sidebar -->
+    <aside :class="sidebarOpen ? 'w-64' : 'w-20'" class="bg-gradient-to-b from-green-600 to-green-700 text-white transition-all duration-300 flex flex-col fixed lg:static inset-y-0 left-0 z-50">
+        <!-- Logo -->
+        <div class="p-6 flex items-center justify-between border-b border-green-500">
+            <div x-show="sidebarOpen" class="flex items-center space-x-3">
+                <i class="fab fa-whatsapp text-3xl"></i>
+                <span class="text-xl font-bold">QashierWise</span>
+            </div>
+            <i x-show="!sidebarOpen" class="fab fa-whatsapp text-3xl mx-auto"></i>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="flex-1 py-6">
+            <a href="/dashboard" class="flex items-center space-x-3 px-6 py-3 bg-green-500 transition">
+                <i class="fas fa-home text-xl w-6"></i>
+                <span x-show="sidebarOpen">Dashboard</span>
+            </a>
+            <a href="/dashboard/contacts" class="flex items-center space-x-3 px-6 py-3 hover:bg-green-500 transition">
+                <i class="fas fa-address-book text-xl w-6"></i>
+                <span x-show="sidebarOpen">Contacts</span>
+            </a>
+            <a href="/dashboard/messages" class="flex items-center space-x-3 px-6 py-3 hover:bg-green-500 transition">
+                <i class="fas fa-comments text-xl w-6"></i>
+                <span x-show="sidebarOpen">Messages</span>
+            </a>
+            <a href="/dashboard/templates" class="flex items-center space-x-3 px-6 py-3 hover:bg-green-500 transition">
+                <i class="fas fa-file-alt text-xl w-6"></i>
+                <span x-show="sidebarOpen">Templates</span>
+            </a>
+            <a href="/dashboard/profile" class="flex items-center space-x-3 px-6 py-3 hover:bg-green-500 transition">
+                <i class="fas fa-building text-xl w-6"></i>
+                <span x-show="sidebarOpen">Business Profile</span>
+            </a>
+        </nav>
+
+        <!-- User Info & Logout -->
+        <div class="p-4 border-t border-green-500">
+            <div x-show="sidebarOpen" class="mb-3">
+                <div class="flex items-center space-x-3 px-2 py-2 bg-green-500 bg-opacity-30 rounded-lg mb-2">
+                    <div class="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                        <span class="text-white font-bold text-lg" x-text="user ? user.name.charAt(0).toUpperCase() : 'U'"></span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-white font-semibold text-sm truncate" x-text="user ? user.name : 'User'"></p>
+                        <p class="text-green-100 text-xs truncate" x-text="user ? user.email : ''"></p>
+                    </div>
+                </div>
+                <button @click="logout()" class="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg transition text-white font-medium">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </button>
+            </div>
+
+            <!-- Toggle & Collapsed Actions -->
+            <div class="flex items-center justify-between">
+                <button x-show="!sidebarOpen" @click="logout()" class="p-2 hover:bg-red-500 rounded transition" title="Logout">
+                    <i class="fas fa-sign-out-alt text-xl"></i>
+                </button>
+                <button @click="sidebarOpen = !sidebarOpen" class="p-2 hover:bg-green-500 rounded transition">
+                    <i class="fas" :class="sidebarOpen ? 'fa-chevron-left' : 'fa-chevron-right'"></i>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col">
+        <!-- Top Navigation -->
+        <header class="bg-white shadow-sm">
+            <div class="px-6 py-4 flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+                    <p class="text-sm text-gray-600">Welcome back! Here's your WhatsApp Business overview.</p>
+                </div>
+
+                <div class="flex items-center space-x-4">
+                    <!-- Notifications -->
+                    <div x-data="{ open: false }" class="relative">
+                        <button @click="open = !open" class="relative p-2 text-gray-600 hover:text-gray-900 transition">
+                            <i class="fas fa-bell text-xl"></i>
+                            <span x-show="notifications.length > 0" class="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center" x-text="notifications.length"></span>
+                        </button>
+                        <div x-show="open" @click.away="open = false" x-transition class="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg py-2 z-50">
+                            <div class="px-4 py-2 border-b">
+                                <h3 class="font-semibold text-gray-900">Notifications</h3>
+                            </div>
+                            <div class="max-h-96 overflow-y-auto">
+                                <template x-if="notifications.length === 0">
+                                    <div class="px-4 py-8 text-center text-gray-500">
+                                        <i class="fas fa-inbox text-3xl mb-2"></i>
+                                        <p>No notifications</p>
+                                    </div>
+                                </template>
+                                <template x-for="notif in notifications" :key="notif.time">
+                                    <div class="px-4 py-3 hover:bg-gray-50 border-b">
+                                        <p class="text-sm text-gray-900" x-text="notif.message"></p>
+                                        <p class="text-xs text-gray-500 mt-1" x-text="notif.time"></p>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </header>
+
+        <!-- Page Content -->
+        <main class="flex-1 overflow-auto p-6">
+            <div class="max-w-7xl mx-auto space-y-6">
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6" x-data="dashboardStats()">
         <!-- Total Contacts -->
@@ -207,11 +370,29 @@
                     </a>
                 </div>
             </div>
+            </div>
         </div>
+        </main>
     </div>
 </div>
 
 <script>
+    // Global function for sidebar state management
+    function initSidebarState() {
+        // Make sidebar state persistent across pages
+        window.sidebarState = {
+            save: function(state) {
+                localStorage.setItem('sidebarOpen', JSON.stringify(state));
+            },
+            load: function() {
+                const saved = localStorage.getItem('sidebarOpen');
+                return saved !== null ? JSON.parse(saved) : true;
+            }
+        };
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', initSidebarState);
     function dashboardStats() {
         return {
             API_BASE_URL: 'https://api.qashierwise.com/api',
