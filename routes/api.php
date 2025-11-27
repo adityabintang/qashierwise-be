@@ -58,7 +58,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Business Profile
         Route::get('/profile', [WhatsAppController::class, 'getBusinessProfile']);
-        Route::put('/profile', [WhatsAppController::class, 'updateBusinessProfile']);
+        Route::match(['put', 'post'], '/profile', [WhatsAppController::class, 'updateBusinessProfile']);
 
         // Phone Number Info
         Route::get('/phone-info', [WhatsAppController::class, 'getPhoneNumberInfo']);
@@ -73,6 +73,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Dashboard Stats
         Route::get('/stats', [WhatsAppController::class, 'getDashboardStats']);
+        Route::get('/stats/weekly-chart', [WhatsAppController::class, 'getWeeklyChartData']);
 
         // Message History
         Route::get('/messages', [WhatsAppController::class, 'getMessages']);

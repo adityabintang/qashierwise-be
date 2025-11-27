@@ -23,7 +23,7 @@ class WhatsAppMessage extends Model
         'is_read',
         'sent_at',
         'delivered_at',
-        'read_at'
+        'read_at',
     ];
 
     protected $casts = [
@@ -44,48 +44,221 @@ class WhatsAppMessage extends Model
         return $this->belongsTo(WhatsAppContact::class, 'contact_id');
     }
 
+    // Helper to get parsed content
+    private function getParsedContent()
+    {
+        if (empty($this->content)) {
+            return [];
+        }
+
+        return is_string($this->content) ? json_decode($this->content, true) : $this->content;
+    }
+
     // Accessors for frontend
     public function getBodyAttribute()
     {
+        $content = $this->getParsedContent();
+
         // For text messages, return content directly
         if ($this->type === 'text') {
             return $this->content ?? '';
         }
+
         // For template messages, extract template info
         if ($this->type === 'template') {
-            $templateName = $this->metadata['template_name'] ?? 'Unknown template';
+            $templateName = $content['template_name'] ?? $this->metadata['template_name'] ?? 'Unknown template';
+
             return "Template: {$templateName}";
         }
-        // For other message types, return content or empty string
-        return $this->content ?? '';
+
+        // For interactive messages (buttons, lists)
+        if ($this->type === 'interactive') {
+            return $content['body'] ?? 'Interactive message';
+        }
+
+        // For location messages
+        if ($this->type === 'location') {
+            $name = $content['name'] ?? '';
+            $address = $content['address'] ?? '';
+
+            return $name ?: $address ?: 'Location shared';
+        }
+
+        // For document messages
+        if ($this->type === 'document') {
+            $filename = $content['filename'] ?? null;
+            $caption = $content['caption'] ?? null;
+
+            return $filename ?: $caption ?: 'Document';
+        }
+
+        // For image messages
+        if ($this->type === 'image') {
+            $caption = $content['caption'] ?? null;
+
+            return $caption ?: 'Image';
+        }
+
+        // For video messages
+        if ($this->type === 'video') {
+            $caption = $content['caption'] ?? null;
+
+            return $caption ?: 'Video';
+        }
+
+        // For audio messages
+        if ($this->type === 'audio') {
+            return 'Audio message';
+        }
+
+        // For sticker messages
+        if ($this->type === 'sticker') {
+            return 'Sticker';
+        }
+
+        // For contact messages
+        if ($this->type === 'contact' || $this->type === 'contacts') {
+            return 'Contact card';
+        }
+
+        // For other message types, just return the type
+        return ucfirst($this->type ?? 'Message');
     }
 
     public function getMediaUrlAttribute()
     {
         if (in_array($this->type, ['image', 'video', 'audio', 'document'])) {
-            $content = is_string($this->content) ? json_decode($this->content, true) : $this->content;
-            return $content['media_url'] ?? null;
+            $content = $this->getParsedContent();
+
+            // Check for 'url' first (our format), then 'media_url' for backward compatibility
+            return $content['url'] ?? $content['media_url'] ?? null;
         }
+
         return null;
     }
 
     public function getCaptionAttribute()
     {
-        if ($this->type === 'image') {
-            $content = is_string($this->content) ? json_decode($this->content, true) : $this->content;
+        if (in_array($this->type, ['image', 'video', 'document'])) {
+            $content = $this->getParsedContent();
+
             return $content['caption'] ?? null;
         }
+
         return null;
     }
 
     public function getFilenameAttribute()
     {
         if ($this->type === 'document') {
-            $content = is_string($this->content) ? json_decode($this->content, true) : $this->content;
+            $content = $this->getParsedContent();
+
             return $content['filename'] ?? 'document';
         }
+
         return null;
     }
 
-    protected $appends = ['body', 'media_url', 'caption', 'filename'];
+    public function getTemplateNameAttribute()
+    {
+        if ($this->type === 'template') {
+            $content = $this->getParsedContent();
+
+            return $content['template_name'] ?? $this->metadata['template_name'] ?? null;
+        }
+
+        return null;
+    }
+
+    public function getButtonsAttribute()
+    {
+        if ($this->type === 'interactive') {
+            $content = $this->getParsedContent();
+
+            return $content['buttons'] ?? [];
+        }
+
+        return [];
+    }
+
+    public function getListSectionsAttribute()
+    {
+        if ($this->type === 'interactive') {
+            $content = $this->getParsedContent();
+
+            return $content['sections'] ?? [];
+        }
+
+        return [];
+    }
+
+    public function getButtonTextAttribute()
+    {
+        if ($this->type === 'interactive') {
+            $content = $this->getParsedContent();
+
+            return $content['button_text'] ?? null;
+        }
+
+        return null;
+    }
+
+    public function getLatitudeAttribute()
+    {
+        if ($this->type === 'location') {
+            $content = $this->getParsedContent();
+
+            return $content['latitude'] ?? null;
+        }
+
+        return null;
+    }
+
+    public function getLongitudeAttribute()
+    {
+        if ($this->type === 'location') {
+            $content = $this->getParsedContent();
+
+            return $content['longitude'] ?? null;
+        }
+
+        return null;
+    }
+
+    public function getLocationNameAttribute()
+    {
+        if ($this->type === 'location') {
+            $content = $this->getParsedContent();
+
+            return $content['name'] ?? null;
+        }
+
+        return null;
+    }
+
+    public function getLocationAddressAttribute()
+    {
+        if ($this->type === 'location') {
+            $content = $this->getParsedContent();
+
+            return $content['address'] ?? null;
+        }
+
+        return null;
+    }
+
+    protected $appends = [
+        'body',
+        'media_url',
+        'caption',
+        'filename',
+        'template_name',
+        'buttons',
+        'list_sections',
+        'button_text',
+        'latitude',
+        'longitude',
+        'location_name',
+        'location_address',
+    ];
 }

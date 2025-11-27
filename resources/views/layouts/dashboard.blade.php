@@ -4,32 +4,34 @@
 <div x-data="{
     sidebarOpen: true,
     user: null,
-    notifications: []
-}" x-init="
-    // Load user info
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-        try {
-            user = JSON.parse(storedUser);
-        } catch (e) {
-            user = { name: 'User', email: 'user@example.com' };
+    notifications: [],
+
+    init() {
+        // Load user info
+        let storedUser = localStorage.getItem('user');
+        if (storedUser) {
+            try {
+                this.user = JSON.parse(storedUser);
+            } catch (e) {
+                this.user = { name: 'User', email: 'user@example.com' };
+            }
+        } else {
+            this.user = { name: 'User', email: 'user@example.com' };
         }
-    } else {
-        user = { name: 'User', email: 'user@example.com' };
-    }
 
-    // Listen for new WhatsApp messages
-    window.addEventListener('whatsapp-message-received', (event) => {
-        console.log('📩 Dashboard - New message notification:', event.detail);
-        notifications.unshift({
-            message: `New message from ${event.detail.contact?.name || 'Unknown'}`,
-            time: new Date().toLocaleTimeString()
+        // Listen for new WhatsApp messages
+        window.addEventListener('whatsapp-message-received', (event) => {
+            console.log('📩 Dashboard - New message notification:', event.detail);
+            this.notifications.unshift({
+                message: `New message from ${event.detail.contact?.name || 'Unknown'}`,
+                time: new Date().toLocaleTimeString()
+            });
         });
-    });
+    },
 
-    function logout() {
-        const API_BASE_URL = window.location.origin + '/api';
-        fetch(`${API_BASE_URL}/logout`, {
+    logout() {
+        let apiBaseUrl = window.location.origin + '/api';
+        fetch(`${apiBaseUrl}/logout`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -41,7 +43,7 @@
             window.location.href = '/login';
         });
     }
-" class="min-h-screen flex">
+}" class="min-h-screen flex">
     <!-- Sidebar -->
     <aside :class="sidebarOpen ? 'w-64' : 'w-20'" class="bg-gradient-to-b from-green-600 to-green-700 text-white transition-all duration-300 flex flex-col">
         <!-- Logo -->

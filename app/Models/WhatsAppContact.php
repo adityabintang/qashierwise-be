@@ -18,12 +18,14 @@ class WhatsAppContact extends Model
         'profile_pic_url',
         'last_message_at',
         'last_message_text',
-        'unread_count'
+        'unread_count',
     ];
 
     protected $casts = [
         'last_message_at' => 'datetime',
     ];
+
+    protected $appends = ['phone_number'];
 
     public function user()
     {
@@ -38,5 +40,24 @@ class WhatsAppContact extends Model
     public function latestMessage()
     {
         return $this->hasOne(WhatsAppMessage::class, 'contact_id')->latest();
+    }
+
+    /**
+     * Get phone number (formatted wa_id)
+     */
+    public function getPhoneNumberAttribute()
+    {
+        $waId = $this->wa_id;
+
+        if (! $waId) {
+            return null;
+        }
+
+        // Add + prefix if not present
+        if (! str_starts_with($waId, '+')) {
+            return '+'.$waId;
+        }
+
+        return $waId;
     }
 }

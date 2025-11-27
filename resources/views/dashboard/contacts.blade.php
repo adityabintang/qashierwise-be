@@ -1,4 +1,4 @@
-@extends('layouts.dashboard')
+@extends('layouts.app')
 
 @section('title', 'Contacts - WhatsApp Business API')
 
@@ -8,12 +8,37 @@
     user: null,
     notifications: [],
 
+    init() {
+        // Load sidebar state from localStorage
+        let savedSidebarState = localStorage.getItem('sidebarOpen');
+        if (savedSidebarState !== null) {
+            this.sidebarOpen = JSON.parse(savedSidebarState);
+        }
+
+        // Watch for sidebarOpen changes and save to localStorage
+        this.$watch('sidebarOpen', value => {
+            localStorage.setItem('sidebarOpen', JSON.stringify(value));
+        });
+
+        // Load user info
+        let storedUser = localStorage.getItem('user');
+        if (storedUser) {
+            try {
+                this.user = JSON.parse(storedUser);
+            } catch (e) {
+                this.user = { name: 'User', email: 'user@example.com' };
+            }
+        } else {
+            this.user = { name: 'User', email: 'user@example.com' };
+        }
+    },
+
     logout() {
-        const API_BASE_URL = 'https://api.qashierwise.com/api';
-        const token = localStorage.getItem('token');
+        let apiBaseUrl = window.location.origin + '/api';
+        let token = localStorage.getItem('token');
 
         if (token) {
-            fetch(`${API_BASE_URL}/logout`, {
+            fetch(`${apiBaseUrl}/logout`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -37,75 +62,52 @@
             window.location.href = '/login';
         }
     }
-}" x-init="
-    // Load sidebar state from localStorage
-    const savedSidebarState = localStorage.getItem('sidebarOpen');
-    if (savedSidebarState !== null) {
-        sidebarOpen = JSON.parse(savedSidebarState);
-    }
-
-    // Watch for sidebarOpen changes and save to localStorage
-    $watch('sidebarOpen', value => {
-        localStorage.setItem('sidebarOpen', JSON.stringify(value));
-    });
-
-    // Load user info
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-        try {
-            user = JSON.parse(storedUser);
-        } catch (e) {
-            user = { name: 'User', email: 'user@example.com' };
-        }
-    } else {
-        user = { name: 'User', email: 'user@example.com' };
-    }
-" class="min-h-screen flex">
+}" class="min-h-screen flex">
     <!-- Sidebar -->
-    <aside :class="sidebarOpen ? 'w-64' : 'w-20'" class="bg-gradient-to-b from-green-600 to-green-700 text-white transition-all duration-300 flex flex-col fixed lg:static inset-y-0 left-0 z-50">
+    <aside :class="sidebarOpen ? 'w-64' : 'w-20'" class="bg-slate-900 text-white transition-all duration-300 flex flex-col fixed lg:static inset-y-0 left-0 z-50">
         <!-- Logo -->
-        <div class="p-6 flex items-center justify-between border-b border-green-500">
+        <div class="p-6 flex items-center justify-between border-b border-slate-700">
             <div x-show="sidebarOpen" class="flex items-center space-x-3">
-                <i class="fab fa-whatsapp text-3xl"></i>
+                <img src="{{ asset('images/logo.png') }}" class="h-8 rounded-lg" alt="Logo">
                 <span class="text-xl font-bold">QashierWise</span>
             </div>
-            <i x-show="!sidebarOpen" class="fab fa-whatsapp text-3xl mx-auto"></i>
+            <img x-show="!sidebarOpen" src="{{ asset('images/logo.png') }}" class="h-8 rounded-lg mx-auto" alt="Logo">
         </div>
 
         <!-- Navigation -->
         <nav class="flex-1 py-6">
-            <a href="/dashboard" class="flex items-center space-x-3 px-6 py-3 hover:bg-green-500 transition">
+            <a href="/dashboard" class="flex items-center space-x-3 px-6 py-3 hover:bg-slate-800 transition">
                 <i class="fas fa-home text-xl w-6"></i>
                 <span x-show="sidebarOpen">Dashboard</span>
             </a>
-            <a href="/dashboard/contacts" class="flex items-center space-x-3 px-6 py-3 bg-green-500 transition">
+            <a href="/dashboard/contacts" class="flex items-center space-x-3 px-6 py-3 bg-slate-800 transition">
                 <i class="fas fa-address-book text-xl w-6"></i>
                 <span x-show="sidebarOpen">Contacts</span>
             </a>
-            <a href="/dashboard/messages" class="flex items-center space-x-3 px-6 py-3 hover:bg-green-500 transition">
+            <a href="/dashboard/messages" class="flex items-center space-x-3 px-6 py-3 hover:bg-slate-800 transition">
                 <i class="fas fa-comments text-xl w-6"></i>
                 <span x-show="sidebarOpen">Messages</span>
             </a>
-            <a href="/dashboard/templates" class="flex items-center space-x-3 px-6 py-3 hover:bg-green-500 transition">
+            <a href="/dashboard/templates" class="flex items-center space-x-3 px-6 py-3 hover:bg-slate-800 transition">
                 <i class="fas fa-file-alt text-xl w-6"></i>
                 <span x-show="sidebarOpen">Templates</span>
             </a>
-            <a href="/dashboard/profile" class="flex items-center space-x-3 px-6 py-3 hover:bg-green-500 transition">
+            <a href="/dashboard/profile" class="flex items-center space-x-3 px-6 py-3 hover:bg-slate-800 transition">
                 <i class="fas fa-building text-xl w-6"></i>
                 <span x-show="sidebarOpen">Business Profile</span>
             </a>
         </nav>
 
         <!-- User Info & Logout -->
-        <div class="p-4 border-t border-green-500">
+        <div class="p-4 border-t border-slate-700">
             <div x-show="sidebarOpen" class="mb-3">
-                <div class="flex items-center space-x-3 px-2 py-2 bg-green-500 bg-opacity-30 rounded-lg mb-2">
-                    <div class="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                <div class="flex items-center space-x-3 px-2 py-2 bg-slate-800 rounded-lg mb-2">
+                    <div class="w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center">
                         <span class="text-white font-bold text-lg" x-text="user ? user.name.charAt(0).toUpperCase() : 'U'"></span>
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="text-white font-semibold text-sm truncate" x-text="user ? user.name : 'User'"></p>
-                        <p class="text-green-100 text-xs truncate" x-text="user ? user.email : ''"></p>
+                        <p class="text-slate-400 text-xs truncate" x-text="user ? user.email : ''"></p>
                     </div>
                 </div>
                 <button @click="logout()" class="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg transition text-white font-medium">
@@ -119,7 +121,7 @@
                 <button x-show="!sidebarOpen" @click="logout()" class="p-2 hover:bg-red-500 rounded transition" title="Logout">
                     <i class="fas fa-sign-out-alt text-xl"></i>
                 </button>
-                <button @click="sidebarOpen = !sidebarOpen" class="p-2 hover:bg-green-500 rounded transition">
+                <button @click="sidebarOpen = !sidebarOpen" class="p-2 hover:bg-slate-800 rounded transition">
                     <i class="fas" :class="sidebarOpen ? 'fa-chevron-left' : 'fa-chevron-right'"></i>
                 </button>
             </div>
@@ -176,32 +178,59 @@
 
     <!-- Contacts Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <template x-for="contact in filteredContacts" :key="contact.id">
-            <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition cursor-pointer" @click="showContactDetails(contact)">
-                <div class="p-6">
-                    <!-- Avatar & Name -->
-                    <div class="flex items-center space-x-4 mb-4">
-                        <div class="relative">
-                            <div class="w-16 h-16 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                                <span x-text="contact.name ? contact.name.charAt(0).toUpperCase() : '?'">?</span>
+        <!-- Shimmer Loading for Contacts -->
+        <template x-if="loading">
+            <template x-for="i in 6" :key="'contact-grid-shimmer-'+i">
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden animate-pulse">
+                    <div class="p-6">
+                        <div class="flex items-center space-x-4 mb-4">
+                            <div class="w-16 h-16 bg-gray-300 rounded-full"></div>
+                            <div class="flex-1">
+                                <div class="h-5 bg-gray-300 rounded w-32 mb-2"></div>
+                                <div class="h-4 bg-gray-200 rounded w-24"></div>
                             </div>
-                            <div x-show="contact.unread_count > 0" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold" x-text="contact.unread_count">0</div>
                         </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-lg font-semibold text-gray-900 truncate" x-text="contact.name || 'Unknown'">Unknown</h3>
-                            <p class="text-sm text-gray-500 truncate" x-text="contact.phone_number">-</p>
+                        <div class="space-y-2 mb-4">
+                            <div class="h-3 bg-gray-200 rounded w-full"></div>
+                            <div class="h-3 bg-gray-200 rounded w-3/4"></div>
+                        </div>
+                        <div class="flex items-center justify-between pt-4 border-t border-gray-100">
+                            <div class="h-4 bg-gray-200 rounded w-20"></div>
+                            <div class="h-8 bg-gray-200 rounded w-16"></div>
                         </div>
                     </div>
+                </div>
+            </template>
+        </template>
 
-                    <!-- Contact Info -->
-                    <div class="space-y-2 mb-4">
-                        <div class="flex items-center text-sm text-gray-600" x-show="contact.profile_name">
+        <!-- Actual Contacts Grid -->
+        <template x-if="!loading">
+            <template x-for="contact in filteredContacts" :key="contact.id">
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition cursor-pointer" @click="showContactDetails(contact)">
+                    <div class="p-6">
+                        <!-- Avatar & Name -->
+                        <div class="flex items-center space-x-4 mb-4">
+                            <div class="relative">
+                                <div class="w-16 h-16 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                                    <span x-text="contact.name ? contact.name.charAt(0).toUpperCase() : '?'">?</span>
+                                </div>
+                                <div x-show="contact.unread_count > 0" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold" x-text="contact.unread_count">0</div>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-gray-900 truncate" x-text="contact.name || 'Unknown'">Unknown</h3>
+                                <p class="text-sm text-gray-500 truncate" x-text="contact.phone_number">-</p>
+                            </div>
+                        </div>
+
+                        <!-- Contact Info -->
+                        <div class="space-y-2 mb-4">
+                            <div class="flex items-center text-sm text-gray-600" x-show="contact.profile_name">
                             <i class="fas fa-user w-5 text-gray-400"></i>
                             <span class="ml-2 truncate" x-text="contact.profile_name">-</span>
                         </div>
                         <div class="flex items-center text-sm text-gray-600">
                             <i class="fas fa-comment-dots w-5 text-gray-400"></i>
-                            <span class="ml-2" x-text="`${contact.message_count || 0} messages`">0 messages</span>
+                            <span class="ml-2" x-text="`${contact.messages_count || 0} messages`">0 messages</span>
                         </div>
                         <div class="flex items-center text-sm text-gray-600">
                             <i class="fas fa-clock w-5 text-gray-400"></i>
@@ -220,10 +249,11 @@
                     </div>
                 </div>
             </div>
+            </template>
         </template>
 
         <!-- Empty State -->
-        <div x-show="filteredContacts.length === 0" class="col-span-full text-center py-16">
+        <div x-show="filteredContacts.length === 0 && !loading" class="col-span-full text-center py-16">
             <div class="text-gray-400 text-6xl mb-4">
                 <i class="fas fa-address-book"></i>
             </div>
@@ -274,7 +304,7 @@
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-500 mb-1">Total Messages</label>
-                                <p class="text-lg text-gray-900" x-text="selectedContact?.message_count || 0">0</p>
+                                <p class="text-lg text-gray-900" x-text="selectedContact?.messages_count || 0">0</p>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-500 mb-1">Last Activity</label>

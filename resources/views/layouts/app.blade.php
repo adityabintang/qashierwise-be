@@ -21,6 +21,9 @@
     <!-- Laravel Echo -->
     <script src="https://cdn.jsdelivr.net/npm/laravel-echo@1.15.3/dist/echo.iife.js"></script>
 
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
     <!-- Echo Setup Script -->
     <script src="{{ asset('js/echo-setup.js') }}"></script>
 

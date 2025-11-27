@@ -20,12 +20,20 @@ class WhatsAppAccount extends Model
         'webhook_config',
         'display_name',
         'quality_rating',
-        'verified_name'
+        'verified_name',
+        'about',
+        'address',
+        'description',
+        'email',
+        'vertical',
+        'websites',
+        'profile_picture_url',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'webhook_config' => 'array',
+        'websites' => 'array',
     ];
 
     public function user()

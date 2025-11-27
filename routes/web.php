@@ -16,6 +16,15 @@ Route::get('/register', function () {
     return view('auth.register');
 })->name('register');
 
+// Legal pages
+Route::get('/privacy-policy', function () {
+    return view('privacy-policy');
+})->name('privacy-policy');
+
+Route::get('/terms-of-service', function () {
+    return view('terms-of-service');
+})->name('terms-of-service');
+
 // Dashboard routes (protected by middleware in production)
 Route::middleware(['web'])->group(function () {
     Route::get('/dashboard', function () {

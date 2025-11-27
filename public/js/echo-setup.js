@@ -27,8 +27,8 @@
         // Enable Pusher logging for debugging
         Pusher.logToConsole = true;
 
-        // Get API base URL - use production API URL
-        const API_BASE_URL = 'https://api.qashierwise.com/api';
+        // Get API base URL - use dynamic URL based on current location
+        const API_BASE_URL = window.location.origin + '/api';
 
         // Get authentication token
         const token = localStorage.getItem('token');
@@ -151,6 +151,26 @@
 
                 // Dispatch custom event for other parts of the app
                 window.dispatchEvent(new CustomEvent('whatsapp-message-received', {
+                    detail: data
+                }));
+            });
+
+            // Listen for message status updates
+            channel.listen('.message.status', (data) => {
+                console.log('📊 MESSAGE STATUS UPDATE RECEIVED!', data);
+
+                // Dispatch custom event for status updates
+                window.dispatchEvent(new CustomEvent('whatsapp-status-updated', {
+                    detail: data
+                }));
+            });
+
+            // Listen for profile updates
+            channel.listen('.profile.updated', (data) => {
+                console.log('👤 PROFILE UPDATE RECEIVED!', data);
+
+                // Dispatch custom event for profile updates
+                window.dispatchEvent(new CustomEvent('whatsapp-profile-updated', {
                     detail: data
                 }));
             });
