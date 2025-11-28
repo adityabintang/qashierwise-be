@@ -159,8 +159,8 @@ class WhatsAppController extends Controller
             'last_message_text' => $this->getLastMessageText($type, $content, $templateName),
         ]);
 
-        // Broadcast the new message event
-        broadcast(new \App\Events\NewWhatsAppMessage($message->load('contact'), $contact))->toOthers();
+        // Broadcast the new message event (include sender so message appears in their UI)
+        broadcast(new \App\Events\NewWhatsAppMessage($message->load('contact'), $contact));
 
         return $message;
     }

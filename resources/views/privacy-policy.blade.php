@@ -37,9 +37,9 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <!-- Logo -->
-                <div class="flex items-center space-x-2">
-                    <img src="{{ asset('images/logo.png') }}" class="h-7 rounded-xl" alt="Logo">
-                    <span class="text-xl font-bold text-gray-900">QashierWise</span>
+                <div class="flex items-center space-x-2 mb-4">
+                        <img src="{{ asset('images/logo.png') }}" class="h-7 rounded-xl" alt="Logo">
+                        <span class="text-xl font-bold text-primary">QashierWise</span>
                 </div>
 
                 <!-- Desktop Menu -->

@@ -1,1783 +1,1412 @@
 @extends('layouts.app')
 
-@section('title', 'Messages - WhatsApp Business API')
+@section('title', 'Messages - QashierWise')
 
 @section('content')
-<div x-data="{
-    sidebarOpen: true,
-    user: null,
-    notifications: [],
-
-    init() {
-        // Load sidebar state from localStorage
-        let savedSidebarState = localStorage.getItem('sidebarOpen');
-        if (savedSidebarState !== null) {
-            this.sidebarOpen = JSON.parse(savedSidebarState);
-        }
-
-        // Watch for sidebarOpen changes and save to localStorage
-        this.$watch('sidebarOpen', value => {
-            localStorage.setItem('sidebarOpen', JSON.stringify(value));
-        });
-
-        // Load user info
-        let storedUser = localStorage.getItem('user');
-        if (storedUser) {
-            try {
-                this.user = JSON.parse(storedUser);
-            } catch (e) {
-                this.user = { name: 'User', email: 'user@example.com' };
-            }
-        } else {
-            this.user = { name: 'User', email: 'user@example.com' };
-        }
-    },
-
-    logout() {
-        let apiBaseUrl = window.location.origin + '/api';
-        let token = localStorage.getItem('token');
-
-        if (token) {
-            fetch(`${apiBaseUrl}/logout`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/json'
-                }
-            }).then(() => {
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-                localStorage.removeItem('sidebarOpen');
-                window.location.href = '/login';
-            }).catch(() => {
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-                localStorage.removeItem('sidebarOpen');
-                window.location.href = '/login';
-            });
-        } else {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            localStorage.removeItem('sidebarOpen');
-            window.location.href = '/login';
-        }
-    }
-}" class="min-h-screen flex">
+<div x-data="messagesApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
     <!-- Sidebar -->
-    <aside :class="sidebarOpen ? 'w-64' : 'w-20'" class="bg-slate-900 text-white transition-all duration-300 flex flex-col fixed lg:static inset-y-0 left-0 z-50">
-        <!-- Logo -->
-        <div class="p-6 flex items-center justify-between border-b border-slate-700">
-            <div x-show="sidebarOpen" class="flex items-center space-x-3">
-                <img src="{{ asset('images/logo.png') }}" class="h-8 rounded-lg" alt="Logo">
-                <span class="text-xl font-bold">QashierWise</span>
-            </div>
-            <img x-show="!sidebarOpen" src="{{ asset('images/logo.png') }}" class="h-8 rounded-lg mx-auto" alt="Logo">
-        </div>
-
-        <!-- Navigation -->
-        <nav class="flex-1 py-6">
-            <a href="/dashboard" class="flex items-center space-x-3 px-6 py-3 hover:bg-slate-800 transition">
-                <i class="fas fa-home text-xl w-6"></i>
-                <span x-show="sidebarOpen">Dashboard</span>
-            </a>
-            <a href="/dashboard/contacts" class="flex items-center space-x-3 px-6 py-3 hover:bg-slate-800 transition">
-                <i class="fas fa-address-book text-xl w-6"></i>
-                <span x-show="sidebarOpen">Contacts</span>
-            </a>
-            <a href="/dashboard/messages" class="flex items-center space-x-3 px-6 py-3 bg-slate-800 transition">
-                <i class="fas fa-comments text-xl w-6"></i>
-                <span x-show="sidebarOpen">Messages</span>
-            </a>
-            <a href="/dashboard/templates" class="flex items-center space-x-3 px-6 py-3 hover:bg-slate-800 transition">
-                <i class="fas fa-file-alt text-xl w-6"></i>
-                <span x-show="sidebarOpen">Templates</span>
-            </a>
-            <a href="/dashboard/profile" class="flex items-center space-x-3 px-6 py-3 hover:bg-slate-800 transition">
-                <i class="fas fa-building text-xl w-6"></i>
-                <span x-show="sidebarOpen">Business Profile</span>
-            </a>
-        </nav>
-
-        <!-- User Info & Logout -->
-        <div class="p-4 border-t border-slate-700">
-            <div x-show="sidebarOpen" class="mb-3">
-                <div class="flex items-center space-x-3 px-2 py-2 bg-slate-800 rounded-lg mb-2">
-                    <div class="w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center">
-                        <span class="text-white font-bold text-lg" x-text="user ? user.name.charAt(0).toUpperCase() : 'U'"></span>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="text-white font-semibold text-sm truncate" x-text="user ? user.name : 'User'"></p>
-                        <p class="text-slate-400 text-xs truncate" x-text="user ? user.email : ''"></p>
-                    </div>
-                </div>
-                <button @click="logout()" class="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg transition text-white font-medium">
-                    <i class="fas fa-sign-out-alt"></i>
-                    <span>Logout</span>
-                </button>
-            </div>
-
-            <!-- Toggle & Collapsed Actions -->
-            <div class="flex items-center justify-between">
-                <button x-show="!sidebarOpen" @click="logout()" class="p-2 hover:bg-red-500 rounded transition" title="Logout">
-                    <i class="fas fa-sign-out-alt text-xl"></i>
-                </button>
-                <button @click="sidebarOpen = !sidebarOpen" class="p-2 hover:bg-slate-800 rounded transition">
-                    <i class="fas" :class="sidebarOpen ? 'fa-chevron-left' : 'fa-chevron-right'"></i>
-                </button>
-            </div>
-        </div>
-    </aside>
+    @include('components.dashboard-sidebar', ['activePage' => 'messages'])
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col">
-        <!-- Top Navigation -->
-        <header class="bg-white shadow-sm">
-            <div class="px-6 py-4 flex items-center justify-between">
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-900">Messages</h1>
-                    <p class="text-sm text-gray-600">Chat with your WhatsApp contacts</p>
-                </div>
-            </div>
-        </header>
+    <div class="flex-1 flex flex-col min-h-screen">
+        <!-- Header -->
+        @include('components.dashboard-header', ['title' => 'Messages', 'description' => 'Chat with your WhatsApp contacts'])
 
         <!-- Page Content -->
-        <main class="flex-1 overflow-auto p-6">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                <div class="h-[calc(100vh-12rem)]" x-data="messagesManager()">
-                    <div class="flex h-full bg-white rounded-xl shadow-lg overflow-hidden">
-                        <!-- Contacts Sidebar -->
-        <div class="w-full md:w-1/3 border-r border-gray-200 flex flex-col">
-            <!-- Search -->
-            <div class="p-4 border-b border-gray-200">
-                <div class="relative">
-                    <input
-                        type="text"
-                        x-model="contactSearch"
-                        @input="filterContactList"
-                        placeholder="Search contacts..."
-                        class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <i class="fas fa-search text-gray-400"></i>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Contacts List -->
-            <div class="flex-1 overflow-y-auto">
-                <!-- Shimmer Loading for Contacts -->
-                <template x-if="loadingContacts">
-                    <div>
-                        <template x-for="i in 6" :key="'contact-shimmer-'+i">
-                            <div class="flex items-center space-x-3 p-4 border-b border-gray-100 animate-pulse">
-                                <div class="w-12 h-12 bg-gray-300 rounded-full"></div>
-                                <div class="flex-1">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <div class="h-4 bg-gray-300 rounded w-24"></div>
-                                        <div class="h-3 bg-gray-200 rounded w-12"></div>
-                                    </div>
-                                    <div class="h-3 bg-gray-200 rounded w-20 mb-1"></div>
-                                    <div class="h-3 bg-gray-200 rounded w-32"></div>
-                                </div>
+        <main class="flex-1 p-6">
+            <div class="max-w-7xl mx-auto h-[calc(100vh-10rem)]" x-data="messagesManager()">
+                <div class="card flex h-full overflow-hidden">
+                    <!-- Contacts Sidebar -->
+                    <div class="w-80 border-r border-[hsl(var(--border))] flex flex-col">
+                        <!-- Search -->
+                        <div class="p-4 border-b border-[hsl(var(--border))]">
+                            <div class="relative">
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm"></i>
+                                <input
+                                    type="text"
+                                    x-model="contactSearch"
+                                    @input="filterContactList"
+                                    placeholder="Search contacts..."
+                                    class="input pl-9 w-full h-9 text-sm"
+                                >
                             </div>
-                        </template>
-                    </div>
-                </template>
-
-                <!-- Actual Contacts List -->
-                <template x-if="!loadingContacts">
-                    <div>
-                        <template x-for="contact in filteredContactList" :key="contact.id">
-                            <div
-                                @click="selectContact(contact)"
-                                class="flex items-center space-x-3 p-4 hover:bg-gray-50 cursor-pointer transition border-b border-gray-100"
-                                :class="{'bg-green-50': selectedContact?.id === contact.id}">
-                                <div class="relative flex-shrink-0">
-                                    <div class="w-12 h-12 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-                                        <span x-text="contact.name ? contact.name.charAt(0).toUpperCase() : '?'">?</span>
-                                    </div>
-                                    <div x-show="contact.unread_count > 0" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold" x-text="contact.unread_count">0</div>
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex items-center justify-between">
-                                        <p class="text-sm font-semibold text-gray-900 truncate" x-text="contact.name || contact.phone_number || 'Unknown'">Unknown</p>
-                                        <p class="text-xs text-gray-500" x-text="formatTime(contact.last_message_at)">-</p>
-                                    </div>
-                                    <p class="text-xs text-gray-500 truncate mt-0.5" x-text="contact.phone_number" x-show="contact.name">-</p>
-                                    <p class="text-sm text-gray-600 truncate mt-1"
-                                       :class="{'font-semibold': contact.unread_count > 0}"
-                                       x-text="contact.last_message_text || 'No messages yet'">-</p>
-                                </div>
-                            </div>
-                        </template>
-
-                        <div x-show="filteredContactList.length === 0" class="text-center py-12 text-gray-500">
-                            <i class="fas fa-inbox text-4xl mb-4"></i>
-                            <p>No contacts found</p>
                         </div>
-                    </div>
-                </template>
-            </div>
-        </div>
 
-        <!-- Chat Area -->
-        <div class="flex-1 flex flex-col" x-show="selectedContact">
-            <!-- Chat Header -->
-            <div class="p-4 border-b border-gray-200 bg-gray-50">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-                            <span x-text="selectedContact?.name ? selectedContact.name.charAt(0).toUpperCase() : '?'">?</span>
-                        </div>
-                        <div>
-                            <p class="font-semibold text-gray-900" x-text="selectedContact?.name || 'Unknown'">Unknown</p>
-                            <p class="text-xs text-gray-600" x-text="selectedContact?.phone_number">-</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        <button @click="refreshMessages" class="p-2 text-gray-600 hover:text-gray-900 transition">
-                            <i class="fas fa-sync-alt" :class="{'fa-spin': loadingMessages}"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Messages List -->
-            <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50" x-ref="messagesContainer">
-                <!-- Shimmer Loading for Messages -->
-                <template x-if="loadingMessages">
-                    <div class="space-y-4">
-                        <template x-for="i in 5" :key="'msg-shimmer-'+i">
-                            <div class="flex animate-pulse" :class="i % 2 === 0 ? 'justify-end' : 'justify-start'">
-                                <div class="max-w-xs rounded-lg p-3 shadow" :class="i % 2 === 0 ? 'bg-slate-800' : 'bg-white'">
-                                    <div class="h-3 rounded w-32 mb-2" :class="i % 2 === 0 ? 'bg-slate-700' : 'bg-gray-200'"></div>
-                                    <div class="h-3 rounded w-48" :class="i % 2 === 0 ? 'bg-slate-700' : 'bg-gray-200'"></div>
-                                    <div class="flex items-center justify-end mt-2 space-x-1">
-                                        <div class="h-2 rounded w-10" :class="i % 2 === 0 ? 'bg-slate-700' : 'bg-gray-200'"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-                </template>
-
-                <!-- Actual Messages -->
-                <template x-if="!loadingMessages">
-                    <div class="space-y-4">
-                        <template x-for="(message, index) in messages" :key="message?.id || `msg-${index}`">
-                            <div x-show="message && message.id" class="flex" :class="message?.direction === 'outgoing' ? 'justify-end' : 'justify-start'">
-                                <div class="max-w-xs md:max-w-md lg:max-w-lg">
-                                    <!-- Message Bubble -->
-                                    <div class="rounded-lg p-3 shadow"
-                                 :class="message?.direction === 'outgoing' ? 'bg-slate-900 text-white' : 'bg-white text-gray-900'">
-
-                                <!-- Text Message -->
-                                <template x-if="message?.type === 'text'">
-                                    <p class="text-sm whitespace-pre-wrap" x-text="message?.content || message?.body"></p>
-                                </template>
-
-                                <!-- Template Message -->
-                                <template x-if="message?.type === 'template'">
-                                    <div class="text-sm">
-                                        <div class="flex items-center space-x-2 mb-1">
-                                            <i class="fas fa-file-alt"></i>
-                                            <span class="font-medium">Template</span>
-                                        </div>
-                                        <div class="bg-white/20 rounded p-2 text-xs">
-                                            <span x-text="message?.template_name || message?.body || 'Template message'"></span>
-                                        </div>
-                                    </div>
-                                </template>
-
-                                <!-- Image Message -->
-                                <template x-if="message?.type === 'image'">
-                                    <div class="max-w-[200px]">
-                                        <template x-if="message?.media_url">
-                                            <a :href="message?.media_url" target="_blank">
-                                                <img :src="message?.media_url" class="rounded-lg w-full h-auto max-h-[150px] object-cover cursor-pointer hover:opacity-90 transition" alt="Image">
-                                            </a>
-                                        </template>
-                                        <template x-if="!message?.media_url">
-                                            <div class="bg-white/20 rounded-lg p-4 text-center">
-                                                <i class="fas fa-image text-2xl mb-2"></i>
-                                                <p class="text-xs">Image</p>
+                        <!-- Contacts List -->
+                        <div class="flex-1 overflow-y-auto scroll-area">
+                            <!-- Loading -->
+                            <template x-if="loadingContacts">
+                                <div class="p-2 space-y-1">
+                                    <template x-for="i in 8" :key="'contact-skeleton-'+i">
+                                        <div class="flex items-center gap-3 p-3 rounded-lg">
+                                            <div class="skeleton h-10 w-10 rounded-full"></div>
+                                            <div class="flex-1 space-y-2">
+                                                <div class="skeleton h-3 w-24"></div>
+                                                <div class="skeleton h-2 w-32"></div>
                                             </div>
-                                        </template>
-                                        <p x-show="message?.caption" class="text-sm mt-1" x-text="message?.caption"></p>
-                                    </div>
-                                </template>
-
-                                <!-- Document Message -->
-                                <template x-if="message?.type === 'document'">
-                                    <div class="flex items-center space-x-3 p-2 bg-white/10 rounded-lg">
-                                        <div class="w-10 h-10 bg-white/20 rounded flex items-center justify-center">
-                                            <i class="fas fa-file-pdf text-xl"></i>
-                                        </div>
-                                        <div class="flex-1 min-w-0">
-                                            <p class="text-sm font-medium truncate" x-text="message?.filename || 'Document'"></p>
-                                            <template x-if="message?.media_url">
-                                                <a :href="message?.media_url" target="_blank" class="text-xs underline opacity-80 hover:opacity-100">Download</a>
-                                            </template>
-                                        </div>
-                                    </div>
-                                </template>
-
-                                <!-- Audio Message -->
-                                <template x-if="message?.type === 'audio'">
-                                    <div class="max-w-[220px]">
-                                        <template x-if="message?.media_url">
-                                            <audio controls class="w-full h-10">
-                                                <source :src="message?.media_url" type="audio/mpeg">
-                                            </audio>
-                                        </template>
-                                        <template x-if="!message?.media_url">
-                                            <div class="flex items-center space-x-2 p-2 bg-white/10 rounded-lg">
-                                                <i class="fas fa-microphone text-xl"></i>
-                                                <span class="text-sm">Audio message</span>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </template>
-
-                                <!-- Video Message -->
-                                <template x-if="message?.type === 'video'">
-                                    <div class="max-w-[200px]">
-                                        <template x-if="message?.media_url">
-                                            <video controls class="rounded-lg w-full max-h-[150px]">
-                                                <source :src="message?.media_url" type="video/mp4">
-                                            </video>
-                                        </template>
-                                        <template x-if="!message?.media_url">
-                                            <div class="bg-white/20 rounded-lg p-4 text-center">
-                                                <i class="fas fa-video text-2xl mb-2"></i>
-                                                <p class="text-xs">Video</p>
-                                            </div>
-                                        </template>
-                                        <p x-show="message?.caption" class="text-sm mt-1" x-text="message?.caption"></p>
-                                    </div>
-                                </template>
-
-                                <!-- Location Message -->
-                                <template x-if="message?.type === 'location'">
-                                    <div class="p-2 bg-white/10 rounded-lg">
-                                        <div class="flex items-center space-x-2 mb-2">
-                                            <i class="fas fa-map-marker-alt text-xl"></i>
-                                            <span class="font-medium text-sm">Location</span>
-                                        </div>
-                                        <p x-show="message?.location_name" class="text-sm" x-text="message?.location_name"></p>
-                                        <p x-show="message?.location_address" class="text-xs opacity-80" x-text="message?.location_address"></p>
-                                        <a x-show="message?.latitude && message?.longitude"
-                                           :href="`https://maps.google.com/?q=${message?.latitude},${message?.longitude}`"
-                                           target="_blank"
-                                           class="text-xs underline mt-1 inline-block">
-                                            Open in Maps
-                                        </a>
-                                    </div>
-                                </template>
-
-                                <!-- Interactive / Button Message -->
-                                <template x-if="message?.type === 'interactive' && message?.buttons?.length > 0">
-                                    <div>
-                                        <p class="text-sm mb-2" x-text="message?.body"></p>
-                                        <div class="space-y-1">
-                                            <template x-for="btn in (message?.buttons || [])" :key="btn.id || btn.title">
-                                                <div class="bg-white/20 rounded px-3 py-1.5 text-xs text-center">
-                                                    <span x-text="btn.title || btn.reply?.title"></span>
-                                                </div>
-                                            </template>
-                                        </div>
-                                    </div>
-                                </template>
-
-                                <!-- Interactive / List Message -->
-                                <template x-if="message?.type === 'interactive' && message?.list_sections?.length > 0">
-                                    <div>
-                                        <p class="text-sm mb-2" x-text="message?.body"></p>
-                                        <div class="bg-white/20 rounded-lg p-2 mt-2">
-                                            <div class="flex items-center justify-center space-x-2 text-xs py-1">
-                                                <i class="fas fa-list"></i>
-                                                <span x-text="message?.button_text || 'View Options'"></span>
-                                            </div>
-                                            <template x-for="section in (message?.list_sections || [])" :key="section.title">
-                                                <div class="mt-2 border-t border-white/20 pt-2">
-                                                    <p class="text-xs font-semibold mb-1" x-text="section.title"></p>
-                                                    <template x-for="row in (section.rows || [])" :key="row.id || row.title">
-                                                        <div class="text-xs py-1 px-2 bg-white/10 rounded mb-1">
-                                                            <span x-text="row.title"></span>
-                                                            <p x-show="row.description" class="opacity-70 text-[10px]" x-text="row.description"></p>
-                                                        </div>
-                                                    </template>
-                                                </div>
-                                            </template>
-                                        </div>
-                                    </div>
-                                </template>
-
-                                <!-- Interactive fallback (no buttons or sections) -->
-                                <template x-if="message?.type === 'interactive' && !message?.buttons?.length && !message?.list_sections?.length">
-                                    <div>
-                                        <p class="text-sm" x-text="message?.body || 'Interactive message'"></p>
-                                    </div>
-                                </template>
-
-                                <!-- Contact Message -->
-                                <template x-if="message?.type === 'contact' || message?.type === 'contacts'">
-                                    <div class="flex items-center space-x-2 p-2 bg-white/10 rounded-lg">
-                                        <i class="fas fa-address-book text-xl"></i>
-                                        <div>
-                                            <p class="text-sm font-medium">Contact Card</p>
-                                            <p class="text-xs opacity-80" x-text="message?.body || 'Contact shared'"></p>
-                                        </div>
-                                    </div>
-                                </template>
-
-                                <!-- Sticker Message -->
-                                <template x-if="message?.type === 'sticker'">
-                                    <div class="max-w-[120px]">
-                                        <template x-if="message?.media_url">
-                                            <img :src="message?.media_url" class="w-full" alt="Sticker">
-                                        </template>
-                                        <template x-if="!message?.media_url">
-                                            <div class="text-4xl text-center">🎭</div>
-                                        </template>
-                                    </div>
-                                </template>
-
-                                <!-- Unknown/Other Message Type -->
-                                <template x-if="!['text', 'template', 'image', 'document', 'audio', 'video', 'location', 'interactive', 'contact', 'contacts', 'sticker'].includes(message?.type)">
-                                    <div class="text-sm">
-                                        <i class="fas fa-comment mr-1"></i>
-                                        <span x-text="message?.body || message?.content || message?.type + ' message'"></span>
-                                    </div>
-                                </template>
-                            </div>
-
-                            <!-- Message Meta -->
-                            <div class="flex items-center justify-between mt-1 px-2">
-                                <p class="text-xs text-gray-500" x-text="formatTime(message?.created_at)">-</p>
-                                <div x-show="message?.direction === 'outgoing'" class="flex items-center space-x-1">
-                                    <span class="text-xs capitalize"
-                                        :class="{
-                                            'text-gray-500': message?.status === 'sent',
-                                            'text-blue-600': message?.status === 'delivered',
-                                            'text-green-600': message?.status === 'read',
-                                            'text-red-600': message?.status === 'failed'
-                                        }"
-                                        x-text="message?.status">-</span>
-                                    <i class="text-xs"
-                                    :class="{
-                                        'fas fa-check text-gray-500': message?.status === 'sent',
-                                        'fas fa-check-double text-blue-600': message?.status === 'delivered',
-                                        'fas fa-check-double text-green-600': message?.status === 'read',
-                                        'fas fa-exclamation-triangle text-red-600': message?.status === 'failed'
-                                    }"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </template>
-
-                <div x-show="messages.length === 0 && !loadingMessages" class="text-center py-12 text-gray-500">
-                    <i class="fas fa-comments text-4xl mb-4"></i>
-                    <p>No messages yet. Start a conversation!</p>
-                </div>
-                    </div>
-                </template>
-            </div>
-
-            <!-- Message Input -->
-            <div class="p-4 border-t border-gray-200 bg-white" :class="selectedTemplate ? 'pt-6' : ''">
-                <form @submit.prevent="sendTextMessage" class="space-y-3">
-                    <!-- Attachment Preview -->
-                    <div x-show="attachmentPreview" class="flex items-center space-x-3 p-3 bg-gray-100 rounded-lg">
-                        <div class="flex-shrink-0">
-                            <template x-if="attachmentType === 'image'">
-                                <img :src="attachmentPreview" class="w-16 h-16 object-cover rounded-lg">
-                            </template>
-                            <template x-if="attachmentType === 'video'">
-                                <div class="w-16 h-16 bg-gray-300 rounded-lg flex items-center justify-center">
-                                    <i class="fas fa-video text-2xl text-gray-600"></i>
-                                </div>
-                            </template>
-                            <template x-if="attachmentType === 'audio'">
-                                <div class="w-16 h-16 bg-gray-300 rounded-lg flex items-center justify-center">
-                                    <i class="fas fa-music text-2xl text-gray-600"></i>
-                                </div>
-                            </template>
-                            <template x-if="attachmentType === 'document'">
-                                <div class="w-16 h-16 bg-gray-300 rounded-lg flex items-center justify-center">
-                                    <i class="fas fa-file text-2xl text-gray-600"></i>
-                                </div>
-                            </template>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-sm font-medium text-gray-900 truncate" x-text="attachmentName"></p>
-                            <p class="text-xs text-gray-500" x-text="attachmentSize"></p>
-                        </div>
-                        <button type="button" @click="clearAttachment()" class="p-2 text-red-500 hover:text-red-700">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-
-                    <div class="flex items-end space-x-2">
-                        <!-- Attachment Menu -->
-                        <div class="relative" x-data="{ showAttachMenu: false }">
-                            <button type="button" @click="showAttachMenu = !showAttachMenu" class="p-3 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition">
-                                <i class="fas fa-plus text-xl"></i>
-                            </button>
-
-                            <!-- Attachment Dropdown Menu -->
-                            <div x-show="showAttachMenu" @click.away="showAttachMenu = false" x-transition
-                                 class="absolute bottom-full left-0 mb-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50">
-                                <p class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Send Attachment</p>
-
-                                <!-- Image -->
-                                <button type="button" @click="$refs.imageInput.click(); showAttachMenu = false"
-                                        class="w-full flex items-center space-x-3 px-4 py-3 hover:bg-green-50 transition">
-                                    <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                                        <i class="fas fa-image text-green-600"></i>
-                                    </div>
-                                    <span class="text-gray-700">Image</span>
-                                </button>
-
-                                <!-- Video -->
-                                <button type="button" @click="$refs.videoInput.click(); showAttachMenu = false"
-                                        class="w-full flex items-center space-x-3 px-4 py-3 hover:bg-purple-50 transition">
-                                    <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                                        <i class="fas fa-video text-purple-600"></i>
-                                    </div>
-                                    <span class="text-gray-700">Video</span>
-                                </button>
-
-                                <!-- Audio -->
-                                <button type="button" @click="$refs.audioInput.click(); showAttachMenu = false"
-                                        class="w-full flex items-center space-x-3 px-4 py-3 hover:bg-orange-50 transition">
-                                    <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                                        <i class="fas fa-music text-orange-600"></i>
-                                    </div>
-                                    <span class="text-gray-700">Audio</span>
-                                </button>
-
-                                <!-- Document -->
-                                <button type="button" @click="$refs.documentInput.click(); showAttachMenu = false"
-                                        class="w-full flex items-center space-x-3 px-4 py-3 hover:bg-blue-50 transition">
-                                    <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                        <i class="fas fa-file-alt text-blue-600"></i>
-                                    </div>
-                                    <span class="text-gray-700">Document</span>
-                                </button>
-
-                                <hr class="my-2">
-                                <p class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Interactive</p>
-
-                                <!-- Location -->
-                                <button type="button" @click="showLocationModal = true; showAttachMenu = false"
-                                        class="w-full flex items-center space-x-3 px-4 py-3 hover:bg-red-50 transition">
-                                    <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                                        <i class="fas fa-map-marker-alt text-red-600"></i>
-                                    </div>
-                                    <span class="text-gray-700">Location</span>
-                                </button>
-
-                                <!-- Contact -->
-                                <button type="button" @click="showContactModal = true; showAttachMenu = false"
-                                        class="w-full flex items-center space-x-3 px-4 py-3 hover:bg-cyan-50 transition">
-                                    <div class="w-10 h-10 bg-cyan-100 rounded-full flex items-center justify-center">
-                                        <i class="fas fa-user text-cyan-600"></i>
-                                    </div>
-                                    <span class="text-gray-700">Contact</span>
-                                </button>
-
-                                <!-- Button Message -->
-                                <button type="button" @click="showButtonModal = true; showAttachMenu = false"
-                                        class="w-full flex items-center space-x-3 px-4 py-3 hover:bg-indigo-50 transition">
-                                    <div class="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-                                        <i class="fas fa-hand-pointer text-indigo-600"></i>
-                                    </div>
-                                    <span class="text-gray-700">Button Message</span>
-                                </button>
-
-                                <!-- List Message -->
-                                <button type="button" @click="showListModal = true; showAttachMenu = false"
-                                        class="w-full flex items-center space-x-3 px-4 py-3 hover:bg-teal-50 transition">
-                                    <div class="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center">
-                                        <i class="fas fa-list text-teal-600"></i>
-                                    </div>
-                                    <span class="text-gray-700">List Message</span>
-                                </button>
-
-                                <hr class="my-2">
-
-                                <!-- Template -->
-                                <button type="button" @click="showTemplateModal = true; showAttachMenu = false"
-                                        class="w-full flex items-center space-x-3 px-4 py-3 hover:bg-yellow-50 transition">
-                                    <div class="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-                                        <i class="fas fa-file-code text-yellow-600"></i>
-                                    </div>
-                                    <span class="text-gray-700">Template</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Hidden File Inputs -->
-                        <input type="file" x-ref="imageInput" @change="handleFileSelect($event, 'image')" accept="image/*" class="hidden">
-                        <input type="file" x-ref="videoInput" @change="handleFileSelect($event, 'video')" accept="video/*" class="hidden">
-                        <input type="file" x-ref="audioInput" @change="handleFileSelect($event, 'audio')" accept="audio/*" class="hidden">
-                        <input type="file" x-ref="documentInput" @change="handleFileSelect($event, 'document')" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" class="hidden">
-
-                        <!-- Message Input -->
-                        <div class="flex-1 relative">
-                            <!-- Template Indicator -->
-                            <div x-show="selectedTemplate" class="absolute -top-10 left-0 right-0">
-                                <div class="flex items-center justify-between bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5">
-                                    <div class="flex items-center space-x-2">
-                                        <i class="fas fa-file-code text-yellow-600 text-sm"></i>
-                                        <span class="text-sm text-yellow-800 font-medium">Template: </span>
-                                        <span class="text-sm text-yellow-700" x-text="selectedTemplate?.name"></span>
-                                    </div>
-                                    <button type="button" @click="clearSelectedTemplate()" class="text-yellow-600 hover:text-yellow-800 p-1">
-                                        <i class="fas fa-times text-xs"></i>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <textarea
-                                x-model="newMessage"
-                                @keydown.enter.prevent="$event.shiftKey ? (newMessage += '\n') : (selectedTemplate ? sendTemplate() : (attachmentFile ? sendMediaMessage() : sendTextMessage()))"
-                                :placeholder="selectedTemplate ? 'Template message (preview only)' : (attachmentFile ? 'Add a caption (optional)...' : 'Type a message...')"
-                                :readonly="selectedTemplate !== null"
-                                rows="2"
-                                class="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none transition"
-                                :class="selectedTemplate ? 'bg-yellow-50 border-yellow-300 text-yellow-800' : 'bg-white border-gray-300'"></textarea>
-                        </div>
-
-                        <!-- Send Button -->
-                        <button
-                            type="button"
-                            @click="selectedTemplate ? sendTemplate() : (attachmentFile ? sendMediaMessage() : sendTextMessage())"
-                            :disabled="(!newMessage.trim() && !attachmentFile && !selectedTemplate) || sending"
-                            class="p-4 text-white rounded-xl transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
-                            :class="selectedTemplate ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700' : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700'">
-                            <i class="fas" :class="sending ? 'fa-spinner fa-spin' : 'fa-paper-plane'"></i>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Empty State -->
-        <div x-show="!selectedContact" class="flex-1 flex items-center justify-center bg-gray-50">
-            <div class="text-center">
-                <i class="fas fa-comment-dots text-6xl text-gray-300 mb-4"></i>
-                <h3 class="text-xl font-semibold text-gray-700 mb-2">Select a Contact</h3>
-                <p class="text-gray-500">Choose a contact from the list to start messaging</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Template Modal -->
-    <div x-show="showTemplateModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" @keydown.escape.window="showTemplateModal = false">
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="showTemplateModal = false"></div>
-
-            <div class="relative bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden z-10">
-                <div class="p-6">
-                    <div class="flex items-center justify-between mb-6">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                                <i class="fas fa-file-alt text-green-600 text-xl"></i>
-                            </div>
-                            <h3 class="text-xl font-bold text-gray-900">Select Template</h3>
-                        </div>
-                        <button @click="showTemplateModal = false" class="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-full transition">
-                            <i class="fas fa-times text-xl"></i>
-                        </button>
-                    </div>
-
-                    <div class="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
-                        <template x-for="template in templates" :key="template.id">
-                            <button type="button"
-                                    @click="selectTemplate(template)"
-                                    class="w-full text-left border rounded-xl p-4 cursor-pointer transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                                    :class="selectedTemplate && selectedTemplate.id === template.id ? 'border-green-500 bg-green-50 ring-2 ring-green-500' : 'border-gray-200 hover:border-green-500 hover:bg-green-50'">
-                                <div class="flex items-center justify-between mb-2">
-                                    <div class="flex items-center space-x-2">
-                                        <h4 class="font-semibold text-gray-900" x-text="template.name"></h4>
-                                        <i x-show="selectedTemplate && selectedTemplate.id === template.id" class="fas fa-check-circle text-green-500"></i>
-                                    </div>
-                                    <span class="text-xs px-3 py-1 rounded-full font-medium"
-                                          :class="template.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
-                                          x-text="template.status"></span>
-                                </div>
-                                <p class="text-xs text-gray-500 uppercase tracking-wide mb-2" x-text="template.category"></p>
-                                <p class="text-sm text-gray-600 line-clamp-2" x-text="template.body || template.header || 'No preview available'"></p>
-                            </button>
-                        </template>
-
-                        <div x-show="templates.length === 0" class="text-center py-12 text-gray-500">
-                            <i class="fas fa-file-excel text-4xl text-gray-300 mb-3"></i>
-                            <p class="font-medium">No approved templates available</p>
-                            <p class="text-sm mt-1">Create templates in WhatsApp Business Manager</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Location Modal -->
-    <div x-show="showLocationModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" @keydown.escape.window="showLocationModal = false">
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75" @click="showLocationModal = false"></div>
-
-            <div class="relative bg-white rounded-2xl shadow-xl max-w-md w-full">
-                <div class="p-6">
-                    <div class="flex items-center justify-between mb-6">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                                <i class="fas fa-map-marker-alt text-red-600 text-xl"></i>
-                            </div>
-                            <h3 class="text-xl font-bold text-gray-900">Send Location</h3>
-                        </div>
-                        <button @click="showLocationModal = false" class="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-full transition">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-
-                    <form @submit.prevent="sendLocationMessage()" class="space-y-4">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Latitude *</label>
-                                <input type="text" x-model="locationForm.latitude" placeholder="-6.200000"
-                                       class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Longitude *</label>
-                                <input type="text" x-model="locationForm.longitude" placeholder="106.816666"
-                                       class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Name (Optional)</label>
-                            <input type="text" x-model="locationForm.name" placeholder="Location name"
-                                   class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Address (Optional)</label>
-                            <input type="text" x-model="locationForm.address" placeholder="Full address"
-                                   class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
-                        </div>
-
-                        <button type="button" @click="getCurrentLocation()"
-                                class="w-full flex items-center justify-center space-x-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-600 hover:border-red-500 hover:text-red-600 transition">
-                            <i class="fas fa-crosshairs"></i>
-                            <span>Use Current Location</span>
-                        </button>
-
-                        <div class="flex space-x-3 pt-4">
-                            <button type="button" @click="showLocationModal = false"
-                                    class="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition font-medium">
-                                Cancel
-                            </button>
-                            <button type="submit" :disabled="!locationForm.latitude || !locationForm.longitude || sending"
-                                    class="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition font-medium disabled:opacity-50">
-                                <span x-show="!sending">Send Location</span>
-                                <span x-show="sending"><i class="fas fa-spinner fa-spin mr-2"></i>Sending...</span>
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Contact Modal -->
-    <div x-show="showContactModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" @keydown.escape.window="showContactModal = false">
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75" @click="showContactModal = false"></div>
-
-            <div class="relative bg-white rounded-2xl shadow-xl max-w-md w-full">
-                <div class="p-6">
-                    <div class="flex items-center justify-between mb-6">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-12 h-12 bg-cyan-100 rounded-full flex items-center justify-center">
-                                <i class="fas fa-user text-cyan-600 text-xl"></i>
-                            </div>
-                            <h3 class="text-xl font-bold text-gray-900">Send Contact</h3>
-                        </div>
-                        <button @click="showContactModal = false" class="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-full transition">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-
-                    <form @submit.prevent="sendContactMessage()" class="space-y-4">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
-                                <input type="text" x-model="contactForm.firstName" placeholder="John"
-                                       class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-                                <input type="text" x-model="contactForm.lastName" placeholder="Doe"
-                                       class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
-                            <input type="text" x-model="contactForm.phone" placeholder="+628123456789"
-                                   class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Email (Optional)</label>
-                            <input type="email" x-model="contactForm.email" placeholder="john@example.com"
-                                   class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Organization (Optional)</label>
-                            <input type="text" x-model="contactForm.org" placeholder="Company name"
-                                   class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
-                        </div>
-
-                        <div class="flex space-x-3 pt-4">
-                            <button type="button" @click="showContactModal = false"
-                                    class="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition font-medium">
-                                Cancel
-                            </button>
-                            <button type="submit" :disabled="!contactForm.firstName || !contactForm.phone || sending"
-                                    class="flex-1 px-4 py-3 bg-gradient-to-r from-cyan-500 to-cyan-600 text-white rounded-xl hover:from-cyan-600 hover:to-cyan-700 transition font-medium disabled:opacity-50">
-                                <span x-show="!sending">Send Contact</span>
-                                <span x-show="sending"><i class="fas fa-spinner fa-spin mr-2"></i>Sending...</span>
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Button Message Modal -->
-    <div x-show="showButtonModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" @keydown.escape.window="showButtonModal = false">
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75" @click="showButtonModal = false"></div>
-
-            <div class="relative bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-                <div class="p-6">
-                    <div class="flex items-center justify-between mb-6">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center">
-                                <i class="fas fa-hand-pointer text-indigo-600 text-xl"></i>
-                            </div>
-                            <h3 class="text-xl font-bold text-gray-900">Button Message</h3>
-                        </div>
-                        <button @click="showButtonModal = false" class="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-full transition">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-
-                    <form @submit.prevent="sendButtonMessage()" class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Header (Optional)</label>
-                            <input type="text" x-model="buttonForm.header" placeholder="Header text"
-                                   class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Body Text *</label>
-                            <textarea x-model="buttonForm.body" rows="3" placeholder="Main message content"
-                                      class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"></textarea>
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Footer (Optional)</label>
-                            <input type="text" x-model="buttonForm.footer" placeholder="Footer text"
-                                   class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Buttons (Max 3)</label>
-                            <template x-for="(btn, index) in buttonForm.buttons" :key="index">
-                                <div class="flex items-center space-x-2 mb-2">
-                                    <input type="text" x-model="buttonForm.buttons[index]"
-                                           :placeholder="'Button ' + (index + 1) + ' text'"
-                                           class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                                    <button type="button" @click="buttonForm.buttons.splice(index, 1)" x-show="buttonForm.buttons.length > 1"
-                                            class="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </template>
-                            <button type="button" @click="buttonForm.buttons.length < 3 && buttonForm.buttons.push('')"
-                                    x-show="buttonForm.buttons.length < 3"
-                                    class="w-full flex items-center justify-center space-x-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-indigo-500 hover:text-indigo-500 transition">
-                                <i class="fas fa-plus"></i>
-                                <span>Add Button</span>
-                            </button>
-                        </div>
-
-                        <div class="flex space-x-3 pt-4">
-                            <button type="button" @click="showButtonModal = false"
-                                    class="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition font-medium">
-                                Cancel
-                            </button>
-                            <button type="submit" :disabled="!buttonForm.body || buttonForm.buttons.filter(b => b.trim()).length === 0 || sending"
-                                    class="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-xl hover:from-indigo-600 hover:to-indigo-700 transition font-medium disabled:opacity-50">
-                                <span x-show="!sending">Send Message</span>
-                                <span x-show="sending"><i class="fas fa-spinner fa-spin mr-2"></i>Sending...</span>
-                            </button>
-                        </div>
-                    </form>
-
-                    <!-- Preview -->
-                    <div class="mt-6 p-4 bg-gray-100 rounded-xl">
-                        <p class="text-xs font-medium text-gray-500 mb-2">Preview</p>
-                        <div class="bg-white rounded-lg shadow p-4">
-                            <p x-show="buttonForm.header" class="font-semibold text-gray-900 mb-1" x-text="buttonForm.header"></p>
-                            <p class="text-gray-700 text-sm mb-2" x-text="buttonForm.body || 'Your message here...'"></p>
-                            <p x-show="buttonForm.footer" class="text-xs text-gray-500 mb-3" x-text="buttonForm.footer"></p>
-                            <div class="space-y-2">
-                                <template x-for="(btn, i) in buttonForm.buttons.filter(b => b.trim())" :key="i">
-                                    <button class="w-full py-2 bg-gray-100 text-indigo-600 rounded-lg text-sm font-medium" x-text="btn"></button>
-                                </template>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- List Message Modal -->
-    <div x-show="showListModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" @keydown.escape.window="showListModal = false">
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75" @click="showListModal = false"></div>
-
-            <div class="relative bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-                <div class="p-6">
-                    <div class="flex items-center justify-between mb-6">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center">
-                                <i class="fas fa-list text-teal-600 text-xl"></i>
-                            </div>
-                            <h3 class="text-xl font-bold text-gray-900">List Message</h3>
-                        </div>
-                        <button @click="showListModal = false" class="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-full transition">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-
-                    <form @submit.prevent="sendListMessage()" class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Header (Optional)</label>
-                            <input type="text" x-model="listForm.header" placeholder="Header text"
-                                   class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent">
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Body Text *</label>
-                            <textarea x-model="listForm.body" rows="3" placeholder="Main message content"
-                                      class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"></textarea>
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Footer (Optional)</label>
-                            <input type="text" x-model="listForm.footer" placeholder="Footer text"
-                                   class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent">
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Button Text *</label>
-                            <input type="text" x-model="listForm.buttonText" placeholder="View Options"
-                                   class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent">
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Sections</label>
-                            <template x-for="(section, sIndex) in listForm.sections" :key="sIndex">
-                                <div class="border border-gray-200 rounded-xl p-4 mb-3">
-                                    <div class="flex items-center justify-between mb-3">
-                                        <input type="text" x-model="section.title" placeholder="Section Title"
-                                               class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent text-sm font-medium">
-                                        <button type="button" @click="listForm.sections.splice(sIndex, 1)" x-show="listForm.sections.length > 1"
-                                                class="ml-2 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                    <template x-for="(row, rIndex) in section.rows" :key="rIndex">
-                                        <div class="flex items-center space-x-2 mb-2">
-                                            <input type="text" x-model="row.title" placeholder="Item title"
-                                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent text-sm">
-                                            <input type="text" x-model="row.description" placeholder="Description (optional)"
-                                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent text-sm">
-                                            <button type="button" @click="section.rows.splice(rIndex, 1)" x-show="section.rows.length > 1"
-                                                    class="p-2 text-red-400 hover:text-red-600 transition">
-                                                <i class="fas fa-times"></i>
-                                            </button>
                                         </div>
                                     </template>
-                                    <button type="button" @click="section.rows.push({ title: '', description: '' })"
-                                            class="w-full flex items-center justify-center space-x-1 py-2 text-teal-600 hover:text-teal-700 text-sm">
-                                        <i class="fas fa-plus"></i>
-                                        <span>Add Row</span>
-                                    </button>
                                 </div>
                             </template>
-                            <button type="button" @click="listForm.sections.push({ title: '', rows: [{ title: '', description: '' }] })"
-                                    class="w-full flex items-center justify-center space-x-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-teal-500 hover:text-teal-500 transition">
-                                <i class="fas fa-plus"></i>
-                                <span>Add Section</span>
+
+                            <!-- Contacts -->
+                            <template x-if="!loadingContacts">
+                                <div class="p-2 space-y-1">
+                                    <template x-for="contact in filteredContactList" :key="contact.id">
+                                        <div
+                                            @click="selectContact(contact)"
+                                            class="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors"
+                                            :class="selectedContact?.id === contact.id ? 'bg-[hsl(var(--primary)/0.1)]' : 'hover:bg-[hsl(var(--muted))]'"
+                                        >
+                                            <div class="relative flex-shrink-0">
+                                                <!-- Avatar with name (use DiceBear) -->
+                                                <img 
+                                                    x-show="contact.name && contact.name.trim()"
+                                                    :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(contact.name || 'U')}&backgroundColor=a855f7`" 
+                                                    :alt="contact.name"
+                                                    class="avatar"
+                                                >
+                                                <!-- Avatar without name (show country code) -->
+                                                <div 
+                                                    x-show="!contact.name || !contact.name.trim()"
+                                                    class="avatar flex items-center justify-center text-white font-bold"
+                                                    style="background: linear-gradient(135deg, #a855f7, #9333ea); font-size: 0.75rem;"
+                                                >
+                                                    <span x-text="getCountryCode(contact.phone_number) || '?'"></span>
+                                                </div>
+                                                <!-- Unread Badge -->
+                                                <span x-show="contact.unread_count > 0" class="notification-badge text-[10px]" x-text="contact.unread_count">0</span>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <div class="flex items-center justify-between">
+                                                    <p class="text-sm font-medium truncate" x-text="contact.name || contact.phone_number">Unknown</p>
+                                                    <p class="text-[10px] text-[hsl(var(--muted-foreground))]" x-text="formatTime(contact.last_message_at)">-</p>
+                                                </div>
+                                                <p class="text-xs text-[hsl(var(--muted-foreground))] truncate mt-0.5" :class="{'font-medium': contact.unread_count > 0}" x-text="contact.last_message_text || 'No messages'">-</p>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Empty -->
+                                    <div x-show="filteredContactList.length === 0" class="empty-state py-12">
+                                        <div class="empty-state-icon h-12 w-12">
+                                            <i class="fas fa-inbox"></i>
+                                        </div>
+                                        <p class="text-sm text-[hsl(var(--muted-foreground))]">No contacts found</p>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Chat Area -->
+                    <div class="flex-1 flex flex-col" x-show="selectedContact">
+                        <!-- Chat Header -->
+                        <div class="h-16 px-4 border-b border-[hsl(var(--border))] flex items-center justify-between bg-[hsl(var(--muted)/0.3)]">
+                            <div class="flex items-center gap-3">
+                                <!-- Avatar with name -->
+                                <img 
+                                    x-show="selectedContact?.name && selectedContact.name.trim()"
+                                    :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(selectedContact?.name || 'U')}&backgroundColor=a855f7`" 
+                                    :alt="selectedContact?.name"
+                                    class="avatar"
+                                >
+                                <!-- Avatar without name -->
+                                <div 
+                                    x-show="!selectedContact?.name || !selectedContact.name.trim()"
+                                    class="avatar flex items-center justify-center text-white font-bold"
+                                    style="background: linear-gradient(135deg, #a855f7, #9333ea); font-size: 0.875rem;"
+                                >
+                                    <span x-text="getCountryCode(selectedContact?.phone_number) || '?'"></span>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-sm" x-text="selectedContact?.name || 'Unknown'">Unknown</p>
+                                    <p class="text-xs text-[hsl(var(--muted-foreground))]" x-text="selectedContact?.phone_number">-</p>
+                                </div>
+                            </div>
+                            <button @click="refreshMessages" class="btn btn-ghost btn-icon">
+                                <i class="fas fa-sync-alt" :class="{'animate-spin': loadingMessages}"></i>
                             </button>
                         </div>
 
-                        <div class="flex space-x-3 pt-4">
-                            <button type="button" @click="showListModal = false"
-                                    class="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition font-medium">
-                                Cancel
-                            </button>
-                            <button type="submit" :disabled="!listForm.body || !listForm.buttonText || sending"
-                                    class="flex-1 px-4 py-3 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-xl hover:from-teal-600 hover:to-teal-700 transition font-medium disabled:opacity-50">
-                                <span x-show="!sending">Send Message</span>
-                                <span x-show="sending"><i class="fas fa-spinner fa-spin mr-2"></i>Sending...</span>
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
+                        <!-- Messages -->
+                        <div class="flex-1 overflow-y-auto scroll-area p-4 space-y-3 bg-[hsl(var(--muted)/0.2)]" x-ref="messagesContainer">
+                            <!-- Loading -->
+                            <template x-if="loadingMessages">
+                                <div class="space-y-3">
+                                    <template x-for="i in 5" :key="'msg-skeleton-'+i">
+                                        <div class="flex" :class="i % 2 === 0 ? 'justify-end' : 'justify-start'">
+                                            <div class="skeleton h-16 w-48 rounded-lg"></div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
 
-    <!-- Media Upload Progress Modal -->
-    <div x-show="uploadingMedia" x-cloak class="fixed inset-0 z-50 overflow-y-auto">
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75"></div>
-            <div class="relative bg-white rounded-2xl shadow-xl p-8 text-center">
-                <div class="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
-                    <i class="fas fa-cloud-upload-alt text-green-600 text-2xl fa-bounce"></i>
+                            <!-- Messages List -->
+                            <template x-if="!loadingMessages">
+                                <div class="space-y-3">
+                                    <template x-for="(message, index) in messages" :key="message?.id || `msg-${index}`">
+                                        <div x-show="message && message.id" class="flex" :class="message?.direction === 'outgoing' ? 'justify-end' : 'justify-start'">
+                                            <div class="max-w-[70%]">
+                                                <!-- Message Bubble -->
+                                                <div 
+                                                    class="rounded-2xl px-4 py-2 shadow-sm"
+                                                    :class="message?.direction === 'outgoing' ? 'bg-[hsl(var(--primary))] text-white rounded-br-md' : 'bg-white border border-[hsl(var(--border))] rounded-bl-md'"
+                                                >
+                                                    <!-- Text -->
+                                                    <div x-show="message?.type === 'text'">
+                                                        <p class="text-sm whitespace-pre-wrap" x-html="formatWhatsAppText(message?.content || message?.body)"></p>
+                                                    </div>
+
+                                                    <!-- Template -->
+                                                    <div x-show="message?.type === 'template'" class="text-sm">
+                                                        <div class="flex items-center gap-2 mb-1 opacity-80">
+                                                            <i class="fas fa-file-alt text-xs"></i>
+                                                            <span class="text-xs font-medium">Template</span>
+                                                        </div>
+                                                        <p class="whitespace-pre-wrap" x-html="formatWhatsAppText(message?.body || 'Template message')"></p>
+                                                    </div>
+
+                                                    <!-- Image -->
+                                                    <div x-show="message?.type === 'image'">
+                                                        <a x-show="message?.media_url" :href="message?.media_url" target="_blank">
+                                                            <img :src="message?.media_url" class="rounded-lg max-w-[200px] max-h-[150px] object-cover" alt="Image">
+                                                        </a>
+                                                        <div x-show="!message?.media_url" class="flex items-center gap-2 py-2">
+                                                            <i class="fas fa-image"></i>
+                                                            <span class="text-sm">Image</span>
+                                                        </div>
+                                                        <p x-show="message?.caption" class="text-sm mt-2" x-text="message?.caption"></p>
+                                                    </div>
+
+                                                    <!-- Video -->
+                                                    <div x-show="message?.type === 'video'">
+                                                        <div x-show="message?.media_url" class="max-w-[220px]">
+                                                            <video controls class="rounded-lg w-full max-h-[150px]">
+                                                                <source :src="message?.media_url" type="video/mp4">
+                                                            </video>
+                                                        </div>
+                                                        <div x-show="!message?.media_url" class="flex items-center gap-2 py-2">
+                                                            <i class="fas fa-video"></i>
+                                                            <span class="text-sm">Video</span>
+                                                        </div>
+                                                        <p x-show="message?.caption" class="text-sm mt-2" x-text="message?.caption"></p>
+                                                    </div>
+
+                                                    <!-- Document -->
+                                                    <div x-show="message?.type === 'document'" class="flex items-center gap-3">
+                                                        <div class="h-10 w-10 rounded-lg flex items-center justify-center" :class="message?.direction === 'outgoing' ? 'bg-white/20' : 'bg-[hsl(var(--muted))]'">
+                                                            <i class="fas fa-file-alt"></i>
+                                                        </div>
+                                                        <div class="flex-1 min-w-0">
+                                                            <p class="text-sm font-medium truncate" x-text="message?.filename || 'Document'"></p>
+                                                            <a x-show="message?.media_url" :href="message?.media_url" target="_blank" class="text-xs underline opacity-80">Download</a>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Audio -->
+                                                    <div x-show="message?.type === 'audio'">
+                                                        <div x-show="message?.media_url">
+                                                            <audio controls class="h-10 max-w-[200px]">
+                                                                <source :src="message?.media_url" type="audio/mpeg">
+                                                            </audio>
+                                                        </div>
+                                                        <div x-show="!message?.media_url" class="flex items-center gap-2">
+                                                            <i class="fas fa-microphone"></i>
+                                                            <span class="text-sm">Audio message</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Location -->
+                                                    <div x-show="message?.type === 'location'">
+                                                        <div class="flex items-center gap-2 mb-1">
+                                                            <i class="fas fa-map-marker-alt"></i>
+                                                            <span class="text-sm font-medium">Location</span>
+                                                        </div>
+                                                        <p x-show="message?.location_name" class="text-sm" x-text="message?.location_name"></p>
+                                                        <a x-show="message?.latitude && message?.longitude" :href="`https://maps.google.com/?q=${message?.latitude},${message?.longitude}`" target="_blank" class="text-xs underline">Open in Maps</a>
+                                                    </div>
+
+                                                    <!-- Interactive - Buttons -->
+                                                    <div x-show="message?.type === 'interactive'">
+                                                        <p x-show="message?.body" class="text-sm mb-2" x-text="message?.body"></p>
+                                                        <!-- Button Reply -->
+                                                        <div x-show="message?.buttons && message?.buttons.length > 0" class="space-y-1 mt-2">
+                                                            <template x-for="btn in (message?.buttons || [])" :key="btn.id || btn.title">
+                                                                <div class="text-xs py-1.5 px-3 rounded text-center" :class="message?.direction === 'outgoing' ? 'bg-white/20' : 'bg-[hsl(var(--muted))]'">
+                                                                    <span x-text="btn.title || btn.reply?.title"></span>
+                                                                </div>
+                                                            </template>
+                                                        </div>
+                                                        <!-- List -->
+                                                        <div x-show="message?.list_sections && message?.list_sections.length > 0" class="mt-2 rounded p-2" :class="message?.direction === 'outgoing' ? 'bg-white/20' : 'bg-[hsl(var(--muted))]'">
+                                                            <div class="flex items-center justify-center gap-2 text-xs py-1">
+                                                                <i class="fas fa-list"></i>
+                                                                <span x-text="message?.button_text || 'View Options'"></span>
+                                                            </div>
+                                                        </div>
+                                                        <!-- Fallback if no buttons/list -->
+                                                        <p x-show="!message?.buttons?.length && !message?.list_sections?.length && !message?.body" class="text-sm">Interactive message</p>
+                                                    </div>
+
+                                                    <!-- Sticker -->
+                                                    <div x-show="message?.type === 'sticker'">
+                                                        <img x-show="message?.media_url" :src="message?.media_url" class="w-24 h-24" alt="Sticker">
+                                                        <div x-show="!message?.media_url" class="text-4xl text-center">🎭</div>
+                                                    </div>
+
+                                                    <!-- Contacts -->
+                                                    <div x-show="message?.type === 'contacts' || message?.type === 'contact'" class="flex items-center gap-2">
+                                                        <i class="fas fa-address-book"></i>
+                                                        <div>
+                                                            <p class="text-sm font-medium">Contact Card</p>
+                                                            <p class="text-xs opacity-80" x-text="message?.body || 'Contact shared'"></p>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Reaction -->
+                                                    <div x-show="message?.type === 'reaction'" class="text-2xl" x-text="message?.emoji || message?.body || '👍'"></div>
+
+                                                    <!-- Unknown/Other -->
+                                                    <div x-show="!['text', 'template', 'image', 'video', 'document', 'audio', 'location', 'interactive', 'sticker', 'contacts', 'contact', 'reaction'].includes(message?.type)">
+                                                        <p class="text-sm" x-text="message?.body || message?.content || (message?.type ? message.type + ' message' : 'Message')"></p>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Meta -->
+                                                <div class="flex items-center justify-between mt-1 px-1">
+                                                    <p class="text-[10px] text-[hsl(var(--muted-foreground))]" x-text="formatTime(message?.created_at)">-</p>
+                                                    <div x-show="message?.direction === 'outgoing'" class="flex items-center gap-1">
+                                                        <i class="text-[10px]"
+                                                            :class="{
+                                                                'fas fa-check text-[hsl(var(--muted-foreground))]': message?.status === 'sent',
+                                                                'fas fa-check-double text-blue-500': message?.status === 'delivered',
+                                                                'fas fa-check-double text-emerald-500': message?.status === 'read',
+                                                                'fas fa-exclamation-triangle text-red-500': message?.status === 'failed'
+                                                            }"></i>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Empty -->
+                                    <div x-show="messages.length === 0" class="empty-state py-16">
+                                        <div class="empty-state-icon">
+                                            <i class="fas fa-comments text-xl"></i>
+                                        </div>
+                                        <p class="text-sm font-medium mt-2">No messages yet</p>
+                                        <p class="text-xs text-[hsl(var(--muted-foreground))]">Start a conversation!</p>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Input -->
+                        <div class="p-4 border-t border-[hsl(var(--border))] bg-white">
+                            <form @submit.prevent="sendMessage" class="flex items-end gap-2">
+                                <!-- Attachment Menu -->
+                                <div x-data="{ showMenu: false }" class="relative">
+                                    <button type="button" @click="showMenu = !showMenu" class="btn btn-ghost btn-icon" title="Attach">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                    <div x-show="showMenu" @click.away="showMenu = false" x-transition class="absolute bottom-12 left-0 bg-white rounded-lg shadow-lg border border-[hsl(var(--border))] py-2 w-48 z-10">
+                                        <button type="button" @click="showMenu = false; showTemplateModal = true" class="w-full flex items-center gap-3 px-4 py-2 hover:bg-[hsl(var(--muted))] text-sm">
+                                            <i class="fas fa-file-alt w-5 text-purple-500"></i> Template
+                                        </button>
+                                        <button type="button" @click="showMenu = false; showImageModal = true" class="w-full flex items-center gap-3 px-4 py-2 hover:bg-[hsl(var(--muted))] text-sm">
+                                            <i class="fas fa-image w-5 text-blue-500"></i> Image
+                                        </button>
+                                        <button type="button" @click="showMenu = false; showVideoModal = true" class="w-full flex items-center gap-3 px-4 py-2 hover:bg-[hsl(var(--muted))] text-sm">
+                                            <i class="fas fa-video w-5 text-pink-500"></i> Video
+                                        </button>
+                                        <button type="button" @click="showMenu = false; showDocumentModal = true" class="w-full flex items-center gap-3 px-4 py-2 hover:bg-[hsl(var(--muted))] text-sm">
+                                            <i class="fas fa-file w-5 text-orange-500"></i> Document
+                                        </button>
+                                        <button type="button" @click="showMenu = false; showLocationModal = true" class="w-full flex items-center gap-3 px-4 py-2 hover:bg-[hsl(var(--muted))] text-sm">
+                                            <i class="fas fa-map-marker-alt w-5 text-red-500"></i> Location
+                                        </button>
+                                        <button type="button" @click="showMenu = false; showButtonModal = true" class="w-full flex items-center gap-3 px-4 py-2 hover:bg-[hsl(var(--muted))] text-sm">
+                                            <i class="fas fa-hand-pointer w-5 text-green-500"></i> Buttons
+                                        </button>
+                                        <button type="button" @click="showMenu = false; showListModal = true" class="w-full flex items-center gap-3 px-4 py-2 hover:bg-[hsl(var(--muted))] text-sm">
+                                            <i class="fas fa-list w-5 text-cyan-500"></i> List
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="flex-1 relative">
+                                    <!-- Template Indicator -->
+                                    <div x-show="isTemplateMessage" x-cloak class="absolute -top-8 left-0 right-0 flex items-center justify-between px-2 py-1 bg-purple-50 border border-purple-200 rounded-t-lg text-xs">
+                                        <div class="flex items-center gap-2">
+                                            <i class="fas fa-file-alt text-purple-600"></i>
+                                            <span class="text-purple-700 font-medium">Template: <span x-text="selectedTemplateInfo?.name"></span></span>
+                                        </div>
+                                        <button @click="isTemplateMessage = false; selectedTemplateInfo = null" class="text-purple-600 hover:text-purple-800">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+
+                                    <!-- Formatting Toolbar -->
+                                    <div 
+                                        x-show="showFormatBar" 
+                                        x-cloak
+                                        :style="`top: ${formatBarPosition.top}px; left: ${formatBarPosition.left}px;`"
+                                        class="absolute z-50 bg-[hsl(var(--card))] rounded-lg shadow-lg border border-[hsl(var(--border))] flex items-center gap-1 p-1"
+                                        @click.away="showFormatBar = false"
+                                    >
+                                        <button type="button" @click="formatText('bold')" class="btn btn-ghost btn-icon btn-sm" title="Bold (Ctrl+B)">
+                                            <i class="fas fa-bold"></i>
+                                        </button>
+                                        <button type="button" @click="formatText('italic')" class="btn btn-ghost btn-icon btn-sm" title="Italic (Ctrl+I)">
+                                            <i class="fas fa-italic"></i>
+                                        </button>
+                                        <button type="button" @click="formatText('strikethrough')" class="btn btn-ghost btn-icon btn-sm" title="Strikethrough">
+                                            <i class="fas fa-strikethrough"></i>
+                                        </button>
+                                        <button type="button" @click="formatText('code')" class="btn btn-ghost btn-icon btn-sm" title="Code">
+                                            <i class="fas fa-code"></i>
+                                        </button>
+                                        <div class="w-px h-6 bg-[hsl(var(--border))]"></div>
+                                        <button type="button" @click="formatText('bullet')" class="btn btn-ghost btn-icon btn-sm" title="Bullet List">
+                                            <i class="fas fa-list-ul"></i>
+                                        </button>
+                                        <button type="button" @click="formatText('numbered')" class="btn btn-ghost btn-icon btn-sm" title="Numbered List">
+                                            <i class="fas fa-list-ol"></i>
+                                        </button>
+                                        <button type="button" @click="formatText('quote')" class="btn btn-ghost btn-icon btn-sm" title="Quote">
+                                            <i class="fas fa-quote-right"></i>
+                                        </button>
+                                    </div>
+
+                                    <textarea 
+                                        x-ref="messageInput"
+                                        x-model="newMessage" 
+                                        @input="autoResizeTextarea($event.target)"
+                                        @keydown.enter="handleEnterKey($event)"
+                                        @keydown.ctrl.b.prevent="formatText('bold')"
+                                        @keydown.ctrl.i.prevent="formatText('italic')"
+                                        @select="handleTextSelect($event)"
+                                        @mouseup="handleTextSelect($event)"
+                                        placeholder="Type a message... (Shift+Enter for new line)" 
+                                        rows="1" 
+                                        class="input w-full resize-none py-2 overflow-hidden" 
+                                        style="min-height: 40px; max-height: 200px;"
+                                        :disabled="sending"
+                                    ></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-icon" :disabled="sending || !newMessage.trim()">
+                                    <i class="fas" :class="sending ? 'fa-spinner animate-spin' : 'fa-paper-plane'"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- No Contact Selected -->
+                    <div x-show="!selectedContact" class="flex-1 flex items-center justify-center bg-[hsl(var(--muted)/0.2)]">
+                        <div class="text-center">
+                            <div class="h-16 w-16 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center mx-auto mb-4">
+                                <i class="fas fa-comments text-2xl text-[hsl(var(--muted-foreground))]"></i>
+                            </div>
+                            <h3 class="font-medium">Select a conversation</h3>
+                            <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">Choose a contact to start messaging</p>
+                        </div>
+                    </div>
                 </div>
-                <h3 class="text-lg font-semibold text-gray-900 mb-2">Uploading Media</h3>
-                <p class="text-gray-500">Please wait...</p>
-                <div class="mt-4 w-48 mx-auto bg-gray-200 rounded-full h-2">
-                    <div class="bg-green-500 h-2 rounded-full animate-pulse" style="width: 60%"></div>
+
+                <!-- Template Modal -->
+                <div x-show="showTemplateModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div class="fixed inset-0 bg-black/50" @click="showTemplateModal = false"></div>
+                    <div class="card relative w-full max-w-lg max-h-[85vh] overflow-hidden">
+                        <div class="p-4 border-b border-[hsl(var(--border))] flex items-center justify-between">
+                            <h3 class="font-semibold">Select Template</h3>
+                            <button @click="showTemplateModal = false" class="btn btn-ghost btn-icon"><i class="fas fa-times"></i></button>
+                        </div>
+                        
+                        <!-- Template List -->
+                        <div class="p-4 max-h-96 overflow-y-auto scroll-area space-y-2">
+                            <template x-for="tpl in templates" :key="tpl.id">
+                                <div @click="selectTemplate(tpl)" class="p-3 border border-[hsl(var(--border))] rounded-lg hover:bg-[hsl(var(--muted))] cursor-pointer transition-colors">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div class="flex-1">
+                                            <p class="font-medium text-sm" x-text="tpl.name"></p>
+                                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1 line-clamp-2" x-text="tpl.body"></p>
+                                        </div>
+                                        <i class="fas fa-chevron-right text-[hsl(var(--muted-foreground))] text-xs mt-1"></i>
+                                    </div>
+                                    <div class="flex items-center gap-2 mt-2">
+                                        <span class="text-[10px] px-2 py-0.5 rounded bg-[hsl(var(--muted))]" x-text="tpl.language || 'en'"></span>
+                                        <span class="text-[10px] px-2 py-0.5 rounded" :class="tpl.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'" x-text="tpl.status"></span>
+                                    </div>
+                                </div>
+                            </template>
+                            <div x-show="templates.length === 0" class="empty-state py-12">
+                                <div class="empty-state-icon"><i class="fas fa-file-alt"></i></div>
+                                <p class="text-sm text-[hsl(var(--muted-foreground))]">No templates available</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Image Modal -->
+                <div x-show="showImageModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div class="fixed inset-0 bg-black/50" @click="showImageModal = false; imageForm = { file: null, caption: '', preview: null }"></div>
+                    <div class="card relative w-full max-w-md">
+                        <div class="p-4 border-b border-[hsl(var(--border))] flex items-center justify-between">
+                            <h3 class="font-semibold">Send Image</h3>
+                            <button @click="showImageModal = false; imageForm = { file: null, caption: '', preview: null }" class="btn btn-ghost btn-icon"><i class="fas fa-times"></i></button>
+                        </div>
+                        <form @submit.prevent="sendImage" class="p-4 space-y-4">
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Select Image</label>
+                                <input type="file" @change="handleImageSelect" accept="image/jpeg,image/jpg,image/png" class="input w-full p-2" required>
+                                <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Supported: JPG, PNG (max 5MB)</p>
+                            </div>
+                            <div x-show="imageForm.preview" class="rounded-lg overflow-hidden border border-[hsl(var(--border))]">
+                                <img :src="imageForm.preview" class="w-full max-h-48 object-contain bg-[hsl(var(--muted))]" alt="Preview">
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Caption (optional)</label>
+                                <input type="text" x-model="imageForm.caption" class="input w-full" placeholder="Image caption">
+                            </div>
+                            <div class="flex gap-2">
+                                <button type="button" @click="showImageModal = false; imageForm = { file: null, caption: '', preview: null }" class="btn btn-outline btn-md flex-1">Cancel</button>
+                                <button type="submit" :disabled="sending || !imageForm.file" class="btn btn-primary btn-md flex-1">
+                                    <i class="fas" :class="sending ? 'fa-spinner animate-spin' : 'fa-paper-plane'"></i> Send
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Video Modal -->
+                <div x-show="showVideoModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div class="fixed inset-0 bg-black/50" @click="showVideoModal = false; videoForm = { file: null, caption: '', preview: null }"></div>
+                    <div class="card relative w-full max-w-md">
+                        <div class="p-4 border-b border-[hsl(var(--border))] flex items-center justify-between">
+                            <h3 class="font-semibold">Send Video</h3>
+                            <button @click="showVideoModal = false; videoForm = { file: null, caption: '', preview: null }" class="btn btn-ghost btn-icon"><i class="fas fa-times"></i></button>
+                        </div>
+                        <form @submit.prevent="sendVideo" class="p-4 space-y-4">
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Select Video</label>
+                                <input type="file" @change="handleVideoSelect" accept="video/mp4,video/3gpp" class="input w-full p-2" required>
+                                <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Supported: MP4, 3GP (max 16MB)</p>
+                            </div>
+                            <div x-show="videoForm.preview" class="rounded-lg overflow-hidden border border-[hsl(var(--border))]">
+                                <video :src="videoForm.preview" controls class="w-full max-h-48 bg-[hsl(var(--muted))]"></video>
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Caption (optional)</label>
+                                <input type="text" x-model="videoForm.caption" class="input w-full" placeholder="Video caption">
+                            </div>
+                            <div class="flex gap-2">
+                                <button type="button" @click="showVideoModal = false; videoForm = { file: null, caption: '', preview: null }" class="btn btn-outline btn-md flex-1">Cancel</button>
+                                <button type="submit" :disabled="sending || !videoForm.file" class="btn btn-primary btn-md flex-1">
+                                    <i class="fas" :class="sending ? 'fa-spinner animate-spin' : 'fa-paper-plane'"></i> Send
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Document Modal -->
+                <div x-show="showDocumentModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div class="fixed inset-0 bg-black/50" @click="showDocumentModal = false; documentForm = { file: null, filename: '', caption: '' }"></div>
+                    <div class="card relative w-full max-w-md">
+                        <div class="p-4 border-b border-[hsl(var(--border))] flex items-center justify-between">
+                            <h3 class="font-semibold">Send Document</h3>
+                            <button @click="showDocumentModal = false; documentForm = { file: null, filename: '', caption: '' }" class="btn btn-ghost btn-icon"><i class="fas fa-times"></i></button>
+                        </div>
+                        <form @submit.prevent="sendDocument" class="p-4 space-y-4">
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Select Document</label>
+                                <input type="file" @change="handleDocumentSelect" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" class="input w-full p-2" required>
+                                <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Supported: PDF, DOC, XLS, PPT, TXT (max 100MB)</p>
+                            </div>
+                            <div x-show="documentForm.file" class="p-3 bg-[hsl(var(--muted))] rounded-lg flex items-center gap-3">
+                                <i class="fas fa-file-alt text-xl text-[hsl(var(--primary))]"></i>
+                                <span class="text-sm truncate" x-text="documentForm.filename"></span>
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Caption (optional)</label>
+                                <input type="text" x-model="documentForm.caption" class="input w-full" placeholder="Document caption">
+                            </div>
+                            <div class="flex gap-2">
+                                <button type="button" @click="showDocumentModal = false; documentForm = { file: null, filename: '', caption: '' }" class="btn btn-outline btn-md flex-1">Cancel</button>
+                                <button type="submit" :disabled="sending || !documentForm.file" class="btn btn-primary btn-md flex-1">
+                                    <i class="fas" :class="sending ? 'fa-spinner animate-spin' : 'fa-paper-plane'"></i> Send
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Location Modal -->
+                <div x-show="showLocationModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div class="fixed inset-0 bg-black/50" @click="showLocationModal = false; locationForm = { latitude: '', longitude: '', name: '', address: '', mapUrl: '' }"></div>
+                    <div class="card relative w-full max-w-lg">
+                        <div class="p-4 border-b border-[hsl(var(--border))] flex items-center justify-between">
+                            <h3 class="font-semibold">Send Location</h3>
+                            <button @click="showLocationModal = false; locationForm = { latitude: '', longitude: '', name: '', address: '', mapUrl: '' }" class="btn btn-ghost btn-icon"><i class="fas fa-times"></i></button>
+                        </div>
+                        <form @submit.prevent="sendLocation" class="p-4 space-y-4">
+                            <!-- Search Location -->
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Search Location</label>
+                                <div class="relative">
+                                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm"></i>
+                                    <input type="text" x-model="locationForm.searchQuery" @input.debounce.500ms="searchLocation" class="input w-full pl-9" placeholder="Search for a place...">
+                                </div>
+                                <!-- Search Results -->
+                                <div x-show="locationForm.searchResults && locationForm.searchResults.length > 0" class="mt-2 border border-[hsl(var(--border))] rounded-lg max-h-40 overflow-y-auto">
+                                    <template x-for="result in locationForm.searchResults" :key="result.place_id">
+                                        <div @click="selectSearchResult(result)" class="p-2 hover:bg-[hsl(var(--muted))] cursor-pointer border-b border-[hsl(var(--border))] last:border-b-0">
+                                            <p class="text-sm font-medium" x-text="result.name"></p>
+                                            <p class="text-xs text-[hsl(var(--muted-foreground))]" x-text="result.formatted_address"></p>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- Get Current Location Button -->
+                            <div class="flex gap-2">
+                                <button type="button" @click="getCurrentLocation" class="btn btn-outline btn-sm flex-1" :disabled="locationForm.gettingLocation">
+                                    <i class="fas" :class="locationForm.gettingLocation ? 'fa-spinner animate-spin' : 'fa-crosshairs'"></i>
+                                    <span x-text="locationForm.gettingLocation ? 'Getting...' : 'Use My Location'"></span>
+                                </button>
+                                <a x-show="locationForm.latitude && locationForm.longitude" :href="`https://www.google.com/maps?q=${locationForm.latitude},${locationForm.longitude}`" target="_blank" class="btn btn-outline btn-sm">
+                                    <i class="fas fa-external-link-alt"></i> View Map
+                                </a>
+                            </div>
+
+                            <!-- Map Preview -->
+                            <div x-show="locationForm.latitude && locationForm.longitude" class="rounded-lg overflow-hidden border border-[hsl(var(--border))]">
+                                <iframe 
+                                    :src="`https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${locationForm.latitude},${locationForm.longitude}&zoom=15`"
+                                    width="100%" 
+                                    height="200" 
+                                    style="border:0;" 
+                                    allowfullscreen="" 
+                                    loading="lazy">
+                                </iframe>
+                            </div>
+
+                            <!-- Coordinates (readonly, auto-filled) -->
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="text-sm font-medium mb-1.5 block">Latitude</label>
+                                    <input type="number" step="any" x-model="locationForm.latitude" class="input w-full bg-[hsl(var(--muted))]" placeholder="-6.2088" readonly required>
+                                </div>
+                                <div>
+                                    <label class="text-sm font-medium mb-1.5 block">Longitude</label>
+                                    <input type="number" step="any" x-model="locationForm.longitude" class="input w-full bg-[hsl(var(--muted))]" placeholder="106.8456" readonly required>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Location Name</label>
+                                <input type="text" x-model="locationForm.name" class="input w-full" placeholder="Location name">
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Address</label>
+                                <input type="text" x-model="locationForm.address" class="input w-full" placeholder="Full address">
+                            </div>
+                            <div class="flex gap-2">
+                                <button type="button" @click="showLocationModal = false; locationForm = { latitude: '', longitude: '', name: '', address: '', mapUrl: '' }" class="btn btn-outline btn-md flex-1">Cancel</button>
+                                <button type="submit" :disabled="sending || !locationForm.latitude || !locationForm.longitude" class="btn btn-primary btn-md flex-1">
+                                    <i class="fas" :class="sending ? 'fa-spinner animate-spin' : 'fa-paper-plane'"></i> Send
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Button Message Modal -->
+                <div x-show="showButtonModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div class="fixed inset-0 bg-black/50" @click="showButtonModal = false"></div>
+                    <div class="card relative w-full max-w-md">
+                        <div class="p-4 border-b border-[hsl(var(--border))] flex items-center justify-between">
+                            <h3 class="font-semibold">Send Button Message</h3>
+                            <button @click="showButtonModal = false" class="btn btn-ghost btn-icon"><i class="fas fa-times"></i></button>
+                        </div>
+                        <form @submit.prevent="sendButtonMessage" class="p-4 space-y-4">
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Body Text</label>
+                                <textarea x-model="buttonForm.body" class="input w-full" rows="2" placeholder="Message body" required></textarea>
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Buttons (max 3)</label>
+                                <template x-for="(btn, idx) in buttonForm.buttons" :key="idx">
+                                    <div class="flex gap-2 mb-2">
+                                        <input type="text" x-model="buttonForm.buttons[idx]" class="input flex-1" :placeholder="'Button ' + (idx+1)">
+                                        <button type="button" x-show="buttonForm.buttons.length > 1" @click="buttonForm.buttons.splice(idx, 1)" class="btn btn-ghost btn-icon text-red-500"><i class="fas fa-trash"></i></button>
+                                    </div>
+                                </template>
+                                <button type="button" x-show="buttonForm.buttons.length < 3" @click="buttonForm.buttons.push('')" class="btn btn-outline btn-sm w-full"><i class="fas fa-plus mr-2"></i>Add Button</button>
+                            </div>
+                            <div class="flex gap-2">
+                                <button type="button" @click="showButtonModal = false" class="btn btn-outline btn-md flex-1">Cancel</button>
+                                <button type="submit" :disabled="sending" class="btn btn-primary btn-md flex-1">
+                                    <i class="fas" :class="sending ? 'fa-spinner animate-spin' : 'fa-paper-plane'"></i> Send
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- List Message Modal -->
+                <div x-show="showListModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div class="fixed inset-0 bg-black/50" @click="showListModal = false"></div>
+                    <div class="card relative w-full max-w-md max-h-[90vh] overflow-y-auto">
+                        <div class="p-4 border-b border-[hsl(var(--border))] flex items-center justify-between sticky top-0 bg-white">
+                            <h3 class="font-semibold">Send List Message</h3>
+                            <button @click="showListModal = false" class="btn btn-ghost btn-icon"><i class="fas fa-times"></i></button>
+                        </div>
+                        <form @submit.prevent="sendListMessage" class="p-4 space-y-4">
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Body Text</label>
+                                <textarea x-model="listForm.body" class="input w-full" rows="2" placeholder="Message body" required></textarea>
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Button Text</label>
+                                <input type="text" x-model="listForm.buttonText" class="input w-full" placeholder="View Options" required>
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Section Title</label>
+                                <input type="text" x-model="listForm.sectionTitle" class="input w-full" placeholder="Options">
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Items</label>
+                                <template x-for="(item, idx) in listForm.items" :key="idx">
+                                    <div class="flex gap-2 mb-2">
+                                        <input type="text" x-model="listForm.items[idx].title" class="input flex-1" placeholder="Item title">
+                                        <button type="button" x-show="listForm.items.length > 1" @click="listForm.items.splice(idx, 1)" class="btn btn-ghost btn-icon text-red-500"><i class="fas fa-trash"></i></button>
+                                    </div>
+                                </template>
+                                <button type="button" x-show="listForm.items.length < 10" @click="listForm.items.push({title: '', description: ''})" class="btn btn-outline btn-sm w-full"><i class="fas fa-plus mr-2"></i>Add Item</button>
+                            </div>
+                            <div class="flex gap-2">
+                                <button type="button" @click="showListModal = false" class="btn btn-outline btn-md flex-1">Cancel</button>
+                                <button type="submit" :disabled="sending" class="btn btn-primary btn-md flex-1">
+                                    <i class="fas" :class="sending ? 'fa-spinner animate-spin' : 'fa-paper-plane'"></i> Send
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
-        </div>
+        </main>
     </div>
 </div>
 
+
 <script>
-    function messagesManager() {
-        return {
-            API_BASE_URL: window.location.origin + '/api',
-            contacts: [],
-            filteredContactList: [],
-            selectedContact: null,
-            messages: [],
-            templates: [],
-            newMessage: '',
-            contactSearch: '',
-            loadingContacts: true,
-            loadingMessages: false,
-            sending: false,
-            uploadingMedia: false,
+function messagesApp() {
+    return {
+        sidebarOpen: true,
+        user: null,
+        notifications: [],
 
-            // Modals
-            showTemplateModal: false,
-            showLocationModal: false,
-            showContactModal: false,
-            showButtonModal: false,
-            showListModal: false,
+        init() {
+            let savedState = localStorage.getItem('sidebarOpen');
+            if (savedState !== null) this.sidebarOpen = JSON.parse(savedState);
+            this.$watch('sidebarOpen', v => localStorage.setItem('sidebarOpen', JSON.stringify(v)));
 
-            // Selected template
-            selectedTemplate: null,
+            let storedUser = localStorage.getItem('user');
+            if (storedUser) {
+                try { this.user = JSON.parse(storedUser); } 
+                catch (e) { this.user = { name: 'User', email: 'user@example.com' }; }
+            } else {
+                this.user = { name: 'User', email: 'user@example.com' };
+            }
 
-            // Attachment state
-            attachmentFile: null,
-            attachmentPreview: null,
-            attachmentType: null,
-            attachmentName: '',
-            attachmentSize: '',
+            let savedNotifs = localStorage.getItem('notifications');
+            if (savedNotifs) {
+                try { this.notifications = JSON.parse(savedNotifs); } catch (e) { this.notifications = []; }
+            }
+        },
 
-            // Form data for modals
-            locationForm: {
-                latitude: '',
-                longitude: '',
-                name: '',
-                address: ''
-            },
+        addNotification(notif) {
+            notif.id = Date.now() + Math.random();
+            this.notifications.unshift(notif);
+            if (this.notifications.length > 50) this.notifications = this.notifications.slice(0, 50);
+            localStorage.setItem('notifications', JSON.stringify(this.notifications));
+        },
 
-            contactForm: {
-                firstName: '',
-                lastName: '',
-                phone: '',
-                email: '',
-                org: ''
-            },
+        clearNotifications() {
+            this.notifications = [];
+            localStorage.removeItem('notifications');
+        },
 
-            buttonForm: {
-                header: '',
-                body: '',
-                footer: '',
-                buttons: ['']
-            },
+        removeNotification(id) {
+            this.notifications = this.notifications.filter(n => n.id !== id);
+            localStorage.setItem('notifications', JSON.stringify(this.notifications));
+        },
 
-            listForm: {
-                header: '',
-                body: '',
-                footer: '',
-                buttonText: 'View Options',
-                sections: [
-                    {
-                        title: '',
-                        rows: [{ title: '', description: '' }]
-                    }
-                ]
-            },
+        formatNotificationTime(timestamp) {
+            let date = new Date(timestamp);
+            let diff = Math.floor((new Date() - date) / 1000);
+            if (diff < 60) return 'Just now';
+            if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+            if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+            return date.toLocaleDateString();
+        },
 
-            async init() {
-                this.messages = [];
-                await this.fetchContacts();
-                await this.fetchTemplates();
-                this.checkUrlParams();
-                this.listenForUpdates();
-
-                // Listen for new messages
-                window.addEventListener('whatsapp-message-received', (event) => {
-                    console.log('📩 Messages page - Received via custom event:', event.detail);
-                    this.handleIncomingMessage(event.detail);
+        logout() {
+            let token = localStorage.getItem('token');
+            if (token) {
+                fetch(`${window.location.origin}/api/logout`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                }).finally(() => {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    localStorage.removeItem('sidebarOpen');
+                    localStorage.removeItem('notifications');
+                    window.location.href = '/login';
                 });
-
-                // Listen for status updates
-                window.addEventListener('whatsapp-status-updated', (event) => {
-                    console.log('📊 Messages page - Status update received:', event.detail);
-                    this.handleStatusUpdate(event.detail);
-                });
-            },
-
-            // Handle real-time status updates
-            handleStatusUpdate(data) {
-                console.log('📊 Handling status update:', data);
-
-                // Find message by id (database id) or message_id (WhatsApp message id)
-                const messageIndex = this.messages.findIndex(m =>
-                    m && (m.id === data.id || m.message_id === data.message_id)
-                );
-
-                if (messageIndex !== -1) {
-                    console.log('✅ Found message to update at index:', messageIndex);
-
-                    // Update status
-                    this.messages[messageIndex].status = data.status;
-
-                    // Update timestamps
-                    if (data.delivered_at) {
-                        this.messages[messageIndex].delivered_at = data.delivered_at;
-                    }
-                    if (data.read_at) {
-                        this.messages[messageIndex].read_at = data.read_at;
-                    }
-
-                    // Force Alpine to react to the change
-                    this.messages = [...this.messages];
-
-                    console.log('✅ Message status updated to:', data.status);
-
-                    // Update contact's last message if this is the most recent message
-                    if (this.selectedContact && this.selectedContact.id === data.contact_id) {
-                        // Optionally refresh contacts to update badges
-                        this.fetchContacts();
-                    }
-                } else {
-                    console.log('⚠️ Message not found in current list, id:', data.id, 'message_id:', data.message_id);
-                }
-            },
-
-            handleIncomingMessage(e) {
-                console.log('🔔 Handling incoming message:', e);
-
-                if (this.selectedContact && e.contact && e.contact.id === this.selectedContact.id) {
-                    console.log('✅ Contact matches! Adding message to chat');
-
-                    if (e.message && e.message.id) {
-                        if (!this.messages.find(m => m && m.id === e.message.id)) {
-                            this.messages.push(e.message);
-                            this.scrollToBottom();
-                            console.log('✅ Message added to chat, total messages:', this.messages.length);
-                        }
-                    }
-                }
-                this.fetchContacts();
-            },
-
-            async fetchContacts() {
-                this.loadingContacts = true;
-                try {
-                    let token = localStorage.getItem('token');
-                    let response = await fetch(`${this.API_BASE_URL}/whatsapp/contacts`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    let data = await response.json();
-                    this.contacts = data.data || [];
-                    this.filteredContactList = this.contacts;
-                } catch (error) {
-                    console.error('Error fetching contacts:', error);
-                } finally {
-                    this.loadingContacts = false;
-                }
-            },
-
-            async fetchTemplates() {
-                try {
-                    let token = localStorage.getItem('token');
-                    let response = await fetch(`${this.API_BASE_URL}/whatsapp/templates`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    let data = await response.json();
-                    this.templates = (data.data || []).filter(t => t.status === 'APPROVED');
-                } catch (error) {
-                    console.error('Error fetching templates:', error);
-                }
-            },
-
-            checkUrlParams() {
-                let urlParams = new URLSearchParams(window.location.search);
-                let contactId = urlParams.get('contact');
-                if (contactId) {
-                    let contact = this.contacts.find(c => c.id == contactId);
-                    if (contact) {
-                        this.selectContact(contact);
-                    }
-                }
-            },
-
-            filterContactList() {
-                if (!this.contactSearch) {
-                    this.filteredContactList = this.contacts;
-                    return;
-                }
-
-                let query = this.contactSearch.toLowerCase();
-                this.filteredContactList = this.contacts.filter(contact =>
-                    (contact.name && contact.name.toLowerCase().includes(query)) ||
-                    (contact.phone_number && contact.phone_number.includes(query))
-                );
-            },
-
-            async selectContact(contact) {
-                this.selectedContact = contact;
-                await this.fetchMessages();
-                await this.markContactMessagesAsRead(contact.id);
-                this.scrollToBottom();
-            },
-
-            async markContactMessagesAsRead(contactId) {
-                try {
-                    let token = localStorage.getItem('token');
-                    await fetch(`${this.API_BASE_URL}/whatsapp/contacts/${contactId}/mark-read`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    let contactInList = this.contacts.find(c => c.id === contactId);
-                    if (contactInList) contactInList.unread_count = 0;
-
-                    let contactInFiltered = this.filteredContactList.find(c => c.id === contactId);
-                    if (contactInFiltered) contactInFiltered.unread_count = 0;
-                } catch (error) {
-                    console.error('Error marking messages as read:', error);
-                }
-            },
-
-            async fetchMessages() {
-                if (!this.selectedContact) {
-                    this.messages = [];
-                    return;
-                }
-
-                this.loadingMessages = true;
-                try {
-                    let token = localStorage.getItem('token');
-                    let response = await fetch(`${this.API_BASE_URL}/whatsapp/contacts/${this.selectedContact.id}/messages`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-
-                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-                    let data = await response.json();
-                    let rawMessages = Array.isArray(data.data) ? data.data : [];
-                    let validMessages = rawMessages.filter(m => m != null && m !== undefined && m.id);
-
-                    let seenIds = new Set();
-                    this.messages = validMessages.filter(m => {
-                        if (seenIds.has(m.id)) return false;
-                        seenIds.add(m.id);
-                        return true;
-                    });
-
-                    this.scrollToBottom();
-                } catch (error) {
-                    console.error('Error fetching messages:', error);
-                    this.messages = [];
-                } finally {
-                    this.loadingMessages = false;
-                }
-            },
-
-            async refreshMessages() {
-                await this.fetchMessages();
-            },
-
-            // File handling
-            handleFileSelect(event, type) {
-                let file = event.target.files[0];
-                if (!file) return;
-
-                this.attachmentFile = file;
-                this.attachmentType = type;
-                this.attachmentName = file.name;
-                this.attachmentSize = this.formatFileSize(file.size);
-
-                if (type === 'image') {
-                    let reader = new FileReader();
-                    reader.onload = (e) => {
-                        this.attachmentPreview = e.target.result;
-                    };
-                    reader.readAsDataURL(file);
-                } else {
-                    this.attachmentPreview = type;
-                }
-            },
-
-            clearAttachment() {
-                this.attachmentFile = null;
-                this.attachmentPreview = null;
-                this.attachmentType = null;
-                this.attachmentName = '';
-                this.attachmentSize = '';
-            },
-
-            formatFileSize(bytes) {
-                if (bytes === 0) return '0 Bytes';
-                let k = 1024;
-                let sizes = ['Bytes', 'KB', 'MB', 'GB'];
-                let i = Math.floor(Math.log(bytes) / Math.log(k));
-                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-            },
-
-            // Send Text Message
-            async sendTextMessage() {
-                if (!this.newMessage.trim() || !this.selectedContact) return;
-
-                this.sending = true;
-                try {
-                    let token = localStorage.getItem('token');
-                    let payload = {
-                        to: this.selectedContact.wa_id,
-                        message: this.newMessage
-                    };
-
-                    let response = await fetch(`${this.API_BASE_URL}/whatsapp/send/text`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (response.ok) {
-                        this.newMessage = '';
-                        await this.fetchMessages();
-                    } else {
-                        let error = await response.json();
-                        alert('Failed to send message: ' + (error.message || 'Unknown error'));
-                    }
-                } catch (error) {
-                    console.error('Error sending message:', error);
-                    alert('Error sending message: ' + error.message);
-                } finally {
-                    this.sending = false;
-                }
-            },
-
-            // Send Media Message (Image, Video, Audio, Document)
-            async sendMediaMessage() {
-                if (!this.attachmentFile || !this.selectedContact) return;
-
-                this.sending = true;
-                this.uploadingMedia = true;
-
-                try {
-                    let token = localStorage.getItem('token');
-                    let formData = new FormData();
-                    formData.append('to', this.selectedContact.wa_id);
-                    formData.append('file', this.attachmentFile);
-                    if (this.newMessage.trim()) {
-                        formData.append('caption', this.newMessage);
-                    }
-
-                    let endpoint = '';
-                    switch (this.attachmentType) {
-                        case 'image': endpoint = '/whatsapp/send/image'; break;
-                        case 'video': endpoint = '/whatsapp/send/video'; break;
-                        case 'audio': endpoint = '/whatsapp/send/audio'; break;
-                        case 'document': endpoint = '/whatsapp/send/document'; break;
-                    }
-
-                    let response = await fetch(`${this.API_BASE_URL}${endpoint}`, {
-                        method: 'POST',
-                        headers: { 'Authorization': `Bearer ${token}` },
-                        body: formData
-                    });
-
-                    if (response.ok) {
-                        this.newMessage = '';
-                        this.clearAttachment();
-                        await this.fetchMessages();
-                    } else {
-                        let error = await response.json();
-                        alert('Failed to send media: ' + (error.message || 'Unknown error'));
-                    }
-                } catch (error) {
-                    console.error('Error sending media:', error);
-                    alert('Error sending media: ' + error.message);
-                } finally {
-                    this.sending = false;
-                    this.uploadingMedia = false;
-                }
-            },
-
-            // Send Location Message
-            async sendLocationMessage() {
-                if (!this.locationForm.latitude || !this.locationForm.longitude || !this.selectedContact) return;
-
-                this.sending = true;
-                try {
-                    let token = localStorage.getItem('token');
-                    let payload = {
-                        to: this.selectedContact.wa_id,
-                        latitude: parseFloat(this.locationForm.latitude),
-                        longitude: parseFloat(this.locationForm.longitude),
-                        name: this.locationForm.name || undefined,
-                        address: this.locationForm.address || undefined
-                    };
-
-                    let response = await fetch(`${this.API_BASE_URL}/whatsapp/send/location`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (response.ok) {
-                        this.showLocationModal = false;
-                        this.resetLocationForm();
-                        await this.fetchMessages();
-                    } else {
-                        let error = await response.json();
-                        alert('Failed to send location: ' + (error.message || 'Unknown error'));
-                    }
-                } catch (error) {
-                    console.error('Error sending location:', error);
-                    alert('Error sending location: ' + error.message);
-                } finally {
-                    this.sending = false;
-                }
-            },
-
-            getCurrentLocation() {
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                            this.locationForm.latitude = position.coords.latitude.toString();
-                            this.locationForm.longitude = position.coords.longitude.toString();
-                        },
-                        (error) => {
-                            alert('Unable to get location: ' + error.message);
-                        }
-                    );
-                } else {
-                    alert('Geolocation is not supported by this browser.');
-                }
-            },
-
-            resetLocationForm() {
-                this.locationForm = { latitude: '', longitude: '', name: '', address: '' };
-            },
-
-            // Send Contact Message
-            async sendContactMessage() {
-                if (!this.contactForm.firstName || !this.contactForm.phone || !this.selectedContact) return;
-
-                this.sending = true;
-                try {
-                    let token = localStorage.getItem('token');
-                    let payload = {
-                        to: this.selectedContact.wa_id,
-                        contacts: [{
-                            name: {
-                                formatted_name: `${this.contactForm.firstName} ${this.contactForm.lastName}`.trim(),
-                                first_name: this.contactForm.firstName,
-                                last_name: this.contactForm.lastName || undefined
-                            },
-                            phones: [{
-                                phone: this.contactForm.phone,
-                                type: 'CELL'
-                            }],
-                            emails: this.contactForm.email ? [{ email: this.contactForm.email, type: 'WORK' }] : undefined,
-                            org: this.contactForm.org ? { company: this.contactForm.org } : undefined
-                        }]
-                    };
-
-                    let response = await fetch(`${this.API_BASE_URL}/whatsapp/send/contact`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (response.ok) {
-                        this.showContactModal = false;
-                        this.resetContactForm();
-                        await this.fetchMessages();
-                    } else {
-                        let error = await response.json();
-                        alert('Failed to send contact: ' + (error.message || 'Unknown error'));
-                    }
-                } catch (error) {
-                    console.error('Error sending contact:', error);
-                    alert('Error sending contact: ' + error.message);
-                } finally {
-                    this.sending = false;
-                }
-            },
-
-            resetContactForm() {
-                this.contactForm = { firstName: '', lastName: '', phone: '', email: '', org: '' };
-            },
-
-            // Send Button Message
-            async sendButtonMessage() {
-                if (!this.buttonForm.body || !this.selectedContact) return;
-
-                let validButtons = this.buttonForm.buttons.filter(b => b.trim());
-                if (validButtons.length === 0) return;
-
-                this.sending = true;
-                try {
-                    let token = localStorage.getItem('token');
-                    let payload = {
-                        to: this.selectedContact.wa_id,
-                        body: this.buttonForm.body,
-                        buttons: validButtons.map((text, i) => ({
-                            type: 'reply',
-                            reply: {
-                                id: `btn_${i + 1}`,
-                                title: text.substring(0, 20)
-                            }
-                        })),
-                        header: this.buttonForm.header || undefined,
-                        footer: this.buttonForm.footer || undefined
-                    };
-
-                    let response = await fetch(`${this.API_BASE_URL}/whatsapp/send/button`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (response.ok) {
-                        this.showButtonModal = false;
-                        this.resetButtonForm();
-                        await this.fetchMessages();
-                    } else {
-                        let error = await response.json();
-                        alert('Failed to send button message: ' + (error.message || 'Unknown error'));
-                    }
-                } catch (error) {
-                    console.error('Error sending button message:', error);
-                    alert('Error sending button message: ' + error.message);
-                } finally {
-                    this.sending = false;
-                }
-            },
-
-            resetButtonForm() {
-                this.buttonForm = { header: '', body: '', footer: '', buttons: [''] };
-            },
-
-            // Send List Message
-            async sendListMessage() {
-                if (!this.listForm.body || !this.listForm.buttonText || !this.selectedContact) return;
-
-                this.sending = true;
-                try {
-                    let token = localStorage.getItem('token');
-                    let sections = this.listForm.sections.map((section, sIndex) => ({
-                        title: section.title || `Section ${sIndex + 1}`,
-                        rows: section.rows.filter(r => r.title.trim()).map((row, rIndex) => ({
-                            id: `row_${sIndex}_${rIndex}`,
-                            title: row.title.substring(0, 24),
-                            description: row.description ? row.description.substring(0, 72) : undefined
-                        }))
-                    })).filter(s => s.rows.length > 0);
-
-                    let payload = {
-                        to: this.selectedContact.wa_id || this.selectedContact.phone_number?.replace('+', ''),
-                        body: this.listForm.body,
-                        button_text: this.listForm.buttonText,
-                        sections: sections,
-                        header: this.listForm.header || undefined,
-                        footer: this.listForm.footer || undefined
-                    };
-
-                    console.log('Sending list message:', payload);
-
-                    let response = await fetch(`${this.API_BASE_URL}/whatsapp/send/list`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json'
-                        },
-                        body: JSON.stringify(payload)
-                    });
-
-                    let data = await response.json();
-
-                    if (response.ok && data.success) {
-                        this.showListModal = false;
-                        this.resetListForm();
-                        await this.fetchMessages();
-                    } else {
-                        alert('Failed to send list message: ' + (data.message || data.error || 'Unknown error'));
-                    }
-                } catch (error) {
-                    console.error('Error sending list message:', error);
-                    alert('Error sending list message: ' + error.message);
-                } finally {
-                    this.sending = false;
-                }
-            },
-
-            resetListForm() {
-                this.listForm = {
-                    header: '',
-                    body: '',
-                    footer: '',
-                    buttonText: 'View Options',
-                    sections: [{ title: '', rows: [{ title: '', description: '' }] }]
-                };
-            },
-
-            // Select Template (put into message input)
-            selectTemplate(template) {
-                this.selectedTemplate = template;
-                this.newMessage = template.body || template.header || '';
-                this.showTemplateModal = false;
-            },
-
-            // Clear selected template
-            clearSelectedTemplate() {
-                this.selectedTemplate = null;
-                this.newMessage = '';
-            },
-
-            // Send Template
-            async sendTemplate() {
-                if (!this.selectedContact) {
-                    alert('Please select a contact first');
-                    return;
-                }
-
-                if (!this.selectedTemplate) {
-                    return;
-                }
-
-                this.sending = true;
-                try {
-                    let token = localStorage.getItem('token');
-                    let payload = {
-                        to: this.selectedContact.wa_id,
-                        template_name: this.selectedTemplate.name,
-                        language: this.selectedTemplate.language
-                    };
-
-                    console.log('Sending template:', payload);
-
-                    let response = await fetch(`${this.API_BASE_URL}/whatsapp/send/template`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (response.ok) {
-                        this.selectedTemplate = null;
-                        this.newMessage = '';
-                        await this.fetchMessages();
-                    } else {
-                        let error = await response.json();
-                        alert('Failed to send template: ' + (error.message || 'Unknown error'));
-                    }
-                } catch (error) {
-                    console.error('Error sending template:', error);
-                    alert('Error sending template: ' + error.message);
-                } finally {
-                    this.sending = false;
-                }
-            },
-
-            scrollToBottom() {
-                this.$nextTick(() => {
-                    let container = this.$refs.messagesContainer;
-                    if (container) {
-                        container.scrollTop = container.scrollHeight;
-                    }
-                });
-            },
-
-            formatTime(timestamp) {
-                let date = new Date(timestamp);
-                let now = new Date();
-                let isToday = date.toDateString() === now.toDateString();
-
-                if (isToday) {
-                    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                }
-                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            },
-
-            listenForUpdates() {
-                console.log('📡 Messages page - Setting up message listener');
-                console.log('📡 Listening for: whatsapp-message-received, whatsapp-status-updated events');
-
-                // Check if Echo is ready
-                if (window.isEchoReady && window.isEchoReady()) {
-                    console.log('✅ Echo is ready for real-time updates');
-                } else {
-                    console.log('⏳ Waiting for Echo to be ready...');
-                    window.addEventListener('echo-ready', () => {
-                        console.log('✅ Echo is now ready for real-time updates');
-                    });
-                }
+            } else {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/login';
             }
         }
     }
+}
+
+function messagesManager() {
+    return {
+        API_BASE_URL: window.location.origin + '/api',
+        contacts: [], filteredContactList: [], selectedContact: null, messages: [], templates: [],
+        newMessage: '', contactSearch: '', loadingContacts: true, loadingMessages: false, sending: false,
+        mediaPreview: null, mediaFile: null,
+        showTemplateModal: false, showImageModal: false, showVideoModal: false, showDocumentModal: false, 
+        showLocationModal: false, showButtonModal: false, showListModal: false,
+        showFormatBar: false, formatBarPosition: { top: 0, left: 0 },
+        isTemplateMessage: false, selectedTemplateInfo: null,
+        imageForm: { file: null, caption: '', preview: null },
+        videoForm: { file: null, caption: '', preview: null },
+        documentForm: { file: null, filename: '', caption: '' },
+        locationForm: { latitude: '', longitude: '', name: '', address: '', searchQuery: '', searchResults: [], gettingLocation: false },
+        buttonForm: { body: '', buttons: ['', ''] },
+        listForm: { body: '', buttonText: 'View Options', sectionTitle: 'Options', items: [{title: ''}, {title: ''}] },
+
+
+        async init() {
+            await Promise.all([this.fetchContacts(), this.fetchTemplates()]);
+            const urlParams = new URLSearchParams(window.location.search);
+            const contactId = urlParams.get('contact');
+            if (contactId) { const contact = this.contacts.find(c => c.id == contactId); if (contact) this.selectContact(contact); }
+            
+            // Listen for real-time messages from broadcast
+            window.addEventListener('whatsapp-message-received', (e) => {
+                const newMessage = e.detail.message;
+                const messageContact = e.detail.contact;
+                
+                if (this.selectedContact && messageContact?.id === this.selectedContact.id && newMessage) {
+                    // Check if message already exists to prevent duplicates
+                    const exists = this.messages.some(m => m.id === newMessage.id || m.message_id === newMessage.message_id);
+                    if (!exists) {
+                        this.messages.push(newMessage);
+                        // Scroll to bottom with smooth animation for new messages
+                        this.$nextTick(() => setTimeout(() => this.scrollToBottom(true), 50));
+                        // Mark incoming message as read since user is viewing
+                        if (newMessage.direction === 'incoming') {
+                            this.markContactAsRead(messageContact.id);
+                        }
+                    }
+                }
+                // Update contacts list silently
+                this.updateContactsList();
+            });
+            
+            // Listen for message status updates (delivered, read)
+            window.addEventListener('whatsapp-status-updated', (e) => {
+                console.log('📊 Status update received:', e.detail);
+                const { id, message_id, status } = e.detail;
+                // Find message by id or message_id
+                const msg = this.messages.find(m => m.id === id || m.message_id === message_id);
+                if (msg) {
+                    console.log('✅ Updating message status:', msg.id, '->', status);
+                    msg.status = status;
+                }
+            });
+        },
+
+        // Fetch contacts with loading indicator (initial load only)
+        async fetchContacts() {
+            this.loadingContacts = true;
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/contacts`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const data = await res.json();
+                this.contacts = data.data || [];
+                this.filterContactList();
+            } catch (e) { console.error('Error:', e); }
+            finally { this.loadingContacts = false; }
+        },
+        
+        // Update contacts list silently (no loading indicator)
+        async updateContactsList() {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/contacts`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const data = await res.json();
+                this.contacts = data.data || [];
+                this.filterContactList();
+            } catch (e) { console.error('Error:', e); }
+        },
+
+        async fetchTemplates() {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/templates`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const data = await res.json();
+                this.templates = (data.data || []).filter(t => t.status === 'APPROVED');
+            } catch (e) { console.error('Error:', e); }
+        },
+
+        filterContactList() {
+            if (!this.contactSearch) { this.filteredContactList = this.contacts; }
+            else {
+                const q = this.contactSearch.toLowerCase();
+                this.filteredContactList = this.contacts.filter(c => (c.name && c.name.toLowerCase().includes(q)) || (c.phone_number && c.phone_number.includes(q)));
+            }
+        },
+
+        async selectContact(contact) { 
+            this.messages = []; 
+            this.selectedContact = contact; 
+            await this.fetchMessages(); 
+            // Mark messages as read when opening conversation
+            if (contact.unread_count > 0) {
+                await this.markContactAsRead(contact.id);
+            }
+        },
+
+        async fetchMessages() {
+            if (!this.selectedContact?.id) return;
+            this.loadingMessages = true; this.messages = [];
+            try {
+                const token = localStorage.getItem('token');
+                const contactId = this.selectedContact.id;
+                // Use the correct endpoint that filters by contact_id
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/contacts/${contactId}/messages`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const data = await res.json();
+                if (this.selectedContact?.id === contactId) { 
+                    this.messages = data.data || []; 
+                    // Wait for DOM to render then scroll to bottom (latest messages)
+                    await this.$nextTick();
+                    setTimeout(() => this.scrollToBottom(), 100);
+                }
+            } catch (e) { console.error('Error:', e); }
+            finally { this.loadingMessages = false; }
+        },
+
+        async refreshMessages() { await this.fetchMessages(); },
+        
+        // Mark all messages from contact as read
+        async markContactAsRead(contactId) {
+            try {
+                const token = localStorage.getItem('token');
+                await fetch(`${this.API_BASE_URL}/whatsapp/contacts/${contactId}/mark-read`, { 
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                });
+                // Update local contact unread count
+                if (this.selectedContact?.id === contactId) {
+                    this.selectedContact.unread_count = 0;
+                }
+                // Update in contacts list
+                const contact = this.contacts.find(c => c.id === contactId);
+                if (contact) contact.unread_count = 0;
+            } catch (e) { console.error('Error marking as read:', e); }
+        },
+
+        selectTemplate(tpl) { 
+            // Insert template body into the message textarea
+            this.newMessage = tpl.body || '';
+            this.isTemplateMessage = true;
+            this.selectedTemplateInfo = {
+                name: tpl.name,
+                language: tpl.language || 'en',
+                originalBody: tpl.body
+            };
+            this.showTemplateModal = false;
+            // Focus on the textarea so user can edit
+            this.$nextTick(() => {
+                const textarea = this.$refs.messageInput;
+                if (textarea) {
+                    textarea.focus();
+                    // Move cursor to end
+                    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+                    // Auto resize after inserting template
+                    this.autoResizeTextarea(textarea);
+                }
+            });
+        },
+
+        autoResizeTextarea(textarea) {
+            if (!textarea) return;
+            // Reset height to auto to get the correct scrollHeight
+            textarea.style.height = 'auto';
+            // Set height based on content, respecting min and max
+            const newHeight = Math.min(Math.max(textarea.scrollHeight, 40), 200);
+            textarea.style.height = newHeight + 'px';
+        },
+
+        handleEnterKey(event) {
+            if (event.shiftKey) {
+                // Shift+Enter: allow new line (default behavior)
+                return;
+            } else {
+                // Enter only: send message
+                event.preventDefault();
+                this.sendMessage();
+            }
+        },
+
+        handleTextSelect(event) {
+            const textarea = event.target;
+            const selectedText = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd);
+            
+            if (selectedText.length > 0) {
+                // Show formatting toolbar
+                const rect = textarea.getBoundingClientRect();
+                
+                // Calculate approximate position (above the textarea)
+                this.showFormatBar = true;
+                this.formatBarPosition = {
+                    top: -45,
+                    left: Math.min(rect.width / 2 - 150, rect.width - 320)
+                };
+            } else {
+                // Hide formatting toolbar
+                this.showFormatBar = false;
+            }
+        },
+
+        formatText(type) {
+            const textarea = this.$refs.messageInput;
+            if (!textarea) return;
+
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selectedText = textarea.value.substring(start, end);
+            
+            if (!selectedText) return;
+
+            let formattedText = '';
+            let cursorOffset = 0;
+
+            switch(type) {
+                case 'bold':
+                    formattedText = `*${selectedText}*`;
+                    cursorOffset = 1;
+                    break;
+                case 'italic':
+                    formattedText = `_${selectedText}_`;
+                    cursorOffset = 1;
+                    break;
+                case 'strikethrough':
+                    formattedText = `~${selectedText}~`;
+                    cursorOffset = 1;
+                    break;
+                case 'code':
+                    formattedText = `\`\`\`${selectedText}\`\`\``;
+                    cursorOffset = 3;
+                    break;
+                case 'bullet':
+                    formattedText = selectedText.split('\n').map(line => `• ${line}`).join('\n');
+                    cursorOffset = 2;
+                    break;
+                case 'numbered':
+                    formattedText = selectedText.split('\n').map((line, i) => `${i + 1}. ${line}`).join('\n');
+                    cursorOffset = 3;
+                    break;
+                case 'quote':
+                    formattedText = selectedText.split('\n').map(line => `> ${line}`).join('\n');
+                    cursorOffset = 2;
+                    break;
+            }
+
+            // Replace selected text with formatted text
+            this.newMessage = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
+            
+            // Restore focus and selection
+            this.$nextTick(() => {
+                textarea.focus();
+                textarea.setSelectionRange(start + cursorOffset, start + formattedText.length - cursorOffset);
+                this.autoResizeTextarea(textarea);
+            });
+        },
+
+        formatWhatsAppText(text) {
+            if (!text) return '';
+            
+            // Escape HTML first
+            let formatted = text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            
+            // Bold: *text*
+            formatted = formatted.replace(/\*([^\*]+)\*/g, '<strong>$1</strong>');
+            
+            // Italic: _text_
+            formatted = formatted.replace(/_([^_]+)_/g, '<em>$1</em>');
+            
+            // Strikethrough: ~text~
+            formatted = formatted.replace(/~([^~]+)~/g, '<del>$1</del>');
+            
+            // Code: ```text```
+            formatted = formatted.replace(/```([^`]+)```/g, '<code class="bg-black/10 px-1 py-0.5 rounded text-xs font-mono">$1</code>');
+            
+            // Quote: > text (at start of line)
+            formatted = formatted.replace(/^&gt; (.+)$/gm, '<div class="border-l-2 border-current pl-2 opacity-80">$1</div>');
+            
+            return formatted;
+        },
+
+        getCountryCode(phoneNumber) {
+            if (!phoneNumber) {
+                console.log('getCountryCode: no phone number');
+                return '?';
+            }
+            console.log('getCountryCode input:', phoneNumber);
+            // Extract country code (e.g., +62 from +6281234567890)
+            const match = phoneNumber.match(/^\+(\d{1,3})/);
+            if (match) {
+                console.log('getCountryCode match:', '+' + match[1]);
+                return '+' + match[1];
+            }
+            // If no + prefix, try to extract first 2-3 digits
+            const digits = phoneNumber.match(/^(\d{2,3})/);
+            if (digits) {
+                console.log('getCountryCode digits:', digits[1]);
+                return digits[1];
+            }
+            console.log('getCountryCode fallback: ?');
+            return '?';
+        }
+
+
+
+        async sendMessage() {
+            if (!this.newMessage.trim() || !this.selectedContact || this.sending) return;
+            this.sending = true;
+            const messageText = this.newMessage;
+            const isTemplate = this.isTemplateMessage;
+            const templateInfo = this.selectedTemplateInfo;
+            
+            // Clear input immediately for better UX
+            this.newMessage = '';
+            this.isTemplateMessage = false;
+            this.selectedTemplateInfo = null;
+            
+            // Reset textarea height
+            this.$nextTick(() => {
+                const textarea = this.$refs.messageInput;
+                if (textarea) textarea.style.height = '40px';
+            });
+            
+            try {
+                const token = localStorage.getItem('token');
+                let payload, endpoint;
+                
+                if (isTemplate && templateInfo) {
+                    // Send as template message with custom body
+                    payload = { 
+                        to: this.selectedContact.phone_number, 
+                        template_name: templateInfo.name,
+                        language: templateInfo.language,
+                        body_text: messageText
+                    };
+                    endpoint = '/whatsapp/send/template';
+                } else {
+                    // Send as regular text message
+                    payload = { 
+                        to: this.selectedContact.phone_number, 
+                        message: messageText 
+                    };
+                    endpoint = '/whatsapp/send/text';
+                }
+                
+                const res = await fetch(`${this.API_BASE_URL}${endpoint}`, { 
+                    method: 'POST', 
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify(payload) 
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    alert(data.message || 'Failed to send');
+                    // Restore message if failed
+                    this.newMessage = messageText;
+                    this.isTemplateMessage = isTemplate;
+                    this.selectedTemplateInfo = templateInfo;
+                }
+                // Message will be added via broadcast event - no need to add locally
+            } catch (e) { 
+                console.error('Error:', e);
+                // Restore message if failed
+                this.newMessage = messageText;
+                this.isTemplateMessage = isTemplate;
+                this.selectedTemplateInfo = templateInfo;
+            }
+            finally { this.sending = false; }
+        },
+        
+        // Handle image file selection
+        handleImageSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                this.imageForm.file = file;
+                this.imageForm.preview = URL.createObjectURL(file);
+            }
+        },
+        
+        // Handle video file selection
+        handleVideoSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                this.videoForm.file = file;
+                this.videoForm.preview = URL.createObjectURL(file);
+            }
+        },
+        
+        // Handle document file selection
+        handleDocumentSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                this.documentForm.file = file;
+                this.documentForm.filename = file.name;
+            }
+        },
+
+        async sendImage() {
+            if (!this.imageForm.file || !this.selectedContact) return;
+            this.sending = true;
+            try {
+                const token = localStorage.getItem('token');
+                const formData = new FormData();
+                formData.append('to', this.selectedContact.phone_number);
+                formData.append('file', this.imageForm.file);
+                if (this.imageForm.caption) formData.append('caption', this.imageForm.caption);
+                
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/send/image`, { 
+                    method: 'POST', 
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData 
+                });
+                const data = await res.json();
+                if (data.success) { 
+                    this.showImageModal = false; 
+                    this.imageForm = { file: null, caption: '', preview: null }; 
+                    // Message will be added via broadcast event
+                }
+                else alert(data.message || 'Failed to send');
+            } catch (e) { console.error('Error:', e); }
+            finally { this.sending = false; }
+        },
+
+        async sendVideo() {
+            if (!this.videoForm.file || !this.selectedContact) return;
+            this.sending = true;
+            try {
+                const token = localStorage.getItem('token');
+                const formData = new FormData();
+                formData.append('to', this.selectedContact.phone_number);
+                formData.append('file', this.videoForm.file);
+                if (this.videoForm.caption) formData.append('caption', this.videoForm.caption);
+                
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/send/video`, { 
+                    method: 'POST', 
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData 
+                });
+                const data = await res.json();
+                if (data.success) { 
+                    this.showVideoModal = false; 
+                    this.videoForm = { file: null, caption: '', preview: null }; 
+                    // Message will be added via broadcast event
+                }
+                else alert(data.message || 'Failed to send video');
+            } catch (e) { console.error('Error:', e); }
+            finally { this.sending = false; }
+        },
+
+        async sendDocument() {
+            if (!this.documentForm.file || !this.selectedContact) return;
+            this.sending = true;
+            try {
+                const token = localStorage.getItem('token');
+                const formData = new FormData();
+                formData.append('to', this.selectedContact.phone_number);
+                formData.append('file', this.documentForm.file);
+                formData.append('filename', this.documentForm.filename);
+                if (this.documentForm.caption) formData.append('caption', this.documentForm.caption);
+                
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/send/document`, { 
+                    method: 'POST', 
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData 
+                });
+                const data = await res.json();
+                if (data.success) { 
+                    this.showDocumentModal = false; 
+                    this.documentForm = { file: null, filename: '', caption: '' }; 
+                    // Message will be added via broadcast event
+                }
+                else alert(data.message || 'Failed to send');
+            } catch (e) { console.error('Error:', e); }
+            finally { this.sending = false; }
+        },
+
+        // Get current location using browser geolocation
+        getCurrentLocation() {
+            if (!navigator.geolocation) {
+                alert('Geolocation is not supported by your browser');
+                return;
+            }
+            this.locationForm.gettingLocation = true;
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    this.locationForm.latitude = position.coords.latitude;
+                    this.locationForm.longitude = position.coords.longitude;
+                    // Try to get address from coordinates
+                    await this.reverseGeocode(position.coords.latitude, position.coords.longitude);
+                    this.locationForm.gettingLocation = false;
+                },
+                (error) => {
+                    console.error('Geolocation error:', error);
+                    alert('Unable to get your location. Please search for a location instead.');
+                    this.locationForm.gettingLocation = false;
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        },
+
+        // Search location using Google Places API (via Nominatim as free alternative)
+        async searchLocation() {
+            if (!this.locationForm.searchQuery || this.locationForm.searchQuery.length < 3) {
+                this.locationForm.searchResults = [];
+                return;
+            }
+            try {
+                const query = encodeURIComponent(this.locationForm.searchQuery);
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=5`);
+                const data = await res.json();
+                this.locationForm.searchResults = data.map(item => ({
+                    place_id: item.place_id,
+                    name: item.display_name.split(',')[0],
+                    formatted_address: item.display_name,
+                    lat: parseFloat(item.lat),
+                    lon: parseFloat(item.lon)
+                }));
+            } catch (e) { 
+                console.error('Search error:', e);
+                this.locationForm.searchResults = [];
+            }
+        },
+
+        // Select a search result
+        selectSearchResult(result) {
+            this.locationForm.latitude = result.lat;
+            this.locationForm.longitude = result.lon;
+            this.locationForm.name = result.name;
+            this.locationForm.address = result.formatted_address;
+            this.locationForm.searchResults = [];
+            this.locationForm.searchQuery = '';
+        },
+
+        // Reverse geocode to get address from coordinates
+        async reverseGeocode(lat, lon) {
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+                const data = await res.json();
+                if (data.display_name) {
+                    this.locationForm.name = data.name || data.display_name.split(',')[0];
+                    this.locationForm.address = data.display_name;
+                }
+            } catch (e) { console.error('Reverse geocode error:', e); }
+        },
+
+        async sendLocation() {
+            if (!this.locationForm.latitude || !this.locationForm.longitude || !this.selectedContact) return;
+            this.sending = true;
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/send/location`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ to: this.selectedContact.phone_number, latitude: parseFloat(this.locationForm.latitude), longitude: parseFloat(this.locationForm.longitude), name: this.locationForm.name, address: this.locationForm.address }) });
+                const data = await res.json();
+                if (data.success) { 
+                    this.showLocationModal = false; 
+                    this.locationForm = { latitude: '', longitude: '', name: '', address: '', searchQuery: '', searchResults: [], gettingLocation: false }; 
+                    // Message will be added via broadcast event
+                }
+                else alert(data.message || 'Failed to send');
+            } catch (e) { console.error('Error:', e); }
+            finally { this.sending = false; }
+        },
+
+        async sendButtonMessage() {
+            if (!this.buttonForm.body || !this.selectedContact) return;
+            this.sending = true;
+            try {
+                const token = localStorage.getItem('token');
+                const buttons = this.buttonForm.buttons.filter(b => b.trim()).map((b, i) => ({ id: `btn_${i}`, title: b }));
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/send/button`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ to: this.selectedContact.phone_number, body: this.buttonForm.body, buttons: buttons }) });
+                const data = await res.json();
+                if (data.success) { 
+                    this.showButtonModal = false; 
+                    this.buttonForm = { body: '', buttons: ['', ''] }; 
+                    // Message will be added via broadcast event
+                }
+                else alert(data.message || 'Failed to send');
+            } catch (e) { console.error('Error:', e); }
+            finally { this.sending = false; }
+        },
+
+        async sendListMessage() {
+            if (!this.listForm.body || !this.selectedContact) return;
+            this.sending = true;
+            try {
+                const token = localStorage.getItem('token');
+                const rows = this.listForm.items.filter(i => i.title.trim()).map((i, idx) => ({ id: `item_${idx}`, title: i.title, description: i.description || '' }));
+                const sections = [{ title: this.listForm.sectionTitle, rows: rows }];
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/send/list`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ to: this.selectedContact.phone_number, body: this.listForm.body, button_text: this.listForm.buttonText, sections: sections }) });
+                const data = await res.json();
+                if (data.success) { 
+                    this.showListModal = false; 
+                    this.listForm = { body: '', buttonText: 'View Options', sectionTitle: 'Options', items: [{title: ''}, {title: ''}] }; 
+                    // Message will be added via broadcast event
+                }
+                else alert(data.message || 'Failed to send');
+            } catch (e) { console.error('Error:', e); }
+            finally { this.sending = false; }
+        },
+
+        scrollToBottom(smooth = false) { 
+            const c = this.$refs.messagesContainer; 
+            if (c) {
+                if (smooth) {
+                    c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' });
+                } else {
+                    c.scrollTop = c.scrollHeight;
+                }
+            }
+        },
+
+        formatTime(timestamp) {
+            if (!timestamp) return '-';
+            const date = new Date(timestamp), now = new Date(), diff = now - date, hours = Math.floor(diff / 3600000);
+            if (hours < 24) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            if (hours < 48) return 'Yesterday';
+            return date.toLocaleDateString();
+        }
+    }
+}
 </script>
 @endsection

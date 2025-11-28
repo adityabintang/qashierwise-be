@@ -1,638 +1,319 @@
 @extends('layouts.app')
 
-@section('title', 'Templates - WhatsApp Business API')
+@section('title', 'Templates - QashierWise')
 
 @section('content')
-<div x-data="{
-    sidebarOpen: true,
-    user: null,
-    notifications: [],
-
-    init() {
-        // Load sidebar state from localStorage
-        let savedSidebarState = localStorage.getItem('sidebarOpen');
-        if (savedSidebarState !== null) {
-            this.sidebarOpen = JSON.parse(savedSidebarState);
-        }
-
-        // Watch for sidebarOpen changes and save to localStorage
-        this.$watch('sidebarOpen', value => {
-            localStorage.setItem('sidebarOpen', JSON.stringify(value));
-        });
-
-        // Load user info
-        let storedUser = localStorage.getItem('user');
-        if (storedUser) {
-            try {
-                this.user = JSON.parse(storedUser);
-            } catch (e) {
-                this.user = { name: 'User', email: 'user@example.com' };
-            }
-        } else {
-            this.user = { name: 'User', email: 'user@example.com' };
-        }
-    },
-
-    logout() {
-        let apiBaseUrl = window.location.origin + '/api';
-        let token = localStorage.getItem('token');
-
-        if (token) {
-            fetch(`${apiBaseUrl}/logout`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/json'
-                }
-            }).then(() => {
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-                localStorage.removeItem('sidebarOpen');
-                window.location.href = '/login';
-            }).catch(() => {
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-                localStorage.removeItem('sidebarOpen');
-                window.location.href = '/login';
-            });
-        } else {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            localStorage.removeItem('sidebarOpen');
-            window.location.href = '/login';
-        }
-    }
-}" class="min-h-screen flex">
+<div x-data="templatesApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
     <!-- Sidebar -->
-    <aside :class="sidebarOpen ? 'w-64' : 'w-20'" class="bg-slate-900 text-white transition-all duration-300 flex flex-col fixed lg:static inset-y-0 left-0 z-50">
-        <!-- Logo -->
-        <div class="p-6 flex items-center justify-between border-b border-slate-700">
-            <div x-show="sidebarOpen" class="flex items-center space-x-3">
-                <img src="{{ asset('images/logo.png') }}" class="h-8 rounded-lg" alt="Logo">
-                <span class="text-xl font-bold">QashierWise</span>
-            </div>
-            <img x-show="!sidebarOpen" src="{{ asset('images/logo.png') }}" class="h-8 rounded-lg mx-auto" alt="Logo">
-        </div>
-
-        <!-- Navigation -->
-        <nav class="flex-1 py-6">
-            <a href="/dashboard" class="flex items-center space-x-3 px-6 py-3 hover:bg-slate-800 transition">
-                <i class="fas fa-home text-xl w-6"></i>
-                <span x-show="sidebarOpen">Dashboard</span>
-            </a>
-            <a href="/dashboard/contacts" class="flex items-center space-x-3 px-6 py-3 hover:bg-slate-800 transition">
-                <i class="fas fa-address-book text-xl w-6"></i>
-                <span x-show="sidebarOpen">Contacts</span>
-            </a>
-            <a href="/dashboard/messages" class="flex items-center space-x-3 px-6 py-3 hover:bg-slate-800 transition">
-                <i class="fas fa-comments text-xl w-6"></i>
-                <span x-show="sidebarOpen">Messages</span>
-            </a>
-            <a href="/dashboard/templates" class="flex items-center space-x-3 px-6 py-3 bg-slate-800 transition">
-                <i class="fas fa-file-alt text-xl w-6"></i>
-                <span x-show="sidebarOpen">Templates</span>
-            </a>
-            <a href="/dashboard/profile" class="flex items-center space-x-3 px-6 py-3 hover:bg-slate-800 transition">
-                <i class="fas fa-building text-xl w-6"></i>
-                <span x-show="sidebarOpen">Business Profile</span>
-            </a>
-        </nav>
-
-        <!-- User Info & Logout -->
-        <div class="p-4 border-t border-slate-700">
-            <div x-show="sidebarOpen" class="mb-3">
-                <div class="flex items-center space-x-3 px-2 py-2 bg-slate-800 rounded-lg mb-2">
-                    <div class="w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center">
-                        <span class="text-white font-bold text-lg" x-text="user ? user.name.charAt(0).toUpperCase() : 'U'"></span>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="text-white font-semibold text-sm truncate" x-text="user ? user.name : 'User'"></p>
-                        <p class="text-slate-400 text-xs truncate" x-text="user ? user.email : ''"></p>
-                    </div>
-                </div>
-                <button @click="logout()" class="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg transition text-white font-medium">
-                    <i class="fas fa-sign-out-alt"></i>
-                    <span>Logout</span>
-                </button>
-            </div>
-
-            <!-- Toggle & Collapsed Actions -->
-            <div class="flex items-center justify-between">
-                <button x-show="!sidebarOpen" @click="logout()" class="p-2 hover:bg-red-500 rounded transition" title="Logout">
-                    <i class="fas fa-sign-out-alt text-xl"></i>
-                </button>
-                <button @click="sidebarOpen = !sidebarOpen" class="p-2 hover:bg-slate-800 rounded transition">
-                    <i class="fas" :class="sidebarOpen ? 'fa-chevron-left' : 'fa-chevron-right'"></i>
-                </button>
-            </div>
-        </div>
-    </aside>
+    @include('components.dashboard-sidebar', ['activePage' => 'templates'])
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col">
-        <!-- Top Navigation -->
-        <header class="bg-white shadow-sm">
-            <div class="px-6 py-4 flex items-center justify-between">
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-900">Templates</h1>
-                    <p class="text-sm text-gray-600">Manage your WhatsApp message templates</p>
-                </div>
-            </div>
-        </header>
+    <div class="flex-1 flex flex-col min-h-screen">
+        <!-- Header -->
+        @include('components.dashboard-header', ['title' => 'Templates', 'description' => 'Manage your WhatsApp message templates'])
 
         <!-- Page Content -->
-        <main class="flex-1 overflow-auto p-6">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                <div class="space-y-6" x-data="templatesManager()">
-
-    <!-- Filter Bar -->
-    <div class="bg-white rounded-xl shadow-lg p-6">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <!-- Status Filter -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                <select
-                    x-model="filters.status"
-                    @change="filterTemplates"
-                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-                    <option value="">All Statuses</option>
-                    <option value="APPROVED">Approved</option>
-                    <option value="PENDING">Pending</option>
-                    <option value="REJECTED">Rejected</option>
-                </select>
-            </div>
-
-            <!-- Category Filter -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                <select
-                    x-model="filters.category"
-                    @change="filterTemplates"
-                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-                    <option value="">All Categories</option>
-                    <option value="MARKETING">Marketing</option>
-                    <option value="UTILITY">Utility</option>
-                    <option value="AUTHENTICATION">Authentication</option>
-                </select>
-            </div>
-
-            <!-- Search -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Search</label>
-                <div class="relative">
-                    <input
-                        type="text"
-                        x-model="filters.search"
-                        @input="filterTemplates"
-                        placeholder="Search by name..."
-                        class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <i class="fas fa-search text-gray-400"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Templates Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <!-- Shimmer Loading for Templates -->
-        <template x-if="loading">
-            <template x-for="i in 6" :key="'template-shimmer-'+i">
-                <div class="bg-white rounded-xl shadow-lg overflow-hidden animate-pulse">
-                    <div class="p-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <div class="h-6 bg-gray-300 rounded w-32"></div>
-                            <div class="h-6 bg-gray-200 rounded-full w-20"></div>
-                        </div>
-                        <div class="space-y-2 mb-4">
-                            <div class="h-3 bg-gray-200 rounded w-full"></div>
-                            <div class="h-3 bg-gray-200 rounded w-3/4"></div>
-                            <div class="h-3 bg-gray-200 rounded w-1/2"></div>
-                        </div>
-                        <div class="flex items-center justify-between pt-4 border-t border-gray-100">
-                            <div class="h-4 bg-gray-200 rounded w-24"></div>
-                            <div class="h-8 bg-gray-200 rounded w-20"></div>
-                        </div>
-                    </div>
-                </div>
-            </template>
-        </template>
-
-        <!-- Actual Templates Grid -->
-        <template x-if="!loading">
-            <template x-for="template in filteredTemplates" :key="template.id">
-                <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition">
-                <div class="p-6">
-                    <!-- Header -->
-                    <div class="flex items-start justify-between mb-4">
-                        <div class="flex-1">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-1" x-text="template.name"></h3>
-                            <div class="flex items-center gap-2">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                                    :class="{
-                                        'bg-green-100 text-green-800': template.status === 'APPROVED',
-                                        'bg-yellow-100 text-yellow-800': template.status === 'PENDING',
-                                        'bg-red-100 text-red-800': template.status === 'REJECTED'
-                                    }">
-                                    <i class="mr-1"
-                                    :class="{
-                                        'fas fa-check-circle': template.status === 'APPROVED',
-                                        'fas fa-clock': template.status === 'PENDING',
-                                        'fas fa-times-circle': template.status === 'REJECTED'
-                                    }"></i>
-                                    <span x-text="template.status">Status</span>
-                                </span>
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                    <span x-text="template.category">Category</span>
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Template Preview -->
-                    <div class="bg-gray-50 rounded-lg p-4 mb-4 min-h-[120px]">
-                        <!-- Header Component -->
-                        <div x-show="template.header" class="mb-3">
-                            <template x-if="template.header_type === 'TEXT'">
-                                <p class="font-semibold text-gray-900 text-sm" x-text="template.header"></p>
-                            </template>
-                            <template x-if="template.header_type === 'IMAGE'">
-                                <div class="flex items-center space-x-2 text-gray-600">
-                                    <i class="fas fa-image"></i>
-                                    <span class="text-sm">Image Header</span>
-                                </div>
-                            </template>
-                            <template x-if="template.header_type === 'VIDEO'">
-                                <div class="flex items-center space-x-2 text-gray-600">
-                                    <i class="fas fa-video"></i>
-                                    <span class="text-sm">Video Header</span>
-                                </div>
-                            </template>
-                            <template x-if="template.header_type === 'DOCUMENT'">
-                                <div class="flex items-center space-x-2 text-gray-600">
-                                    <i class="fas fa-file"></i>
-                                    <span class="text-sm">Document Header</span>
-                                </div>
-                            </template>
-                        </div>
-
-                        <!-- Body Component -->
-                        <div x-show="template.body" class="mb-3">
-                            <p class="text-sm text-gray-700 whitespace-pre-wrap" x-text="template.body"></p>
-                        </div>
-
-                        <!-- Footer Component -->
-                        <div x-show="template.footer">
-                            <p class="text-xs text-gray-500 italic" x-text="template.footer"></p>
-                        </div>
-
-                        <!-- Buttons Component -->
-                        <div x-show="template.buttons && template.buttons.length > 0" class="mt-3 space-y-1">
-                            <template x-for="button in template.buttons" :key="button.text">
-                                <div class="flex items-center justify-center py-2 px-3 bg-white border border-gray-300 rounded text-xs text-blue-600">
-                                    <i class="mr-2" :class="{
-                                        'fas fa-phone': button.type === 'PHONE_NUMBER',
-                                        'fas fa-external-link-alt': button.type === 'URL',
-                                        'fas fa-reply': button.type === 'QUICK_REPLY'
-                                    }"></i>
-                                    <span x-text="button.text"></span>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-
-                    <!-- Meta Information -->
-                    <div class="space-y-2 mb-4">
-                        <div class="flex items-center text-xs text-gray-600">
-                            <i class="fas fa-language w-5"></i>
-                            <span x-text="template.language">Language</span>
-                        </div>
-                        <div class="flex items-center text-xs text-gray-600" x-show="template.quality_score">
-                            <i class="fas fa-star w-5"></i>
-                            <span x-text="`Quality: ${template.quality_score}`">Quality</span>
-                        </div>
-                    </div>
-
-                    <!-- Actions -->
-                    <div class="flex gap-2">
-                        <button
-                            @click="viewTemplate(template)"
-                            class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium transition">
-                            <i class="fas fa-eye mr-2"></i>View
-                        </button>
-                        <button
-                            x-show="template.status === 'APPROVED'"
-                            @click="sendTemplateModal(template)"
-                            class="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg text-sm font-medium transition">
-                            <i class="fas fa-paper-plane mr-2"></i>Send
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </template>
-        </template>
-
-        <!-- Empty State -->
-        <div x-show="!loading && filteredTemplates.length === 0" class="col-span-full text-center py-16">
-            <div class="text-gray-400 text-6xl mb-4">
-                <i class="fas fa-file-alt"></i>
-            </div>
-            <h3 class="text-xl font-semibold text-gray-900 mb-2">No templates found</h3>
-            <p class="text-gray-600">Your message templates will appear here.</p>
-        </div>
-    </div>
-
-    <!-- Send Template Modal -->
-    <div x-show="showSendModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto">
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75" @click="closeSendModal"></div>
-
-            <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full">
-                <div class="p-6">
-                    <div class="flex items-center justify-between mb-6">
-                        <h3 class="text-2xl font-bold text-gray-900">Send Template</h3>
-                        <button @click="closeSendModal" class="text-gray-400 hover:text-gray-500">
-                            <i class="fas fa-times text-xl"></i>
-                        </button>
-                    </div>
-
-                    <form @submit.prevent="sendTemplate">
-                        <!-- Contact Selection -->
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Select Contact</label>
-                            <select
-                                x-model="sendForm.contactId"
-                                required
-                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-                                <option value="">Choose a contact...</option>
-                                <template x-for="contact in contacts" :key="contact.id">
-                                    <option :value="contact.id" x-text="`${contact.name} (${contact.phone_number})`"></option>
-                                </template>
+        <main class="flex-1 p-6">
+            <div class="max-w-7xl mx-auto space-y-6" x-data="templatesManager()">
+                <!-- Filters -->
+                <div class="card p-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">Status</label>
+                            <select x-model="filters.status" @change="filterTemplates" class="input w-full">
+                                <option value="">All Statuses</option>
+                                <option value="APPROVED">Approved</option>
+                                <option value="PENDING">Pending</option>
+                                <option value="REJECTED">Rejected</option>
                             </select>
                         </div>
-
-                        <!-- Template Preview -->
-                        <div x-show="selectedTemplate" class="bg-gray-50 rounded-lg p-4 mb-4">
-                            <p class="text-sm font-medium text-gray-700 mb-2">Template Preview:</p>
-                            <p class="text-sm text-gray-900 font-semibold mb-1" x-text="selectedTemplate?.name"></p>
-                            <p class="text-sm text-gray-700 whitespace-pre-wrap" x-text="selectedTemplate?.body || selectedTemplate?.header"></p>
-                        </div>
-
-                        <!-- Action Buttons -->
-                        <div class="flex gap-3">
-                            <button
-                                type="button"
-                                @click="closeSendModal"
-                                class="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                :disabled="sending"
-                                class="flex-1 bg-green-500 hover:bg-green-600 text-white py-3 px-4 rounded-lg text-sm font-medium transition disabled:opacity-50">
-                                <i class="fas mr-2" :class="sending ? 'fa-spinner fa-spin' : 'fa-paper-plane'"></i>
-                                <span x-text="sending ? 'Sending...' : 'Send'"></span>
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- View Template Modal -->
-    <div x-show="showViewModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto">
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75" @click="closeViewModal"></div>
-
-            <div class="relative bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-                <div class="p-6" x-show="selectedTemplate">
-                    <div class="flex items-center justify-between mb-6">
-                        <h3 class="text-2xl font-bold text-gray-900">Template Details</h3>
-                        <button @click="closeViewModal" class="text-gray-400 hover:text-gray-500">
-                            <i class="fas fa-times text-xl"></i>
-                        </button>
-                    </div>
-
-                    <div class="space-y-6">
-                        <!-- Basic Info -->
                         <div>
-                            <h4 class="text-lg font-semibold text-gray-900 mb-3" x-text="selectedTemplate?.name"></h4>
-                            <div class="flex gap-2 mb-4">
-                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
-                                    :class="{
-                                        'bg-green-100 text-green-800': selectedTemplate?.status === 'APPROVED',
-                                        'bg-yellow-100 text-yellow-800': selectedTemplate?.status === 'PENDING',
-                                        'bg-red-100 text-red-800': selectedTemplate?.status === 'REJECTED'
-                                    }">
-                                    <span x-text="selectedTemplate?.status">Status</span>
-                                </span>
-                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                                    <span x-text="selectedTemplate?.category">Category</span>
-                                </span>
-                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
-                                    <span x-text="selectedTemplate?.language">Language</span>
-                                </span>
+                            <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">Category</label>
+                            <select x-model="filters.category" @change="filterTemplates" class="input w-full">
+                                <option value="">All Categories</option>
+                                <option value="MARKETING">Marketing</option>
+                                <option value="UTILITY">Utility</option>
+                                <option value="AUTHENTICATION">Authentication</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">Search</label>
+                            <div class="relative">
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm"></i>
+                                <input type="text" x-model="filters.search" @input="filterTemplates" placeholder="Search templates..." class="input pl-9 w-full">
                             </div>
                         </div>
+                    </div>
+                </div>
 
-                        <!-- Components -->
-                        <div class="bg-gray-50 rounded-lg p-6 space-y-4">
-                            <h5 class="font-semibold text-gray-900">Template Components:</h5>
-
-                            <div x-show="selectedTemplate?.header">
-                                <p class="text-sm font-medium text-gray-600 mb-1">Header:</p>
-                                <p class="text-gray-900" x-text="selectedTemplate?.header || `[${selectedTemplate?.header_type}]`"></p>
+                <!-- Templates Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Loading -->
+                    <template x-if="loading">
+                        <template x-for="i in 6" :key="'skeleton-'+i">
+                            <div class="card p-5">
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="skeleton h-5 w-32"></div>
+                                    <div class="skeleton h-5 w-20 rounded-full"></div>
+                                </div>
+                                <div class="skeleton h-24 w-full rounded-lg mb-4"></div>
+                                <div class="flex gap-2">
+                                    <div class="skeleton h-9 flex-1 rounded-md"></div>
+                                    <div class="skeleton h-9 flex-1 rounded-md"></div>
+                                </div>
                             </div>
+                        </template>
+                    </template>
 
-                            <div x-show="selectedTemplate?.body">
-                                <p class="text-sm font-medium text-gray-600 mb-1">Body:</p>
-                                <p class="text-gray-900 whitespace-pre-wrap" x-text="selectedTemplate?.body"></p>
-                            </div>
-
-                            <div x-show="selectedTemplate?.footer">
-                                <p class="text-sm font-medium text-gray-600 mb-1">Footer:</p>
-                                <p class="text-gray-600 italic" x-text="selectedTemplate?.footer"></p>
-                            </div>
-
-                            <div x-show="selectedTemplate?.buttons && selectedTemplate?.buttons.length > 0">
-                                <p class="text-sm font-medium text-gray-600 mb-2">Buttons:</p>
-                                <div class="space-y-2">
-                                    <template x-for="button in selectedTemplate?.buttons" :key="button.text">
-                                        <div class="bg-white border border-gray-300 rounded px-4 py-2">
-                                            <span class="text-sm font-medium" x-text="button.text"></span>
-                                            <span class="text-xs text-gray-500 ml-2" x-text="`(${button.type})`"></span>
+                    <!-- Templates -->
+                    <template x-if="!loading">
+                        <template x-for="template in filteredTemplates" :key="template.id">
+                            <div class="card p-5 hover:shadow-md transition-shadow">
+                                <!-- Header -->
+                                <div class="flex items-start justify-between mb-3">
+                                    <div class="flex-1 min-w-0">
+                                        <h3 class="font-semibold truncate" x-text="template.name"></h3>
+                                        <div class="flex items-center gap-2 mt-1.5">
+                                            <span class="badge text-xs"
+                                                :class="{
+                                                    'bg-emerald-100 text-emerald-700': template.status === 'APPROVED',
+                                                    'bg-amber-100 text-amber-700': template.status === 'PENDING',
+                                                    'bg-red-100 text-red-700': template.status === 'REJECTED'
+                                                }">
+                                                <i class="mr-1 text-[10px]" :class="{
+                                                    'fas fa-check-circle': template.status === 'APPROVED',
+                                                    'fas fa-clock': template.status === 'PENDING',
+                                                    'fas fa-times-circle': template.status === 'REJECTED'
+                                                }"></i>
+                                                <span x-text="template.status"></span>
+                                            </span>
+                                            <span class="badge badge-secondary text-xs" x-text="template.category"></span>
                                         </div>
-                                    </template>
+                                    </div>
+                                </div>
+
+                                <!-- Preview -->
+                                <div class="bg-[hsl(var(--muted)/0.5)] rounded-lg p-3 mb-4 min-h-[100px] text-sm">
+                                    <div x-show="template.header" class="mb-2">
+                                        <template x-if="template.header_type === 'TEXT'">
+                                            <p class="font-medium" x-text="template.header"></p>
+                                        </template>
+                                        <template x-if="['IMAGE', 'VIDEO', 'DOCUMENT'].includes(template.header_type)">
+                                            <div class="flex items-center gap-2 text-[hsl(var(--muted-foreground))]">
+                                                <i :class="{
+                                                    'fas fa-image': template.header_type === 'IMAGE',
+                                                    'fas fa-video': template.header_type === 'VIDEO',
+                                                    'fas fa-file': template.header_type === 'DOCUMENT'
+                                                }"></i>
+                                                <span class="text-xs" x-text="template.header_type + ' Header'"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <p x-show="template.body" class="text-[hsl(var(--muted-foreground))] line-clamp-3" x-text="template.body"></p>
+                                    <p x-show="template.footer" class="text-xs text-[hsl(var(--muted-foreground))] italic mt-2" x-text="template.footer"></p>
+                                </div>
+
+                                <!-- Meta -->
+                                <div class="flex items-center gap-3 text-xs text-[hsl(var(--muted-foreground))] mb-4">
+                                    <span class="flex items-center gap-1">
+                                        <i class="fas fa-language"></i>
+                                        <span x-text="template.language"></span>
+                                    </span>
+                                </div>
+
+                                <!-- Actions -->
+                                <div class="flex gap-2">
+                                    <button @click="viewTemplate(template)" class="btn btn-outline btn-md flex-1">
+                                        <i class="fas fa-eye"></i>
+                                        <span>View</span>
+                                    </button>
+                                    <button x-show="template.status === 'APPROVED'" @click="sendTemplateModal(template)" class="btn btn-primary btn-md flex-1">
+                                        <i class="fas fa-paper-plane"></i>
+                                        <span>Send</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </template>
+                </div>
+
+                <!-- Empty State -->
+                <div x-show="!loading && filteredTemplates.length === 0" class="card">
+                    <div class="empty-state py-16">
+                        <div class="empty-state-icon">
+                            <i class="fas fa-file-alt text-2xl"></i>
+                        </div>
+                        <h3 class="font-semibold mt-4">No templates found</h3>
+                        <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">Your message templates will appear here.</p>
+                    </div>
+                </div>
+
+                <!-- View Modal -->
+                <div x-show="showViewModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div x-show="showViewModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="fixed inset-0 bg-black/50" @click="closeViewModal"></div>
+                    <div x-show="showViewModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="card relative w-full max-w-lg max-h-[80vh] overflow-y-auto scroll-area">
+                        <div class="p-6 border-b border-[hsl(var(--border))] flex items-center justify-between">
+                            <h3 class="text-lg font-semibold">Template Details</h3>
+                            <button @click="closeViewModal" class="btn btn-ghost btn-icon"><i class="fas fa-times"></i></button>
+                        </div>
+                        <div class="p-6" x-show="selectedTemplate">
+                            <h4 class="font-semibold text-lg mb-3" x-text="selectedTemplate?.name"></h4>
+                            <div class="flex flex-wrap gap-2 mb-4">
+                                <span class="badge" :class="{'bg-emerald-100 text-emerald-700': selectedTemplate?.status === 'APPROVED', 'bg-amber-100 text-amber-700': selectedTemplate?.status === 'PENDING', 'bg-red-100 text-red-700': selectedTemplate?.status === 'REJECTED'}" x-text="selectedTemplate?.status"></span>
+                                <span class="badge badge-secondary" x-text="selectedTemplate?.category"></span>
+                                <span class="badge badge-outline" x-text="selectedTemplate?.language"></span>
+                            </div>
+                            <div class="bg-[hsl(var(--muted)/0.5)] rounded-lg p-4 space-y-3">
+                                <div x-show="selectedTemplate?.header">
+                                    <p class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">Header</p>
+                                    <p x-text="selectedTemplate?.header || `[${selectedTemplate?.header_type}]`"></p>
+                                </div>
+                                <div x-show="selectedTemplate?.body">
+                                    <p class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">Body</p>
+                                    <p class="whitespace-pre-wrap" x-text="selectedTemplate?.body"></p>
+                                </div>
+                                <div x-show="selectedTemplate?.footer">
+                                    <p class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">Footer</p>
+                                    <p class="text-sm italic" x-text="selectedTemplate?.footer"></p>
+                                </div>
+                                <div x-show="selectedTemplate?.buttons?.length > 0">
+                                    <p class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-2">Buttons</p>
+                                    <div class="space-y-1">
+                                        <template x-for="btn in selectedTemplate?.buttons" :key="btn.text">
+                                            <div class="bg-white border border-[hsl(var(--border))] rounded-md px-3 py-2 text-sm" x-text="btn.text"></div>
+                                        </template>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-</div>
 
-<script>
-    function templatesManager() {
-        return {
-            API_BASE_URL: window.location.origin + '/api',
-            templates: [],
-            filteredTemplates: [],
-            contacts: [],
-            selectedTemplate: null,
-            showSendModal: false,
-            showViewModal: false,
-            loading: false,
-            sending: false,
-            filters: {
-                status: '',
-                category: '',
-                search: ''
-            },
-            sendForm: {
-                contactId: ''
-            },
-
-            async init() {
-                await this.fetchTemplates();
-                await this.fetchContacts();
-            },
-
-            async fetchTemplates() {
-                this.loading = true;
-                try {
-                    const token = localStorage.getItem('token');
-                    const response = await fetch(`${this.API_BASE_URL}/whatsapp/templates`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    const data = await response.json();
-                    this.templates = data.data || [];
-                    this.filterTemplates();
-                } catch (error) {
-                    console.error('Error fetching templates:', error);
-                } finally {
-                    this.loading = false;
-                }
-            },
-
-            async fetchContacts() {
-                try {
-                    const token = localStorage.getItem('token');
-                    const response = await fetch(`${this.API_BASE_URL}/whatsapp/contacts`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    const data = await response.json();
-                    this.contacts = data.data || [];
-                } catch (error) {
-                    console.error('Error fetching contacts:', error);
-                }
-            },
-
-            filterTemplates() {
-                let filtered = this.templates;
-
-                if (this.filters.status) {
-                    filtered = filtered.filter(t => t.status === this.filters.status);
-                }
-
-                if (this.filters.category) {
-                    filtered = filtered.filter(t => t.category === this.filters.category);
-                }
-
-                if (this.filters.search) {
-                    const query = this.filters.search.toLowerCase();
-                    filtered = filtered.filter(t =>
-                        t.name.toLowerCase().includes(query) ||
-                        (t.body && t.body.toLowerCase().includes(query))
-                    );
-                }
-
-                this.filteredTemplates = filtered;
-            },
-
-            async refreshTemplates() {
-                await this.fetchTemplates();
-            },
-
-            viewTemplate(template) {
-                this.selectedTemplate = template;
-                this.showViewModal = true;
-            },
-
-            closeViewModal() {
-                this.showViewModal = false;
-                setTimeout(() => {
-                    this.selectedTemplate = null;
-                }, 300);
-            },
-
-            sendTemplateModal(template) {
-                this.selectedTemplate = template;
-                this.sendForm.contactId = '';
-                this.showSendModal = true;
-            },
-
-            closeSendModal() {
-                this.showSendModal = false;
-                setTimeout(() => {
-                    this.selectedTemplate = null;
-                    this.sendForm.contactId = '';
-                }, 300);
-            },
-
-            async sendTemplate() {
-                if (!this.sendForm.contactId || !this.selectedTemplate) return;
-
-                this.sending = true;
-                try {
-                    const token = localStorage.getItem('token');
-                    const contact = this.contacts.find(c => c.id == this.sendForm.contactId);
-
-                    if (!contact) {
-                        alert('Contact not found');
-                        this.sending = false;
-                        return;
-                    }
-
-                    const payload = {
-                        to: contact.wa_id,
-                        template_name: this.selectedTemplate.name,
-                        language: this.selectedTemplate.language
-                    };
-
-                    console.log('Sending template:', payload);
-
-                    const response = await fetch(`${this.API_BASE_URL}/whatsapp/send/template`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (response.ok) {
-                        this.closeSendModal();
-                        alert('Template sent successfully!');
-                    } else {
-                        alert('Failed to send template. Please try again.');
-                    }
-                } catch (error) {
-                    console.error('Error sending template:', error);
-                    alert('An error occurred. Please try again.');
-                } finally {
-                    this.sending = false;
-                }
-            }
-        }
-    }
-</script>
+                <!-- Send Modal -->
+                <div x-show="showSendModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div x-show="showSendModal" x-transition class="fixed inset-0 bg-black/50" @click="closeSendModal"></div>
+                    <div x-show="showSendModal" x-transition class="card relative w-full max-w-md">
+                        <div class="p-6 border-b border-[hsl(var(--border))] flex items-center justify-between">
+                            <h3 class="text-lg font-semibold">Send Template</h3>
+                            <button @click="closeSendModal" class="btn btn-ghost btn-icon"><i class="fas fa-times"></i></button>
+                        </div>
+                        <form @submit.prevent="sendTemplate" class="p-6">
+                            <div class="mb-4">
+                                <label class="text-sm font-medium mb-1.5 block">Select Contact</label>
+                                <select x-model="sendForm.contactId" required class="input w-full">
+                                    <option value="">Choose a contact...</option>
+                                    <template x-for="contact in contacts" :key="contact.id">
+                                        <option :value="contact.id" x-text="`${contact.name} (${contact.phone_number})`"></option>
+                                    </template>
+                                </select>
+                            </div>
+                            <div x-show="selectedTemplate" class="bg-[hsl(var(--muted)/0.5)] rounded-lg p-3 mb-4">
+                                <p class="text-xs text-[hsl(var(--muted-foreground))] mb-1">Template</p>
+                                <p class="font-medium text-sm" x-text="selectedTemplate?.name"></p>
+                            </div>
+                            <div class="flex gap-3">
+                                <button type="button" @click="closeSendModal" class="btn btn-outline btn-md flex-1">Cancel</button>
+                                <button type="submit" :disabled="sending" class="btn btn-primary btn-md flex-1">
+                                    <i class="fas" :class="sending ? 'fa-spinner animate-spin' : 'fa-paper-plane'"></i>
+                                    <span x-text="sending ? 'Sending...' : 'Send'"></span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         </main>
     </div>
 </div>
+
+<script>
+function templatesApp() {
+    return {
+        sidebarOpen: true, user: null, notifications: [],
+        init() {
+            let savedState = localStorage.getItem('sidebarOpen');
+            if (savedState !== null) this.sidebarOpen = JSON.parse(savedState);
+            this.$watch('sidebarOpen', v => localStorage.setItem('sidebarOpen', JSON.stringify(v)));
+            let storedUser = localStorage.getItem('user');
+            if (storedUser) { try { this.user = JSON.parse(storedUser); } catch (e) { this.user = { name: 'User', email: 'user@example.com' }; } }
+            else { this.user = { name: 'User', email: 'user@example.com' }; }
+            let savedNotifs = localStorage.getItem('notifications');
+            if (savedNotifs) { try { this.notifications = JSON.parse(savedNotifs); } catch (e) { this.notifications = []; } }
+        },
+        addNotification(n) { n.id = Date.now() + Math.random(); this.notifications.unshift(n); if (this.notifications.length > 50) this.notifications = this.notifications.slice(0, 50); localStorage.setItem('notifications', JSON.stringify(this.notifications)); },
+        clearNotifications() { this.notifications = []; localStorage.removeItem('notifications'); },
+        removeNotification(id) { this.notifications = this.notifications.filter(n => n.id !== id); localStorage.setItem('notifications', JSON.stringify(this.notifications)); },
+        formatNotificationTime(t) { let d = new Date(t), diff = Math.floor((new Date() - d) / 1000); if (diff < 60) return 'Just now'; if (diff < 3600) return Math.floor(diff / 60) + 'm ago'; if (diff < 86400) return Math.floor(diff / 3600) + 'h ago'; return d.toLocaleDateString(); },
+        logout() { let token = localStorage.getItem('token'); if (token) { fetch(`${window.location.origin}/api/logout`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } }).finally(() => { localStorage.removeItem('token'); localStorage.removeItem('user'); localStorage.removeItem('sidebarOpen'); localStorage.removeItem('notifications'); window.location.href = '/login'; }); } else { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/login'; } }
+    }
+}
+
+function templatesManager() {
+    return {
+        API_BASE_URL: window.location.origin + '/api',
+        templates: [], filteredTemplates: [], contacts: [], selectedTemplate: null,
+        showSendModal: false, showViewModal: false, loading: true, sending: false,
+        filters: { status: '', category: '', search: '' },
+        sendForm: { contactId: '' },
+
+        async init() { await Promise.all([this.fetchTemplates(), this.fetchContacts()]); },
+
+        async fetchTemplates() {
+            this.loading = true;
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/templates`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const data = await res.json();
+                this.templates = data.data || [];
+                this.filterTemplates();
+            } catch (e) { console.error('Error:', e); }
+            finally { this.loading = false; }
+        },
+
+        async fetchContacts() {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/contacts`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const data = await res.json();
+                this.contacts = data.data || [];
+            } catch (e) { console.error('Error:', e); }
+        },
+
+        filterTemplates() {
+            let filtered = this.templates;
+            if (this.filters.status) filtered = filtered.filter(t => t.status === this.filters.status);
+            if (this.filters.category) filtered = filtered.filter(t => t.category === this.filters.category);
+            if (this.filters.search) {
+                const q = this.filters.search.toLowerCase();
+                filtered = filtered.filter(t => t.name.toLowerCase().includes(q) || (t.body && t.body.toLowerCase().includes(q)));
+            }
+            this.filteredTemplates = filtered;
+        },
+
+        viewTemplate(t) { this.selectedTemplate = t; this.showViewModal = true; },
+        closeViewModal() { this.showViewModal = false; setTimeout(() => this.selectedTemplate = null, 200); },
+        sendTemplateModal(t) { this.selectedTemplate = t; this.sendForm.contactId = ''; this.showSendModal = true; },
+        closeSendModal() { this.showSendModal = false; setTimeout(() => { this.selectedTemplate = null; this.sendForm.contactId = ''; }, 200); },
+
+        async sendTemplate() {
+            if (!this.sendForm.contactId || !this.selectedTemplate) return;
+            this.sending = true;
+            try {
+                const token = localStorage.getItem('token');
+                const contact = this.contacts.find(c => c.id == this.sendForm.contactId);
+                if (!contact) { alert('Contact not found'); return; }
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/send-template`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ to: contact.phone_number, template_name: this.selectedTemplate.name, language_code: this.selectedTemplate.language || 'en' })
+                });
+                const data = await res.json();
+                if (data.success) { alert('Template sent successfully!'); this.closeSendModal(); }
+                else { alert(data.message || 'Failed to send template'); }
+            } catch (e) { console.error('Error:', e); alert('Failed to send template'); }
+            finally { this.sending = false; }
+        }
+    }
+}
+</script>
 @endsection

@@ -55,9 +55,9 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <!-- Logo -->
-                <div class="flex items-center space-x-2">
-                    <img src="{{ asset('images/logo.png') }}" class="h-7 rounded-xl" alt="Logo">
-                    <span class="text-xl font-bold text-gray-900">QashierWise</span>
+                <div class="flex items-center space-x-2 mb-4">
+                        <img src="{{ asset('images/logo.png') }}" class="h-7 rounded-xl" alt="Logo">
+                        <span class="text-xl font-bold text-primary">QashierWise</span>
                 </div>
 
                 <!-- Desktop Menu -->
@@ -110,10 +110,10 @@
                     <div class="flex flex-col sm:flex-row gap-4 mb-8">
                         <a href="/login" class="inline-flex items-center justify-center px-8 py-4 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all">
                             <span>Coba Gratis 14 Hari</span>
-                        </a>
+                        </a>    
                         <a href="#demo" class="inline-flex items-center justify-center px-8 py-4 bg-white text-primary rounded-xl font-semibold border-2 border-primary/30 hover:border-primary transition-all">
                             <i class="fas fa-play-circle mr-2"></i>
-                            <span>Lihat Fitur</span>
+                            <span>Lihat Demo</span>
                         </a>
                     </div>
 
@@ -410,7 +410,7 @@
                         <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>Tanpa pembayaran online (bayar di tempat)</li>
                         <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>1 user staf + Email support (48hr)</li>
                     </ul>
-                    <a href="/register" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition">
+                    <a href="/login" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition">
                         Mulai Gratis
                     </a>
                 </div>
@@ -433,7 +433,7 @@
                         <li class="flex items-center"><i class="fas fa-check text-primary mr-2"></i>XX pesan/bulan + Chat support (2hr)</li>
                         <li class="flex items-center"><i class="fas fa-check text-primary mr-2"></i>Customer Base</li>
                     </ul>
-                    <a href="/register" class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all">
+                    <a href="/login" class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all">
                         Pilih Standard
                     </a>
                 </div>
@@ -453,7 +453,7 @@
                         <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>Priority routing & handover</li>
                         <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>SLA + dedicated support</li>
                     </ul>
-                    <a href="/register" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition">
+                    <a href="/login" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition">
                         Pilih Pro
                     </a>
                 </div>
@@ -607,7 +607,7 @@
             </div>
 
             <div class="border-t border-gray-200 pt-8 text-center text-sm text-gray-600">
-                <p>&copy; 2025 QashierWise by AdityaBintang. All Rights Reserved.</p>
+                <p>&copy; 2025 QashierWise by Aditya Bintang Fadila. All Rights Reserved.</p>
             </div>
         </div>
     </footer>
