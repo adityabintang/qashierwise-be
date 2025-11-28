@@ -1,17 +1,13 @@
 @extends('layouts.app')
-
 @section('title', 'Messages - QashierWise')
-
 @section('content')
 <div x-data="messagesApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
     <!-- Sidebar -->
     @include('components.dashboard-sidebar', ['activePage' => 'messages'])
-
     <!-- Main Content -->
     <div class="flex-1 flex flex-col min-h-screen">
         <!-- Header -->
         @include('components.dashboard-header', ['title' => 'Messages', 'description' => 'Chat with your WhatsApp contacts'])
-
         <!-- Page Content -->
         <main class="flex-1 p-6">
             <div class="max-w-7xl mx-auto h-[calc(100vh-10rem)]" x-data="messagesManager()">
@@ -31,7 +27,6 @@
                                 >
                             </div>
                         </div>
-
                         <!-- Contacts List -->
                         <div class="flex-1 overflow-y-auto scroll-area">
                             <!-- Loading -->
@@ -48,7 +43,6 @@
                                     </template>
                                 </div>
                             </template>
-
                             <!-- Contacts -->
                             <template x-if="!loadingContacts">
                                 <div class="p-2 space-y-1">
@@ -60,14 +54,14 @@
                                         >
                                             <div class="relative flex-shrink-0">
                                                 <!-- Avatar with name (use DiceBear) -->
-                                                <img 
+                                                <img
                                                     x-show="contact.name && contact.name.trim()"
-                                                    :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(contact.name || 'U')}&backgroundColor=a855f7`" 
+                                                    :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(contact.name || 'U')}&backgroundColor=a855f7`"
                                                     :alt="contact.name"
                                                     class="avatar"
                                                 >
                                                 <!-- Avatar without name (show country code) -->
-                                                <div 
+                                                <div
                                                     x-show="!contact.name || !contact.name.trim()"
                                                     class="avatar flex items-center justify-center text-white font-bold"
                                                     style="background: linear-gradient(135deg, #a855f7, #9333ea); font-size: 0.75rem;"
@@ -86,7 +80,6 @@
                                             </div>
                                         </div>
                                     </template>
-
                                     <!-- Empty -->
                                     <div x-show="filteredContactList.length === 0" class="empty-state py-12">
                                         <div class="empty-state-icon h-12 w-12">
@@ -98,21 +91,20 @@
                             </template>
                         </div>
                     </div>
-
                     <!-- Chat Area -->
                     <div class="flex-1 flex flex-col" x-show="selectedContact">
                         <!-- Chat Header -->
                         <div class="h-16 px-4 border-b border-[hsl(var(--border))] flex items-center justify-between bg-[hsl(var(--muted)/0.3)]">
                             <div class="flex items-center gap-3">
                                 <!-- Avatar with name -->
-                                <img 
+                                <img
                                     x-show="selectedContact?.name && selectedContact.name.trim()"
-                                    :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(selectedContact?.name || 'U')}&backgroundColor=a855f7`" 
+                                    :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(selectedContact?.name || 'U')}&backgroundColor=a855f7`"
                                     :alt="selectedContact?.name"
                                     class="avatar"
                                 >
                                 <!-- Avatar without name -->
-                                <div 
+                                <div
                                     x-show="!selectedContact?.name || !selectedContact.name.trim()"
                                     class="avatar flex items-center justify-center text-white font-bold"
                                     style="background: linear-gradient(135deg, #a855f7, #9333ea); font-size: 0.875rem;"
@@ -128,7 +120,6 @@
                                 <i class="fas fa-sync-alt" :class="{'animate-spin': loadingMessages}"></i>
                             </button>
                         </div>
-
                         <!-- Messages -->
                         <div class="flex-1 overflow-y-auto scroll-area p-4 space-y-3 bg-[hsl(var(--muted)/0.2)]" x-ref="messagesContainer">
                             <!-- Loading -->
@@ -141,7 +132,6 @@
                                     </template>
                                 </div>
                             </template>
-
                             <!-- Messages List -->
                             <template x-if="!loadingMessages">
                                 <div class="space-y-3">
@@ -149,7 +139,7 @@
                                         <div x-show="message && message.id" class="flex" :class="message?.direction === 'outgoing' ? 'justify-end' : 'justify-start'">
                                             <div class="max-w-[70%]">
                                                 <!-- Message Bubble -->
-                                                <div 
+                                                <div
                                                     class="rounded-2xl px-4 py-2 shadow-sm"
                                                     :class="message?.direction === 'outgoing' ? 'bg-[hsl(var(--primary))] text-white rounded-br-md' : 'bg-white border border-[hsl(var(--border))] rounded-bl-md'"
                                                 >
@@ -157,7 +147,6 @@
                                                     <div x-show="message?.type === 'text'">
                                                         <p class="text-sm whitespace-pre-wrap" x-html="formatWhatsAppText(message?.content || message?.body)"></p>
                                                     </div>
-
                                                     <!-- Template -->
                                                     <div x-show="message?.type === 'template'" class="text-sm">
                                                         <div class="flex items-center gap-2 mb-1 opacity-80">
@@ -166,7 +155,6 @@
                                                         </div>
                                                         <p class="whitespace-pre-wrap" x-html="formatWhatsAppText(message?.body || 'Template message')"></p>
                                                     </div>
-
                                                     <!-- Image -->
                                                     <div x-show="message?.type === 'image'">
                                                         <a x-show="message?.media_url" :href="message?.media_url" target="_blank">
@@ -178,7 +166,6 @@
                                                         </div>
                                                         <p x-show="message?.caption" class="text-sm mt-2" x-text="message?.caption"></p>
                                                     </div>
-
                                                     <!-- Video -->
                                                     <div x-show="message?.type === 'video'">
                                                         <div x-show="message?.media_url" class="max-w-[220px]">
@@ -192,7 +179,6 @@
                                                         </div>
                                                         <p x-show="message?.caption" class="text-sm mt-2" x-text="message?.caption"></p>
                                                     </div>
-
                                                     <!-- Document -->
                                                     <div x-show="message?.type === 'document'" class="flex items-center gap-3">
                                                         <div class="h-10 w-10 rounded-lg flex items-center justify-center" :class="message?.direction === 'outgoing' ? 'bg-white/20' : 'bg-[hsl(var(--muted))]'">
@@ -203,7 +189,6 @@
                                                             <a x-show="message?.media_url" :href="message?.media_url" target="_blank" class="text-xs underline opacity-80">Download</a>
                                                         </div>
                                                     </div>
-
                                                     <!-- Audio -->
                                                     <div x-show="message?.type === 'audio'">
                                                         <div x-show="message?.media_url">
@@ -216,7 +201,6 @@
                                                             <span class="text-sm">Audio message</span>
                                                         </div>
                                                     </div>
-
                                                     <!-- Location -->
                                                     <div x-show="message?.type === 'location'">
                                                         <div class="flex items-center gap-2 mb-1">
@@ -226,7 +210,6 @@
                                                         <p x-show="message?.location_name" class="text-sm" x-text="message?.location_name"></p>
                                                         <a x-show="message?.latitude && message?.longitude" :href="`https://maps.google.com/?q=${message?.latitude},${message?.longitude}`" target="_blank" class="text-xs underline">Open in Maps</a>
                                                     </div>
-
                                                     <!-- Interactive - Buttons -->
                                                     <div x-show="message?.type === 'interactive'">
                                                         <p x-show="message?.body" class="text-sm mb-2" x-text="message?.body"></p>
@@ -248,13 +231,11 @@
                                                         <!-- Fallback if no buttons/list -->
                                                         <p x-show="!message?.buttons?.length && !message?.list_sections?.length && !message?.body" class="text-sm">Interactive message</p>
                                                     </div>
-
                                                     <!-- Sticker -->
                                                     <div x-show="message?.type === 'sticker'">
                                                         <img x-show="message?.media_url" :src="message?.media_url" class="w-24 h-24" alt="Sticker">
                                                         <div x-show="!message?.media_url" class="text-4xl text-center">🎭</div>
                                                     </div>
-
                                                     <!-- Contacts -->
                                                     <div x-show="message?.type === 'contacts' || message?.type === 'contact'" class="flex items-center gap-2">
                                                         <i class="fas fa-address-book"></i>
@@ -263,16 +244,13 @@
                                                             <p class="text-xs opacity-80" x-text="message?.body || 'Contact shared'"></p>
                                                         </div>
                                                     </div>
-
                                                     <!-- Reaction -->
                                                     <div x-show="message?.type === 'reaction'" class="text-2xl" x-text="message?.emoji || message?.body || '👍'"></div>
-
                                                     <!-- Unknown/Other -->
                                                     <div x-show="!['text', 'template', 'image', 'video', 'document', 'audio', 'location', 'interactive', 'sticker', 'contacts', 'contact', 'reaction'].includes(message?.type)">
                                                         <p class="text-sm" x-text="message?.body || message?.content || (message?.type ? message.type + ' message' : 'Message')"></p>
                                                     </div>
                                                 </div>
-
                                                 <!-- Meta -->
                                                 <div class="flex items-center justify-between mt-1 px-1">
                                                     <p class="text-[10px] text-[hsl(var(--muted-foreground))]" x-text="formatTime(message?.created_at)">-</p>
@@ -289,7 +267,6 @@
                                             </div>
                                         </div>
                                     </template>
-
                                     <!-- Empty -->
                                     <div x-show="messages.length === 0" class="empty-state py-16">
                                         <div class="empty-state-icon">
@@ -301,7 +278,6 @@
                                 </div>
                             </template>
                         </div>
-
                         <!-- Input -->
                         <div class="p-4 border-t border-[hsl(var(--border))] bg-white">
                             <form @submit.prevent="sendMessage" class="flex items-end gap-2">
@@ -334,7 +310,6 @@
                                         </button>
                                     </div>
                                 </div>
-
                                 <div class="flex-1 relative">
                                     <!-- Template Indicator -->
                                     <div x-show="isTemplateMessage" x-cloak class="absolute -top-8 left-0 right-0 flex items-center justify-between px-2 py-1 bg-purple-50 border border-purple-200 rounded-t-lg text-xs">
@@ -346,10 +321,9 @@
                                             <i class="fas fa-times"></i>
                                         </button>
                                     </div>
-
                                     <!-- Formatting Toolbar -->
-                                    <div 
-                                        x-show="showFormatBar" 
+                                    <div
+                                        x-show="showFormatBar"
                                         x-cloak
                                         :style="`top: ${formatBarPosition.top}px; left: ${formatBarPosition.left}px;`"
                                         class="absolute z-50 bg-[hsl(var(--card))] rounded-lg shadow-lg border border-[hsl(var(--border))] flex items-center gap-1 p-1"
@@ -378,19 +352,18 @@
                                             <i class="fas fa-quote-right"></i>
                                         </button>
                                     </div>
-
-                                    <textarea 
+                                    <textarea
                                         x-ref="messageInput"
-                                        x-model="newMessage" 
+                                        x-model="newMessage"
                                         @input="autoResizeTextarea($event.target)"
                                         @keydown.enter="handleEnterKey($event)"
                                         @keydown.ctrl.b.prevent="formatText('bold')"
                                         @keydown.ctrl.i.prevent="formatText('italic')"
                                         @select="handleTextSelect($event)"
                                         @mouseup="handleTextSelect($event)"
-                                        placeholder="Type a message... (Shift+Enter for new line)" 
-                                        rows="1" 
-                                        class="input w-full resize-none py-2 overflow-hidden" 
+                                        placeholder="Type a message... (Shift+Enter for new line)"
+                                        rows="1"
+                                        class="input w-full resize-none py-2 overflow-hidden"
                                         style="min-height: 40px; max-height: 200px;"
                                         :disabled="sending"
                                     ></textarea>
@@ -401,7 +374,6 @@
                             </form>
                         </div>
                     </div>
-
                     <!-- No Contact Selected -->
                     <div x-show="!selectedContact" class="flex-1 flex items-center justify-center bg-[hsl(var(--muted)/0.2)]">
                         <div class="text-center">
@@ -413,7 +385,6 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- Template Modal -->
                 <div x-show="showTemplateModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div class="fixed inset-0 bg-black/50" @click="showTemplateModal = false"></div>
@@ -422,7 +393,7 @@
                             <h3 class="font-semibold">Select Template</h3>
                             <button @click="showTemplateModal = false" class="btn btn-ghost btn-icon"><i class="fas fa-times"></i></button>
                         </div>
-                        
+
                         <!-- Template List -->
                         <div class="p-4 max-h-96 overflow-y-auto scroll-area space-y-2">
                             <template x-for="tpl in templates" :key="tpl.id">
@@ -447,7 +418,6 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- Image Modal -->
                 <div x-show="showImageModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div class="fixed inset-0 bg-black/50" @click="showImageModal = false; imageForm = { file: null, caption: '', preview: null }"></div>
@@ -478,7 +448,6 @@
                         </form>
                     </div>
                 </div>
-
                 <!-- Video Modal -->
                 <div x-show="showVideoModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div class="fixed inset-0 bg-black/50" @click="showVideoModal = false; videoForm = { file: null, caption: '', preview: null }"></div>
@@ -509,7 +478,6 @@
                         </form>
                     </div>
                 </div>
-
                 <!-- Document Modal -->
                 <div x-show="showDocumentModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div class="fixed inset-0 bg-black/50" @click="showDocumentModal = false; documentForm = { file: null, filename: '', caption: '' }"></div>
@@ -541,7 +509,6 @@
                         </form>
                     </div>
                 </div>
-
                 <!-- Location Modal -->
                 <div x-show="showLocationModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div class="fixed inset-0 bg-black/50" @click="showLocationModal = false; locationForm = { latitude: '', longitude: '', name: '', address: '', mapUrl: '' }"></div>
@@ -568,7 +535,6 @@
                                     </template>
                                 </div>
                             </div>
-
                             <!-- Get Current Location Button -->
                             <div class="flex gap-2">
                                 <button type="button" @click="getCurrentLocation" class="btn btn-outline btn-sm flex-1" :disabled="locationForm.gettingLocation">
@@ -579,19 +545,17 @@
                                     <i class="fas fa-external-link-alt"></i> View Map
                                 </a>
                             </div>
-
                             <!-- Map Preview -->
                             <div x-show="locationForm.latitude && locationForm.longitude" class="rounded-lg overflow-hidden border border-[hsl(var(--border))]">
-                                <iframe 
+                                <iframe
                                     :src="`https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${locationForm.latitude},${locationForm.longitude}&zoom=15`"
-                                    width="100%" 
-                                    height="200" 
-                                    style="border:0;" 
-                                    allowfullscreen="" 
+                                    width="100%"
+                                    height="200"
+                                    style="border:0;"
+                                    allowfullscreen=""
                                     loading="lazy">
                                 </iframe>
                             </div>
-
                             <!-- Coordinates (readonly, auto-filled) -->
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
@@ -620,7 +584,6 @@
                         </form>
                     </div>
                 </div>
-
                 <!-- Button Message Modal -->
                 <div x-show="showButtonModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div class="fixed inset-0 bg-black/50" @click="showButtonModal = false"></div>
@@ -653,7 +616,6 @@
                         </form>
                     </div>
                 </div>
-
                 <!-- List Message Modal -->
                 <div x-show="showListModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div class="fixed inset-0 bg-black/50" @click="showListModal = false"></div>
@@ -698,51 +660,42 @@
         </main>
     </div>
 </div>
-
-
 <script>
 function messagesApp() {
     return {
         sidebarOpen: true,
         user: null,
         notifications: [],
-
         init() {
             let savedState = localStorage.getItem('sidebarOpen');
             if (savedState !== null) this.sidebarOpen = JSON.parse(savedState);
             this.$watch('sidebarOpen', v => localStorage.setItem('sidebarOpen', JSON.stringify(v)));
-
             let storedUser = localStorage.getItem('user');
             if (storedUser) {
-                try { this.user = JSON.parse(storedUser); } 
+                try { this.user = JSON.parse(storedUser); }
                 catch (e) { this.user = { name: 'User', email: 'user@example.com' }; }
             } else {
                 this.user = { name: 'User', email: 'user@example.com' };
             }
-
             let savedNotifs = localStorage.getItem('notifications');
             if (savedNotifs) {
                 try { this.notifications = JSON.parse(savedNotifs); } catch (e) { this.notifications = []; }
             }
         },
-
         addNotification(notif) {
             notif.id = Date.now() + Math.random();
             this.notifications.unshift(notif);
             if (this.notifications.length > 50) this.notifications = this.notifications.slice(0, 50);
             localStorage.setItem('notifications', JSON.stringify(this.notifications));
         },
-
         clearNotifications() {
             this.notifications = [];
             localStorage.removeItem('notifications');
         },
-
         removeNotification(id) {
             this.notifications = this.notifications.filter(n => n.id !== id);
             localStorage.setItem('notifications', JSON.stringify(this.notifications));
         },
-
         formatNotificationTime(timestamp) {
             let date = new Date(timestamp);
             let diff = Math.floor((new Date() - date) / 1000);
@@ -751,7 +704,6 @@ function messagesApp() {
             if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
             return date.toLocaleDateString();
         },
-
         logout() {
             let token = localStorage.getItem('token');
             if (token) {
@@ -773,14 +725,13 @@ function messagesApp() {
         }
     }
 }
-
 function messagesManager() {
     return {
         API_BASE_URL: window.location.origin + '/api',
         contacts: [], filteredContactList: [], selectedContact: null, messages: [], templates: [],
         newMessage: '', contactSearch: '', loadingContacts: true, loadingMessages: false, sending: false,
         mediaPreview: null, mediaFile: null,
-        showTemplateModal: false, showImageModal: false, showVideoModal: false, showDocumentModal: false, 
+        showTemplateModal: false, showImageModal: false, showVideoModal: false, showDocumentModal: false,
         showLocationModal: false, showButtonModal: false, showListModal: false,
         showFormatBar: false, formatBarPosition: { top: 0, left: 0 },
         isTemplateMessage: false, selectedTemplateInfo: null,
@@ -790,19 +741,17 @@ function messagesManager() {
         locationForm: { latitude: '', longitude: '', name: '', address: '', searchQuery: '', searchResults: [], gettingLocation: false },
         buttonForm: { body: '', buttons: ['', ''] },
         listForm: { body: '', buttonText: 'View Options', sectionTitle: 'Options', items: [{title: ''}, {title: ''}] },
-
-
         async init() {
             await Promise.all([this.fetchContacts(), this.fetchTemplates()]);
             const urlParams = new URLSearchParams(window.location.search);
             const contactId = urlParams.get('contact');
             if (contactId) { const contact = this.contacts.find(c => c.id == contactId); if (contact) this.selectContact(contact); }
-            
+
             // Listen for real-time messages from broadcast
             window.addEventListener('whatsapp-message-received', (e) => {
                 const newMessage = e.detail.message;
                 const messageContact = e.detail.contact;
-                
+
                 if (this.selectedContact && messageContact?.id === this.selectedContact.id && newMessage) {
                     // Check if message already exists to prevent duplicates
                     const exists = this.messages.some(m => m.id === newMessage.id || m.message_id === newMessage.message_id);
@@ -819,7 +768,7 @@ function messagesManager() {
                 // Update contacts list silently
                 this.updateContactsList();
             });
-            
+
             // Listen for message status updates (delivered, read)
             window.addEventListener('whatsapp-status-updated', (e) => {
                 console.log('📊 Status update received:', e.detail);
@@ -832,7 +781,6 @@ function messagesManager() {
                 }
             });
         },
-
         // Fetch contacts with loading indicator (initial load only)
         async fetchContacts() {
             this.loadingContacts = true;
@@ -845,7 +793,7 @@ function messagesManager() {
             } catch (e) { console.error('Error:', e); }
             finally { this.loadingContacts = false; }
         },
-        
+
         // Update contacts list silently (no loading indicator)
         async updateContactsList() {
             try {
@@ -856,7 +804,6 @@ function messagesManager() {
                 this.filterContactList();
             } catch (e) { console.error('Error:', e); }
         },
-
         async fetchTemplates() {
             try {
                 const token = localStorage.getItem('token');
@@ -865,7 +812,6 @@ function messagesManager() {
                 this.templates = (data.data || []).filter(t => t.status === 'APPROVED');
             } catch (e) { console.error('Error:', e); }
         },
-
         filterContactList() {
             if (!this.contactSearch) { this.filteredContactList = this.contacts; }
             else {
@@ -873,17 +819,15 @@ function messagesManager() {
                 this.filteredContactList = this.contacts.filter(c => (c.name && c.name.toLowerCase().includes(q)) || (c.phone_number && c.phone_number.includes(q)));
             }
         },
-
-        async selectContact(contact) { 
-            this.messages = []; 
-            this.selectedContact = contact; 
-            await this.fetchMessages(); 
+        async selectContact(contact) {
+            this.messages = [];
+            this.selectedContact = contact;
+            await this.fetchMessages();
             // Mark messages as read when opening conversation
             if (contact.unread_count > 0) {
                 await this.markContactAsRead(contact.id);
             }
         },
-
         async fetchMessages() {
             if (!this.selectedContact?.id) return;
             this.loadingMessages = true; this.messages = [];
@@ -893,8 +837,8 @@ function messagesManager() {
                 // Use the correct endpoint that filters by contact_id
                 const res = await fetch(`${this.API_BASE_URL}/whatsapp/contacts/${contactId}/messages`, { headers: { 'Authorization': `Bearer ${token}` } });
                 const data = await res.json();
-                if (this.selectedContact?.id === contactId) { 
-                    this.messages = data.data || []; 
+                if (this.selectedContact?.id === contactId) {
+                    this.messages = data.data || [];
                     // Wait for DOM to render then scroll to bottom (latest messages)
                     await this.$nextTick();
                     setTimeout(() => this.scrollToBottom(), 100);
@@ -902,14 +846,13 @@ function messagesManager() {
             } catch (e) { console.error('Error:', e); }
             finally { this.loadingMessages = false; }
         },
-
         async refreshMessages() { await this.fetchMessages(); },
-        
+
         // Mark all messages from contact as read
         async markContactAsRead(contactId) {
             try {
                 const token = localStorage.getItem('token');
-                await fetch(`${this.API_BASE_URL}/whatsapp/contacts/${contactId}/mark-read`, { 
+                await fetch(`${this.API_BASE_URL}/whatsapp/contacts/${contactId}/mark-read`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
                 });
@@ -922,8 +865,7 @@ function messagesManager() {
                 if (contact) contact.unread_count = 0;
             } catch (e) { console.error('Error marking as read:', e); }
         },
-
-        selectTemplate(tpl) { 
+        selectTemplate(tpl) {
             // Insert template body into the message textarea
             this.newMessage = tpl.body || '';
             this.isTemplateMessage = true;
@@ -945,7 +887,6 @@ function messagesManager() {
                 }
             });
         },
-
         autoResizeTextarea(textarea) {
             if (!textarea) return;
             // Reset height to auto to get the correct scrollHeight
@@ -954,7 +895,6 @@ function messagesManager() {
             const newHeight = Math.min(Math.max(textarea.scrollHeight, 40), 200);
             textarea.style.height = newHeight + 'px';
         },
-
         handleEnterKey(event) {
             if (event.shiftKey) {
                 // Shift+Enter: allow new line (default behavior)
@@ -965,15 +905,14 @@ function messagesManager() {
                 this.sendMessage();
             }
         },
-
         handleTextSelect(event) {
             const textarea = event.target;
             const selectedText = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd);
-            
+
             if (selectedText.length > 0) {
                 // Show formatting toolbar
                 const rect = textarea.getBoundingClientRect();
-                
+
                 // Calculate approximate position (above the textarea)
                 this.showFormatBar = true;
                 this.formatBarPosition = {
@@ -985,20 +924,16 @@ function messagesManager() {
                 this.showFormatBar = false;
             }
         },
-
         formatText(type) {
             const textarea = this.$refs.messageInput;
             if (!textarea) return;
-
             const start = textarea.selectionStart;
             const end = textarea.selectionEnd;
             const selectedText = textarea.value.substring(start, end);
-            
-            if (!selectedText) return;
 
+            if (!selectedText) return;
             let formattedText = '';
             let cursorOffset = 0;
-
             switch(type) {
                 case 'bold':
                     formattedText = `*${selectedText}*`;
@@ -1029,10 +964,9 @@ function messagesManager() {
                     cursorOffset = 2;
                     break;
             }
-
             // Replace selected text with formatted text
             this.newMessage = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
-            
+
             // Restore focus and selection
             this.$nextTick(() => {
                 textarea.focus();
@@ -1040,34 +974,32 @@ function messagesManager() {
                 this.autoResizeTextarea(textarea);
             });
         },
-
         formatWhatsAppText(text) {
             if (!text) return '';
-            
+
             // Escape HTML first
             let formatted = text
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;');
-            
+
             // Bold: *text*
             formatted = formatted.replace(/\*([^\*]+)\*/g, '<strong>$1</strong>');
-            
+
             // Italic: _text_
             formatted = formatted.replace(/_([^_]+)_/g, '<em>$1</em>');
-            
+
             // Strikethrough: ~text~
             formatted = formatted.replace(/~([^~]+)~/g, '<del>$1</del>');
-            
+
             // Code: ```text```
             formatted = formatted.replace(/```([^`]+)```/g, '<code class="bg-black/10 px-1 py-0.5 rounded text-xs font-mono">$1</code>');
-            
+
             // Quote: > text (at start of line)
             formatted = formatted.replace(/^&gt; (.+)$/gm, '<div class="border-l-2 border-current pl-2 opacity-80">$1</div>');
-            
+
             return formatted;
         },
-
         getCountryCode(phoneNumber) {
             if (!phoneNumber) {
                 console.log('getCountryCode: no phone number');
@@ -1088,36 +1020,33 @@ function messagesManager() {
             }
             console.log('getCountryCode fallback: ?');
             return '?';
-        }
-
-
-
+        },
         async sendMessage() {
             if (!this.newMessage.trim() || !this.selectedContact || this.sending) return;
             this.sending = true;
             const messageText = this.newMessage;
             const isTemplate = this.isTemplateMessage;
             const templateInfo = this.selectedTemplateInfo;
-            
+
             // Clear input immediately for better UX
             this.newMessage = '';
             this.isTemplateMessage = false;
             this.selectedTemplateInfo = null;
-            
+
             // Reset textarea height
             this.$nextTick(() => {
                 const textarea = this.$refs.messageInput;
                 if (textarea) textarea.style.height = '40px';
             });
-            
+
             try {
                 const token = localStorage.getItem('token');
                 let payload, endpoint;
-                
+
                 if (isTemplate && templateInfo) {
                     // Send as template message with custom body
-                    payload = { 
-                        to: this.selectedContact.phone_number, 
+                    payload = {
+                        to: this.selectedContact.phone_number,
                         template_name: templateInfo.name,
                         language: templateInfo.language,
                         body_text: messageText
@@ -1125,17 +1054,17 @@ function messagesManager() {
                     endpoint = '/whatsapp/send/template';
                 } else {
                     // Send as regular text message
-                    payload = { 
-                        to: this.selectedContact.phone_number, 
-                        message: messageText 
+                    payload = {
+                        to: this.selectedContact.phone_number,
+                        message: messageText
                     };
                     endpoint = '/whatsapp/send/text';
                 }
-                
-                const res = await fetch(`${this.API_BASE_URL}${endpoint}`, { 
-                    method: 'POST', 
-                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify(payload) 
+
+                const res = await fetch(`${this.API_BASE_URL}${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
                 });
                 const data = await res.json();
                 if (!data.success) {
@@ -1146,7 +1075,7 @@ function messagesManager() {
                     this.selectedTemplateInfo = templateInfo;
                 }
                 // Message will be added via broadcast event - no need to add locally
-            } catch (e) { 
+            } catch (e) {
                 console.error('Error:', e);
                 // Restore message if failed
                 this.newMessage = messageText;
@@ -1155,7 +1084,7 @@ function messagesManager() {
             }
             finally { this.sending = false; }
         },
-        
+
         // Handle image file selection
         handleImageSelect(event) {
             const file = event.target.files[0];
@@ -1164,7 +1093,7 @@ function messagesManager() {
                 this.imageForm.preview = URL.createObjectURL(file);
             }
         },
-        
+
         // Handle video file selection
         handleVideoSelect(event) {
             const file = event.target.files[0];
@@ -1173,7 +1102,7 @@ function messagesManager() {
                 this.videoForm.preview = URL.createObjectURL(file);
             }
         },
-        
+
         // Handle document file selection
         handleDocumentSelect(event) {
             const file = event.target.files[0];
@@ -1182,7 +1111,6 @@ function messagesManager() {
                 this.documentForm.filename = file.name;
             }
         },
-
         async sendImage() {
             if (!this.imageForm.file || !this.selectedContact) return;
             this.sending = true;
@@ -1192,23 +1120,22 @@ function messagesManager() {
                 formData.append('to', this.selectedContact.phone_number);
                 formData.append('file', this.imageForm.file);
                 if (this.imageForm.caption) formData.append('caption', this.imageForm.caption);
-                
-                const res = await fetch(`${this.API_BASE_URL}/whatsapp/send/image`, { 
-                    method: 'POST', 
+
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/send/image`, {
+                    method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` },
-                    body: formData 
+                    body: formData
                 });
                 const data = await res.json();
-                if (data.success) { 
-                    this.showImageModal = false; 
-                    this.imageForm = { file: null, caption: '', preview: null }; 
+                if (data.success) {
+                    this.showImageModal = false;
+                    this.imageForm = { file: null, caption: '', preview: null };
                     // Message will be added via broadcast event
                 }
                 else alert(data.message || 'Failed to send');
             } catch (e) { console.error('Error:', e); }
             finally { this.sending = false; }
         },
-
         async sendVideo() {
             if (!this.videoForm.file || !this.selectedContact) return;
             this.sending = true;
@@ -1218,23 +1145,22 @@ function messagesManager() {
                 formData.append('to', this.selectedContact.phone_number);
                 formData.append('file', this.videoForm.file);
                 if (this.videoForm.caption) formData.append('caption', this.videoForm.caption);
-                
-                const res = await fetch(`${this.API_BASE_URL}/whatsapp/send/video`, { 
-                    method: 'POST', 
+
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/send/video`, {
+                    method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` },
-                    body: formData 
+                    body: formData
                 });
                 const data = await res.json();
-                if (data.success) { 
-                    this.showVideoModal = false; 
-                    this.videoForm = { file: null, caption: '', preview: null }; 
+                if (data.success) {
+                    this.showVideoModal = false;
+                    this.videoForm = { file: null, caption: '', preview: null };
                     // Message will be added via broadcast event
                 }
                 else alert(data.message || 'Failed to send video');
             } catch (e) { console.error('Error:', e); }
             finally { this.sending = false; }
         },
-
         async sendDocument() {
             if (!this.documentForm.file || !this.selectedContact) return;
             this.sending = true;
@@ -1245,23 +1171,22 @@ function messagesManager() {
                 formData.append('file', this.documentForm.file);
                 formData.append('filename', this.documentForm.filename);
                 if (this.documentForm.caption) formData.append('caption', this.documentForm.caption);
-                
-                const res = await fetch(`${this.API_BASE_URL}/whatsapp/send/document`, { 
-                    method: 'POST', 
+
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/send/document`, {
+                    method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` },
-                    body: formData 
+                    body: formData
                 });
                 const data = await res.json();
-                if (data.success) { 
-                    this.showDocumentModal = false; 
-                    this.documentForm = { file: null, filename: '', caption: '' }; 
+                if (data.success) {
+                    this.showDocumentModal = false;
+                    this.documentForm = { file: null, filename: '', caption: '' };
                     // Message will be added via broadcast event
                 }
                 else alert(data.message || 'Failed to send');
             } catch (e) { console.error('Error:', e); }
             finally { this.sending = false; }
         },
-
         // Get current location using browser geolocation
         getCurrentLocation() {
             if (!navigator.geolocation) {
@@ -1285,7 +1210,6 @@ function messagesManager() {
                 { enableHighAccuracy: true, timeout: 10000 }
             );
         },
-
         // Search location using Google Places API (via Nominatim as free alternative)
         async searchLocation() {
             if (!this.locationForm.searchQuery || this.locationForm.searchQuery.length < 3) {
@@ -1303,12 +1227,11 @@ function messagesManager() {
                     lat: parseFloat(item.lat),
                     lon: parseFloat(item.lon)
                 }));
-            } catch (e) { 
+            } catch (e) {
                 console.error('Search error:', e);
                 this.locationForm.searchResults = [];
             }
         },
-
         // Select a search result
         selectSearchResult(result) {
             this.locationForm.latitude = result.lat;
@@ -1318,7 +1241,6 @@ function messagesManager() {
             this.locationForm.searchResults = [];
             this.locationForm.searchQuery = '';
         },
-
         // Reverse geocode to get address from coordinates
         async reverseGeocode(lat, lon) {
             try {
@@ -1330,44 +1252,57 @@ function messagesManager() {
                 }
             } catch (e) { console.error('Reverse geocode error:', e); }
         },
-
         async sendLocation() {
             if (!this.locationForm.latitude || !this.locationForm.longitude || !this.selectedContact) return;
             this.sending = true;
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${this.API_BASE_URL}/whatsapp/send/location`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ to: this.selectedContact.phone_number, latitude: parseFloat(this.locationForm.latitude), longitude: parseFloat(this.locationForm.longitude), name: this.locationForm.name, address: this.locationForm.address }) });
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/send/location`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        to: this.selectedContact.phone_number,
+                        latitude: parseFloat(this.locationForm.latitude),
+                        longitude: parseFloat(this.locationForm.longitude),
+                        name: this.locationForm.name,
+                        address: this.locationForm.address
+                    })
+                });
                 const data = await res.json();
-                if (data.success) { 
-                    this.showLocationModal = false; 
-                    this.locationForm = { latitude: '', longitude: '', name: '', address: '', searchQuery: '', searchResults: [], gettingLocation: false }; 
+                if (data.success) {
+                    this.showLocationModal = false;
+                    this.locationForm = { latitude: '', longitude: '', name: '', address: '', searchQuery: '', searchResults: [], gettingLocation: false };
                     // Message will be added via broadcast event
                 }
                 else alert(data.message || 'Failed to send');
             } catch (e) { console.error('Error:', e); }
             finally { this.sending = false; }
         },
-
         async sendButtonMessage() {
             if (!this.buttonForm.body || !this.selectedContact) return;
             this.sending = true;
             try {
                 const token = localStorage.getItem('token');
                 const buttons = this.buttonForm.buttons.filter(b => b.trim()).map((b, i) => ({ id: `btn_${i}`, title: b }));
-                const res = await fetch(`${this.API_BASE_URL}/whatsapp/send/button`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ to: this.selectedContact.phone_number, body: this.buttonForm.body, buttons: buttons }) });
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/send/button`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        to: this.selectedContact.phone_number,
+                        body: this.buttonForm.body,
+                        buttons: buttons
+                    })
+                });
                 const data = await res.json();
-                if (data.success) { 
-                    this.showButtonModal = false; 
-                    this.buttonForm = { body: '', buttons: ['', ''] }; 
+                if (data.success) {
+                    this.showButtonModal = false;
+                    this.buttonForm = { body: '', buttons: ['', ''] };
                     // Message will be added via broadcast event
                 }
                 else alert(data.message || 'Failed to send');
             } catch (e) { console.error('Error:', e); }
             finally { this.sending = false; }
         },
-
         async sendListMessage() {
             if (!this.listForm.body || !this.selectedContact) return;
             this.sending = true;
@@ -1375,21 +1310,28 @@ function messagesManager() {
                 const token = localStorage.getItem('token');
                 const rows = this.listForm.items.filter(i => i.title.trim()).map((i, idx) => ({ id: `item_${idx}`, title: i.title, description: i.description || '' }));
                 const sections = [{ title: this.listForm.sectionTitle, rows: rows }];
-                const res = await fetch(`${this.API_BASE_URL}/whatsapp/send/list`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ to: this.selectedContact.phone_number, body: this.listForm.body, button_text: this.listForm.buttonText, sections: sections }) });
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/send/list`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        to: this.selectedContact.phone_number,
+                        body: this.listForm.body,
+                        button_text: this.listForm.buttonText,
+                        sections: sections
+                    })
+                });
                 const data = await res.json();
-                if (data.success) { 
-                    this.showListModal = false; 
-                    this.listForm = { body: '', buttonText: 'View Options', sectionTitle: 'Options', items: [{title: ''}, {title: ''}] }; 
+                if (data.success) {
+                    this.showListModal = false;
+                    this.listForm = { body: '', buttonText: 'View Options', sectionTitle: 'Options', items: [{title: ''}, {title: ''}] };
                     // Message will be added via broadcast event
                 }
                 else alert(data.message || 'Failed to send');
             } catch (e) { console.error('Error:', e); }
             finally { this.sending = false; }
         },
-
-        scrollToBottom(smooth = false) { 
-            const c = this.$refs.messagesContainer; 
+        scrollToBottom(smooth = false) {
+            const c = this.$refs.messagesContainer;
             if (c) {
                 if (smooth) {
                     c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' });
@@ -1398,7 +1340,6 @@ function messagesManager() {
                 }
             }
         },
-
         formatTime(timestamp) {
             if (!timestamp) return '-';
             const date = new Date(timestamp), now = new Date(), diff = now - date, hours = Math.floor(diff / 3600000);

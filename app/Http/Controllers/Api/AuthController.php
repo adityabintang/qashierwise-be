@@ -36,7 +36,10 @@ class AuthController extends Controller
             'password' => Hash::make($request->password),
         ]);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        // Create token with expiration (1 month)
+        $expirationMinutes = (int) config('sanctum.expiration', 43200);
+        $expiresAt = now()->addMinutes($expirationMinutes);
+        $token = $user->createToken('auth_token', ['*'], $expiresAt)->plainTextToken;
 
         return response()->json([
             'success' => true,
@@ -45,6 +48,7 @@ class AuthController extends Controller
                 'user' => $user,
                 'access_token' => $token,
                 'token_type' => 'Bearer',
+                'expires_at' => $expiresAt->toIso8601String(),
             ]
         ], 201);
     }
@@ -75,7 +79,11 @@ class AuthController extends Controller
         }
 
         $user = User::where('email', $request->email)->firstOrFail();
-        $token = $user->createToken('auth_token')->plainTextToken;
+        
+        // Create token with expiration (1 month)
+        $expirationMinutes = (int) config('sanctum.expiration', 43200);
+        $expiresAt = now()->addMinutes($expirationMinutes);
+        $token = $user->createToken('auth_token', ['*'], $expiresAt)->plainTextToken;
 
         return response()->json([
             'success' => true,
@@ -84,6 +92,7 @@ class AuthController extends Controller
                 'user' => $user,
                 'access_token' => $token,
                 'token_type' => 'Bearer',
+                'expires_at' => $expiresAt->toIso8601String(),
             ]
         ], 200);
     }
