@@ -299,6 +299,9 @@
                                         <button type="button" @click="showMenu = false; showDocumentModal = true" class="w-full flex items-center gap-3 px-4 py-2 hover:bg-[hsl(var(--muted))] text-sm">
                                             <i class="fas fa-file w-5 text-orange-500"></i> Document
                                         </button>
+                                        <button type="button" @click="showMenu = false; showAudioModal = true" class="w-full flex items-center gap-3 px-4 py-2 hover:bg-[hsl(var(--muted))] text-sm">
+                                            <i class="fas fa-microphone w-5 text-yellow-500"></i> Audio
+                                        </button>
                                         <button type="button" @click="showMenu = false; showLocationModal = true" class="w-full flex items-center gap-3 px-4 py-2 hover:bg-[hsl(var(--muted))] text-sm">
                                             <i class="fas fa-map-marker-alt w-5 text-red-500"></i> Location
                                         </button>
@@ -317,7 +320,7 @@
                                             <i class="fas fa-file-alt text-purple-600"></i>
                                             <span class="text-purple-700 font-medium">Template: <span x-text="selectedTemplateInfo?.name"></span></span>
                                         </div>
-                                        <button @click="isTemplateMessage = false; selectedTemplateInfo = null" class="text-purple-600 hover:text-purple-800">
+                                        <button type="button" @click="cancelTemplate()" class="text-purple-600 hover:text-purple-800">
                                             <i class="fas fa-times"></i>
                                         </button>
                                     </div>
@@ -503,6 +506,36 @@
                             <div class="flex gap-2">
                                 <button type="button" @click="showDocumentModal = false; documentForm = { file: null, filename: '', caption: '' }" class="btn btn-outline btn-md flex-1">Cancel</button>
                                 <button type="submit" :disabled="sending || !documentForm.file" class="btn btn-primary btn-md flex-1">
+                                    <i class="fas" :class="sending ? 'fa-spinner animate-spin' : 'fa-paper-plane'"></i> Send
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <!-- Audio Modal -->
+                <div x-show="showAudioModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div class="fixed inset-0 bg-black/50" @click="showAudioModal = false; audioForm = { file: null, filename: '', preview: null }"></div>
+                    <div class="card relative w-full max-w-md">
+                        <div class="p-4 border-b border-[hsl(var(--border))] flex items-center justify-between">
+                            <h3 class="font-semibold">Send Audio</h3>
+                            <button @click="showAudioModal = false; audioForm = { file: null, filename: '', preview: null }" class="btn btn-ghost btn-icon"><i class="fas fa-times"></i></button>
+                        </div>
+                        <form @submit.prevent="sendAudio" class="p-4 space-y-4">
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Select Audio File</label>
+                                <input type="file" @change="handleAudioSelect" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac" class="input w-full p-2" required>
+                                <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Supported: MP3, WAV, OGG, M4A, AAC (max 16MB)</p>
+                            </div>
+                            <div x-show="audioForm.file" class="p-3 bg-[hsl(var(--muted))] rounded-lg">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <i class="fas fa-music text-xl text-[hsl(var(--primary))]"></i>
+                                    <span class="text-sm truncate" x-text="audioForm.filename"></span>
+                                </div>
+                                <audio x-show="audioForm.preview" :src="audioForm.preview" controls class="w-full h-10"></audio>
+                            </div>
+                            <div class="flex gap-2">
+                                <button type="button" @click="showAudioModal = false; audioForm = { file: null, filename: '', preview: null }" class="btn btn-outline btn-md flex-1">Cancel</button>
+                                <button type="submit" :disabled="sending || !audioForm.file" class="btn btn-primary btn-md flex-1">
                                     <i class="fas" :class="sending ? 'fa-spinner animate-spin' : 'fa-paper-plane'"></i> Send
                                 </button>
                             </div>
@@ -732,12 +765,13 @@ function messagesManager() {
         newMessage: '', contactSearch: '', loadingContacts: true, loadingMessages: false, sending: false,
         mediaPreview: null, mediaFile: null,
         showTemplateModal: false, showImageModal: false, showVideoModal: false, showDocumentModal: false,
-        showLocationModal: false, showButtonModal: false, showListModal: false,
+        showLocationModal: false, showButtonModal: false, showListModal: false, showAudioModal: false,
         showFormatBar: false, formatBarPosition: { top: 0, left: 0 },
         isTemplateMessage: false, selectedTemplateInfo: null,
         imageForm: { file: null, caption: '', preview: null },
         videoForm: { file: null, caption: '', preview: null },
         documentForm: { file: null, filename: '', caption: '' },
+        audioForm: { file: null, filename: '', preview: null },
         locationForm: { latitude: '', longitude: '', name: '', address: '', searchQuery: '', searchResults: [], gettingLocation: false },
         buttonForm: { body: '', buttons: ['', ''] },
         listForm: { body: '', buttonText: 'View Options', sectionTitle: 'Options', items: [{title: ''}, {title: ''}] },
@@ -885,6 +919,17 @@ function messagesManager() {
                     // Auto resize after inserting template
                     this.autoResizeTextarea(textarea);
                 }
+            });
+        },
+        cancelTemplate() {
+            // Cancel template - clear everything and don't send any message
+            this.isTemplateMessage = false;
+            this.selectedTemplateInfo = null;
+            this.newMessage = '';
+            // Reset textarea height
+            this.$nextTick(() => {
+                const textarea = this.$refs.messageInput;
+                if (textarea) textarea.style.height = '40px';
             });
         },
         autoResizeTextarea(textarea) {
@@ -1044,14 +1089,26 @@ function messagesManager() {
                 let payload, endpoint;
 
                 if (isTemplate && templateInfo) {
-                    // Send as template message with custom body
-                    payload = {
-                        to: this.selectedContact.phone_number,
-                        template_name: templateInfo.name,
-                        language: templateInfo.language,
-                        body_text: messageText
-                    };
-                    endpoint = '/whatsapp/send/template';
+                    // Check if template body was edited
+                    const isEdited = messageText !== templateInfo.originalBody;
+
+                    if (isEdited) {
+                        // Template was edited - send as regular text message instead
+                        // because WhatsApp templates cannot be modified after approval
+                        payload = {
+                            to: this.selectedContact.phone_number,
+                            message: messageText
+                        };
+                        endpoint = '/whatsapp/send/text';
+                    } else {
+                        // Template not edited - send as original template
+                        payload = {
+                            to: this.selectedContact.phone_number,
+                            template_name: templateInfo.name,
+                            language: templateInfo.language
+                        };
+                        endpoint = '/whatsapp/send/template';
+                    }
                 } else {
                     // Send as regular text message
                     payload = {
@@ -1181,6 +1238,39 @@ function messagesManager() {
                 if (data.success) {
                     this.showDocumentModal = false;
                     this.documentForm = { file: null, filename: '', caption: '' };
+                    // Message will be added via broadcast event
+                }
+                else alert(data.message || 'Failed to send');
+            } catch (e) { console.error('Error:', e); }
+            finally { this.sending = false; }
+        },
+        // Handle audio file selection
+        handleAudioSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                this.audioForm.file = file;
+                this.audioForm.filename = file.name;
+                this.audioForm.preview = URL.createObjectURL(file);
+            }
+        },
+        async sendAudio() {
+            if (!this.audioForm.file || !this.selectedContact) return;
+            this.sending = true;
+            try {
+                const token = localStorage.getItem('token');
+                const formData = new FormData();
+                formData.append('to', this.selectedContact.phone_number);
+                formData.append('file', this.audioForm.file);
+
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/send/audio`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.showAudioModal = false;
+                    this.audioForm = { file: null, filename: '', preview: null };
                     // Message will be added via broadcast event
                 }
                 else alert(data.message || 'Failed to send');

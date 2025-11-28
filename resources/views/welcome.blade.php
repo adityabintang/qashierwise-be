@@ -3,12 +3,57 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>QashierWise - AI Chatbot WhatsApp untuk Restoran</title>
+    <!-- Primary Meta Tags -->
+    <title>QashierWise - AI Chatbot WhatsApp untuk Restoran | Reservasi & Order Otomatis</title>
+    <meta name="title" content="QashierWise - AI Chatbot WhatsApp untuk Restoran | Reservasi & Order Otomatis">
+    <meta name="description" content="Platform AI Chatbot WhatsApp untuk restoran dengan integrasi QRIS. Kelola reservasi, pesanan, delivery, dan pembayaran dalam satu dashboard. Coba gratis 14 hari!">
+    <meta name="keywords" content="chatbot whatsapp restoran, AI chatbot restoran, reservasi restoran otomatis, order whatsapp, QRIS restoran, POS restoran, manajemen restoran, WhatsApp Business API restoran">
+    <meta name="author" content="Aditya Bintang Fadila">
+    <meta name="robots" content="index, follow">
+    <meta name="language" content="Indonesian">
+    <meta name="revisit-after" content="7 days">
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://qashierwise.com">
+
+     <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/logo.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/logo.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/logo.png') }}">
+    <link rel="manifest" href="{{ asset('site.webmanifest') }}">
+    <meta name="theme-color" content="#4910ce">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://qashierwise.com">
+    <meta property="og:title" content="QashierWise - AI Chatbot WhatsApp untuk Restoran">
+    <meta property="og:description" content="Respon lebih cepat, jual lebih banyak. Platform AI Chatbot WhatsApp dengan integrasi QRIS untuk restoran. Kelola reservasi & order dalam satu dashboard.">
+    <meta property="og:image" content="https://qashierwise.com/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="QashierWise - AI Chatbot WhatsApp untuk Restoran">
+    <meta property="og:locale" content="id_ID">
+    <meta property="og:site_name" content="QashierWise">
+    
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://qashierwise.com">
+    <meta name="twitter:title" content="QashierWise - AI Chatbot WhatsApp untuk Restoran">
+    <meta name="twitter:description" content="Respon lebih cepat, jual lebih banyak. Platform AI Chatbot WhatsApp dengan integrasi QRIS untuk restoran.">
+    <meta name="twitter:image" content="https://qashierwise.com/images/og-image.png">
+    <meta name="twitter:image:alt" content="QashierWise - AI Chatbot WhatsApp untuk Restoran">
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Additional SEO Meta -->
+    <meta name="geo.region" content="ID-JT">
+    <meta name="geo.placename" content="Salatiga">
+    <meta name="geo.position" content="-7.3305;110.5084">
+    <meta name="ICBM" content="-7.3305, 110.5084">
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -29,6 +74,155 @@
 
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- Structured Data - Organization -->
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "Organization",
+        "name": "QashierWise",
+        "url": "https://qashierwise.com",
+        "logo": "https://qashierwise.com/images/logo.png",
+        "description": "Platform AI Chatbot WhatsApp untuk restoran dengan integrasi QRIS",
+        "address": {
+            "@@type": "PostalAddress",
+            "streetAddress": "Jl. Widosari No. 55, Tegalrejo Raya",
+            "addressLocality": "Salatiga",
+            "addressRegion": "Jawa Tengah",
+            "postalCode": "50733",
+            "addressCountry": "ID"
+        },
+        "founder": {
+            "@@type": "Person",
+            "name": "Aditya Bintang Fadila"
+        },
+        "foundingDate": "2025",
+        "sameAs": []
+    }
+    </script>
+
+    <!-- Structured Data - SoftwareApplication -->
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "SoftwareApplication",
+        "name": "QashierWise",
+        "applicationCategory": "BusinessApplication",
+        "applicationSubCategory": "Restaurant Management Software",
+        "operatingSystem": "Web Browser",
+        "description": "AI Chatbot WhatsApp untuk restoran dengan integrasi QRIS. Kelola reservasi, pesanan, dan pembayaran dalam satu dashboard.",
+        "offers": {
+            "@@type": "AggregateOffer",
+            "lowPrice": "0",
+            "highPrice": "2990000",
+            "priceCurrency": "IDR",
+            "offerCount": "3"
+        },
+        "featureList": [
+            "AI Chatbot WhatsApp",
+            "Reservasi Otomatis",
+            "Order Delivery & Pickup",
+            "Pembayaran QRIS",
+            "Dashboard Manajemen",
+            "Laporan & CRM"
+        ]
+    }
+    </script>
+
+    <!-- Structured Data - WebSite -->
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "WebSite",
+        "name": "QashierWise",
+        "url": "https://qashierwise.com",
+        "description": "Platform AI Chatbot WhatsApp untuk restoran dengan integrasi QRIS",
+        "publisher": {
+            "@@type": "Organization",
+            "name": "QashierWise"
+        }
+    }
+    </script>
+
+    <!-- Structured Data - FAQ -->
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@@type": "Question",
+                "name": "Apa itu QashierWise?",
+                "acceptedAnswer": {
+                    "@@type": "Answer",
+                    "text": "QashierWise adalah platform AI Chatbot WhatsApp yang dirancang khusus untuk restoran, membantu mengelola reservasi, pesanan, dan pembayaran QRIS dalam satu dashboard."
+                }
+            },
+            {
+                "@@type": "Question",
+                "name": "Apakah perlu aplikasi terpisah untuk pelanggan?",
+                "acceptedAnswer": {
+                    "@@type": "Answer",
+                    "text": "Tidak! Pelanggan cukup menggunakan WhatsApp yang sudah mereka miliki. Tidak perlu download aplikasi tambahan."
+                }
+            },
+            {
+                "@@type": "Question",
+                "name": "Bagaimana pembayaran dilakukan?",
+                "acceptedAnswer": {
+                    "@@type": "Answer",
+                    "text": "Pembayaran bisa dilakukan melalui QRIS yang terintegrasi dengan Midtrans, Xendit, atau penyedia QRIS lainnya. Pelanggan juga bisa bayar di tempat."
+                }
+            },
+            {
+                "@@type": "Question",
+                "name": "Apakah bisa multi-outlet dan multi nomor?",
+                "acceptedAnswer": {
+                    "@@type": "Answer",
+                    "text": "Ya! Paket Standard mendukung hingga 2 outlet, dan paket Pro mendukung unlimited outlet dengan fitur multi-branding."
+                }
+            }
+        ]
+    }
+    </script>
+
+    <!-- Structured Data - BreadcrumbList -->
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "BreadcrumbList",
+        "itemListElement": [
+            {
+                "@@type": "ListItem",
+                "position": 1,
+                "name": "Home",
+                "item": "https://qashierwise.com"
+            }
+        ]
+    }
+    </script>
+
+    <!-- Structured Data - Product/Pricing -->
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "Product",
+        "name": "QashierWise Standard",
+        "description": "Paket Standard QashierWise dengan fitur delivery, QRIS unlimited, dan dukungan hingga 2 outlet",
+        "brand": {
+            "@@type": "Brand",
+            "name": "QashierWise"
+        },
+        "offers": {
+            "@@type": "Offer",
+            "price": "249000",
+            "priceCurrency": "IDR",
+            "priceValidUntil": "2025-12-31",
+            "availability": "https://schema.org/InStock",
+            "url": "https://qashierwise.com/#pricing"
+        }
+    }
+    </script>
 
     <style>
         body { font-family: 'Inter', sans-serif; }
