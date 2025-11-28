@@ -26,6 +26,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'webhook/*',
             'broadcasting/*',
         ]);
+
+        // Register custom middleware aliases
+        $middleware->alias([
+            'check.web.auth' => \App\Http\Middleware\CheckWebAuth::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

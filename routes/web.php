@@ -25,8 +25,8 @@ Route::get('/terms-of-service', function () {
     return view('terms-of-service');
 })->name('terms-of-service');
 
-// Dashboard routes (protected by middleware in production)
-Route::middleware(['web'])->group(function () {
+// Dashboard routes (protected by authentication middleware)
+Route::middleware(['web', 'check.web.auth'])->group(function () {
     Route::get('/dashboard', function () {
         return view('dashboard.index');
     })->name('dashboard');
