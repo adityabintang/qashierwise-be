@@ -8,11 +8,21 @@ use App\Http\Controllers\Controller;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
 use App\Models\WhatsAppMessage;
+use App\Services\MediaStorageService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class WhatsAppWebhookController extends Controller
 {
+    protected MediaStorageService $mediaStorageService;
+
+    public function __construct(MediaStorageService $mediaStorageService)
+    {
+        $this->mediaStorageService = $mediaStorageService;
+    }
+
     /**
      * Verify webhook (GET request from WhatsApp)
      */
@@ -151,35 +161,76 @@ class WhatsAppWebhookController extends Controller
                 break;
 
             case 'image':
-                $content = $message['image']['caption'] ?? 'Image';
+                $mediaId = $message['image']['id'];
+                $mimeType = $message['image']['mime_type'] ?? 'image/jpeg';
+                $mediaResult = $this->downloadAndStoreMedia($mediaId, 'image', $mimeType, null, $from);
+                $content = json_encode([
+                    'url' => $mediaResult['url'],
+                    'caption' => $message['image']['caption'] ?? '',
+                    'exceeded_limit' => $mediaResult['exceeded_limit'],
+                ]);
                 $metadata = [
-                    'media_id' => $message['image']['id'],
-                    'mime_type' => $message['image']['mime_type'] ?? null,
+                    'media_id' => $mediaId,
+                    'mime_type' => $mimeType,
+                    'stored_url' => $mediaResult['url'],
+                    'exceeded_limit' => $mediaResult['exceeded_limit'],
+                    'file_size' => $mediaResult['file_size'],
                 ];
                 break;
 
             case 'document':
-                $content = $message['document']['filename'] ?? 'Document';
+                $mediaId = $message['document']['id'];
+                $mimeType = $message['document']['mime_type'] ?? 'application/octet-stream';
+                $filename = $message['document']['filename'] ?? 'document';
+                $mediaResult = $this->downloadAndStoreMedia($mediaId, 'document', $mimeType, $filename, $from);
+                $content = json_encode([
+                    'url' => $mediaResult['url'],
+                    'filename' => $filename,
+                    'caption' => $message['document']['caption'] ?? '',
+                    'exceeded_limit' => $mediaResult['exceeded_limit'],
+                ]);
                 $metadata = [
-                    'media_id' => $message['document']['id'],
-                    'mime_type' => $message['document']['mime_type'] ?? null,
-                    'caption' => $message['document']['caption'] ?? null,
+                    'media_id' => $mediaId,
+                    'mime_type' => $mimeType,
+                    'filename' => $filename,
+                    'stored_url' => $mediaResult['url'],
+                    'exceeded_limit' => $mediaResult['exceeded_limit'],
+                    'file_size' => $mediaResult['file_size'],
                 ];
                 break;
 
             case 'audio':
-                $content = 'Audio message';
+                $mediaId = $message['audio']['id'];
+                $mimeType = $message['audio']['mime_type'] ?? 'audio/ogg';
+                $mediaResult = $this->downloadAndStoreMedia($mediaId, 'audio', $mimeType, null, $from);
+                $content = json_encode([
+                    'url' => $mediaResult['url'],
+                    'exceeded_limit' => $mediaResult['exceeded_limit'],
+                ]);
                 $metadata = [
-                    'media_id' => $message['audio']['id'],
-                    'mime_type' => $message['audio']['mime_type'] ?? null,
+                    'media_id' => $mediaId,
+                    'mime_type' => $mimeType,
+                    'stored_url' => $mediaResult['url'],
+                    'exceeded_limit' => $mediaResult['exceeded_limit'],
+                    'file_size' => $mediaResult['file_size'],
                 ];
                 break;
 
             case 'video':
-                $content = $message['video']['caption'] ?? 'Video';
+                $mediaId = $message['video']['id'];
+                $mimeType = $message['video']['mime_type'] ?? 'video/mp4';
+                $mediaResult = $this->downloadAndStoreMedia($mediaId, 'video', $mimeType, null, $from);
+                $content = json_encode([
+                    'url' => $mediaResult['url'],
+                    'caption' => $message['video']['caption'] ?? '',
+                    'exceeded_limit' => $mediaResult['exceeded_limit'],
+                ]);
                 $metadata = [
-                    'media_id' => $message['video']['id'],
-                    'mime_type' => $message['video']['mime_type'] ?? null,
+                    'media_id' => $mediaId,
+                    'mime_type' => $mimeType,
+                    'stored_url' => $mediaResult['url'],
+                    'exceeded_limit' => $mediaResult['exceeded_limit'],
+                    'file_size' => $mediaResult['file_size'],
                 ];
                 break;
 
@@ -302,5 +353,202 @@ class WhatsAppWebhookController extends Controller
                 'errors' => $status['errors']
             ]);
         }
+    }
+
+    /**
+     * Download media from WhatsApp and store to R2/local storage
+     *
+     * @param string $mediaId WhatsApp media ID
+     * @param string $type Media type (image, document, audio, video)
+     * @param string $mimeType MIME type of the media
+     * @param string|null $filename Original filename (for documents)
+     * @param string|null $senderPhone Sender phone number for reply
+     * @return array{url: string|null, exceeded_limit: bool, file_size: int, max_size: int}
+     */
+    protected function downloadAndStoreMedia(string $mediaId, string $type, string $mimeType, ?string $filename = null, ?string $senderPhone = null): array
+    {
+        try {
+            $accessToken = config('whatsapp.access_token');
+
+            // Step 1: Get media URL and file size from WhatsApp
+            $mediaInfoResponse = Http::withToken($accessToken)
+                ->get("https://graph.facebook.com/v21.0/{$mediaId}");
+
+            if (!$mediaInfoResponse->successful()) {
+                Log::error('Failed to get media info from WhatsApp', [
+                    'media_id' => $mediaId,
+                    'response' => $mediaInfoResponse->body(),
+                ]);
+                return null;
+            }
+
+            $mediaInfo = $mediaInfoResponse->json();
+            $mediaUrl = $mediaInfo['url'] ?? null;
+            $fileSize = $mediaInfo['file_size'] ?? 0;
+
+            if (!$mediaUrl) {
+                Log::error('Media URL not found in WhatsApp response', ['media_id' => $mediaId]);
+                return ['url' => null, 'exceeded_limit' => false, 'file_size' => 0, 'max_size' => 0];
+            }
+
+            // Step 2: Check file size limit
+            $maxSize = config("whatsapp.media_limits.{$type}", 16 * 1024 * 1024);
+            if ($fileSize > $maxSize) {
+                Log::warning('Incoming media exceeds size limit, skipping storage', [
+                    'media_id' => $mediaId,
+                    'type' => $type,
+                    'file_size' => $fileSize,
+                    'max_size' => $maxSize,
+                ]);
+
+                // Send reply to client about file size limit
+                if ($senderPhone) {
+                    $this->sendFileSizeLimitReply($senderPhone, $type, $fileSize, $maxSize);
+                }
+
+                return ['url' => null, 'exceeded_limit' => true, 'file_size' => $fileSize, 'max_size' => $maxSize];
+            }
+
+            // Step 3: Download media content
+            $mediaResponse = Http::withToken($accessToken)
+                ->timeout(60)
+                ->get($mediaUrl);
+
+            if (!$mediaResponse->successful()) {
+                Log::error('Failed to download media from WhatsApp', [
+                    'media_id' => $mediaId,
+                    'url' => $mediaUrl,
+                ]);
+                return null;
+            }
+
+            $mediaContent = $mediaResponse->body();
+
+            // Double-check actual content size
+            $actualSize = strlen($mediaContent);
+            if ($actualSize > $maxSize) {
+                Log::warning('Downloaded media exceeds size limit, skipping storage', [
+                    'media_id' => $mediaId,
+                    'type' => $type,
+                    'actual_size' => $actualSize,
+                    'max_size' => $maxSize,
+                ]);
+
+                if ($senderPhone) {
+                    $this->sendFileSizeLimitReply($senderPhone, $type, $actualSize, $maxSize);
+                }
+
+                return ['url' => null, 'exceeded_limit' => true, 'file_size' => $actualSize, 'max_size' => $maxSize];
+            }
+
+            // Step 3: Generate filename and path
+            $extension = $this->getExtensionFromMimeType($mimeType);
+            $generatedFilename = $filename ?? "media_{$mediaId}.{$extension}";
+            $sanitizedFilename = $this->mediaStorageService->sanitizeFilename($generatedFilename);
+            $uniqueFilename = $this->mediaStorageService->generateUniqueFilename($sanitizedFilename);
+            $path = $this->mediaStorageService->generatePath($type, $uniqueFilename);
+
+            // Step 4: Store to configured disk (R2 or local)
+            $diskName = $this->mediaStorageService->getDiskName();
+            Storage::disk($diskName)->put($path, $mediaContent, [
+                'ContentType' => $mimeType,
+            ]);
+
+            // Step 5: Get public URL
+            $publicUrl = $this->mediaStorageService->getPublicUrl($path);
+
+            Log::info('Media downloaded and stored successfully', [
+                'media_id' => $mediaId,
+                'type' => $type,
+                'path' => $path,
+                'url' => $publicUrl,
+            ]);
+
+            return ['url' => $publicUrl, 'exceeded_limit' => false, 'file_size' => $actualSize, 'max_size' => $maxSize];
+
+        } catch (\Exception $e) {
+            Log::error('Failed to download and store media', [
+                'media_id' => $mediaId,
+                'type' => $type,
+                'error' => $e->getMessage(),
+            ]);
+            return ['url' => null, 'exceeded_limit' => false, 'file_size' => 0, 'max_size' => 0];
+        }
+    }
+
+    /**
+     * Send reply to client when file size exceeds limit
+     */
+    protected function sendFileSizeLimitReply(string $to, string $type, int $fileSize, int $maxSize): void
+    {
+        try {
+            $fileSizeMB = round($fileSize / (1024 * 1024), 2);
+            $maxSizeMB = round($maxSize / (1024 * 1024), 2);
+
+            $typeLabels = [
+                'image' => 'Gambar',
+                'document' => 'Dokumen',
+                'audio' => 'Audio',
+                'video' => 'Video',
+            ];
+            $typeLabel = $typeLabels[$type] ?? 'File';
+
+            $message = "⚠️ *{$typeLabel} tidak dapat diproses*\n\n"
+                . "Ukuran file yang Anda kirim ({$fileSizeMB} MB) melebihi batas maksimum ({$maxSizeMB} MB).\n\n"
+                . "Silakan kirim file dengan ukuran lebih kecil.";
+
+            $accessToken = config('whatsapp.access_token');
+            $phoneNumberId = config('whatsapp.phone_number_id');
+
+            Http::withToken($accessToken)
+                ->post("https://graph.facebook.com/v21.0/{$phoneNumberId}/messages", [
+                    'messaging_product' => 'whatsapp',
+                    'to' => $to,
+                    'type' => 'text',
+                    'text' => ['body' => $message],
+                ]);
+
+            Log::info('File size limit reply sent', ['to' => $to, 'type' => $type]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to send file size limit reply', [
+                'to' => $to,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Get file extension from MIME type
+     */
+    protected function getExtensionFromMimeType(string $mimeType): string
+    {
+        $mimeToExt = [
+            // Images
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            'image/webp' => 'webp',
+            // Documents
+            'application/pdf' => 'pdf',
+            'application/msword' => 'doc',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+            'application/vnd.ms-excel' => 'xls',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+            'application/vnd.ms-powerpoint' => 'ppt',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
+            'text/plain' => 'txt',
+            // Audio
+            'audio/ogg' => 'ogg',
+            'audio/mpeg' => 'mp3',
+            'audio/amr' => 'amr',
+            'audio/aac' => 'aac',
+            'audio/mp4' => 'm4a',
+            // Video
+            'video/mp4' => 'mp4',
+            'video/3gpp' => '3gp',
+        ];
+
+        return $mimeToExt[$mimeType] ?? 'bin';
     }
 }
