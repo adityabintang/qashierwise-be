@@ -33,13 +33,9 @@
 
 // ];
 return [
-    'paths' => ['api/*', 'sanctum/csrf-cookie', 'broadcasting/*'],
+    'paths' => ['api/*', 'sanctum/csrf-cookie'],
     'allowed_methods' => ['*'],
-    'allowed_origins' => [
-        'https://qashierwise.com',
-        'https://api.qashierwise.com',
-        env('APP_URL', 'https://qashierwise.com'),
-    ],
+    'allowed_origins' => ['*'],
     'allowed_origins_patterns' => [],
     'allowed_headers' => ['*'],
     'exposed_headers' => ['*'],

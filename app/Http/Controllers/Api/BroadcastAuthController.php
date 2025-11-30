@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Pusher\Pusher;
 
 class BroadcastAuthController extends Controller
 {
@@ -55,19 +54,28 @@ class BroadcastAuthController extends Controller
         }
 
         try {
-            // Create Pusher instance and generate auth signature
-            $pusher = new Pusher(
-                config('broadcasting.connections.pusher.key'),
-                config('broadcasting.connections.pusher.secret'),
-                config('broadcasting.connections.pusher.app_id'),
-                config('broadcasting.connections.pusher.options')
-            );
+            $key = config('broadcasting.connections.pusher.key');
+            $secret = config('broadcasting.connections.pusher.secret');
+            $appId = config('broadcasting.connections.pusher.app_id');
+            
+            Log::info('Pusher config', [
+                'key' => $key,
+                'secret' => $secret ? 'SET' : 'MISSING',
+                'app_id' => $appId,
+            ]);
 
-            $auth = $pusher->authorizeChannel($channelName, $socketId);
+            // Generate auth signature manually (most reliable method)
+            $stringToSign = $socketId . ':' . $channelName;
+            $signature = hash_hmac('sha256', $stringToSign, $secret);
+            
+            $auth = [
+                'auth' => $key . ':' . $signature
+            ];
             
             Log::info('Broadcast auth success', [
                 'user_id' => $user->id,
                 'channel' => $channelName,
+                'socket_id' => $socketId,
                 'auth' => $auth,
             ]);
 
