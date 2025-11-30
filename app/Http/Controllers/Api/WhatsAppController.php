@@ -1508,7 +1508,15 @@ class WhatsAppController extends Controller
     {
         try {
             $status = $request->get('status'); // APPROVED, PENDING, REJECTED
+            $refresh = $request->get('refresh', false); // Force refresh from API
             $account = $this->getWhatsAppAccount();
+
+            // Check if we need to sync from API (no templates in DB or refresh requested)
+            $templateCount = WhatsAppTemplate::where('whatsapp_account_id', $account->id)->count();
+            
+            if ($templateCount === 0 || $refresh) {
+                $this->syncTemplatesFromApi($account);
+            }
 
             // Get templates from database
             $query = WhatsAppTemplate::where('whatsapp_account_id', $account->id);
@@ -1549,6 +1557,76 @@ class WhatsAppController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Sync templates from WhatsApp API to database
+     */
+    private function syncTemplatesFromApi($account)
+    {
+        $wabaId = config('whatsapp.business_account_id');
+        $accessToken = config('whatsapp.access_token');
+
+        $response = Http::withToken($accessToken)
+            ->get("https://graph.facebook.com/v21.0/{$wabaId}/message_templates", [
+                'limit' => 100,
+                'fields' => 'name,status,category,language,components,id,quality_score'
+            ]);
+
+        if ($response->failed()) {
+            \Log::error('Failed to fetch templates from Meta API', [
+                'response' => $response->body()
+            ]);
+            return;
+        }
+
+        $templates = $response->json()['data'] ?? [];
+
+        foreach ($templates as $templateData) {
+            $components = $templateData['components'] ?? [];
+
+            // Extract component details
+            $header = null;
+            $headerType = null;
+            $body = null;
+            $footer = null;
+            $buttons = [];
+
+            foreach ($components as $component) {
+                if ($component['type'] === 'HEADER') {
+                    $headerType = $component['format'] ?? 'TEXT';
+                    $header = $component['text'] ?? null;
+                } elseif ($component['type'] === 'BODY') {
+                    $body = $component['text'] ?? null;
+                } elseif ($component['type'] === 'FOOTER') {
+                    $footer = $component['text'] ?? null;
+                } elseif ($component['type'] === 'BUTTONS') {
+                    $buttons = $component['buttons'] ?? [];
+                }
+            }
+
+            WhatsAppTemplate::updateOrCreate(
+                [
+                    'whatsapp_account_id' => $account->id,
+                    'name' => $templateData['name'],
+                    'language' => $templateData['language'],
+                ],
+                [
+                    'template_id' => $templateData['id'] ?? null,
+                    'status' => $templateData['status'],
+                    'category' => $templateData['category'],
+                    'header' => $header,
+                    'header_type' => $headerType,
+                    'body' => $body,
+                    'footer' => $footer,
+                    'buttons' => !empty($buttons) ? json_encode($buttons) : null,
+                    'components' => $components,
+                    'quality_score' => $templateData['quality_score']['score'] ?? null,
+                ]
+            );
+        }
+
+        \Log::info('Templates synced from WhatsApp API', ['count' => count($templates)]);
     }
 
     /**

@@ -21,8 +21,10 @@ class WhatsAppTemplate extends Model
         'components',
         'body',
         'header',
+        'header_type',
         'footer',
         'buttons',
+        'quality_score',
         'usage_count'
     ];
 
