@@ -188,7 +188,7 @@
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <!-- Recent Messages -->
                     <div class="lg:col-span-2 card" x-data="recentMessages()">
-                        <div class="card-header flex-row items-center justify-between">
+                        <div class="card-header !flex-row items-center justify-between">
                             <div>
                                 <h2 class="card-title">Recent Messages</h2>
                                 <p class="card-description">Latest conversations</p>
