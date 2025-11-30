@@ -54,7 +54,7 @@ COPY docker/supervisord.conf /etc/supervisord.conf
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 # Install Node dependencies and build assets
-RUN npm ci && npm run build && rm -rf node_modules
+RUN npm install && npm run build && rm -rf node_modules
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
