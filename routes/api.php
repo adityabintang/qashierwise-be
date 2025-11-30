@@ -70,6 +70,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Templates
         Route::get('/templates', [WhatsAppController::class, 'getTemplates']);
+        Route::post('/templates', [WhatsAppController::class, 'createTemplate']);
+        Route::put('/templates/{id}', [WhatsAppController::class, 'updateTemplate']);
+        Route::delete('/templates/{name}', [WhatsAppController::class, 'deleteTemplate']);
         Route::get('/templates/{name}', [WhatsAppController::class, 'getTemplateByName']);
 
         // Dashboard Stats
