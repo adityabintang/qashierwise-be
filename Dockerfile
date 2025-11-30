@@ -58,23 +58,25 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction
 # Install Node dependencies and build assets
 RUN npm install && npm run build && rm -rf node_modules
 
-# Set permissions
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
-
 # Create required directories
 RUN mkdir -p /run/nginx \
     && mkdir -p /var/www/html/storage/logs \
     && mkdir -p /var/www/html/storage/framework/sessions \
     && mkdir -p /var/www/html/storage/framework/views \
-    && mkdir -p /var/www/html/storage/framework/cache
+    && mkdir -p /var/www/html/storage/framework/cache \
+    && mkdir -p /var/www/html/storage/app/public
 
-# Copy entrypoint script
-COPY docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Set permissions
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+
+# Clear Laravel caches
+RUN php artisan config:clear \
+    && php artisan route:clear \
+    && php artisan view:clear
 
 # Expose port
 EXPOSE 80
 
-# Use entrypoint to run migrations and start services
-ENTRYPOINT ["/entrypoint.sh"]
+# Start supervisor directly
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
