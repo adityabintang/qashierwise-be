@@ -46,7 +46,9 @@ class TemplateServicePropertyTest extends TestCase
                 
                 // Determine expected validity based on the property definition
                 // Valid names: non-empty strings containing only [a-z0-9_]
-                $shouldBeValid = !empty($name) && preg_match('/^[a-z0-9_]+$/', $name) === 1;
+                // Note: Use strict empty check ($name !== '') instead of empty() because
+                // PHP's empty('0') returns true, but '0' is a valid template name
+                $shouldBeValid = $name !== '' && preg_match('/^[a-z0-9_]+$/', $name) === 1;
                 
                 $this->assertEquals(
                     $shouldBeValid,
