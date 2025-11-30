@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Log;
+use Pusher\Pusher;
 
 class BroadcastAuthController extends Controller
 {
@@ -35,21 +35,43 @@ class BroadcastAuthController extends Controller
             return response()->json(['error' => 'Missing channel_name or socket_id'], 400);
         }
 
-        try {
-            // Use Laravel's broadcast authorization
-            $response = Broadcast::auth($request);
+        // Check if user is authorized for this channel
+        // Channel format: private-whatsapp.{userId}
+        if (preg_match('/^private-whatsapp\.(\d+)$/', $channelName, $matches)) {
+            $requestedUserId = (int) $matches[1];
             
-            Log::info('Broadcast auth response', [
-                'response' => $response,
+            if ($user->id !== $requestedUserId) {
+                Log::warning('Broadcast auth failed: User not authorized for channel', [
+                    'user_id' => $user->id,
+                    'requested_user_id' => $requestedUserId,
+                ]);
+                return response()->json(['error' => 'Forbidden'], 403);
+            }
+        } else {
+            Log::warning('Broadcast auth failed: Invalid channel format', [
+                'channel_name' => $channelName,
+            ]);
+            return response()->json(['error' => 'Invalid channel'], 400);
+        }
+
+        try {
+            // Create Pusher instance and generate auth signature
+            $pusher = new Pusher(
+                config('broadcasting.connections.pusher.key'),
+                config('broadcasting.connections.pusher.secret'),
+                config('broadcasting.connections.pusher.app_id'),
+                config('broadcasting.connections.pusher.options')
+            );
+
+            $auth = $pusher->authorizeChannel($channelName, $socketId);
+            
+            Log::info('Broadcast auth success', [
+                'user_id' => $user->id,
+                'channel' => $channelName,
+                'auth' => $auth,
             ]);
 
-            // If response is already a Response object, return it
-            if ($response instanceof \Illuminate\Http\Response || $response instanceof \Symfony\Component\HttpFoundation\Response) {
-                return $response;
-            }
-
-            // Otherwise, return as JSON
-            return response()->json($response);
+            return response()->json($auth);
             
         } catch (\Exception $e) {
             Log::error('Broadcast auth exception', [
