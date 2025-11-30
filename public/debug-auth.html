@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Debug Broadcasting Auth</title>
+  <style>
+    body { font-family: monospace; padding: 20px; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    pre { background: #f5f5f5; padding: 10px; border-radius: 5px; overflow: auto; }
+    .success { color: green; }
+    .error { color: red; }
+  </style>
+</head>
+<body>
+  <h1>🔍 Debug Broadcasting Auth</h1>
+
+  <h2>Step 1: Check Token</h2>
+  <button onclick="checkToken()">Check Token</button>
+  <pre id="token-result">Click button to check...</pre>
+
+  <h2>Step 2: Test /api/user Endpoint</h2>
+  <button onclick="testUserEndpoint()">Test User Endpoint</button>
+  <pre id="user-result">Click button to test...</pre>
+
+  <h2>Step 3: Test Broadcasting Auth</h2>
+  <button onclick="testBroadcastingAuth()">Test Broadcasting Auth</button>
+  <pre id="auth-result">Click button to test...</pre>
+
+  <h2>Step 4: Full Pusher Test</h2>
+  <button onclick="testPusher()">Test Pusher Connection</button>
+  <pre id="pusher-result">Click button to test...</pre>
+
+  <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+  <script>
+    Pusher.logToConsole = true;
+
+    function checkToken() {
+      const token = localStorage.getItem('token');
+      const user = localStorage.getItem('user');
+
+      let result = 'Token: ';
+      if (token) {
+        result += token.substring(0, 50) + '...\nLength: ' + token.length + ' chars\n\n';
+      } else {
+        result += '❌ NOT FOUND!\n\n';
+      }
+
+      result += 'User: ';
+      if (user) {
+        result += '\n' + JSON.stringify(JSON.parse(user), null, 2);
+      } else {
+        result += '❌ NOT FOUND!';
+      }
+
+      document.getElementById('token-result').textContent = result;
+      document.getElementById('token-result').className = (token && user) ? 'success' : 'error';
+    }
+
+    async function testUserEndpoint() {
+      const token = localStorage.getItem('token');
+      const resultEl = document.getElementById('user-result');
+
+      if (!token) {
+        resultEl.textContent = '❌ No token found! Please login first.';
+        resultEl.className = 'error';
+        return;
+      }
+
+      try {
+        resultEl.textContent = 'Testing...';
+
+        const response = await fetch('https://api.qashierwise.com/api/user', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
+        });
+
+        const data = await response.json();
+
+        let result = `Status: ${response.status} ${response.statusText}\n\n`;
+        result += 'Response:\n' + JSON.stringify(data, null, 2);
+
+        resultEl.textContent = result;
+        resultEl.className = response.ok ? 'success' : 'error';
+      } catch (error) {
+        resultEl.textContent = '❌ Error: ' + error.message;
+        resultEl.className = 'error';
+      }
+    }
+
+    async function testBroadcastingAuth() {
+      const token = localStorage.getItem('token');
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const resultEl = document.getElementById('auth-result');
+
+      if (!token) {
+        resultEl.textContent = '❌ No token found! Please login first.';
+        resultEl.className = 'error';
+        return;
+      }
+
+      try {
+        resultEl.textContent = 'Testing...';
+
+        const formData = new URLSearchParams();
+        formData.append('socket_id', '123456.789012');
+        formData.append('channel_name', `private-whatsapp.${user.id || 1}`);
+
+        const response = await fetch('https://api.qashierwise.com/api/broadcasting/auth', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: formData.toString()
+        });
+
+        let result = `Status: ${response.status} ${response.statusText}\n\n`;
+        result += `Request:\n`;
+        result += `- Channel: private-whatsapp.${user.id || 1}\n`;
+        result += `- Socket ID: 123456.789012\n`;
+        result += `- Token: ${token.substring(0, 30)}...\n\n`;
+
+        if (response.ok) {
+          const data = await response.json();
+          result += 'Response:\n' + JSON.stringify(data, null, 2);
+        } else {
+          const text = await response.text();
+          result += 'Error Response:\n' + text;
+        }
+
+        resultEl.textContent = result;
+        resultEl.className = response.ok ? 'success' : 'error';
+      } catch (error) {
+        resultEl.textContent = '❌ Error: ' + error.message;
+        resultEl.className = 'error';
+      }
+    }
+
+    function testPusher() {
+      const token = localStorage.getItem('token');
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const resultEl = document.getElementById('pusher-result');
+
+      if (!token) {
+        resultEl.textContent = '❌ No token found! Please login first.';
+        resultEl.className = 'error';
+        return;
+      }
+
+      resultEl.textContent = 'Connecting to Pusher...\n';
+
+      const pusher = new Pusher('5e011e24b7fe71be40c7', {
+        cluster: 'ap1',
+        forceTLS: true,
+        authEndpoint: 'https://api.qashierwise.com/api/broadcasting/auth',
+        auth: {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
+        }
+      });
+
+      pusher.connection.bind('connected', function() {
+        resultEl.textContent += '✅ Pusher connected!\n';
+        resultEl.textContent += 'Socket ID: ' + pusher.connection.socket_id + '\n\n';
+        resultEl.textContent += 'Subscribing to private-whatsapp.' + (user.id || 1) + '...\n';
+
+        const channel = pusher.subscribe('private-whatsapp.' + (user.id || 1));
+
+        channel.bind('pusher:subscription_succeeded', function() {
+          resultEl.textContent += '✅ Successfully subscribed!\n';
+          resultEl.textContent += '\n🎉 All tests passed! Pusher is working correctly.';
+          resultEl.className = 'success';
+        });
+
+        channel.bind('pusher:subscription_error', function(status) {
+          resultEl.textContent += '❌ Subscription failed: ' + JSON.stringify(status) + '\n';
+          resultEl.className = 'error';
+        });
+      });
+
+      pusher.connection.bind('error', function(err) {
+        resultEl.textContent += '❌ Pusher error: ' + JSON.stringify(err) + '\n';
+        resultEl.className = 'error';
+      });
+    }
+  </script>
+</body>
+</html>

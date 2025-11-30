@@ -1,0 +1,30 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('whatsapp_messages', function (Blueprint $table) {
+            $table->boolean('is_read')->default(false)->after('direction');
+            $table->index(['contact_id', 'is_read']);
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('whatsapp_messages', function (Blueprint $table) {
+            $table->dropIndex(['contact_id', 'is_read']);
+            $table->dropColumn('is_read');
+        });
+    }
+};

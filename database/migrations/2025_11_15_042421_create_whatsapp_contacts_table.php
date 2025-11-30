@@ -13,17 +13,15 @@ return new class extends Migration
     {
         Schema::create('whatsapp_contacts', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('whatsapp_account_id')->constrained()->onDelete('cascade');
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->string('wa_id')->index();
-            $table->string('phone_number');
             $table->string('name')->nullable();
-            $table->string('profile_name')->nullable();
-            $table->json('labels')->nullable();
-            $table->json('custom_fields')->nullable();
-            $table->boolean('is_blocked')->default(false);
-            $table->timestamp('last_message_at')->nullable();
+            $table->string('profile_pic_url')->nullable();
+            $table->timestamp('last_message_at')->nullable()->index();
+            $table->text('last_message_text')->nullable();
+            $table->integer('unread_count')->default(0);
             $table->timestamps();
-            $table->unique(['whatsapp_account_id', 'wa_id']);
+            $table->unique(['user_id', 'wa_id']);
         });
     }
 

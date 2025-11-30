@@ -13,29 +13,20 @@ return new class extends Migration
     {
         Schema::create('whatsapp_messages', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('whatsapp_account_id')->constrained('whatsapp_accounts')->onDelete('cascade');
-            $table->foreignId('whatsapp_contact_id')->nullable()->constrained('whatsapp_contacts')->onDelete('set null');
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('contact_id')->constrained('whatsapp_contacts')->onDelete('cascade');
             $table->string('message_id')->unique();
-            $table->string('wam_id')->nullable()->index();
-            $table->enum('direction', ['inbound', 'outbound']);
-            $table->enum('status', ['sent', 'delivered', 'read', 'failed', 'pending'])->default('pending');
-            $table->string('from_number')->nullable();
-            $table->string('to_number')->nullable();
-            $table->enum('type', ['text', 'image', 'document', 'audio', 'video', 'location', 'contacts', 'template', 'button', 'list', 'interactive'])->default('text');
+            $table->enum('direction', ['incoming', 'outgoing']);
+            $table->enum('type', ['text', 'image', 'document', 'audio', 'video', 'location', 'contacts', 'button', 'interactive', 'template'])->default('text');
             $table->text('content')->nullable();
-            $table->json('media')->nullable();
             $table->json('metadata')->nullable();
-            $table->string('context_message_id')->nullable();
-            $table->string('template_name')->nullable();
-            $table->string('template_language')->nullable();
+            $table->enum('status', ['sent', 'delivered', 'read', 'failed'])->default('sent');
             $table->timestamp('sent_at')->nullable();
             $table->timestamp('delivered_at')->nullable();
             $table->timestamp('read_at')->nullable();
-            $table->timestamp('failed_at')->nullable();
-            $table->text('error_message')->nullable();
             $table->timestamps();
-            $table->index(['whatsapp_account_id', 'created_at']);
-            $table->index(['whatsapp_contact_id', 'created_at']);
+            $table->index(['user_id', 'created_at']);
+            $table->index(['contact_id', 'created_at']);
         });
     }
 

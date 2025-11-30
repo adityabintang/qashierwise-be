@@ -1,0 +1,27 @@
+{
+    "name": "QashierWise - AI Chatbot WhatsApp untuk Restoran",
+    "short_name": "QashierWise",
+    "description": "Platform AI Chatbot WhatsApp untuk restoran dengan integrasi QRIS",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#4910ce",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "/images/icon-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/images/icon-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": ["business", "food", "productivity"],
+    "lang": "id",
+    "dir": "ltr"
+}

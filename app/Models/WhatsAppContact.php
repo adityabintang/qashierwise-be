@@ -12,31 +12,52 @@ class WhatsAppContact extends Model
     protected $table = 'whatsapp_contacts';
 
     protected $fillable = [
-        'whatsapp_account_id',
+        'user_id',
         'wa_id',
-        'phone_number',
         'name',
-        'profile_name',
-        'labels',
-        'custom_fields',
-        'is_blocked',
-        'last_message_at'
+        'profile_pic_url',
+        'last_message_at',
+        'last_message_text',
+        'unread_count',
     ];
 
     protected $casts = [
-        'labels' => 'array',
-        'custom_fields' => 'array',
-        'is_blocked' => 'boolean',
         'last_message_at' => 'datetime',
     ];
 
-    public function account()
+    protected $appends = ['phone_number'];
+
+    public function user()
     {
-        return $this->belongsTo(WhatsAppAccount::class, 'whatsapp_account_id');
+        return $this->belongsTo(User::class);
     }
 
     public function messages()
     {
-        return $this->hasMany(WhatsAppMessage::class, 'whatsapp_contact_id');
+        return $this->hasMany(WhatsAppMessage::class, 'contact_id');
+    }
+
+    public function latestMessage()
+    {
+        return $this->hasOne(WhatsAppMessage::class, 'contact_id')->latest();
+    }
+
+    /**
+     * Get phone number (formatted wa_id)
+     */
+    public function getPhoneNumberAttribute()
+    {
+        $waId = $this->wa_id;
+
+        if (! $waId) {
+            return null;
+        }
+
+        // Add + prefix if not present
+        if (! str_starts_with($waId, '+')) {
+            return '+'.$waId;
+        }
+
+        return $waId;
     }
 }

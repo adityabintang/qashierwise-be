@@ -15,12 +15,11 @@ return [
     |
     */
 
-    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
-        '%s%s',
-        'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1',
-        Sanctum::currentApplicationUrlWithPort(),
-        // Sanctum::currentRequestHost(),
-    ))),
+    'stateful' => explode(',', env(
+        'SANCTUM_STATEFUL_DOMAINS',
+        'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1,qashierwise.com,api.qashierwise.com'
+    )),
+
 
     /*
     |--------------------------------------------------------------------------
@@ -45,9 +44,11 @@ return [
     | considered expired. This will override any values set in the token's
     | "expires_at" attribute, but first-party sessions are not affected.
     |
+    | 1 month = 30 days * 24 hours * 60 minutes = 43200 minutes
+    |
     */
 
-    'expiration' => null,
+    'expiration' => env('SANCTUM_EXPIRATION', 43200), // 1 month
 
     /*
     |--------------------------------------------------------------------------

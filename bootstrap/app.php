@@ -9,10 +9,28 @@ return Application::configure(basePath: dirname(__DIR__))
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
+        channels: __DIR__.'/../routes/channels.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->statefulApi();
+
+        // CORS configuration
+        $middleware->api(prepend: [
+            \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
+
+        // Disable CSRF for API routes
+        $middleware->validateCsrfTokens(except: [
+            'api/*',
+            'webhook/*',
+            'broadcasting/*',
+        ]);
+
+        // Register custom middleware aliases
+        $middleware->alias([
+            'check.web.auth' => \App\Http\Middleware\CheckWebAuth::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

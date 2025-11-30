@@ -3,24 +3,35 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Netflie\WhatsAppCloudApi\WhatsAppCloudApi;
-use Netflie\WhatsAppCloudApi\Message\Media\LinkID;
-use Netflie\WhatsAppCloudApi\Message\Media\MediaObjectID;
-use Netflie\WhatsAppCloudApi\Message\Template\Component;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
 use App\Models\WhatsAppMessage;
 use App\Models\WhatsAppTemplate;
-use App\Models\WhatsAppMedia;
+use App\Services\MediaStorageService;
+use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
+use Netflie\WhatsAppCloudApi\Message\ButtonReply\Button;
+use Netflie\WhatsAppCloudApi\Message\ButtonReply\ButtonAction;
+use Netflie\WhatsAppCloudApi\Message\Media\LinkID;
+use Netflie\WhatsAppCloudApi\Message\Media\MediaObjectID;
+use Netflie\WhatsAppCloudApi\Message\OptionsList\Action as ListAction;
+use Netflie\WhatsAppCloudApi\Message\OptionsList\Row as ListRow;
+use Netflie\WhatsAppCloudApi\Message\OptionsList\Section as ListSection;
+use Netflie\WhatsAppCloudApi\Message\Template\Component;
+use Netflie\WhatsAppCloudApi\WhatsAppCloudApi;
 
 class WhatsAppController extends Controller
 {
     protected $whatsapp;
+
     protected $whatsappAccount;
 
-    public function __construct()
+    protected MediaStorageService $mediaStorageService;
+
+    public function __construct(MediaStorageService $mediaStorageService)
     {
+        $this->mediaStorageService = $mediaStorageService;
         $this->whatsapp = new WhatsAppCloudApi([
             'from_phone_number_id' => config('whatsapp.phone_number_id'),
             'access_token' => config('whatsapp.access_token'),
@@ -28,11 +39,40 @@ class WhatsAppController extends Controller
     }
 
     /**
+     * Upload media to WhatsApp with correct MIME type
+     */
+    private function uploadMediaToWhatsApp(UploadedFile $file): array
+    {
+        $phoneNumberId = config('whatsapp.phone_number_id');
+        $accessToken = config('whatsapp.access_token');
+
+        $response = Http::withToken($accessToken)
+            ->attach(
+                'file',
+                file_get_contents($file->getRealPath()),
+                $file->getClientOriginalName(),
+                ['Content-Type' => $file->getMimeType()]
+            )
+            ->post("https://graph.facebook.com/v21.0/{$phoneNumberId}/media", [
+                'messaging_product' => 'whatsapp',
+                'type' => $file->getMimeType(),
+            ]);
+
+        if (! $response->successful()) {
+            throw new \Exception('Failed to upload media: '.$response->body());
+        }
+
+        return $response->json();
+    }
+
+
+
+    /**
      * Get WhatsApp account instance
      */
     private function getWhatsAppAccount()
     {
-        if (!$this->whatsappAccount) {
+        if (! $this->whatsappAccount) {
             $this->whatsappAccount = WhatsAppAccount::firstOrCreate(
                 ['phone_number_id' => config('whatsapp.phone_number_id')],
                 [
@@ -43,6 +83,7 @@ class WhatsAppController extends Controller
                 ]
             );
         }
+
         return $this->whatsappAccount;
     }
 
@@ -51,13 +92,17 @@ class WhatsAppController extends Controller
      */
     private function getOrCreateContact($phoneNumber)
     {
+        // Clean phone number (remove +, spaces, etc)
+        $cleanNumber = preg_replace('/[^0-9]/', '', $phoneNumber);
+        $userId = auth()->id() ?? 1;
+
         return WhatsAppContact::firstOrCreate(
             [
-                'whatsapp_account_id' => $this->getWhatsAppAccount()->id,
-                'phone_number' => $phoneNumber,
+                'user_id' => $userId,
+                'wa_id' => $cleanNumber,
             ],
             [
-                'wa_id' => $phoneNumber,
+                'name' => $phoneNumber, // Will be updated when they reply
             ]
         );
     }
@@ -68,25 +113,81 @@ class WhatsAppController extends Controller
     private function saveMessage($contact, $type, $content, $response, $templateName = null, $templateLanguage = null)
     {
         $responseBody = $response->decodedBody();
+        $userId = auth()->id() ?? $contact->user_id ?? 1;
+
+        // For template messages, include template_name in content
+        if ($type === 'template' && $templateName) {
+            $contentData = is_string($content) ? json_decode($content, true) : $content;
+            if (is_array($contentData)) {
+                $contentData['template_name'] = $templateName;
+                $contentData['language'] = $templateLanguage;
+            } else {
+                $contentData = [
+                    'template_name' => $templateName,
+                    'language' => $templateLanguage,
+                    'original_content' => $content,
+                ];
+            }
+            $content = $contentData;
+        }
 
         $message = WhatsAppMessage::create([
-            'whatsapp_account_id' => $this->getWhatsAppAccount()->id,
-            'whatsapp_contact_id' => $contact->id,
+            'user_id' => $userId,
+            'contact_id' => $contact->id,
             'message_id' => $responseBody['messages'][0]['id'] ?? null,
-            'wam_id' => $responseBody['messages'][0]['id'] ?? null,
-            'direction' => 'outbound',
+            'direction' => 'outgoing',
             'status' => 'sent',
             'type' => $type,
             'content' => is_array($content) ? json_encode($content) : $content,
-            'template_name' => $templateName,
-            'template_language' => $templateLanguage,
+            'metadata' => [
+                'template_name' => $templateName,
+                'template_language' => $templateLanguage,
+            ],
             'sent_at' => now(),
         ]);
 
-        // Update contact's last message timestamp
-        $contact->update(['last_message_at' => now()]);
+        // Update contact's last message info
+        $contact->update([
+            'last_message_at' => now(),
+            'last_message_text' => $this->getLastMessageText($type, $content, $templateName),
+        ]);
+
+        // Broadcast the new message event (include sender so message appears in their UI)
+        broadcast(new \App\Events\NewWhatsAppMessage($message->load('contact'), $contact));
 
         return $message;
+    }
+
+    /**
+     * Get last message text for contact preview
+     */
+    private function getLastMessageText($type, $content, $templateName = null)
+    {
+        switch ($type) {
+            case 'text':
+                return is_string($content) ? $content : 'Text message';
+            case 'template':
+                return '📋 Template: '.($templateName ?? 'Template');
+            case 'image':
+                return '📷 Image';
+            case 'video':
+                return '🎥 Video';
+            case 'audio':
+                return '🎵 Audio';
+            case 'document':
+                $filename = is_array($content) ? ($content['filename'] ?? 'Document') : 'Document';
+
+                return '📄 '.$filename;
+            case 'location':
+                return '📍 Location';
+            case 'interactive':
+                return '🔘 Interactive message';
+            case 'contact':
+            case 'contacts':
+                return '👤 Contact card';
+            default:
+                return ucfirst($type).' message';
+        }
     }
 
     /**
@@ -112,13 +213,13 @@ class WhatsAppController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Text message sent successfully',
-                'data' => $response->decodedBody()
+                'data' => $response->decodedBody(),
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to send message',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -136,7 +237,7 @@ class WhatsAppController extends Controller
 
         try {
             // For simple template without parameters (like hello_world)
-            if (!$request->has('header_params') && !$request->has('body_params') && !$request->has('button_params')) {
+            if (! $request->has('header_params') && ! $request->has('body_params') && ! $request->has('button_params')) {
                 $response = $this->whatsapp->sendTemplate(
                     $request->to,
                     $request->template_name,
@@ -185,13 +286,13 @@ class WhatsAppController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Template message sent successfully',
-                'data' => $response->decodedBody()
+                'data' => $response->decodedBody(),
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to send template',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -201,38 +302,68 @@ class WhatsAppController extends Controller
      */
     public function sendImageMessage(Request $request)
     {
+        $maxSizeKb = (int) (config('whatsapp.media_limits.image', 5 * 1024 * 1024) / 1024);
         $request->validate([
             'to' => 'required|string',
-            'image_url' => 'required|string',
+            'file' => "required_without:image_url|file|mimes:jpeg,jpg,png|max:{$maxSizeKb}",
+            'image_url' => 'required_without:file|string|nullable',
+            'caption' => 'nullable|string',
         ]);
 
         try {
-            $link_id = new LinkID($request->image_url);
+            $imageUrl = $request->image_url;
 
-            $response = $this->whatsapp->sendImage(
-                $request->to,
-                $link_id,
-                $request->caption ?? ''
-            );
+            // If file is uploaded, upload to WhatsApp first
+            if ($request->hasFile('file')) {
+                $file = $request->file('file');
+
+                // Store using MediaStorageService
+                $storageResult = $this->mediaStorageService->store($file, 'image');
+                $imageUrl = $storageResult['url'];
+
+                // Upload to WhatsApp
+                $uploadData = $this->uploadMediaToWhatsApp($file);
+
+                if (! isset($uploadData['id'])) {
+                    throw new \Exception('Failed to upload media to WhatsApp');
+                }
+
+                // Use MediaObjectID for uploaded media
+                $media_id = new MediaObjectID($uploadData['id']);
+
+                $response = $this->whatsapp->sendImage(
+                    $request->to,
+                    $media_id,
+                    $request->caption ?? ''
+                );
+            } else {
+                $link_id = new LinkID($request->image_url);
+
+                $response = $this->whatsapp->sendImage(
+                    $request->to,
+                    $link_id,
+                    $request->caption ?? ''
+                );
+            }
 
             // Save to database
             $contact = $this->getOrCreateContact($request->to);
             $content = [
-                'url' => $request->image_url,
-                'caption' => $request->caption ?? ''
+                'url' => $imageUrl,
+                'caption' => $request->caption ?? '',
             ];
             $this->saveMessage($contact, 'image', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Image sent successfully',
-                'data' => $response->decodedBody()
+                'data' => $response->decodedBody(),
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to send image',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -242,32 +373,73 @@ class WhatsAppController extends Controller
      */
     public function sendDocumentMessage(Request $request)
     {
+        $maxSizeKb = (int) (config('whatsapp.media_limits.document', 25 * 1024 * 1024) / 1024);
         $request->validate([
             'to' => 'required|string',
-            'document_url' => 'required|string',
-            'filename' => 'required|string',
+            'file' => "required_without:document_url|file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,txt|max:{$maxSizeKb}",
+            'document_url' => 'required_without:file|string|nullable',
+            'filename' => 'nullable|string',
+            'caption' => 'nullable|string',
         ]);
 
         try {
-            $link_id = new LinkID($request->document_url);
+            $documentUrl = $request->document_url;
+            $filename = $request->filename;
 
-            $response = $this->whatsapp->sendDocument(
-                $request->to,
-                $link_id,
-                $request->filename,
-                $request->caption ?? ''
-            );
+            // If file is uploaded, upload to WhatsApp first
+            if ($request->hasFile('file')) {
+                $file = $request->file('file');
+                $filename = $filename ?? $file->getClientOriginalName();
+
+                // Store using MediaStorageService
+                $storageResult = $this->mediaStorageService->store($file, 'document');
+                $documentUrl = $storageResult['url'];
+
+                $uploadData = $this->uploadMediaToWhatsApp($file);
+
+                if (! isset($uploadData['id'])) {
+                    throw new \Exception('Failed to upload media to WhatsApp');
+                }
+
+                // Use MediaObjectID for uploaded media
+                $media_id = new MediaObjectID($uploadData['id']);
+
+                $response = $this->whatsapp->sendDocument(
+                    $request->to,
+                    $media_id,
+                    $filename,
+                    $request->caption ?? ''
+                );
+            } else {
+                $link_id = new LinkID($request->document_url);
+
+                $response = $this->whatsapp->sendDocument(
+                    $request->to,
+                    $link_id,
+                    $filename ?? 'document',
+                    $request->caption ?? ''
+                );
+            }
+
+            // Save to database
+            $contact = $this->getOrCreateContact($request->to);
+            $content = [
+                'url' => $documentUrl,
+                'filename' => $filename,
+                'caption' => $request->caption ?? '',
+            ];
+            $this->saveMessage($contact, 'document', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Document sent successfully',
-                'data' => $response->decodedBody()
+                'data' => $response->decodedBody(),
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to send document',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -277,29 +449,61 @@ class WhatsAppController extends Controller
      */
     public function sendAudioMessage(Request $request)
     {
+        $maxSizeKb = (int) (config('whatsapp.media_limits.audio', 16 * 1024 * 1024) / 1024);
         $request->validate([
             'to' => 'required|string',
-            'audio_url' => 'required|string',
+            'file' => "required_without:audio_url|file|mimes:mp3,ogg,amr,aac,m4a|max:{$maxSizeKb}",
+            'audio_url' => 'required_without:file|string|nullable',
         ]);
 
         try {
-            $link_id = new LinkID($request->audio_url);
+            $audioUrl = $request->audio_url;
 
-            $response = $this->whatsapp->sendAudio(
-                $request->to,
-                $link_id
-            );
+            // If file is uploaded, upload to WhatsApp first
+            if ($request->hasFile('file')) {
+                $file = $request->file('file');
+
+                // Store using MediaStorageService
+                $storageResult = $this->mediaStorageService->store($file, 'audio');
+                $audioUrl = $storageResult['url'];
+
+                $uploadData = $this->uploadMediaToWhatsApp($file);
+
+                if (! isset($uploadData['id'])) {
+                    throw new \Exception('Failed to upload media to WhatsApp');
+                }
+
+                // Use MediaObjectID for uploaded media
+                $media_id = new MediaObjectID($uploadData['id']);
+
+                $response = $this->whatsapp->sendAudio(
+                    $request->to,
+                    $media_id
+                );
+            } else {
+                $link_id = new LinkID($request->audio_url);
+
+                $response = $this->whatsapp->sendAudio(
+                    $request->to,
+                    $link_id
+                );
+            }
+
+            // Save to database
+            $contact = $this->getOrCreateContact($request->to);
+            $content = ['url' => $audioUrl];
+            $this->saveMessage($contact, 'audio', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Audio sent successfully',
-                'data' => $response->decodedBody()
+                'data' => $response->decodedBody(),
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to send audio',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -309,30 +513,67 @@ class WhatsAppController extends Controller
      */
     public function sendVideoMessage(Request $request)
     {
+        $maxSizeKb = (int) (config('whatsapp.media_limits.video', 16 * 1024 * 1024) / 1024);
         $request->validate([
             'to' => 'required|string',
-            'video_url' => 'required|string',
+            'file' => "required_without:video_url|file|mimes:mp4,3gp|max:{$maxSizeKb}",
+            'video_url' => 'required_without:file|string|nullable',
+            'caption' => 'nullable|string',
         ]);
 
         try {
-            $link_id = new LinkID($request->video_url);
+            $videoUrl = $request->video_url;
 
-            $response = $this->whatsapp->sendVideo(
-                $request->to,
-                $link_id,
-                $request->caption ?? ''
-            );
+            // If file is uploaded, upload to WhatsApp first
+            if ($request->hasFile('file')) {
+                $file = $request->file('file');
+
+                // Store using MediaStorageService
+                $storageResult = $this->mediaStorageService->store($file, 'video');
+                $videoUrl = $storageResult['url'];
+
+                $uploadData = $this->uploadMediaToWhatsApp($file);
+
+                if (! isset($uploadData['id'])) {
+                    throw new \Exception('Failed to upload media to WhatsApp');
+                }
+
+                // Use MediaObjectID for uploaded media
+                $media_id = new MediaObjectID($uploadData['id']);
+
+                $response = $this->whatsapp->sendVideo(
+                    $request->to,
+                    $media_id,
+                    $request->caption ?? ''
+                );
+            } else {
+                $link_id = new LinkID($request->video_url);
+
+                $response = $this->whatsapp->sendVideo(
+                    $request->to,
+                    $link_id,
+                    $request->caption ?? ''
+                );
+            }
+
+            // Save to database
+            $contact = $this->getOrCreateContact($request->to);
+            $content = [
+                'url' => $videoUrl,
+                'caption' => $request->caption ?? '',
+            ];
+            $this->saveMessage($contact, 'video', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Video sent successfully',
-                'data' => $response->decodedBody()
+                'data' => $response->decodedBody(),
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to send video',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -346,8 +587,8 @@ class WhatsAppController extends Controller
             'to' => 'required|string',
             'longitude' => 'required|numeric',
             'latitude' => 'required|numeric',
-            'name' => 'required|string',
-            'address' => 'required|string',
+            'name' => 'nullable|string',
+            'address' => 'nullable|string',
         ]);
 
         try {
@@ -355,20 +596,30 @@ class WhatsAppController extends Controller
                 $request->to,
                 $request->longitude,
                 $request->latitude,
-                $request->name,
-                $request->address
+                $request->name ?? '',
+                $request->address ?? ''
             );
+
+            // Save to database
+            $contact = $this->getOrCreateContact($request->to);
+            $content = [
+                'latitude' => $request->latitude,
+                'longitude' => $request->longitude,
+                'name' => $request->name ?? '',
+                'address' => $request->address ?? '',
+            ];
+            $this->saveMessage($contact, 'location', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Location sent successfully',
-                'data' => $response->decodedBody()
+                'data' => $response->decodedBody(),
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to send location',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -380,27 +631,39 @@ class WhatsAppController extends Controller
     {
         $request->validate([
             'to' => 'required|string',
-            'contact_name' => 'required|string',
-            'contact_phone' => 'required|string',
+            'contacts' => 'required|array',
+            'contacts.*.name' => 'required|array',
+            'contacts.*.name.formatted_name' => 'required|string',
+            'contacts.*.phones' => 'required|array',
+            'contacts.*.phones.*.phone' => 'required|string',
         ]);
 
         try {
+            // Format contacts for WhatsApp API
+            $contacts = $request->contacts;
+            $firstContact = $contacts[0];
+
             $response = $this->whatsapp->sendContact(
                 $request->to,
-                $request->contact_name,
-                $request->contact_phone
+                $firstContact['name']['formatted_name'],
+                $firstContact['phones'][0]['phone']
             );
+
+            // Save to database
+            $contact = $this->getOrCreateContact($request->to);
+            $content = ['contacts' => $contacts];
+            $this->saveMessage($contact, 'contacts', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Contact sent successfully',
-                'data' => $response->decodedBody()
+                'data' => $response->decodedBody(),
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to send contact',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -417,35 +680,45 @@ class WhatsAppController extends Controller
         ]);
 
         try {
-            $buttons = [];
-            foreach ($request->buttons as $button) {
-                $buttons[] = [
-                    'type' => 'reply',
-                    'reply' => [
-                        'id' => $button['id'],
-                        'title' => $button['title']
-                    ]
-                ];
+            $buttonObjects = [];
+            $buttonData = [];
+            foreach ($request->buttons as $index => $button) {
+                $id = $button['id'] ?? 'btn_'.($index + 1);
+                $title = $button['title'] ?? (is_string($button) ? $button : 'Button '.($index + 1));
+                $buttonObjects[] = new Button($id, $title);
+                $buttonData[] = ['id' => $id, 'title' => $title];
             }
+
+            $buttonAction = new ButtonAction($buttonObjects);
 
             $response = $this->whatsapp->sendButton(
                 $request->to,
                 $request->body,
-                $buttons,
+                $buttonAction,
                 $request->header ?? null,
                 $request->footer ?? null
             );
 
+            // Save to database
+            $contact = $this->getOrCreateContact($request->to);
+            $content = [
+                'body' => $request->body,
+                'buttons' => $buttonData,
+                'header' => $request->header ?? null,
+                'footer' => $request->footer ?? null,
+            ];
+            $this->saveMessage($contact, 'interactive', $content, $response);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Button message sent successfully',
-                'data' => $response->decodedBody()
+                'data' => $response->decodedBody(),
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to send button message',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -463,25 +736,55 @@ class WhatsAppController extends Controller
         ]);
 
         try {
+            // Build sections with Row and Section objects
+            $sectionObjects = [];
+            foreach ($request->sections as $section) {
+                $rows = [];
+                foreach ($section['rows'] as $row) {
+                    $rows[] = new ListRow(
+                        $row['id'] ?? uniqid('row_'),
+                        $row['title'],
+                        $row['description'] ?? null
+                    );
+                }
+                $sectionObjects[] = new ListSection(
+                    $section['title'] ?? 'Options',
+                    $rows
+                );
+            }
+
+            // Create Action object
+            $action = new ListAction($request->button_text, $sectionObjects);
+
             $response = $this->whatsapp->sendList(
                 $request->to,
                 $request->header ?? '',
                 $request->body,
                 $request->footer ?? '',
-                $request->button_text,
-                $request->sections
+                $action
             );
+
+            // Save to database
+            $contact = $this->getOrCreateContact($request->to);
+            $content = [
+                'body' => $request->body,
+                'button_text' => $request->button_text,
+                'sections' => $request->sections,
+                'header' => $request->header ?? null,
+                'footer' => $request->footer ?? null,
+            ];
+            $this->saveMessage($contact, 'interactive', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'List message sent successfully',
-                'data' => $response->decodedBody()
+                'data' => $response->decodedBody(),
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to send list message',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -501,13 +804,13 @@ class WhatsAppController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Message marked as read',
-                'data' => $response->decodedBody()
+                'data' => $response->decodedBody(),
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to mark message as read',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -527,13 +830,13 @@ class WhatsAppController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Media URL retrieved successfully',
-                'data' => $response->decodedBody()
+                'data' => $response->decodedBody(),
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to get media URL',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -557,13 +860,13 @@ class WhatsAppController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Media uploaded successfully',
-                'data' => $response->decodedBody()
+                'data' => $response->decodedBody(),
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to upload media',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -574,18 +877,63 @@ class WhatsAppController extends Controller
     public function getBusinessProfile()
     {
         try {
-            $response = $this->whatsapp->businessProfile();
+            $account = $this->getWhatsAppAccount();
+
+            // First check if we have profile data in database
+            $localProfile = [
+                'about' => $account->about,
+                'address' => $account->address,
+                'description' => $account->description,
+                'email' => $account->email,
+                'vertical' => $account->vertical,
+                'websites' => $account->websites ?? [],
+                'profile_picture_url' => $account->profile_picture_url,
+            ];
+
+            // Check if we have any data stored locally
+            $hasLocalData = $account->about || $account->address || $account->description ||
+                            $account->email || $account->vertical || ! empty($account->websites);
+
+            if ($hasLocalData) {
+                // Return local data
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Business profile retrieved successfully',
+                    'data' => $localProfile,
+                    'source' => 'database',
+                ], 200);
+            }
+
+            // If no local data, fetch from WhatsApp API and save to database
+            $fields = 'about,address,description,email,profile_picture_url,websites,vertical';
+            $response = $this->whatsapp->businessProfile($fields);
+            $apiData = $response->decodedBody();
+
+            // Save API data to database for future use
+            if (! empty($apiData['data'][0])) {
+                $profileData = $apiData['data'][0];
+                $account->update([
+                    'about' => $profileData['about'] ?? null,
+                    'address' => $profileData['address'] ?? null,
+                    'description' => $profileData['description'] ?? null,
+                    'email' => $profileData['email'] ?? null,
+                    'vertical' => $profileData['vertical'] ?? null,
+                    'websites' => $profileData['websites'] ?? [],
+                    'profile_picture_url' => $profileData['profile_picture_url'] ?? null,
+                ]);
+            }
 
             return response()->json([
                 'success' => true,
                 'message' => 'Business profile retrieved successfully',
-                'data' => $response->decodedBody()
+                'data' => $apiData['data'][0] ?? $apiData,
+                'source' => 'whatsapp_api',
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to get business profile',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -596,27 +944,364 @@ class WhatsAppController extends Controller
     public function updateBusinessProfile(Request $request)
     {
         try {
+            $request->validate([
+                'about' => 'nullable|string|max:139',
+                'address' => 'nullable|string|max:256',
+                'description' => 'nullable|string|max:512',
+                'email' => 'nullable|email|max:128',
+                'vertical' => 'nullable|in:UNDEFINED,OTHER,AUTO,BEAUTY,APPAREL,EDU,ENTERTAIN,EVENT_PLAN,FINANCE,GROCERY,GOVT,HOTEL,HEALTH,NONPROFIT,PROF_SERVICES,RETAIL,TRAVEL,RESTAURANT,NOT_A_BIZ',
+                'websites' => 'nullable|array',
+                'websites.*' => 'url',
+            ]);
+
             $data = $request->only([
                 'about',
                 'address',
                 'description',
                 'email',
                 'vertical',
-                'websites'
+                'websites',
             ]);
 
+            // Remove null values but keep empty strings
+            $data = array_filter($data, function ($value) {
+                return $value !== null;
+            });
+
+            // Update WhatsApp API
             $response = $this->whatsapp->updateBusinessProfile($data);
+
+            // Save to database
+            $account = $this->getWhatsAppAccount();
+            $account->update([
+                'about' => $data['about'] ?? $account->about,
+                'address' => $data['address'] ?? $account->address,
+                'description' => $data['description'] ?? $account->description,
+                'email' => $data['email'] ?? $account->email,
+                'vertical' => $data['vertical'] ?? $account->vertical,
+                'websites' => $data['websites'] ?? $account->websites,
+            ]);
+
+            // Broadcast profile update event
+            $userId = auth()->id() ?? 1;
+            broadcast(new \App\Events\ProfileUpdated($userId, $data, 'business_profile'));
 
             return response()->json([
                 'success' => true,
                 'message' => 'Business profile updated successfully',
-                'data' => $response->decodedBody()
+                'data' => $data,
             ], 200);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update business profile',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get phone number info and registration status
+     */
+    public function getPhoneNumberInfo()
+    {
+        try {
+            $phoneNumberId = config('whatsapp.phone_number_id');
+            $accessToken = config('whatsapp.access_token');
+
+            // Call Graph API directly to get phone number details
+            $response = Http::withToken($accessToken)
+                ->get("https://graph.facebook.com/v21.0/{$phoneNumberId}", [
+                    'fields' => 'verified_name,display_phone_number,quality_rating,name_status,code_verification_status',
+                ]);
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to retrieve phone number info: '.$response->body());
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Phone number info retrieved successfully',
+                'data' => $response->json(),
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get phone number info',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get WhatsApp Business Account details
+     * Gets account info via phone number endpoint (works with Standard Access)
+     */
+    public function getBusinessAccount()
+    {
+        try {
+            $phoneNumberId = config('whatsapp.phone_number_id');
+            $businessAccountId = config('whatsapp.business_account_id');
+            $accessToken = config('whatsapp.access_token');
+
+            // Get phone numbers associated with the business account
+            // This endpoint works with Standard Access (no BSP required)
+            $response = Http::withToken($accessToken)
+                ->get("https://graph.facebook.com/v21.0/{$businessAccountId}/phone_numbers");
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to retrieve business account info: '.$response->body());
+            }
+
+            $data = $response->json();
+
+            // Combine with current phone number info
+            $phoneInfo = Http::withToken($accessToken)
+                ->get("https://graph.facebook.com/v21.0/{$phoneNumberId}", [
+                    'fields' => 'verified_name,display_phone_number,quality_rating,name_status,code_verification_status,is_official_business_account',
+                ])
+                ->json();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Business account retrieved successfully',
+                'data' => [
+                    'business_account_id' => $businessAccountId,
+                    'phone_numbers' => $data['data'] ?? [],
+                    'current_phone' => $phoneInfo,
+                    'total_phone_numbers' => count($data['data'] ?? []),
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get business account',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get all WhatsApp Business Accounts from Business Portfolio
+     * Simplified approach: Query from Meta App's subscribed WABAs
+     */
+    public function getAllBusinessAccounts()
+    {
+        try {
+            $accessToken = config('whatsapp.access_token');
+            $appId = config('whatsapp.app_id');
+
+            if (! $appId) {
+                throw new \Exception('WhatsApp App ID is required. Please add WHATSAPP_APP_ID to .env file');
+            }
+
+            // Get all WABAs subscribed to this app
+            $appWABAsResponse = Http::withToken($accessToken)
+                ->get("https://graph.facebook.com/v21.0/{$appId}/subscribed_apps");
+
+            $allWABAs = [];
+
+            // Fallback: Try to get from current business account and find related accounts
+            // Get current WABA details
+            $currentWABAId = config('whatsapp.business_account_id');
+
+            // Try multiple approaches to find all WABAs
+            // Approach 1: Get phone numbers from current WABA
+            $phoneResponse = Http::withToken($accessToken)
+                ->get("https://graph.facebook.com/v21.0/{$currentWABAId}/phone_numbers", [
+                    'fields' => 'id,verified_name,display_phone_number,quality_rating,code_verification_status,name_status',
+                ]);
+
+            if ($phoneResponse->successful()) {
+                $phones = $phoneResponse->json()['data'] ?? [];
+
+                // Get WABA details
+                $wabaResponse = Http::withToken($accessToken)
+                    ->get("https://graph.facebook.com/v21.0/{$currentWABAId}", [
+                        'fields' => 'id,name,currency,timezone_id,message_template_namespace,account_review_status',
+                    ]);
+
+                if ($wabaResponse->successful()) {
+                    $waba = $wabaResponse->json();
+                    $waba['phone_numbers'] = $phones;
+                    $allWABAs[] = $waba;
+                }
+            }
+
+            // Approach 2: Try to find other WABAs by querying phone number's owner
+            // Get on_behalf_of_business_info from current phone
+            $phoneNumberId = config('whatsapp.phone_number_id');
+            $phoneInfoResponse = Http::withToken($accessToken)
+                ->get("https://graph.facebook.com/v21.0/{$phoneNumberId}", [
+                    'fields' => 'verified_name,display_phone_number,account_mode,certificate,code_verification_status,quality_rating,name_status',
+                ]);
+
+            $phoneInfo = $phoneInfoResponse->successful() ? $phoneInfoResponse->json() : null;
+
+            // Manual approach: If you have multiple WABA IDs, add them to config
+            $additionalWABAIds = config('whatsapp.additional_waba_ids', []);
+
+            foreach ($additionalWABAIds as $wabaId) {
+                if ($wabaId === $currentWABAId) {
+                    continue;
+                } // Skip current WABA
+
+                $phoneResponse = Http::withToken($accessToken)
+                    ->get("https://graph.facebook.com/v21.0/{$wabaId}/phone_numbers", [
+                        'fields' => 'id,verified_name,display_phone_number,quality_rating,code_verification_status,name_status',
+                    ]);
+
+                if ($phoneResponse->successful()) {
+                    $phones = $phoneResponse->json()['data'] ?? [];
+
+                    $wabaResponse = Http::withToken($accessToken)
+                        ->get("https://graph.facebook.com/v21.0/{$wabaId}", [
+                            'fields' => 'id,name,currency,timezone_id,message_template_namespace,account_review_status',
+                        ]);
+
+                    if ($wabaResponse->successful()) {
+                        $waba = $wabaResponse->json();
+                        $waba['phone_numbers'] = $phones;
+                        $allWABAs[] = $waba;
+                    }
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'WhatsApp Business Accounts retrieved successfully',
+                'data' => [
+                    'whatsapp_accounts' => $allWABAs,
+                    'total_waba' => count($allWABAs),
+                    'current_waba_id' => $currentWABAId,
+                    'current_phone' => $phoneInfo,
+                    'note' => count($allWABAs) === 1
+                        ? 'Only current WABA found. To list other WABAs, add their IDs to WHATSAPP_ADDITIONAL_WABA_IDS in .env (comma-separated)'
+                        : null,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get business accounts',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get dashboard statistics
+     */
+    public function getDashboardStats()
+    {
+        try {
+            $userId = auth()->id() ?? 1;
+
+            // Current totals
+            $totalContacts = WhatsAppContact::where('user_id', $userId)->count();
+            $totalMessages = WhatsAppMessage::where('user_id', $userId)->count();
+            $unreadMessages = WhatsAppContact::where('user_id', $userId)->sum('unread_count');
+
+            // Contacts growth (this month vs last month)
+            $contactsThisMonth = WhatsAppContact::where('user_id', $userId)
+                ->where('created_at', '>=', now()->startOfMonth())
+                ->count();
+            $contactsLastMonth = WhatsAppContact::where('user_id', $userId)
+                ->whereBetween('created_at', [now()->subMonth()->startOfMonth(), now()->subMonth()->endOfMonth()])
+                ->count();
+            $contactsGrowth = $contactsLastMonth > 0
+                ? round((($contactsThisMonth - $contactsLastMonth) / $contactsLastMonth) * 100, 1)
+                : ($contactsThisMonth > 0 ? 100 : 0);
+
+            // Messages growth (this week vs last week)
+            $messagesThisWeek = WhatsAppMessage::where('user_id', $userId)
+                ->where('created_at', '>=', now()->startOfWeek())
+                ->count();
+            $messagesLastWeek = WhatsAppMessage::where('user_id', $userId)
+                ->whereBetween('created_at', [now()->subWeek()->startOfWeek(), now()->subWeek()->endOfWeek()])
+                ->count();
+            $messagesGrowth = $messagesLastWeek > 0
+                ? round((($messagesThisWeek - $messagesLastWeek) / $messagesLastWeek) * 100, 1)
+                : ($messagesThisWeek > 0 ? 100 : 0);
+
+            $stats = [
+                'total_contacts' => $totalContacts,
+                'total_messages' => $totalMessages,
+                'unread_messages' => $unreadMessages,
+                'contacts_growth' => $contactsGrowth,
+                'messages_growth' => $messagesGrowth,
+                'contacts_this_month' => $contactsThisMonth,
+                'contacts_last_month' => $contactsLastMonth,
+                'messages_this_week' => $messagesThisWeek,
+                'messages_last_week' => $messagesLastWeek,
+                'incoming_messages' => WhatsAppMessage::where('user_id', $userId)
+                    ->where('direction', 'incoming')->count(),
+                'outgoing_messages' => WhatsAppMessage::where('user_id', $userId)
+                    ->where('direction', 'outgoing')->count(),
+            ];
+
+            return response()->json([
+                'success' => true,
+                'data' => $stats,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve stats',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get weekly chart data for dashboard
+     */
+    public function getWeeklyChartData()
+    {
+        try {
+            $userId = auth()->id() ?? 1;
+
+            // Get data for the last 7 days
+            $chartData = [];
+            for ($i = 6; $i >= 0; $i--) {
+                $date = now()->subDays($i);
+                $dayName = $date->format('D'); // Mon, Tue, Wed, etc.
+                $fullDate = $date->format('Y-m-d');
+
+                $incoming = WhatsAppMessage::where('user_id', $userId)
+                    ->where('direction', 'incoming')
+                    ->whereDate('created_at', $date)
+                    ->count();
+
+                $outgoing = WhatsAppMessage::where('user_id', $userId)
+                    ->where('direction', 'outgoing')
+                    ->whereDate('created_at', $date)
+                    ->count();
+
+                $chartData[] = [
+                    'day' => $dayName,
+                    'date' => $fullDate,
+                    'incoming' => $incoming,
+                    'outgoing' => $outgoing,
+                    'total' => $incoming + $outgoing,
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $chartData,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve weekly chart data',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -627,21 +1312,42 @@ class WhatsAppController extends Controller
     public function getMessages(Request $request)
     {
         try {
+            $userId = auth()->id() ?? 1; // Default to user 1
             $perPage = $request->get('per_page', 15);
-            $messages = WhatsAppMessage::with(['contact', 'account'])
-                ->where('whatsapp_account_id', $this->getWhatsAppAccount()->id)
-                ->orderBy('created_at', 'desc')
-                ->paginate($perPage);
+            $limit = $request->get('limit');
+
+            $query = WhatsAppMessage::with(['contact', 'user'])
+                ->where('user_id', $userId)
+                ->orderBy('created_at', 'desc');
+
+            // If limit is specified, get that many without pagination
+            if ($limit) {
+                $messages = $query->limit($limit)->get();
+
+                return response()->json([
+                    'success' => true,
+                    'data' => $messages,
+                ], 200);
+            }
+
+            // Otherwise paginate
+            $messages = $query->paginate($perPage);
 
             return response()->json([
                 'success' => true,
-                'data' => $messages
+                'data' => $messages->items(),
+                'total' => $messages->total(),
+                'pagination' => [
+                    'current_page' => $messages->currentPage(),
+                    'last_page' => $messages->lastPage(),
+                    'per_page' => $messages->perPage(),
+                ],
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve messages',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -652,19 +1358,19 @@ class WhatsAppController extends Controller
     public function getMessage($id)
     {
         try {
-            $message = WhatsAppMessage::with(['contact', 'account', 'mediaFiles'])
-                ->where('whatsapp_account_id', $this->getWhatsAppAccount()->id)
+            $message = WhatsAppMessage::with(['contact', 'user'])
+                ->where('user_id', auth()->id())
                 ->findOrFail($id);
 
             return response()->json([
                 'success' => true,
-                'data' => $message
+                'data' => $message,
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Message not found',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 404);
         }
     }
@@ -676,20 +1382,28 @@ class WhatsAppController extends Controller
     {
         try {
             $perPage = $request->get('per_page', 15);
-            $contacts = WhatsAppContact::where('whatsapp_account_id', $this->getWhatsAppAccount()->id)
+            $userId = auth()->id() ?? 1; // Default to user 1 if not authenticated
+
+            $contacts = WhatsAppContact::where('user_id', $userId)
                 ->withCount('messages')
                 ->orderBy('last_message_at', 'desc')
                 ->paginate($perPage);
 
             return response()->json([
                 'success' => true,
-                'data' => $contacts
+                'data' => $contacts->items(),
+                'total' => $contacts->total(),
+                'pagination' => [
+                    'current_page' => $contacts->currentPage(),
+                    'last_page' => $contacts->lastPage(),
+                    'per_page' => $contacts->perPage(),
+                ],
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve contacts',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -700,22 +1414,185 @@ class WhatsAppController extends Controller
     public function getContactMessages($contactId, Request $request)
     {
         try {
-            $perPage = $request->get('per_page', 15);
+            $perPage = $request->get('per_page', 100);
+            $userId = auth()->id() ?? 1;
+
             $messages = WhatsAppMessage::with(['contact'])
-                ->where('whatsapp_account_id', $this->getWhatsAppAccount()->id)
-                ->where('whatsapp_contact_id', $contactId)
-                ->orderBy('created_at', 'desc')
-                ->paginate($perPage);
+                ->where('user_id', $userId)
+                ->where('contact_id', $contactId)
+                ->orderBy('created_at', 'asc')
+                ->get();
 
             return response()->json([
                 'success' => true,
-                'data' => $messages
+                'data' => $messages,
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve contact messages',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Mark all messages from a contact as read
+     */
+    public function markContactMessagesAsRead($contactId)
+    {
+        try {
+            $userId = auth()->id() ?? 1;
+
+            // Get all unread incoming messages from this contact
+            $unreadMessages = WhatsAppMessage::where('user_id', $userId)
+                ->where('contact_id', $contactId)
+                ->where('direction', 'incoming')
+                ->where('is_read', false)
+                ->get();
+
+            $markedCount = 0;
+
+            // Mark each message as read in WhatsApp API
+            foreach ($unreadMessages as $message) {
+                try {
+                    // Call WhatsApp API to mark message as read
+                    $this->whatsapp->markMessageAsRead($message->message_id);
+
+                    // Update in database
+                    $message->is_read = true;
+                    $message->read_at = now();
+                    $message->status = 'read';
+                    $message->save();
+
+                    $markedCount++;
+
+                    \Log::info('Message marked as read', [
+                        'message_id' => $message->message_id,
+                        'contact_id' => $contactId,
+                    ]);
+                } catch (\Exception $e) {
+                    \Log::error('Failed to mark message as read in WhatsApp API', [
+                        'message_id' => $message->message_id,
+                        'error' => $e->getMessage(),
+                    ]);
+                    // Continue marking other messages even if one fails
+                }
+            }
+
+            // Update contact's unread count
+            $contact = WhatsAppContact::find($contactId);
+            if ($contact) {
+                $contact->unread_count = 0;
+                $contact->save();
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Messages marked as read',
+                'updated_count' => $markedCount,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to mark messages as read',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get list of WhatsApp message templates
+     */
+    public function getTemplates(Request $request)
+    {
+        try {
+            $status = $request->get('status'); // APPROVED, PENDING, REJECTED
+            $account = $this->getWhatsAppAccount();
+
+            // Get templates from database
+            $query = WhatsAppTemplate::where('whatsapp_account_id', $account->id);
+
+            if ($status) {
+                $query->where('status', strtoupper($status));
+            }
+
+            $templates = $query->orderBy('created_at', 'desc')->get();
+
+            // Format templates
+            $formattedTemplates = $templates->map(function ($template) {
+                return [
+                    'id' => $template->id,
+                    'name' => $template->name,
+                    'status' => $template->status,
+                    'category' => $template->category,
+                    'language' => $template->language,
+                    'header' => $template->header,
+                    'header_type' => $template->header_type,
+                    'body' => $template->body,
+                    'footer' => $template->footer,
+                    'buttons' => $template->buttons ? json_decode($template->buttons, true) : [],
+                    'quality_score' => $template->quality_score,
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $formattedTemplates,
+                'total' => count($formattedTemplates),
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve templates',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get template detail by name
+     */
+    public function getTemplateByName($name, Request $request)
+    {
+        try {
+            $wabaId = config('whatsapp.business_account_id');
+            $accessToken = config('whatsapp.access_token');
+
+            $response = Http::withToken($accessToken)
+                ->get("https://graph.facebook.com/v21.0/{$wabaId}/message_templates", [
+                    'name' => $name,
+                    'fields' => 'name,status,category,language,components,id,rejected_reason',
+                ]);
+
+            if ($response->failed()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to retrieve template',
+                    'error' => $response->json(),
+                ], $response->status());
+            }
+
+            $templates = $response->json()['data'] ?? [];
+
+            if (empty($templates)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Template '{$name}' not found",
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $templates,
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve template',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }

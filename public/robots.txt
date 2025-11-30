@@ -1,2 +1,19 @@
+# robots.txt for QashierWise
+# https://qashierwise.com
+
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /api/
+Disallow: /login
+Disallow: /register
+Disallow: /password
+Disallow: /sanctum/
+Disallow: /_debugbar/
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 1
+
+# Sitemap location
+Sitemap: https://qashierwise.com/sitemap.xml
