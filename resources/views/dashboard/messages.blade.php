@@ -17,13 +17,13 @@
                         <!-- Search -->
                         <div class="p-4 border-b border-[hsl(var(--border))]">
                             <div class="relative">
-                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm"></i>
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none"></i>
                                 <input
                                     type="text"
                                     x-model="contactSearch"
                                     @input="filterContactList"
                                     placeholder="Search contacts..."
-                                    class="input pl-9 w-full h-9 text-sm"
+                                    class="input pl-10 w-full h-9 text-sm"
                                 >
                             </div>
                         </div>

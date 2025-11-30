@@ -19,7 +19,7 @@
                 <div class="card p-4">
                     <div class="flex flex-col sm:flex-row gap-4">
                         <div class="flex-1 relative">
-                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]"></i>
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none"></i>
                             <input
                                 type="text"
                                 x-model="searchQuery"

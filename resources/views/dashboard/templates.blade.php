@@ -39,8 +39,8 @@
                         <div>
                             <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">Search</label>
                             <div class="relative">
-                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm"></i>
-                                <input type="text" x-model="filters.search" @input="filterTemplates" placeholder="Search templates..." class="input pl-9 w-full">
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none"></i>
+                                <input type="text" x-model="filters.search" @input="filterTemplates" placeholder="Search templates..." class="input pl-10 w-full">
                             </div>
                         </div>
                     </div>
