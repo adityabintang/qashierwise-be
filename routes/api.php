@@ -1,9 +1,9 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BroadcastAuthController;
 use App\Http\Controllers\Api\WhatsAppController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
-use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -25,8 +25,9 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::get('/whatsapp/webhook', [WhatsAppWebhookController::class, 'verify']);
 Route::post('/whatsapp/webhook', [WhatsAppWebhookController::class, 'handle']);
 
-// Broadcast authentication - MUST be outside protected group but with auth:sanctum middleware
-Broadcast::routes(['middleware' => ['auth:sanctum', \App\Http\Middleware\LogBroadcastingAuth::class]]);
+// Broadcast authentication - Custom controller for Sanctum token auth
+Route::post('/broadcasting/auth', [BroadcastAuthController::class, 'authenticate'])
+    ->middleware(['auth:sanctum', \App\Http\Middleware\LogBroadcastingAuth::class]);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
