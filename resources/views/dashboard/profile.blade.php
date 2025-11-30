@@ -192,15 +192,15 @@
                         </div>
 
                         <!-- Tips -->
-                        <div class="card bg-gradient-to-br from-[hsl(var(--primary))] to-[hsl(var(--primary)/0.8)] text-white border-0">
-                            <div class="p-6">
+                        <div class="card bg-gradient-to-br from-[hsl(var(--primary))] to-[hsl(var(--primary)/0.8)] border-0">
+                            <div class="p-6 text-white">
                                 <div class="flex items-start gap-4">
                                     <div class="h-10 w-10 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
                                         <i class="fas fa-lightbulb"></i>
                                     </div>
                                     <div>
-                                        <h3 class="font-semibold mb-2">Profile Tips</h3>
-                                        <ul class="text-sm space-y-1.5 opacity-90">
+                                        <h3 class="font-semibold mb-2 text-white">Profile Tips</h3>
+                                        <ul class="text-sm space-y-1.5 text-white/90">
                                             <li class="flex items-start gap-2">
                                                 <i class="fas fa-check text-xs mt-1"></i>
                                                 <span>Keep your profile up-to-date</span>
