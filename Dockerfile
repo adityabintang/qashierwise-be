@@ -15,12 +15,14 @@ RUN apk add --no-cache \
     oniguruma-dev \
     icu-dev \
     nodejs \
-    npm
+    npm \
+    postgresql-dev
 
 # Install PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
     pdo_mysql \
+    pdo_pgsql \
     mbstring \
     exif \
     pcntl \
@@ -60,11 +62,19 @@ RUN npm install && npm run build && rm -rf node_modules
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Create nginx directories
-RUN mkdir -p /run/nginx
+# Create required directories
+RUN mkdir -p /run/nginx \
+    && mkdir -p /var/www/html/storage/logs \
+    && mkdir -p /var/www/html/storage/framework/sessions \
+    && mkdir -p /var/www/html/storage/framework/views \
+    && mkdir -p /var/www/html/storage/framework/cache
+
+# Copy entrypoint script
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Expose port
 EXPOSE 80
 
-# Start supervisor (manages nginx + php-fpm)
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+# Use entrypoint to run migrations and start services
+ENTRYPOINT ["/entrypoint.sh"]
