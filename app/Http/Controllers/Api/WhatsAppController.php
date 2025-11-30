@@ -7,6 +7,7 @@ use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
 use App\Models\WhatsAppMessage;
 use App\Models\WhatsAppTemplate;
+use App\Services\MediaStorageService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
@@ -26,8 +27,11 @@ class WhatsAppController extends Controller
 
     protected $whatsappAccount;
 
-    public function __construct()
+    protected MediaStorageService $mediaStorageService;
+
+    public function __construct(MediaStorageService $mediaStorageService)
     {
+        $this->mediaStorageService = $mediaStorageService;
         $this->whatsapp = new WhatsAppCloudApi([
             'from_phone_number_id' => config('whatsapp.phone_number_id'),
             'access_token' => config('whatsapp.access_token'),
@@ -61,18 +65,7 @@ class WhatsAppController extends Controller
         return $response->json();
     }
 
-    /**
-     * Store uploaded file locally and return public URL
-     */
-    private function storeMediaLocally(UploadedFile $file, string $type): string
-    {
-        $folder = "whatsapp/{$type}s";
-        $filename = time().'_'.preg_replace('/[^a-zA-Z0-9._-]/', '', $file->getClientOriginalName());
 
-        $path = $file->storeAs($folder, $filename, 'public');
-
-        return url("storage/{$path}");
-    }
 
     /**
      * Get WhatsApp account instance
@@ -309,23 +302,24 @@ class WhatsAppController extends Controller
      */
     public function sendImageMessage(Request $request)
     {
+        $maxSizeKb = (int) (config('whatsapp.media_limits.image', 5 * 1024 * 1024) / 1024);
         $request->validate([
             'to' => 'required|string',
-            'file' => 'required_without:image_url|file|mimes:jpeg,jpg,png|max:5120',
+            'file' => "required_without:image_url|file|mimes:jpeg,jpg,png|max:{$maxSizeKb}",
             'image_url' => 'required_without:file|string|nullable',
             'caption' => 'nullable|string',
         ]);
 
         try {
             $imageUrl = $request->image_url;
-            $localUrl = $request->image_url;
 
             // If file is uploaded, upload to WhatsApp first
             if ($request->hasFile('file')) {
                 $file = $request->file('file');
 
-                // Store locally for preview
-                $localUrl = $this->storeMediaLocally($file, 'image');
+                // Store using MediaStorageService
+                $storageResult = $this->mediaStorageService->store($file, 'image');
+                $imageUrl = $storageResult['url'];
 
                 // Upload to WhatsApp
                 $uploadData = $this->uploadMediaToWhatsApp($file);
@@ -342,8 +336,6 @@ class WhatsAppController extends Controller
                     $media_id,
                     $request->caption ?? ''
                 );
-
-                $imageUrl = $localUrl; // Use local URL for preview
             } else {
                 $link_id = new LinkID($request->image_url);
 
@@ -381,9 +373,10 @@ class WhatsAppController extends Controller
      */
     public function sendDocumentMessage(Request $request)
     {
+        $maxSizeKb = (int) (config('whatsapp.media_limits.document', 25 * 1024 * 1024) / 1024);
         $request->validate([
             'to' => 'required|string',
-            'file' => 'required_without:document_url|file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,txt|max:100000',
+            'file' => "required_without:document_url|file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,txt|max:{$maxSizeKb}",
             'document_url' => 'required_without:file|string|nullable',
             'filename' => 'nullable|string',
             'caption' => 'nullable|string',
@@ -398,8 +391,9 @@ class WhatsAppController extends Controller
                 $file = $request->file('file');
                 $filename = $filename ?? $file->getClientOriginalName();
 
-                // Store locally for preview
-                $localUrl = $this->storeMediaLocally($file, 'document');
+                // Store using MediaStorageService
+                $storageResult = $this->mediaStorageService->store($file, 'document');
+                $documentUrl = $storageResult['url'];
 
                 $uploadData = $this->uploadMediaToWhatsApp($file);
 
@@ -416,8 +410,6 @@ class WhatsAppController extends Controller
                     $filename,
                     $request->caption ?? ''
                 );
-
-                $documentUrl = $localUrl;
             } else {
                 $link_id = new LinkID($request->document_url);
 
@@ -457,9 +449,10 @@ class WhatsAppController extends Controller
      */
     public function sendAudioMessage(Request $request)
     {
+        $maxSizeKb = (int) (config('whatsapp.media_limits.audio', 16 * 1024 * 1024) / 1024);
         $request->validate([
             'to' => 'required|string',
-            'file' => 'required_without:audio_url|file|mimes:mp3,ogg,amr,aac,m4a|max:16000',
+            'file' => "required_without:audio_url|file|mimes:mp3,ogg,amr,aac,m4a|max:{$maxSizeKb}",
             'audio_url' => 'required_without:file|string|nullable',
         ]);
 
@@ -470,8 +463,9 @@ class WhatsAppController extends Controller
             if ($request->hasFile('file')) {
                 $file = $request->file('file');
 
-                // Store locally for preview
-                $localUrl = $this->storeMediaLocally($file, 'audio');
+                // Store using MediaStorageService
+                $storageResult = $this->mediaStorageService->store($file, 'audio');
+                $audioUrl = $storageResult['url'];
 
                 $uploadData = $this->uploadMediaToWhatsApp($file);
 
@@ -486,8 +480,6 @@ class WhatsAppController extends Controller
                     $request->to,
                     $media_id
                 );
-
-                $audioUrl = $localUrl;
             } else {
                 $link_id = new LinkID($request->audio_url);
 
@@ -521,9 +513,10 @@ class WhatsAppController extends Controller
      */
     public function sendVideoMessage(Request $request)
     {
+        $maxSizeKb = (int) (config('whatsapp.media_limits.video', 16 * 1024 * 1024) / 1024);
         $request->validate([
             'to' => 'required|string',
-            'file' => 'required_without:video_url|file|mimes:mp4,3gp|max:16000',
+            'file' => "required_without:video_url|file|mimes:mp4,3gp|max:{$maxSizeKb}",
             'video_url' => 'required_without:file|string|nullable',
             'caption' => 'nullable|string',
         ]);
@@ -535,8 +528,9 @@ class WhatsAppController extends Controller
             if ($request->hasFile('file')) {
                 $file = $request->file('file');
 
-                // Store locally for preview
-                $localUrl = $this->storeMediaLocally($file, 'video');
+                // Store using MediaStorageService
+                $storageResult = $this->mediaStorageService->store($file, 'video');
+                $videoUrl = $storageResult['url'];
 
                 $uploadData = $this->uploadMediaToWhatsApp($file);
 
@@ -552,8 +546,6 @@ class WhatsAppController extends Controller
                     $media_id,
                     $request->caption ?? ''
                 );
-
-                $videoUrl = $localUrl;
             } else {
                 $link_id = new LinkID($request->video_url);
 

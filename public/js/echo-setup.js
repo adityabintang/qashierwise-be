@@ -27,8 +27,8 @@
         // Enable Pusher logging for debugging
         Pusher.logToConsole = true;
 
-        // Get API base URL - use dynamic URL based on current location
-        const API_BASE_URL = window.location.origin + '/api';
+        // Get API base URL - use API subdomain
+        const API_BASE_URL = 'https://api.qashierwise.com/api';
 
         // Get authentication token
         const token = localStorage.getItem('token');
@@ -89,7 +89,8 @@
                 auth: {
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json'
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
                     }
                 }
             });
@@ -106,7 +107,8 @@
                 auth: {
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json'
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
                     }
                 }
             });

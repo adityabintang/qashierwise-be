@@ -18,7 +18,7 @@
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <!-- Profile Form -->
                     <div class="card">
-                        <div class="card-header flex-row items-center justify-between border-b border-[hsl(var(--border))]">
+                        <div class="card-header !flex-row items-center justify-between border-b border-[hsl(var(--border))]">
                             <div class="flex items-center gap-3">
                                 <div class="h-10 w-10 rounded-lg bg-emerald-100 flex items-center justify-center">
                                     <i class="fas fa-building text-emerald-600"></i>
