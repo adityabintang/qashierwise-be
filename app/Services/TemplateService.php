@@ -13,9 +13,9 @@ class TemplateService
 
     public function __construct()
     {
-        $this->apiVersion = config('whatsapp.api_version', 'v22.0');
-        $this->accessToken = config('whatsapp.access_token', '');
-        $this->businessAccountId = config('whatsapp.business_account_id', '');
+        $this->apiVersion = config('whatsapp.api_version') ?? 'v22.0';
+        $this->accessToken = config('whatsapp.access_token') ?? '';
+        $this->businessAccountId = config('whatsapp.business_account_id') ?? '';
     }
 
     /**
