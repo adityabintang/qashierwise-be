@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
 use App\Models\WhatsAppMessage;
+use App\Models\WhatsAppTemplate;
 use App\Services\MediaStorageService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -64,7 +65,22 @@ class WhatsAppWebhookController extends Controller
 
                 // Iterate through entries
                 foreach ($body['entry'] as $entry) {
+                    $wabaId = $entry['id'] ?? null;
+
                     foreach ($entry['changes'] as $change) {
+                        $field = $change['field'] ?? null;
+
+                           Log::info('Webhook change received', [
+                            'field' => $field,
+                            'waba_id' => $wabaId,
+                        ]);
+
+                        // Handle template status updates (message_template_status_update field)
+                        if ($field === 'message_template_status_update') {
+                             Log::info('Template status update webhook detected', $change['value']);
+                            $this->handleTemplateStatusUpdate($change['value'], $wabaId);
+                            continue;
+                        }
 
                         $phoneNumberId = $change['value']['metadata']['phone_number_id'] ?? null;
 
@@ -352,6 +368,102 @@ class WhatsAppWebhookController extends Controller
                 'message_id' => $messageId,
                 'errors' => $status['errors']
             ]);
+        }
+    }
+
+    /**
+     * Handle template status update webhook from Meta
+     * 
+     * Webhook payload example:
+     * {
+     *   "event": "APPROVED" | "PENDING" | "REJECTED" | "DISABLED" | "PENDING_DELETION" | "DELETED",
+     *   "message_template_id": 123456789,
+     *   "message_template_name": "template_name",
+     *   "message_template_language": "en",
+     *   "reason": "NONE" | rejection reason
+     * }
+     */
+    protected function handleTemplateStatusUpdate(array $value, ?string $wabaId)
+    {
+        $event = $value['event'] ?? null;
+        $templateId = $value['message_template_id'] ?? null;
+        $templateName = $value['message_template_name'] ?? null;
+        $templateLanguage = $value['message_template_language'] ?? null;
+        $reason = $value['reason'] ?? null;
+
+        Log::info('Template status update received', [
+            'event' => $event,
+            'template_id' => $templateId,
+            'template_name' => $templateName,
+            'language' => $templateLanguage,
+            'reason' => $reason,
+            'waba_id' => $wabaId,
+        ]);
+
+        if (!$templateName || !$event) {
+            Log::warning('Template status update missing required fields', $value);
+            return;
+        }
+
+        // Map Meta event to our status values
+        $statusMap = [
+            'APPROVED' => 'APPROVED',
+            'PENDING' => 'PENDING',
+            'REJECTED' => 'REJECTED',
+            'DISABLED' => 'DISABLED',
+            'PENDING_DELETION' => 'PENDING_DELETION',
+            'DELETED' => 'DELETED',
+            'IN_APPEAL' => 'IN_APPEAL',
+            'PAUSED' => 'PAUSED',
+        ];
+
+        $newStatus = $statusMap[$event] ?? $event;
+
+        // Find template by name and language
+        $query = WhatsAppTemplate::where('name', $templateName);
+        
+        if ($templateLanguage) {
+            $query->where('language', $templateLanguage);
+        }
+
+        // If we have template_id from Meta, also try to match by that
+        if ($templateId) {
+            $query->orWhere('template_id', $templateId);
+        }
+
+        $template = $query->first();
+
+        if (!$template) {
+            Log::warning('Template not found for status update', [
+                'template_name' => $templateName,
+                'template_id' => $templateId,
+                'language' => $templateLanguage,
+            ]);
+            return;
+        }
+
+        // Update template status
+        $oldStatus = $template->status;
+        $template->status = $newStatus;
+
+        // Update template_id if we received it from Meta and don't have it yet
+        if ($templateId && !$template->template_id) {
+            $template->template_id = $templateId;
+        }
+
+        $template->save();
+
+        Log::info('Template status updated successfully', [
+            'template_name' => $templateName,
+            'old_status' => $oldStatus,
+            'new_status' => $newStatus,
+            'reason' => $reason,
+        ]);
+
+        // If template was deleted, optionally remove from database
+        if ($newStatus === 'DELETED') {
+            Log::info('Template marked as deleted', ['template_name' => $templateName]);
+            // Optionally: $template->delete();
         }
     }
 

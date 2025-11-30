@@ -8,7 +8,9 @@ use App\Models\WhatsAppContact;
 use App\Models\WhatsAppMessage;
 use App\Models\WhatsAppTemplate;
 use App\Services\MediaStorageService;
+use App\Services\TemplateService;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Netflie\WhatsAppCloudApi\Message\ButtonReply\Button;
@@ -29,9 +31,12 @@ class WhatsAppController extends Controller
 
     protected MediaStorageService $mediaStorageService;
 
-    public function __construct(MediaStorageService $mediaStorageService)
+    protected TemplateService $templateService;
+
+    public function __construct(MediaStorageService $mediaStorageService, TemplateService $templateService)
     {
         $this->mediaStorageService = $mediaStorageService;
+        $this->templateService = $templateService;
         $this->whatsapp = new WhatsAppCloudApi([
             'from_phone_number_id' => config('whatsapp.phone_number_id'),
             'access_token' => config('whatsapp.access_token'),
@@ -1670,6 +1675,330 @@ class WhatsAppController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve template',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Create a new WhatsApp message template
+     * 
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function createTemplate(Request $request): JsonResponse
+    {
+        try {
+            // Validate request data using TemplateService
+            $data = $request->all();
+            
+            // Validate required fields
+            $requiredValidation = $this->templateService->validateRequiredFields($data);
+            if (!$requiredValidation['valid']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $requiredValidation['errors'],
+                ], 422);
+            }
+
+            // Validate template name
+            $nameValidation = $this->templateService->validateTemplateName($data['name']);
+            if (!$nameValidation['valid']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => ['name' => $nameValidation['error']],
+                ], 422);
+            }
+
+            // Validate body
+            $bodyText = is_array($data['body']) ? ($data['body']['text'] ?? '') : $data['body'];
+            $bodyValidation = $this->templateService->validateBody($bodyText);
+            if (!$bodyValidation['valid']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => ['body' => $bodyValidation['error']],
+                ], 422);
+            }
+
+            // Validate footer if present
+            if (!empty($data['footer'])) {
+                $footerText = is_array($data['footer']) ? ($data['footer']['text'] ?? '') : $data['footer'];
+                $footerValidation = $this->templateService->validateFooter($footerText);
+                if (!$footerValidation['valid']) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Validation failed',
+                        'errors' => ['footer' => $footerValidation['error']],
+                    ], 422);
+                }
+            }
+
+            // Validate buttons if present
+            if (!empty($data['buttons'])) {
+                $buttonsValidation = $this->templateService->validateButtons($data['buttons']);
+                if (!$buttonsValidation['valid']) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Validation failed',
+                        'errors' => ['buttons' => $buttonsValidation['error']],
+                    ], 422);
+                }
+            }
+
+            // Call TemplateService to create template via WhatsApp API
+            $result = $this->templateService->createTemplate($data);
+
+            if (!$result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to create template',
+                    'error' => $result['error'],
+                ], 400);
+            }
+
+            // Store result in database
+            $account = $this->getWhatsAppAccount();
+            $components = $this->templateService->buildComponents($data);
+            
+            // Extract component details for storage
+            $header = null;
+            $headerType = null;
+            $footer = null;
+            $buttons = null;
+
+            if (!empty($data['header'])) {
+                $headerType = $data['header']['type'] ?? 'TEXT';
+                $header = $data['header']['text'] ?? null;
+            }
+
+            if (!empty($data['footer'])) {
+                $footer = is_array($data['footer']) ? ($data['footer']['text'] ?? '') : $data['footer'];
+            }
+
+            if (!empty($data['buttons'])) {
+                $buttons = json_encode($data['buttons']);
+            }
+
+            $template = WhatsAppTemplate::create([
+                'whatsapp_account_id' => $account->id,
+                'template_id' => $result['data']['id'] ?? null,
+                'name' => $data['name'],
+                'language' => $data['language'],
+                'category' => $data['category'],
+                'status' => $result['data']['status'] ?? 'PENDING',
+                'header' => $header,
+                'header_type' => $headerType,
+                'body' => $bodyText,
+                'footer' => $footer,
+                'buttons' => $buttons,
+                'components' => $components,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Template created successfully',
+                'data' => [
+                    'id' => $template->id,
+                    'template_id' => $template->template_id,
+                    'name' => $template->name,
+                    'status' => $template->status,
+                ],
+            ], 201);
+
+        } catch (\Exception $e) {
+            \Log::error('Template creation failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create template',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Update an existing WhatsApp message template
+     * 
+     * @param Request $request
+     * @param string $id Template ID (local database ID)
+     * @return JsonResponse
+     */
+    public function updateTemplate(Request $request, string $id): JsonResponse
+    {
+        try {
+            // Find template in database
+            $account = $this->getWhatsAppAccount();
+            $template = WhatsAppTemplate::where('whatsapp_account_id', $account->id)
+                ->where('id', $id)
+                ->first();
+
+            if (!$template) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Template not found',
+                ], 404);
+            }
+
+            $data = $request->all();
+
+            // Validate body if present
+            if (!empty($data['body'])) {
+                $bodyText = is_array($data['body']) ? ($data['body']['text'] ?? '') : $data['body'];
+                $bodyValidation = $this->templateService->validateBody($bodyText);
+                if (!$bodyValidation['valid']) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Validation failed',
+                        'errors' => ['body' => $bodyValidation['error']],
+                    ], 422);
+                }
+            }
+
+            // Validate footer if present
+            if (!empty($data['footer'])) {
+                $footerText = is_array($data['footer']) ? ($data['footer']['text'] ?? '') : $data['footer'];
+                $footerValidation = $this->templateService->validateFooter($footerText);
+                if (!$footerValidation['valid']) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Validation failed',
+                        'errors' => ['footer' => $footerValidation['error']],
+                    ], 422);
+                }
+            }
+
+            // Validate buttons if present
+            if (!empty($data['buttons'])) {
+                $buttonsValidation = $this->templateService->validateButtons($data['buttons']);
+                if (!$buttonsValidation['valid']) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Validation failed',
+                        'errors' => ['buttons' => $buttonsValidation['error']],
+                    ], 422);
+                }
+            }
+
+            // Call TemplateService to update template via WhatsApp API
+            $result = $this->templateService->updateTemplate($template->template_id, $data);
+
+            if (!$result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to update template',
+                    'error' => $result['error'],
+                ], 400);
+            }
+
+            // Update database record
+            $components = $this->templateService->buildComponents($data);
+            
+            $updateData = [
+                'components' => $components,
+            ];
+
+            if (!empty($data['header'])) {
+                $updateData['header_type'] = $data['header']['type'] ?? 'TEXT';
+                $updateData['header'] = $data['header']['text'] ?? null;
+            }
+
+            if (!empty($data['body'])) {
+                $updateData['body'] = is_array($data['body']) ? ($data['body']['text'] ?? '') : $data['body'];
+            }
+
+            if (isset($data['footer'])) {
+                $updateData['footer'] = is_array($data['footer']) ? ($data['footer']['text'] ?? '') : $data['footer'];
+            }
+
+            if (isset($data['buttons'])) {
+                $updateData['buttons'] = !empty($data['buttons']) ? json_encode($data['buttons']) : null;
+            }
+
+            $template->update($updateData);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Template updated successfully',
+                'data' => [
+                    'id' => $template->id,
+                    'template_id' => $template->template_id,
+                    'name' => $template->name,
+                    'status' => $template->status,
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::error('Template update failed', [
+                'id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update template',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete a WhatsApp message template
+     * 
+     * @param string $name Template name
+     * @return JsonResponse
+     */
+    public function deleteTemplate(string $name): JsonResponse
+    {
+        try {
+            // Find template in database
+            $account = $this->getWhatsAppAccount();
+            $template = WhatsAppTemplate::where('whatsapp_account_id', $account->id)
+                ->where('name', $name)
+                ->first();
+
+            if (!$template) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Template not found',
+                ], 404);
+            }
+
+            // Call TemplateService to delete template via WhatsApp API
+            $result = $this->templateService->deleteTemplate($name);
+
+            if (!$result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to delete template',
+                    'error' => $result['error'],
+                ], 400);
+            }
+
+            // Remove from database on success
+            $template->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Template deleted successfully',
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::error('Template deletion failed', [
+                'name' => $name,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete template',
                 'error' => $e->getMessage(),
             ], 500);
         }
