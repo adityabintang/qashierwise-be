@@ -36,8 +36,9 @@ return [
     'paths' => ['api/*', 'sanctum/csrf-cookie', 'broadcasting/*'],
     'allowed_methods' => ['*'],
     'allowed_origins' => [
-        env('APP_URL', 'https://qashierwise.com'),
         'https://qashierwise.com',
+        'https://api.qashierwise.com',
+        env('APP_URL', 'https://qashierwise.com'),
     ],
     'allowed_origins_patterns' => [],
     'allowed_headers' => ['*'],
