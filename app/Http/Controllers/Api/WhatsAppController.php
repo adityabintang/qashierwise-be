@@ -2003,4 +2003,100 @@ class WhatsAppController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Upload business profile picture
+     */
+    public function uploadProfilePicture(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:jpeg,jpg,png|max:5120', // Max 5MB
+        ]);
+
+        try {
+            $file = $request->file('file');
+            $phoneNumberId = config('whatsapp.phone_number_id');
+            $accessToken = config('whatsapp.access_token');
+            $appId = config('whatsapp.app_id');
+
+            $fileContent = file_get_contents($file->getRealPath());
+            $fileSize = strlen($fileContent);
+            $mimeType = $file->getMimeType();
+
+            // Step 1: Create upload session to get upload handle
+            $sessionResponse = Http::withToken($accessToken)
+                ->post("https://graph.facebook.com/v21.0/{$appId}/uploads", [
+                    'file_length' => $fileSize,
+                    'file_type' => $mimeType,
+                    'file_name' => $file->getClientOriginalName(),
+                ]);
+
+            if (!$sessionResponse->successful()) {
+                throw new \Exception('Failed to create upload session: ' . $sessionResponse->body());
+            }
+
+            $uploadSessionId = $sessionResponse->json()['id'] ?? null;
+
+            if (!$uploadSessionId) {
+                throw new \Exception('Failed to get upload session ID');
+            }
+
+            // Step 2: Upload the file content
+            $uploadResponse = Http::withHeaders([
+                'Authorization' => 'OAuth ' . $accessToken,
+                'file_offset' => '0',
+            ])
+                ->withBody($fileContent, $mimeType)
+                ->post("https://graph.facebook.com/v21.0/{$uploadSessionId}");
+
+            if (!$uploadResponse->successful()) {
+                throw new \Exception('Failed to upload file: ' . $uploadResponse->body());
+            }
+
+            $handle = $uploadResponse->json()['h'] ?? null;
+
+            if (!$handle) {
+                throw new \Exception('Failed to get file handle from upload');
+            }
+
+            // Step 3: Update business profile with the handle
+            $updateResponse = Http::withToken($accessToken)
+                ->post("https://graph.facebook.com/v21.0/{$phoneNumberId}/whatsapp_business_profile", [
+                    'messaging_product' => 'whatsapp',
+                    'profile_picture_handle' => $handle,
+                ]);
+
+            if (!$updateResponse->successful()) {
+                throw new \Exception('Failed to update profile picture: ' . $updateResponse->body());
+            }
+
+            // Store locally using MediaStorageService
+            $storageResult = $this->mediaStorageService->store($file, 'image');
+
+            // Update database
+            $account = $this->getWhatsAppAccount();
+            $account->update([
+                'profile_picture_url' => $storageResult['url'],
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Profile picture updated successfully',
+                'data' => [
+                    'profile_picture_url' => $storageResult['url'],
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Profile picture upload failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to upload profile picture',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }

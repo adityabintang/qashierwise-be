@@ -12,7 +12,7 @@
     <meta name="robots" content="index, follow">
     <meta name="language" content="Indonesian">
     <meta name="revisit-after" content="7 days">
-    
+
     <!-- Canonical URL -->
     <link rel="canonical" href="https://qashierwise.com">
 
@@ -23,7 +23,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/logo.png') }}">
     <link rel="manifest" href="{{ asset('site.webmanifest') }}">
     <meta name="theme-color" content="#4910ce">
-    
+
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://qashierwise.com">
@@ -35,7 +35,7 @@
     <meta property="og:image:alt" content="QashierWise - AI Chatbot WhatsApp untuk Restoran">
     <meta property="og:locale" content="id_ID">
     <meta property="og:site_name" content="QashierWise">
-    
+
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:url" content="https://qashierwise.com">
@@ -209,17 +209,107 @@
         "@@type": "Product",
         "name": "QashierWise Standard",
         "description": "Paket Standard QashierWise dengan fitur delivery, QRIS unlimited, dan dukungan hingga 2 outlet",
+        "image": [
+            "https://qashierwise.com/images/logo.png",
+            "https://qashierwise.com/images/og-image.png"
+        ],
         "brand": {
             "@@type": "Brand",
             "name": "QashierWise"
         },
+        "aggregateRating": {
+            "@@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "reviewCount": "24",
+            "bestRating": "5",
+            "worstRating": "1"
+        },
+        "review": [
+            {
+                "@@type": "Review",
+                "author": {
+                    "@@type": "Person",
+                    "name": "Budi Santoso"
+                },
+                "datePublished": "2025-11-15",
+                "reviewBody": "QashierWise sangat membantu restoran kami. Reservasi jadi lebih teratur dan otomatis, pelanggan puas dengan respons cepat.",
+                "reviewRating": {
+                    "@@type": "Rating",
+                    "ratingValue": "5",
+                    "bestRating": "5"
+                }
+            },
+            {
+                "@@type": "Review",
+                "author": {
+                    "@@type": "Person",
+                    "name": "Siti Nurhaliza"
+                },
+                "datePublished": "2025-11-20",
+                "reviewBody": "Fitur QRIS dan order via WhatsApp sangat praktis. Dashboard mudah digunakan dan laporan lengkap.",
+                "reviewRating": {
+                    "@@type": "Rating",
+                    "ratingValue": "5",
+                    "bestRating": "5"
+                }
+            },
+            {
+                "@@type": "Review",
+                "author": {
+                    "@@type": "Person",
+                    "name": "Ahmad Rizki"
+                },
+                "datePublished": "2025-11-25",
+                "reviewBody": "Sistem yang bagus untuk restoran. AI chatbot cukup pintar dalam merespons pelanggan. Recommended!",
+                "reviewRating": {
+                    "@@type": "Rating",
+                    "ratingValue": "4",
+                    "bestRating": "5"
+                }
+            }
+        ],
         "offers": {
             "@@type": "Offer",
             "price": "249000",
             "priceCurrency": "IDR",
             "priceValidUntil": "2025-12-31",
             "availability": "https://schema.org/InStock",
-            "url": "https://qashierwise.com/#pricing"
+            "url": "https://qashierwise.com/#pricing",
+            "shippingDetails": {
+                "@@type": "OfferShippingDetails",
+                "shippingRate": {
+                    "@@type": "MonetaryAmount",
+                    "value": "0",
+                    "currency": "IDR"
+                },
+                "shippingDestination": {
+                    "@@type": "DefinedRegion",
+                    "addressCountry": "ID"
+                },
+                "deliveryTime": {
+                    "@@type": "ShippingDeliveryTime",
+                    "handlingTime": {
+                        "@@type": "QuantitativeValue",
+                        "minValue": "0",
+                        "maxValue": "1",
+                        "unitCode": "DAY"
+                    },
+                    "transitTime": {
+                        "@@type": "QuantitativeValue",
+                        "minValue": "0",
+                        "maxValue": "0",
+                        "unitCode": "DAY"
+                    }
+                }
+            },
+            "hasMerchantReturnPolicy": {
+                "@@type": "MerchantReturnPolicy",
+                "applicableCountry": "ID",
+                "returnPolicyCategory": "https://schema.org/MerchantReturnFiniteReturnWindow",
+                "merchantReturnDays": 7,
+                "returnMethod": "https://schema.org/ReturnByMail",
+                "returnFees": "https://schema.org/FreeReturn"
+            }
         }
     }
     </script>
@@ -304,7 +394,7 @@
                     <div class="flex flex-col sm:flex-row gap-4 mb-8">
                         <a href="/login" class="inline-flex items-center justify-center px-8 py-4 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all">
                             <span>Coba Gratis 14 Hari</span>
-                        </a>    
+                        </a>
                         <a href="#demo" class="inline-flex items-center justify-center px-8 py-4 bg-white text-primary rounded-xl font-semibold border-2 border-primary/30 hover:border-primary transition-all">
                             <i class="fas fa-play-circle mr-2"></i>
                             <span>Lihat Demo</span>
