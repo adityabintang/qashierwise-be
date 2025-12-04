@@ -13,11 +13,11 @@
         @include('components.dashboard-header', ['title' => 'Contacts', 'description' => 'Manage your WhatsApp contacts'])
 
         <!-- Page Content -->
-        <main class="flex-1 p-6">
+        <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto space-y-6" x-data="contactsManager()">
                 <!-- Search & Filter -->
-                <div class="card p-4">
-                    <div class="flex flex-col sm:flex-row gap-4">
+                <div class="card p-3 md:p-4 -mx-4 md:mx-0 rounded-none md:rounded-lg">
+                    <div class="flex flex-col sm:flex-row gap-3 md:gap-4">
                         <div class="flex-1 relative">
                             <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none"></i>
                             <input
@@ -110,9 +110,9 @@
 
                                 <!-- Actions -->
                                 <div class="flex gap-2">
-                                    <button @click.stop="sendMessage(contact)" class="btn btn-primary btn-md flex-1">
+                                    <button @click.stop="sendMessage(contact)" class="btn btn-primary btn-icon md:btn-md md:flex-1">
                                         <i class="fas fa-paper-plane"></i>
-                                        <span>Message</span>
+                                        <span class="hidden md:inline">Message</span>
                                     </button>
                                     <button @click.stop="showContactDetails(contact)" class="btn btn-outline btn-icon">
                                         <i class="fas fa-info-circle"></i>
@@ -217,11 +217,16 @@
                         </div>
 
                         <!-- Footer -->
-                        <div class="flex gap-3 p-6 border-t border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)]">
-                            <button @click="closeModal" class="btn btn-outline btn-md flex-1">Close</button>
+                        <div class="flex gap-3 p-4 md:p-6 border-t border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)]">
+                            <button @click="closeModal" class="btn btn-outline btn-md flex-1">
+                                <i class="fas fa-times md:hidden"></i>
+                                <span class="hidden md:inline">Close</span>
+                                <span class="md:hidden">Close</span>
+                            </button>
                             <button @click="sendMessage(selectedContact)" class="btn btn-primary btn-md flex-1">
                                 <i class="fas fa-paper-plane"></i>
-                                <span>Send Message</span>
+                                <span class="hidden md:inline">Send Message</span>
+                                <span class="md:hidden">Message</span>
                             </button>
                         </div>
                     </div>
@@ -234,14 +239,42 @@
 <script>
 function contactsApp() {
     return {
-        sidebarOpen: true,
+        sidebarOpen: window.innerWidth >= 1024,
+        isMobile: window.innerWidth < 768,
         user: null,
         notifications: [],
 
         init() {
-            let savedState = localStorage.getItem('sidebarOpen');
-            if (savedState !== null) this.sidebarOpen = JSON.parse(savedState);
-            this.$watch('sidebarOpen', v => localStorage.setItem('sidebarOpen', JSON.stringify(v)));
+            // Set initial sidebar state based on viewport
+            this.isMobile = window.innerWidth < 768;
+            if (this.isMobile) {
+                this.sidebarOpen = false;
+            } else {
+                let savedState = localStorage.getItem('sidebarOpen');
+                if (savedState !== null) this.sidebarOpen = JSON.parse(savedState);
+            }
+            
+            // Watch sidebar state changes (only save on desktop)
+            this.$watch('sidebarOpen', v => {
+                if (!this.isMobile) localStorage.setItem('sidebarOpen', JSON.stringify(v));
+            });
+            
+            // Handle resize events with debounce
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    const wasMobile = this.isMobile;
+                    this.isMobile = window.innerWidth < 768;
+                    
+                    if (wasMobile && !this.isMobile) {
+                        let savedState = localStorage.getItem('sidebarOpen');
+                        this.sidebarOpen = savedState !== null ? JSON.parse(savedState) : true;
+                    } else if (!wasMobile && this.isMobile) {
+                        this.sidebarOpen = false;
+                    }
+                }, 150);
+            });
 
             let storedUser = localStorage.getItem('user');
             if (storedUser) {

@@ -49,34 +49,36 @@
         @include('components.dashboard-header', ['title' => 'Templates', 'description' => 'Manage your WhatsApp message templates'])
 
         <!-- Page Content -->
-        <main class="flex-1 p-6">
+        <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto space-y-6" x-data="templatesManager()">
                 <!-- Header with Create Button -->
-                <div class="flex items-center justify-between">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                         <h2 class="text-lg font-semibold">Message Templates</h2>
-                        <p class="text-sm text-[hsl(var(--muted-foreground))]">Create and manage your WhatsApp message templates</p>
+                        <p class="text-sm text-[hsl(var(--muted-foreground))] hidden sm:block">Create and manage your WhatsApp message templates</p>
                     </div>
                     <div class="flex gap-2">
                         @if(config('app.debug'))
-                        <button @click="refreshTemplates()" :disabled="refreshing" class="btn btn-outline btn-md">
+                        <button @click="refreshTemplates()" :disabled="refreshing" class="btn btn-outline btn-md flex-1 sm:flex-none">
                             <i class="fas" :class="refreshing ? 'fa-spinner animate-spin' : 'fa-sync-alt'"></i>
-                            <span x-text="refreshing ? 'Syncing...' : 'Sync from Meta'"></span>
+                            <span class="hidden sm:inline" x-text="refreshing ? 'Syncing...' : 'Sync from Meta'"></span>
+                            <span class="sm:hidden" x-text="refreshing ? '' : 'Sync'"></span>
                         </button>
                         @endif
-                        <button @click="openCreateModal()" class="btn btn-primary btn-md">
-                            <i class="fas fa-plus mr-2"></i>
-                            Create Template
+                        <button @click="openCreateModal()" class="btn btn-primary btn-md flex-1 sm:flex-none">
+                            <i class="fas fa-plus sm:mr-2"></i>
+                            <span class="hidden sm:inline">Create Template</span>
+                            <span class="sm:hidden">Create</span>
                         </button>
                     </div>
                 </div>
 
                 <!-- Filters -->
-                <div class="card p-4">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="card p-3 sm:p-4">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                         <div>
                             <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">Status</label>
-                            <select x-model="filters.status" @change="filterTemplates" class="input w-full">
+                            <select x-model="filters.status" @change="filterTemplates" class="input w-full min-h-[44px]">
                                 <option value="">All Statuses</option>
                                 <option value="APPROVED">Approved</option>
                                 <option value="PENDING">Pending</option>
@@ -85,18 +87,18 @@
                         </div>
                         <div>
                             <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">Category</label>
-                            <select x-model="filters.category" @change="filterTemplates" class="input w-full">
+                            <select x-model="filters.category" @change="filterTemplates" class="input w-full min-h-[44px]">
                                 <option value="">All Categories</option>
                                 <option value="MARKETING">Marketing</option>
                                 <option value="UTILITY">Utility</option>
                                 <option value="AUTHENTICATION">Authentication</option>
                             </select>
                         </div>
-                        <div>
+                        <div class="col-span-2 sm:col-span-1">
                             <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">Search</label>
                             <div class="relative">
                                 <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none"></i>
-                                <input type="text" x-model="filters.search" @input="filterTemplates" placeholder="Search templates..." class="input pl-10 w-full">
+                                <input type="text" x-model="filters.search" @input="filterTemplates" placeholder="Search templates..." class="input pl-10 w-full min-h-[44px]">
                             </div>
                         </div>
                     </div>
@@ -124,12 +126,12 @@
                     <!-- Templates -->
                     <template x-if="!loading">
                         <template x-for="template in filteredTemplates" :key="template.id">
-                            <div class="card p-5 hover:shadow-md transition-shadow">
-                                <!-- Header -->
+                            <div class="card p-4 sm:p-5 hover:shadow-md transition-shadow" x-data="{ expanded: false }">
+                                <!-- Header - Always visible -->
                                 <div class="flex items-start justify-between mb-3">
                                     <div class="flex-1 min-w-0">
-                                        <h3 class="font-semibold truncate" x-text="template.name"></h3>
-                                        <div class="flex items-center gap-2 mt-1.5">
+                                        <h3 class="font-semibold truncate text-sm sm:text-base" x-text="template.name"></h3>
+                                        <div class="flex items-center gap-2 mt-1.5 flex-wrap">
                                             <span class="badge text-xs"
                                                 :class="{
                                                     'bg-emerald-100 text-emerald-700': template.status === 'APPROVED',
@@ -146,10 +148,14 @@
                                             <span class="badge badge-secondary text-xs" x-text="template.category"></span>
                                         </div>
                                     </div>
+                                    <!-- Mobile accordion toggle -->
+                                    <button @click="expanded = !expanded" class="sm:hidden btn btn-ghost btn-icon ml-2 flex-shrink-0">
+                                        <i class="fas transition-transform duration-200" :class="expanded ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                                    </button>
                                 </div>
 
-                                <!-- Preview -->
-                                <div class="bg-[hsl(var(--muted)/0.5)] rounded-lg p-3 mb-4 min-h-[100px] text-sm">
+                                <!-- Preview - Collapsible on mobile -->
+                                <div class="hidden sm:block bg-[hsl(var(--muted)/0.5)] rounded-lg p-3 mb-4 min-h-[100px] text-sm">
                                     <div x-show="template.header" class="mb-2">
                                         <template x-if="template.header_type === 'TEXT'">
                                             <p class="font-medium" x-text="template.header"></p>
@@ -169,30 +175,61 @@
                                     <p x-show="template.footer" class="text-xs text-[hsl(var(--muted-foreground))] italic mt-2" x-text="template.footer"></p>
                                 </div>
 
-                                <!-- Meta -->
-                                <div class="flex items-center gap-3 text-xs text-[hsl(var(--muted-foreground))] mb-4">
+                                <!-- Mobile accordion content -->
+                                <div x-show="expanded" x-collapse class="sm:hidden">
+                                    <div class="bg-[hsl(var(--muted)/0.5)] rounded-lg p-3 mb-4 text-sm">
+                                        <div x-show="template.header" class="mb-2">
+                                            <template x-if="template.header_type === 'TEXT'">
+                                                <p class="font-medium" x-text="template.header"></p>
+                                            </template>
+                                            <template x-if="['IMAGE', 'VIDEO', 'DOCUMENT'].includes(template.header_type)">
+                                                <div class="flex items-center gap-2 text-[hsl(var(--muted-foreground))]">
+                                                    <i :class="{
+                                                        'fas fa-image': template.header_type === 'IMAGE',
+                                                        'fas fa-video': template.header_type === 'VIDEO',
+                                                        'fas fa-file': template.header_type === 'DOCUMENT'
+                                                    }"></i>
+                                                    <span class="text-xs" x-text="template.header_type + ' Header'"></span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                        <p x-show="template.body" class="text-[hsl(var(--muted-foreground))]" x-text="template.body"></p>
+                                        <p x-show="template.footer" class="text-xs text-[hsl(var(--muted-foreground))] italic mt-2" x-text="template.footer"></p>
+                                    </div>
+                                    
+                                    <!-- Meta on mobile -->
+                                    <div class="flex items-center gap-3 text-xs text-[hsl(var(--muted-foreground))] mb-4">
+                                        <span class="flex items-center gap-1">
+                                            <i class="fas fa-language"></i>
+                                            <span x-text="template.language"></span>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Meta - Desktop only (outside accordion) -->
+                                <div class="hidden sm:flex items-center gap-3 text-xs text-[hsl(var(--muted-foreground))] mb-4">
                                     <span class="flex items-center gap-1">
                                         <i class="fas fa-language"></i>
                                         <span x-text="template.language"></span>
                                     </span>
                                 </div>
 
-                                <!-- Actions -->
-                                <div class="flex gap-2">
-                                    <button @click="viewTemplate(template)" class="btn btn-outline btn-md flex-1">
+                                <!-- Actions - Always visible but responsive -->
+                                <div class="flex gap-2 flex-wrap sm:flex-nowrap">
+                                    <button @click="viewTemplate(template)" class="btn btn-outline btn-md flex-1 min-w-0">
                                         <i class="fas fa-eye"></i>
-                                        <span>View</span>
+                                        <span class="hidden sm:inline">View</span>
                                     </button>
-                                    <button @click="openEditModal(template)" class="btn btn-outline btn-md flex-1">
+                                    <button @click="openEditModal(template)" class="btn btn-outline btn-md flex-1 min-w-0">
                                         <i class="fas fa-edit"></i>
-                                        <span>Edit</span>
+                                        <span class="hidden sm:inline">Edit</span>
                                     </button>
-                                    <button @click="openDeleteModal(template)" class="btn btn-outline btn-md text-red-600 hover:bg-red-50 hover:border-red-300">
+                                    <button @click="openDeleteModal(template)" class="btn btn-outline btn-md text-red-600 hover:bg-red-50 hover:border-red-300 flex-shrink-0">
                                         <i class="fas fa-trash"></i>
                                     </button>
-                                    <button x-show="template.status === 'APPROVED'" @click="sendTemplateModal(template)" class="btn btn-primary btn-md flex-1">
+                                    <button x-show="template.status === 'APPROVED'" @click="sendTemplateModal(template)" class="btn btn-primary btn-md flex-1 min-w-0">
                                         <i class="fas fa-paper-plane"></i>
-                                        <span>Send</span>
+                                        <span class="hidden sm:inline">Send</span>
                                     </button>
                                 </div>
                             </div>
@@ -286,9 +323,9 @@
                 </div>
 
                 <!-- Create Template Modal -->
-                <div x-show="showCreateModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div x-show="showCreateModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="fixed inset-0 bg-black/50" @click="!creating && closeCreateModal()"></div>
-                    <div x-show="showCreateModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="card relative w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                <div x-show="showCreateModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4">
+                    <div x-show="showCreateModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="fixed inset-0 bg-black/50 hidden sm:block" @click="!creating && closeCreateModal()"></div>
+                    <div x-show="showCreateModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95 sm:scale-95" x-transition:enter-end="opacity-100 scale-100" class="card relative w-full h-full sm:h-auto sm:max-w-4xl sm:max-h-[90vh] overflow-hidden flex flex-col sm:rounded-lg rounded-none">
                         <!-- Loading Overlay -->
                         <div x-show="creating" x-transition class="absolute inset-0 bg-white/80 z-10 flex items-center justify-center">
                             <div class="text-center">
@@ -298,16 +335,16 @@
                         </div>
                         
                         <!-- Modal Header -->
-                        <div class="p-6 border-b border-[hsl(var(--border))] flex items-center justify-between flex-shrink-0">
-                            <h3 class="text-lg font-semibold">Create New Template</h3>
-                            <button @click="closeCreateModal" :disabled="creating" class="btn btn-ghost btn-icon"><i class="fas fa-times"></i></button>
+                        <div class="p-4 sm:p-6 border-b border-[hsl(var(--border))] flex items-center justify-between flex-shrink-0">
+                            <h3 class="text-base sm:text-lg font-semibold">Create New Template</h3>
+                            <button @click="closeCreateModal" :disabled="creating" class="btn btn-ghost btn-icon min-h-[44px] min-w-[44px]"><i class="fas fa-times"></i></button>
                         </div>
                         
                         <!-- Modal Body -->
-                        <div class="flex-1 overflow-y-auto">
-                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
+                        <div class="flex-1 overflow-y-auto scroll-area">
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 p-4 sm:p-6">
                                 <!-- Form Section -->
-                                <div class="space-y-5">
+                                <div class="space-y-4 sm:space-y-5">
                                     <!-- Basic Info -->
                                     <div class="space-y-4">
                                         <h4 class="font-medium text-sm text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Basic Information</h4>
@@ -561,7 +598,7 @@
                         </div>
                         
                         <!-- Modal Footer -->
-                        <div class="p-6 border-t border-[hsl(var(--border))] flex-shrink-0 bg-[hsl(var(--card))]">
+                        <div class="p-4 sm:p-6 border-t border-[hsl(var(--border))] flex-shrink-0 bg-[hsl(var(--card))]">
                             <!-- API Error Display -->
                             <div x-show="apiError" x-transition class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                                 <div class="flex items-start gap-2">
@@ -570,21 +607,21 @@
                                         <p class="text-sm font-medium text-red-800">API Error</p>
                                         <p class="text-sm text-red-600" x-text="apiError"></p>
                                     </div>
-                                    <button @click="apiError = null" class="text-red-400 hover:text-red-600">
+                                    <button @click="apiError = null" class="text-red-400 hover:text-red-600 min-h-[44px] min-w-[44px] flex items-center justify-center">
                                         <i class="fas fa-times"></i>
                                     </button>
                                 </div>
                             </div>
-                            <div class="flex items-center justify-between">
-                                <p x-show="Object.keys(errors).length > 0" class="text-sm text-red-500">
+                            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                                <p x-show="Object.keys(errors).length > 0" class="text-sm text-red-500 text-center sm:text-left">
                                     <i class="fas fa-exclamation-circle mr-1"></i>
                                     Please fix the errors above
                                 </p>
-                                <div class="flex gap-3 ml-auto">
-                                    <button type="button" @click="closeCreateModal" class="btn btn-outline btn-md" :disabled="creating">Cancel</button>
-                                    <button type="button" @click="submitCreate" :disabled="creating || !isFormValid()" class="btn btn-primary btn-md">
+                                <div class="flex gap-3 sm:ml-auto w-full sm:w-auto">
+                                    <button type="button" @click="closeCreateModal" class="btn btn-outline btn-md flex-1 sm:flex-none min-h-[44px]" :disabled="creating">Cancel</button>
+                                    <button type="button" @click="submitCreate" :disabled="creating || !isFormValid()" class="btn btn-primary btn-md flex-1 sm:flex-none min-h-[44px]">
                                         <i class="fas" :class="creating ? 'fa-spinner animate-spin' : 'fa-check'"></i>
-                                        <span x-text="creating ? 'Creating...' : 'Create Template'"></span>
+                                        <span x-text="creating ? 'Creating...' : 'Create'"></span>
                                     </button>
                                 </div>
                             </div>
@@ -593,9 +630,9 @@
                 </div>
 
                 <!-- Edit Template Modal -->
-                <div x-show="showEditModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div x-show="showEditModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="fixed inset-0 bg-black/50" @click="!updating && closeEditModal()"></div>
-                    <div x-show="showEditModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="card relative w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                <div x-show="showEditModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4">
+                    <div x-show="showEditModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="fixed inset-0 bg-black/50 hidden sm:block" @click="!updating && closeEditModal()"></div>
+                    <div x-show="showEditModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95 sm:scale-95" x-transition:enter-end="opacity-100 scale-100" class="card relative w-full h-full sm:h-auto sm:max-w-4xl sm:max-h-[90vh] overflow-hidden flex flex-col sm:rounded-lg rounded-none">
                         <!-- Loading Overlay -->
                         <div x-show="updating" x-transition class="absolute inset-0 bg-white/80 z-10 flex items-center justify-center">
                             <div class="text-center">
@@ -605,16 +642,16 @@
                         </div>
                         
                         <!-- Modal Header -->
-                        <div class="p-6 border-b border-[hsl(var(--border))] flex items-center justify-between flex-shrink-0">
-                            <h3 class="text-lg font-semibold">Edit Template</h3>
-                            <button @click="closeEditModal" :disabled="updating" class="btn btn-ghost btn-icon"><i class="fas fa-times"></i></button>
+                        <div class="p-4 sm:p-6 border-b border-[hsl(var(--border))] flex items-center justify-between flex-shrink-0">
+                            <h3 class="text-base sm:text-lg font-semibold">Edit Template</h3>
+                            <button @click="closeEditModal" :disabled="updating" class="btn btn-ghost btn-icon min-h-[44px] min-w-[44px]"><i class="fas fa-times"></i></button>
                         </div>
                         
                         <!-- Modal Body -->
-                        <div class="flex-1 overflow-y-auto">
-                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
+                        <div class="flex-1 overflow-y-auto scroll-area">
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 p-4 sm:p-6">
                                 <!-- Form Section -->
-                                <div class="space-y-5">
+                                <div class="space-y-4 sm:space-y-5">
                                     <!-- Basic Info -->
                                     <div class="space-y-4">
                                         <h4 class="font-medium text-sm text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Basic Information</h4>
@@ -622,7 +659,7 @@
                                         <!-- Template Name (Read-only) -->
                                         <div>
                                             <label class="text-sm font-medium mb-1.5 block">Template Name</label>
-                                            <input type="text" x-model="editForm.name" disabled class="input w-full bg-[hsl(var(--muted)/0.5)] cursor-not-allowed">
+                                            <input type="text" x-model="editForm.name" disabled class="input w-full bg-[hsl(var(--muted)/0.5)] cursor-not-allowed min-h-[44px]">
                                             <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Template name cannot be changed</p>
                                         </div>
 
@@ -840,7 +877,7 @@
                         </div>
                         
                         <!-- Modal Footer -->
-                        <div class="p-6 border-t border-[hsl(var(--border))] flex-shrink-0 bg-[hsl(var(--card))]">
+                        <div class="p-4 sm:p-6 border-t border-[hsl(var(--border))] flex-shrink-0 bg-[hsl(var(--card))]">
                             <!-- API Error Display -->
                             <div x-show="editApiError" x-transition class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                                 <div class="flex items-start gap-2">
@@ -849,21 +886,21 @@
                                         <p class="text-sm font-medium text-red-800">API Error</p>
                                         <p class="text-sm text-red-600" x-text="editApiError"></p>
                                     </div>
-                                    <button @click="editApiError = null" class="text-red-400 hover:text-red-600">
+                                    <button @click="editApiError = null" class="text-red-400 hover:text-red-600 min-h-[44px] min-w-[44px] flex items-center justify-center">
                                         <i class="fas fa-times"></i>
                                     </button>
                                 </div>
                             </div>
-                            <div class="flex items-center justify-between">
-                                <p x-show="Object.keys(editErrors).length > 0" class="text-sm text-red-500">
+                            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                                <p x-show="Object.keys(editErrors).length > 0" class="text-sm text-red-500 text-center sm:text-left">
                                     <i class="fas fa-exclamation-circle mr-1"></i>
                                     Please fix the errors above
                                 </p>
-                                <div class="flex gap-3 ml-auto">
-                                    <button type="button" @click="closeEditModal" class="btn btn-outline btn-md" :disabled="updating">Cancel</button>
-                                    <button type="button" @click="submitEdit" :disabled="updating || !isEditFormValid()" class="btn btn-primary btn-md">
+                                <div class="flex gap-3 sm:ml-auto w-full sm:w-auto">
+                                    <button type="button" @click="closeEditModal" class="btn btn-outline btn-md flex-1 sm:flex-none min-h-[44px]" :disabled="updating">Cancel</button>
+                                    <button type="button" @click="submitEdit" :disabled="updating || !isEditFormValid()" class="btn btn-primary btn-md flex-1 sm:flex-none min-h-[44px]">
                                         <i class="fas" :class="updating ? 'fa-spinner animate-spin' : 'fa-check'"></i>
-                                        <span x-text="updating ? 'Updating...' : 'Update Template'"></span>
+                                        <span x-text="updating ? 'Updating...' : 'Update'"></span>
                                     </button>
                                 </div>
                             </div>
@@ -997,11 +1034,35 @@ window.showToast = function(message, type = 'info', duration = 5000) {
 
 function templatesApp() {
     return {
-        sidebarOpen: true, user: null, notifications: [],
+        sidebarOpen: window.innerWidth >= 1024, 
+        isMobile: window.innerWidth < 768,
+        user: null, 
+        notifications: [],
         init() {
-            let savedState = localStorage.getItem('sidebarOpen');
-            if (savedState !== null) this.sidebarOpen = JSON.parse(savedState);
-            this.$watch('sidebarOpen', v => localStorage.setItem('sidebarOpen', JSON.stringify(v)));
+            this.isMobile = window.innerWidth < 768;
+            if (this.isMobile) {
+                this.sidebarOpen = false;
+            } else {
+                let savedState = localStorage.getItem('sidebarOpen');
+                if (savedState !== null) this.sidebarOpen = JSON.parse(savedState);
+            }
+            this.$watch('sidebarOpen', v => {
+                if (!this.isMobile) localStorage.setItem('sidebarOpen', JSON.stringify(v));
+            });
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    const wasMobile = this.isMobile;
+                    this.isMobile = window.innerWidth < 768;
+                    if (wasMobile && !this.isMobile) {
+                        let savedState = localStorage.getItem('sidebarOpen');
+                        this.sidebarOpen = savedState !== null ? JSON.parse(savedState) : true;
+                    } else if (!wasMobile && this.isMobile) {
+                        this.sidebarOpen = false;
+                    }
+                }, 150);
+            });
             let storedUser = localStorage.getItem('user');
             if (storedUser) { try { this.user = JSON.parse(storedUser); } catch (e) { this.user = { name: 'User', email: 'user@example.com' }; } }
             else { this.user = { name: 'User', email: 'user@example.com' }; }

@@ -9,11 +9,15 @@
         <!-- Header -->
         @include('components.dashboard-header', ['title' => 'Messages', 'description' => 'Chat with your WhatsApp contacts'])
         <!-- Page Content -->
-        <main class="flex-1 p-6">
+        <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto h-[calc(100vh-10rem)]" x-data="messagesManager()">
                 <div class="card flex h-full overflow-hidden">
                     <!-- Contacts Sidebar -->
-                    <div class="w-80 border-r border-[hsl(var(--border))] flex flex-col">
+                    <div 
+                        class="border-r border-[hsl(var(--border))] flex flex-col transition-all duration-300"
+                        :class="isMobileMessages ? (mobileView === 'contacts' ? 'w-full' : 'hidden') : 'w-80 md:w-60 lg:w-80'"
+                        x-show="!isMobileMessages || mobileView === 'contacts'"
+                    >
                         <!-- Search -->
                         <div class="p-4 border-b border-[hsl(var(--border))]">
                             <div class="relative">
@@ -92,31 +96,44 @@
                         </div>
                     </div>
                     <!-- Chat Area -->
-                    <div class="flex-1 flex flex-col" x-show="selectedContact">
+                    <div 
+                        class="flex-1 flex flex-col" 
+                        x-show="selectedContact && (!isMobileMessages || mobileView === 'chat')"
+                        :class="isMobileMessages ? 'w-full' : ''"
+                    >
                         <!-- Chat Header -->
-                        <div class="h-16 px-4 border-b border-[hsl(var(--border))] flex items-center justify-between bg-[hsl(var(--muted)/0.3)]">
-                            <div class="flex items-center gap-3">
+                        <div class="h-14 md:h-16 px-3 md:px-4 border-b border-[hsl(var(--border))] flex items-center justify-between bg-[hsl(var(--muted)/0.3)]">
+                            <div class="flex items-center gap-2 md:gap-3">
+                                <!-- Back Button (Mobile Only) - Requirements 4.2, 4.3 -->
+                                <button 
+                                    x-show="isMobileMessages" 
+                                    @click="backToContacts()" 
+                                    class="btn btn-ghost btn-icon min-h-[44px] min-w-[44px]"
+                                    title="Back to contacts"
+                                >
+                                    <i class="fas fa-arrow-left"></i>
+                                </button>
                                 <!-- Avatar with name -->
                                 <img
                                     x-show="selectedContact?.name && selectedContact.name.trim()"
                                     :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(selectedContact?.name || 'U')}&backgroundColor=a855f7`"
                                     :alt="selectedContact?.name"
-                                    class="avatar"
+                                    class="avatar h-9 w-9 md:h-10 md:w-10"
                                 >
                                 <!-- Avatar without name -->
                                 <div
                                     x-show="!selectedContact?.name || !selectedContact.name.trim()"
-                                    class="avatar flex items-center justify-center text-white font-bold"
-                                    style="background: linear-gradient(135deg, #a855f7, #9333ea); font-size: 0.875rem;"
+                                    class="avatar h-9 w-9 md:h-10 md:w-10 flex items-center justify-center text-white font-bold"
+                                    style="background: linear-gradient(135deg, #a855f7, #9333ea); font-size: 0.75rem;"
                                 >
                                     <span x-text="getCountryCode(selectedContact?.phone_number) || '?'"></span>
                                 </div>
                                 <div>
-                                    <p class="font-medium text-sm" x-text="selectedContact?.name || 'Unknown'">Unknown</p>
-                                    <p class="text-xs text-[hsl(var(--muted-foreground))]" x-text="selectedContact?.phone_number">-</p>
+                                    <p class="font-medium text-xs md:text-sm" x-text="selectedContact?.name || 'Unknown'">Unknown</p>
+                                    <p class="text-[10px] md:text-xs text-[hsl(var(--muted-foreground))]" x-text="selectedContact?.phone_number">-</p>
                                 </div>
                             </div>
-                            <button @click="refreshMessages" class="btn btn-ghost btn-icon">
+                            <button @click="refreshMessages" class="btn btn-ghost btn-icon min-h-[44px] min-w-[44px]">
                                 <i class="fas fa-sync-alt" :class="{'animate-spin': loadingMessages}"></i>
                             </button>
                         </div>
@@ -137,10 +154,11 @@
                                 <div class="space-y-3">
                                     <template x-for="(message, index) in messages" :key="message?.id || `msg-${index}`">
                                         <div x-show="message && message.id" class="flex" :class="message?.direction === 'outgoing' ? 'justify-end' : 'justify-start'">
-                                            <div class="max-w-[70%]">
-                                                <!-- Message Bubble -->
+                                            <!-- Message bubble max-width: 85% on mobile, 70% on desktop (Requirements 4.5) -->
+                                            <div class="max-w-[85%] md:max-w-[70%]">
+                                                <!-- Message Bubble - Adjusted padding for mobile (Requirements 4.5) -->
                                                 <div
-                                                    class="rounded-2xl px-4 py-2 shadow-sm"
+                                                    class="rounded-2xl px-3 py-1.5 md:px-4 md:py-2 shadow-sm"
                                                     :class="message?.direction === 'outgoing' ? 'bg-[hsl(var(--primary))] text-white rounded-br-md' : 'bg-white border border-[hsl(var(--border))] rounded-bl-md'"
                                                 >
                                                     <!-- Text -->
@@ -191,11 +209,9 @@
                                                     </div>
                                                     <!-- Audio -->
                                                     <div x-show="message?.type === 'audio'">
-                                                        <div x-show="message?.media_url">
-                                                            <audio controls class="h-10 max-w-[200px]">
-                                                                <source :src="message?.media_url" type="audio/mpeg">
-                                                            </audio>
-                                                        </div>
+                                                        <template x-if="message?.media_url">
+                                                            <audio controls class="h-10 max-w-[200px]" :src="message?.media_url"></audio>
+                                                        </template>
                                                         <div x-show="!message?.media_url" class="flex items-center gap-2">
                                                             <i class="fas fa-microphone"></i>
                                                             <span class="text-sm">Audio message</span>
@@ -279,36 +295,37 @@
                             </template>
                         </div>
                         <!-- Input -->
-                        <div class="p-4 border-t border-[hsl(var(--border))] bg-white">
+                        <!-- Input Area - Adjusted for mobile touch targets (Requirements 6.2, 6.3) -->
+                        <div class="p-3 md:p-4 border-t border-[hsl(var(--border))] bg-white sticky bottom-0">
                             <form @submit.prevent="sendMessage" class="flex items-end gap-2">
-                                <!-- Attachment Menu -->
+                                <!-- Attachment Menu - All options shown with touch-friendly sizing -->
                                 <div x-data="{ showMenu: false }" class="relative">
-                                    <button type="button" @click="showMenu = !showMenu" class="btn btn-ghost btn-icon" title="Attach">
+                                    <button type="button" @click="showMenu = !showMenu" class="btn btn-ghost btn-icon min-h-[44px] min-w-[44px]" title="Attach">
                                         <i class="fas fa-plus"></i>
                                     </button>
-                                    <div x-show="showMenu" @click.away="showMenu = false" x-transition class="absolute bottom-12 left-0 bg-white rounded-lg shadow-lg border border-[hsl(var(--border))] py-2 w-48 z-10">
-                                        <button type="button" @click="showMenu = false; showTemplateModal = true" class="w-full flex items-center gap-3 px-4 py-2 hover:bg-[hsl(var(--muted))] text-sm">
+                                    <div x-show="showMenu" @click.away="showMenu = false" x-transition class="absolute bottom-12 left-0 bg-white rounded-lg shadow-lg border border-[hsl(var(--border))] py-2 w-48 z-10 max-h-[60vh] overflow-y-auto">
+                                        <button type="button" @click="showMenu = false; showTemplateModal = true" class="w-full flex items-center gap-3 px-4 py-3 md:py-2 hover:bg-[hsl(var(--muted))] text-sm min-h-[44px]">
                                             <i class="fas fa-file-alt w-5 text-purple-500"></i> Template
                                         </button>
-                                        <button type="button" @click="showMenu = false; showImageModal = true" class="w-full flex items-center gap-3 px-4 py-2 hover:bg-[hsl(var(--muted))] text-sm">
+                                        <button type="button" @click="showMenu = false; showImageModal = true" class="w-full flex items-center gap-3 px-4 py-3 md:py-2 hover:bg-[hsl(var(--muted))] text-sm min-h-[44px]">
                                             <i class="fas fa-image w-5 text-blue-500"></i> Image
                                         </button>
-                                        <button type="button" @click="showMenu = false; showVideoModal = true" class="w-full flex items-center gap-3 px-4 py-2 hover:bg-[hsl(var(--muted))] text-sm">
+                                        <button type="button" @click="showMenu = false; showVideoModal = true" class="w-full flex items-center gap-3 px-4 py-3 md:py-2 hover:bg-[hsl(var(--muted))] text-sm min-h-[44px]">
                                             <i class="fas fa-video w-5 text-pink-500"></i> Video
                                         </button>
-                                        <button type="button" @click="showMenu = false; showDocumentModal = true" class="w-full flex items-center gap-3 px-4 py-2 hover:bg-[hsl(var(--muted))] text-sm">
+                                        <button type="button" @click="showMenu = false; showDocumentModal = true" class="w-full flex items-center gap-3 px-4 py-3 md:py-2 hover:bg-[hsl(var(--muted))] text-sm min-h-[44px]">
                                             <i class="fas fa-file w-5 text-orange-500"></i> Document
                                         </button>
-                                        <button type="button" @click="showMenu = false; showAudioModal = true" class="w-full flex items-center gap-3 px-4 py-2 hover:bg-[hsl(var(--muted))] text-sm">
+                                        <button type="button" @click="showMenu = false; showAudioModal = true" class="w-full flex items-center gap-3 px-4 py-3 md:py-2 hover:bg-[hsl(var(--muted))] text-sm min-h-[44px]">
                                             <i class="fas fa-microphone w-5 text-yellow-500"></i> Audio
                                         </button>
-                                        <button type="button" @click="showMenu = false; showLocationModal = true" class="w-full flex items-center gap-3 px-4 py-2 hover:bg-[hsl(var(--muted))] text-sm">
+                                        <button type="button" @click="showMenu = false; showLocationModal = true" class="w-full flex items-center gap-3 px-4 py-3 md:py-2 hover:bg-[hsl(var(--muted))] text-sm min-h-[44px]">
                                             <i class="fas fa-map-marker-alt w-5 text-red-500"></i> Location
                                         </button>
-                                        <button type="button" @click="showMenu = false; showButtonModal = true" class="w-full flex items-center gap-3 px-4 py-2 hover:bg-[hsl(var(--muted))] text-sm">
+                                        <button type="button" @click="showMenu = false; showButtonModal = true" class="w-full flex items-center gap-3 px-4 py-3 md:py-2 hover:bg-[hsl(var(--muted))] text-sm min-h-[44px]">
                                             <i class="fas fa-hand-pointer w-5 text-green-500"></i> Buttons
                                         </button>
-                                        <button type="button" @click="showMenu = false; showListModal = true" class="w-full flex items-center gap-3 px-4 py-2 hover:bg-[hsl(var(--muted))] text-sm">
+                                        <button type="button" @click="showMenu = false; showListModal = true" class="w-full flex items-center gap-3 px-4 py-3 md:py-2 hover:bg-[hsl(var(--muted))] text-sm min-h-[44px]">
                                             <i class="fas fa-list w-5 text-cyan-500"></i> List
                                         </button>
                                     </div>
@@ -355,6 +372,7 @@
                                             <i class="fas fa-quote-right"></i>
                                         </button>
                                     </div>
+                                    <!-- Textarea with minimum 44px touch target (Requirements 6.3) -->
                                     <textarea
                                         x-ref="messageInput"
                                         x-model="newMessage"
@@ -364,21 +382,22 @@
                                         @keydown.ctrl.i.prevent="formatText('italic')"
                                         @select="handleTextSelect($event)"
                                         @mouseup="handleTextSelect($event)"
-                                        placeholder="Type a message... (Shift+Enter for new line)"
+                                        placeholder="Type a message..."
                                         rows="1"
-                                        class="input w-full resize-none py-2 overflow-hidden"
-                                        style="min-height: 40px; max-height: 200px;"
+                                        class="input w-full resize-none py-2 md:py-2 overflow-hidden text-base md:text-sm"
+                                        style="min-height: 44px; max-height: 200px;"
                                         :disabled="sending"
                                     ></textarea>
                                 </div>
-                                <button type="submit" class="btn btn-primary btn-icon" :disabled="sending || !newMessage.trim()">
+                                <!-- Send button with minimum 44px touch target (Requirements 6.3) -->
+                                <button type="submit" class="btn btn-primary btn-icon min-h-[44px] min-w-[44px]" :disabled="sending || !newMessage.trim()">
                                     <i class="fas" :class="sending ? 'fa-spinner animate-spin' : 'fa-paper-plane'"></i>
                                 </button>
                             </form>
                         </div>
                     </div>
-                    <!-- No Contact Selected -->
-                    <div x-show="!selectedContact" class="flex-1 flex items-center justify-center bg-[hsl(var(--muted)/0.2)]">
+                    <!-- No Contact Selected - Hidden on mobile when contacts view is active -->
+                    <div x-show="!selectedContact && !isMobileMessages" class="flex-1 flex items-center justify-center bg-[hsl(var(--muted)/0.2)]">
                         <div class="text-center">
                             <div class="h-16 w-16 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center mx-auto mb-4">
                                 <i class="fas fa-comments text-2xl text-[hsl(var(--muted-foreground))]"></i>
@@ -531,7 +550,9 @@
                                     <i class="fas fa-music text-xl text-[hsl(var(--primary))]"></i>
                                     <span class="text-sm truncate" x-text="audioForm.filename"></span>
                                 </div>
-                                <audio x-show="audioForm.preview" :src="audioForm.preview" controls class="w-full h-10"></audio>
+                                <template x-if="audioForm.preview">
+                                    <audio :src="audioForm.preview" controls class="w-full h-10"></audio>
+                                </template>
                             </div>
                             <div class="flex gap-2">
                                 <button type="button" @click="showAudioModal = false; audioForm = { file: null, filename: '', preview: null }" class="btn btn-outline btn-md flex-1">Cancel</button>
@@ -696,13 +717,35 @@
 <script>
 function messagesApp() {
     return {
-        sidebarOpen: true,
+        sidebarOpen: window.innerWidth >= 1024,
+        isMobile: window.innerWidth < 768,
         user: null,
         notifications: [],
         init() {
-            let savedState = localStorage.getItem('sidebarOpen');
-            if (savedState !== null) this.sidebarOpen = JSON.parse(savedState);
-            this.$watch('sidebarOpen', v => localStorage.setItem('sidebarOpen', JSON.stringify(v)));
+            this.isMobile = window.innerWidth < 768;
+            if (this.isMobile) {
+                this.sidebarOpen = false;
+            } else {
+                let savedState = localStorage.getItem('sidebarOpen');
+                if (savedState !== null) this.sidebarOpen = JSON.parse(savedState);
+            }
+            this.$watch('sidebarOpen', v => {
+                if (!this.isMobile) localStorage.setItem('sidebarOpen', JSON.stringify(v));
+            });
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    const wasMobile = this.isMobile;
+                    this.isMobile = window.innerWidth < 768;
+                    if (wasMobile && !this.isMobile) {
+                        let savedState = localStorage.getItem('sidebarOpen');
+                        this.sidebarOpen = savedState !== null ? JSON.parse(savedState) : true;
+                    } else if (!wasMobile && this.isMobile) {
+                        this.sidebarOpen = false;
+                    }
+                }, 150);
+            });
             let storedUser = localStorage.getItem('user');
             if (storedUser) {
                 try { this.user = JSON.parse(storedUser); }
@@ -775,7 +818,27 @@ function messagesManager() {
         locationForm: { latitude: '', longitude: '', name: '', address: '', searchQuery: '', searchResults: [], gettingLocation: false },
         buttonForm: { body: '', buttons: ['', ''] },
         listForm: { body: '', buttonText: 'View Options', sectionTitle: 'Options', items: [{title: ''}, {title: ''}] },
+        // Mobile view state management (Requirements 4.1, 4.4)
+        mobileView: 'contacts', // 'contacts' | 'chat'
+        isMobileMessages: window.innerWidth < 768,
         async init() {
+            // Initialize mobile detection
+            this.isMobileMessages = window.innerWidth < 768;
+            
+            // Add resize listener for viewport detection
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    const wasMobile = this.isMobileMessages;
+                    this.isMobileMessages = window.innerWidth < 768;
+                    // Reset to contacts view when switching from mobile to desktop
+                    if (wasMobile && !this.isMobileMessages) {
+                        this.mobileView = 'contacts';
+                    }
+                }, 150);
+            });
+            
             await Promise.all([this.fetchContacts(), this.fetchTemplates()]);
             const urlParams = new URLSearchParams(window.location.search);
             const contactId = urlParams.get('contact');
@@ -856,11 +919,19 @@ function messagesManager() {
         async selectContact(contact) {
             this.messages = [];
             this.selectedContact = contact;
+            // Switch to chat view on mobile (Requirements 4.2, 4.4)
+            if (this.isMobileMessages) {
+                this.mobileView = 'chat';
+            }
             await this.fetchMessages();
             // Mark messages as read when opening conversation
             if (contact.unread_count > 0) {
                 await this.markContactAsRead(contact.id);
             }
+        },
+        // Back to contacts list on mobile (Requirements 4.3)
+        backToContacts() {
+            this.mobileView = 'contacts';
         },
         async fetchMessages() {
             if (!this.selectedContact?.id) return;

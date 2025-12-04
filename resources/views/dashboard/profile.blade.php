@@ -13,7 +13,7 @@
         @include('components.dashboard-header', ['title' => 'Business Profile', 'description' => 'Manage your WhatsApp Business profile'])
 
         <!-- Page Content -->
-        <main class="flex-1 p-6">
+        <main class="flex-1 p-4 md:p-6">
             <div class="max-w-6xl mx-auto" x-data="profileManager()">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <!-- Profile Form -->
@@ -234,11 +234,35 @@
 <script>
 function profileApp() {
     return {
-        sidebarOpen: true, user: null, notifications: [],
+        sidebarOpen: window.innerWidth >= 1024, 
+        isMobile: window.innerWidth < 768,
+        user: null, 
+        notifications: [],
         init() {
-            let savedState = localStorage.getItem('sidebarOpen');
-            if (savedState !== null) this.sidebarOpen = JSON.parse(savedState);
-            this.$watch('sidebarOpen', v => localStorage.setItem('sidebarOpen', JSON.stringify(v)));
+            this.isMobile = window.innerWidth < 768;
+            if (this.isMobile) {
+                this.sidebarOpen = false;
+            } else {
+                let savedState = localStorage.getItem('sidebarOpen');
+                if (savedState !== null) this.sidebarOpen = JSON.parse(savedState);
+            }
+            this.$watch('sidebarOpen', v => {
+                if (!this.isMobile) localStorage.setItem('sidebarOpen', JSON.stringify(v));
+            });
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    const wasMobile = this.isMobile;
+                    this.isMobile = window.innerWidth < 768;
+                    if (wasMobile && !this.isMobile) {
+                        let savedState = localStorage.getItem('sidebarOpen');
+                        this.sidebarOpen = savedState !== null ? JSON.parse(savedState) : true;
+                    } else if (!wasMobile && this.isMobile) {
+                        this.sidebarOpen = false;
+                    }
+                }, 150);
+            });
             let storedUser = localStorage.getItem('user');
             if (storedUser) { try { this.user = JSON.parse(storedUser); } catch (e) { this.user = { name: 'User', email: 'user@example.com' }; } }
             else { this.user = { name: 'User', email: 'user@example.com' }; }
