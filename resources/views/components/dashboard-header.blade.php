@@ -2,13 +2,25 @@
 
 <!-- Header -->
 <header class="sticky top-0 z-40 bg-[hsl(var(--background))]/95 backdrop-blur supports-[backdrop-filter]:bg-[hsl(var(--background))]/60 border-b border-[hsl(var(--border))]">
-    <div class="flex h-16 items-center justify-between px-6">
-        <!-- Title -->
-        <div>
-            <h1 class="text-xl font-semibold tracking-tight">{{ $title }}</h1>
-            @if($description)
-                <p class="text-sm text-[hsl(var(--muted-foreground))]">{{ $description }}</p>
-            @endif
+    <div class="flex h-16 items-center justify-between px-4 md:px-6">
+        <!-- Left Section: Hamburger + Title -->
+        <div class="flex items-center gap-3">
+            <!-- Mobile Hamburger Menu Button -->
+            <button 
+                @click="sidebarOpen = !sidebarOpen"
+                class="btn btn-ghost btn-icon lg:hidden touch-target"
+                aria-label="Toggle navigation menu"
+            >
+                <i class="fas fa-bars text-lg"></i>
+            </button>
+            
+            <!-- Title -->
+            <div>
+                <h1 class="text-responsive-title tracking-tight">{{ $title }}</h1>
+                @if($description)
+                    <p class="text-sm text-[hsl(var(--muted-foreground))] hidden md:block">{{ $description }}</p>
+                @endif
+            </div>
         </div>
 
         <!-- Actions -->
@@ -17,7 +29,7 @@
             <div x-data="{ open: false }" class="relative">
                 <button 
                     @click="open = !open" 
-                    class="btn btn-ghost btn-icon relative"
+                    class="btn btn-ghost btn-icon relative touch-target"
                 >
                     <i class="fas fa-bell text-lg"></i>
                     <span 
@@ -39,7 +51,7 @@
                     x-transition:leave="transition ease-in duration-150"
                     x-transition:leave-start="opacity-100 translate-y-0"
                     x-transition:leave-end="opacity-0 translate-y-1"
-                    class="dropdown-content absolute right-0 mt-2 w-80 max-h-96 overflow-hidden"
+                    class="dropdown-content absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] max-h-96 overflow-hidden"
                 >
                     <!-- Header -->
                     <div class="flex items-center justify-between px-4 py-3 border-b border-[hsl(var(--border))]">

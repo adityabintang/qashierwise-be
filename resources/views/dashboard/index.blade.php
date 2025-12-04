@@ -6,10 +6,10 @@
 <div x-data="dashboardApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
     @include('components.dashboard-sidebar', ['activePage' => 'dashboard'])
 
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col min-h-screen" :class="{ 'lg:ml-0': true }">
         @include('components.dashboard-header', ['title' => 'Dashboard', 'description' => 'Welcome back! Here\'s your WhatsApp Business overview.'])
 
-        <main class="flex-1 p-6">
+        <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto space-y-6">
                 <!-- Stats Cards -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" x-data="dashboardStats()">
@@ -300,11 +300,45 @@
 <script>
 function dashboardApp() {
     return {
-        sidebarOpen: true, user: null, notifications: [],
+        sidebarOpen: window.innerWidth >= 1024, 
+        isMobile: window.innerWidth < 768,
+        user: null, 
+        notifications: [],
         init() {
-            let savedState = localStorage.getItem('sidebarOpen');
-            if (savedState !== null) this.sidebarOpen = JSON.parse(savedState);
-            this.$watch('sidebarOpen', v => localStorage.setItem('sidebarOpen', JSON.stringify(v)));
+            // Set initial sidebar state based on viewport
+            this.isMobile = window.innerWidth < 768;
+            if (this.isMobile) {
+                this.sidebarOpen = false;
+            } else {
+                let savedState = localStorage.getItem('sidebarOpen');
+                if (savedState !== null) this.sidebarOpen = JSON.parse(savedState);
+            }
+            
+            // Watch sidebar state changes (only save on desktop)
+            this.$watch('sidebarOpen', v => {
+                if (!this.isMobile) localStorage.setItem('sidebarOpen', JSON.stringify(v));
+            });
+            
+            // Handle resize events with debounce
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    const wasMobile = this.isMobile;
+                    this.isMobile = window.innerWidth < 768;
+                    
+                    // Auto-adjust sidebar when crossing breakpoint
+                    if (wasMobile && !this.isMobile) {
+                        // Switched from mobile to desktop
+                        let savedState = localStorage.getItem('sidebarOpen');
+                        this.sidebarOpen = savedState !== null ? JSON.parse(savedState) : true;
+                    } else if (!wasMobile && this.isMobile) {
+                        // Switched from desktop to mobile
+                        this.sidebarOpen = false;
+                    }
+                }, 150);
+            });
+            
             let storedUser = localStorage.getItem('user');
             if (storedUser) { try { this.user = JSON.parse(storedUser); } catch (e) { this.user = { name: 'User', email: 'user@example.com' }; } }
             else { this.user = { name: 'User', email: 'user@example.com' }; }

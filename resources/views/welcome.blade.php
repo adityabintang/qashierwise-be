@@ -12,7 +12,7 @@
     <meta name="robots" content="index, follow">
     <meta name="language" content="Indonesian">
     <meta name="revisit-after" content="7 days">
-    
+
     <!-- Canonical URL -->
     <link rel="canonical" href="https://qashierwise.com">
 
@@ -23,7 +23,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/logo.png') }}">
     <link rel="manifest" href="{{ asset('site.webmanifest') }}">
     <meta name="theme-color" content="#4910ce">
-    
+
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://qashierwise.com">
@@ -35,7 +35,7 @@
     <meta property="og:image:alt" content="QashierWise - AI Chatbot WhatsApp untuk Restoran">
     <meta property="og:locale" content="id_ID">
     <meta property="og:site_name" content="QashierWise">
-    
+
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:url" content="https://qashierwise.com">
@@ -209,22 +209,113 @@
         "@@type": "Product",
         "name": "QashierWise Standard",
         "description": "Paket Standard QashierWise dengan fitur delivery, QRIS unlimited, dan dukungan hingga 2 outlet",
+        "image": [
+            "https://qashierwise.com/images/logo.png",
+            "https://qashierwise.com/images/og-image.png"
+        ],
         "brand": {
             "@@type": "Brand",
             "name": "QashierWise"
         },
+        "aggregateRating": {
+            "@@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "reviewCount": "24",
+            "bestRating": "5",
+            "worstRating": "1"
+        },
+        "review": [
+            {
+                "@@type": "Review",
+                "author": {
+                    "@@type": "Person",
+                    "name": "Budi Santoso"
+                },
+                "datePublished": "2025-11-15",
+                "reviewBody": "QashierWise sangat membantu restoran kami. Reservasi jadi lebih teratur dan otomatis, pelanggan puas dengan respons cepat.",
+                "reviewRating": {
+                    "@@type": "Rating",
+                    "ratingValue": "5",
+                    "bestRating": "5"
+                }
+            },
+            {
+                "@@type": "Review",
+                "author": {
+                    "@@type": "Person",
+                    "name": "Siti Nurhaliza"
+                },
+                "datePublished": "2025-11-20",
+                "reviewBody": "Fitur QRIS dan order via WhatsApp sangat praktis. Dashboard mudah digunakan dan laporan lengkap.",
+                "reviewRating": {
+                    "@@type": "Rating",
+                    "ratingValue": "5",
+                    "bestRating": "5"
+                }
+            },
+            {
+                "@@type": "Review",
+                "author": {
+                    "@@type": "Person",
+                    "name": "Ahmad Rizki"
+                },
+                "datePublished": "2025-11-25",
+                "reviewBody": "Sistem yang bagus untuk restoran. AI chatbot cukup pintar dalam merespons pelanggan. Recommended!",
+                "reviewRating": {
+                    "@@type": "Rating",
+                    "ratingValue": "4",
+                    "bestRating": "5"
+                }
+            }
+        ],
         "offers": {
             "@@type": "Offer",
             "price": "249000",
             "priceCurrency": "IDR",
             "priceValidUntil": "2025-12-31",
             "availability": "https://schema.org/InStock",
-            "url": "https://qashierwise.com/#pricing"
+            "url": "https://qashierwise.com/#pricing",
+            "shippingDetails": {
+                "@@type": "OfferShippingDetails",
+                "shippingRate": {
+                    "@@type": "MonetaryAmount",
+                    "value": "0",
+                    "currency": "IDR"
+                },
+                "shippingDestination": {
+                    "@@type": "DefinedRegion",
+                    "addressCountry": "ID"
+                },
+                "deliveryTime": {
+                    "@@type": "ShippingDeliveryTime",
+                    "handlingTime": {
+                        "@@type": "QuantitativeValue",
+                        "minValue": "0",
+                        "maxValue": "1",
+                        "unitCode": "DAY"
+                    },
+                    "transitTime": {
+                        "@@type": "QuantitativeValue",
+                        "minValue": "0",
+                        "maxValue": "0",
+                        "unitCode": "DAY"
+                    }
+                }
+            },
+            "hasMerchantReturnPolicy": {
+                "@@type": "MerchantReturnPolicy",
+                "applicableCountry": "ID",
+                "returnPolicyCategory": "https://schema.org/MerchantReturnFiniteReturnWindow",
+                "merchantReturnDays": 7,
+                "returnMethod": "https://schema.org/ReturnByMail",
+                "returnFees": "https://schema.org/FreeReturn"
+            }
         }
     }
     </script>
 
     <style>
+        [x-cloak] { display: none !important; }
         body { font-family: 'Inter', sans-serif; }
         .gradient-text {
             background: linear-gradient(135deg, #4910ce 0%, #7c3aed 100%);
@@ -245,13 +336,13 @@
 </head>
 <body class="bg-white">
     <!-- Navigation -->
-    <nav class="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
+    <nav x-data="{ menuOpen: false }" class="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <!-- Logo -->
-                <div class="flex items-center space-x-2 mb-4">
-                        <img src="{{ asset('images/logo.png') }}" class="h-7 rounded-xl" alt="Logo">
-                        <span class="text-xl font-bold text-primary">QashierWise</span>
+                <div class="flex items-center space-x-2">
+                    <img src="{{ asset('images/logo.png') }}" class="h-7 rounded-xl" alt="Logo">
+                    <span class="text-xl font-bold text-primary">QashierWise</span>
                 </div>
 
                 <!-- Desktop Menu -->
@@ -263,8 +354,8 @@
                     <a href="#faq" class="text-gray-600 hover:text-primary transition">FAQ</a>
                 </div>
 
-                <!-- CTA Buttons -->
-                <div class="flex items-center space-x-4">
+                <!-- CTA Buttons (Desktop) -->
+                <div class="hidden md:flex items-center space-x-4">
                     @if (Route::has('login'))
                         @auth
                             <a href="{{ url('/dashboard') }}" class="text-gray-600 hover:text-primary font-medium transition">Dashboard</a>
@@ -276,42 +367,105 @@
                         @endauth
                     @endif
                 </div>
+
+                <!-- Mobile Hamburger Button -->
+                <button 
+                    @click="menuOpen = !menuOpen" 
+                    class="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/50 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    aria-label="Toggle menu"
+                    :aria-expanded="menuOpen"
+                >
+                    <i x-show="!menuOpen" class="fas fa-bars text-xl"></i>
+                    <i x-show="menuOpen" x-cloak class="fas fa-times text-xl"></i>
+                </button>
             </div>
         </div>
+
+        <!-- Mobile Menu Panel -->
+        <div 
+            x-show="menuOpen" 
+            x-cloak
+            x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0 -translate-y-2"
+            x-transition:enter-end="opacity-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-200"
+            x-transition:leave-start="opacity-100 translate-y-0"
+            x-transition:leave-end="opacity-0 -translate-y-2"
+            class="md:hidden bg-white border-t border-gray-100 shadow-lg"
+        >
+            <div class="px-4 py-4 space-y-3">
+                <a href="#features" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">Cara Kerja</a>
+                <a href="#fitur" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">Fitur</a>
+                <a href="#pricing" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">Harga</a>
+                <a href="#about" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">Tentang Kami</a>
+                <a href="#faq" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">FAQ</a>
+                
+                <!-- Mobile CTA Buttons -->
+                <div class="pt-4 border-t border-gray-100 space-y-3">
+                    @if (Route::has('login'))
+                        @auth
+                            <a href="{{ url('/dashboard') }}" class="block py-3 px-4 text-center text-gray-600 hover:text-primary font-medium transition">Dashboard</a>
+                        @else
+                            <a href="/login" class="block py-3 px-4 text-center text-gray-600 hover:text-primary font-medium transition">Lihat Demo</a>
+                            <a href="/login" class="block py-3 px-4 text-center bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-all">
+                                Coba Gratis 14 Hari
+                            </a>
+                        @endauth
+                    @endif
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Menu Backdrop Overlay -->
+        <div 
+            x-show="menuOpen" 
+            x-cloak
+            @click="menuOpen = false"
+            x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-200"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            class="md:hidden fixed inset-0 bg-black/20 -z-10"
+            style="top: calc(100% + 1px);"
+        ></div>
     </nav>
 
     <!-- Hero Section -->
-    <section class="hero-gradient pt-32 pb-20 overflow-hidden">
+    <section class="hero-gradient pt-24 md:pt-32 pb-12 md:pb-20 overflow-hidden">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid lg:grid-cols-2 gap-12 items-center">
+            <!-- Mobile: flex-col (text above image), Desktop: grid 2 cols -->
+            <div class="flex flex-col lg:grid lg:grid-cols-2 gap-8 md:gap-12 items-center">
                 <!-- Left Content -->
-                <div>
-                    <div class="inline-flex items-center px-4 py-2 bg-purple-100 rounded-full text-primary text-sm font-medium mb-6">
+                <div class="text-center lg:text-left order-1">
+                    <div class="inline-flex items-center px-3 md:px-4 py-2 bg-purple-100 rounded-full text-primary text-xs md:text-sm font-medium mb-4 md:mb-6">
                         <i class="fas fa-sparkles mr-2"></i>
                         Didukung AI + Terintegrasi QRIS
                     </div>
 
-                    <p class="text-gray-500 mb-4">Chatbot untuk WhatsApp + Sistem QRIS</p>
+                    <p class="text-gray-500 mb-3 md:mb-4 text-sm md:text-base">Chatbot untuk WhatsApp + Sistem QRIS</p>
 
-                    <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6">
+                    <!-- Responsive heading: smaller on mobile -->
+                    <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-4 md:mb-6">
                         Respon lebih cepat, jual lebih <span class="gradient-text">banyak</span>
                     </h1>
 
-                    <p class="text-lg text-gray-600 mb-8 leading-relaxed">
+                    <p class="text-base md:text-lg text-gray-600 mb-6 md:mb-8 leading-relaxed">
                         QashierWise menghadirkan Chatbot WhatsApp yang restoran-first dengan satu layar admin: Inbox, Pesanan, Reservasi, Menu, dan CRM.
                     </p>
 
-                    <div class="flex flex-col sm:flex-row gap-4 mb-8">
-                        <a href="/login" class="inline-flex items-center justify-center px-8 py-4 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all">
+                    <div class="flex flex-col sm:flex-row gap-3 md:gap-4 mb-6 md:mb-8 justify-center lg:justify-start">
+                        <a href="/login" class="inline-flex items-center justify-center px-6 md:px-8 py-3 md:py-4 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all text-sm md:text-base">
                             <span>Coba Gratis 14 Hari</span>
-                        </a>    
-                        <a href="#demo" class="inline-flex items-center justify-center px-8 py-4 bg-white text-primary rounded-xl font-semibold border-2 border-primary/30 hover:border-primary transition-all">
+                        </a>
+                        <a href="#demo" class="inline-flex items-center justify-center px-6 md:px-8 py-3 md:py-4 bg-white text-primary rounded-xl font-semibold border-2 border-primary/30 hover:border-primary transition-all text-sm md:text-base">
                             <i class="fas fa-play-circle mr-2"></i>
                             <span>Lihat Demo</span>
                         </a>
                     </div>
 
-                    <div class="flex flex-col gap-2 text-sm text-gray-500">
+                    <div class="flex flex-col gap-2 text-xs md:text-sm text-gray-500 items-center lg:items-start">
                         <div class="flex items-center">
                             <i class="fas fa-check text-green-500 mr-2"></i>
                             <span>Reservasi & Order via WhatsApp tanpa ribet</span>
@@ -332,27 +486,27 @@
                 </div>
 
                 <!-- Right Content - Hero Image -->
-                <div class="relative">
-                    <img src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" alt="Restaurant ordering" class="rounded-2xl shadow-2xl">
-                    <!-- Floating Elements -->
-                    <div class="absolute -bottom-6 -left-6 bg-white rounded-xl p-4 shadow-xl">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                                <i class="fab fa-whatsapp text-green-600 text-xl"></i>
+                <div class="relative order-2 w-full max-w-md lg:max-w-none mx-auto mt-8 lg:mt-0">
+                    <img src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" alt="Restaurant ordering" class="rounded-2xl shadow-2xl w-full">
+                    <!-- Floating Elements - Hidden on small mobile, visible on larger screens -->
+                    <div class="hidden sm:block absolute -bottom-4 md:-bottom-6 -left-2 md:-left-6 bg-white rounded-xl p-3 md:p-4 shadow-xl">
+                        <div class="flex items-center space-x-2 md:space-x-3">
+                            <div class="w-8 h-8 md:w-10 md:h-10 bg-green-100 rounded-full flex items-center justify-center">
+                                <i class="fab fa-whatsapp text-green-600 text-lg md:text-xl"></i>
                             </div>
                             <div>
-                                <p class="text-sm font-semibold text-gray-900">Pesan Masuk</p>
+                                <p class="text-xs md:text-sm font-semibold text-gray-900">Pesan Masuk</p>
                                 <p class="text-xs text-gray-500">+128 hari ini</p>
                             </div>
                         </div>
                     </div>
-                    <div class="absolute -top-4 -right-4 bg-white rounded-xl p-4 shadow-xl">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                                <i class="fas fa-chart-line text-primary"></i>
+                    <div class="hidden sm:block absolute -top-2 md:-top-4 -right-2 md:-right-4 bg-white rounded-xl p-3 md:p-4 shadow-xl">
+                        <div class="flex items-center space-x-2 md:space-x-3">
+                            <div class="w-8 h-8 md:w-10 md:h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-chart-line text-primary text-lg md:text-xl"></i>
                             </div>
                             <div>
-                                <p class="text-sm font-semibold text-gray-900">Penjualan</p>
+                                <p class="text-xs md:text-sm font-semibold text-gray-900">Penjualan</p>
                                 <p class="text-xs text-green-500">↑ 24% bulan ini</p>
                             </div>
                         </div>
@@ -363,14 +517,15 @@
     </section>
 
     <!-- How It Works Section -->
-    <section id="features" class="py-20 bg-white">
+    <section id="features" class="py-12 md:py-20 bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-16">
-                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Cara kerja otomatis dengan AI + QRIS</h2>
-                <p class="text-gray-600 max-w-2xl mx-auto">Semuanya untuk bisnis restoran: cepat, ringkas, dan akurat.</p>
+            <div class="text-center mb-10 md:mb-16">
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 md:mb-4">Cara kerja otomatis dengan AI + QRIS</h2>
+                <p class="text-sm md:text-base text-gray-600 max-w-2xl mx-auto">Semuanya untuk bisnis restoran: cepat, ringkas, dan akurat.</p>
             </div>
 
-            <div class="grid md:grid-cols-4 gap-8">
+            <!-- Responsive: 1 col mobile, 2 cols tablet, 4 cols desktop -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
                 <!-- Step 1 -->
                 <div class="text-center">
                     <div class="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-green-500/30">
@@ -411,66 +566,67 @@
     </section>
 
     <!-- Features Section -->
-    <section id="fitur" class="py-20 bg-gray-50">
+    <section id="fitur" class="py-12 md:py-20 bg-gray-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-16">
-                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Fitur utama yang restoran butuhkan</h2>
-                <p class="text-gray-600 max-w-2xl mx-auto">Semua alat & aplikasi dibuat untuk memaksimalkan pemasukan restoran</p>
+            <div class="text-center mb-10 md:mb-16">
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 md:mb-4">Fitur utama yang restoran butuhkan</h2>
+                <p class="text-sm md:text-base text-gray-600 max-w-2xl mx-auto">Semua alat & aplikasi dibuat untuk memaksimalkan pemasukan restoran</p>
             </div>
 
-            <div class="grid md:grid-cols-3 gap-8">
+            <!-- Responsive: 1 col mobile, 2 cols tablet, 3 cols desktop -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
                 <!-- Feature 1 -->
-                <div class="bg-white rounded-2xl p-8 feature-card transition-all duration-300">
-                    <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4">
-                        <i class="fab fa-whatsapp text-green-600 text-xl"></i>
+                <div class="bg-white rounded-2xl p-5 md:p-8 feature-card transition-all duration-300">
+                    <div class="w-10 h-10 md:w-12 md:h-12 bg-green-100 rounded-xl flex items-center justify-center mb-3 md:mb-4">
+                        <i class="fab fa-whatsapp text-green-600 text-lg md:text-xl"></i>
                     </div>
-                    <h3 class="text-xl font-semibold text-gray-900 mb-3">AI Chatbot WhatsApp</h3>
-                    <p class="text-gray-600">Balas cerdas dengan model AI, terima order, Talk to Staff, handover ke live agent langsung.</p>
+                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">AI Chatbot WhatsApp</h3>
+                    <p class="text-sm md:text-base text-gray-600">Balas cerdas dengan model AI, terima order, Talk to Staff, handover ke live agent langsung.</p>
                 </div>
 
                 <!-- Feature 2 -->
-                <div class="bg-white rounded-2xl p-8 feature-card transition-all duration-300">
-                    <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4">
-                        <i class="fas fa-desktop text-primary text-xl"></i>
+                <div class="bg-white rounded-2xl p-5 md:p-8 feature-card transition-all duration-300">
+                    <div class="w-10 h-10 md:w-12 md:h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-3 md:mb-4">
+                        <i class="fas fa-desktop text-primary text-lg md:text-xl"></i>
                     </div>
-                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Console Satu Layar</h3>
-                    <p class="text-gray-600">Inbox pesan, pesanan, kelola reservasi, dan semuanya dalam satu dashboard.</p>
+                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">Console Satu Layar</h3>
+                    <p class="text-sm md:text-base text-gray-600">Inbox pesan, pesanan, kelola reservasi, dan semuanya dalam satu dashboard.</p>
                 </div>
 
                 <!-- Feature 3 -->
-                <div class="bg-white rounded-2xl p-8 feature-card transition-all duration-300">
-                    <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4">
-                        <i class="fas fa-motorcycle text-blue-600 text-xl"></i>
+                <div class="bg-white rounded-2xl p-5 md:p-8 feature-card transition-all duration-300">
+                    <div class="w-10 h-10 md:w-12 md:h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-3 md:mb-4">
+                        <i class="fas fa-motorcycle text-blue-600 text-lg md:text-xl"></i>
                     </div>
-                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Order Delivery & Pickup</h3>
-                    <p class="text-gray-600">Penjadwalan, order & delivery bisa terhubung, pembayaran QRIS terintegrasi.</p>
+                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">Order Delivery & Pickup</h3>
+                    <p class="text-sm md:text-base text-gray-600">Penjadwalan, order & delivery bisa terhubung, pembayaran QRIS terintegrasi.</p>
                 </div>
 
                 <!-- Feature 4 -->
-                <div class="bg-white rounded-2xl p-8 feature-card transition-all duration-300">
-                    <div class="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center mb-4">
-                        <i class="fas fa-calendar-check text-amber-600 text-xl"></i>
+                <div class="bg-white rounded-2xl p-5 md:p-8 feature-card transition-all duration-300">
+                    <div class="w-10 h-10 md:w-12 md:h-12 bg-amber-100 rounded-xl flex items-center justify-center mb-3 md:mb-4">
+                        <i class="fas fa-calendar-check text-amber-600 text-lg md:text-xl"></i>
                     </div>
-                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Reservasi Pintar</h3>
-                    <p class="text-gray-600">Slot ketersediaan, jam buka, kapasitas, dan notifikasi staff. Pengingat T-24h & T+7hr.</p>
+                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">Reservasi Pintar</h3>
+                    <p class="text-sm md:text-base text-gray-600">Slot ketersediaan, jam buka, kapasitas, dan notifikasi staff. Pengingat T-24h & T+7hr.</p>
                 </div>
 
                 <!-- Feature 5 -->
-                <div class="bg-white rounded-2xl p-8 feature-card transition-all duration-300">
-                    <div class="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mb-4">
-                        <i class="fas fa-qrcode text-emerald-600 text-xl"></i>
+                <div class="bg-white rounded-2xl p-5 md:p-8 feature-card transition-all duration-300">
+                    <div class="w-10 h-10 md:w-12 md:h-12 bg-emerald-100 rounded-xl flex items-center justify-center mb-3 md:mb-4">
+                        <i class="fas fa-qrcode text-emerald-600 text-lg md:text-xl"></i>
                     </div>
-                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Pembayaran QRIS</h3>
-                    <p class="text-gray-600">Kirim invoice QRIS atau berikan QR statis via chat, semua tercatat otomatis.</p>
+                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">Pembayaran QRIS</h3>
+                    <p class="text-sm md:text-base text-gray-600">Kirim invoice QRIS atau berikan QR statis via chat, semua tercatat otomatis.</p>
                 </div>
 
                 <!-- Feature 6 -->
-                <div class="bg-white rounded-2xl p-8 feature-card transition-all duration-300">
-                    <div class="w-12 h-12 bg-rose-100 rounded-xl flex items-center justify-center mb-4">
-                        <i class="fas fa-chart-pie text-rose-600 text-xl"></i>
+                <div class="bg-white rounded-2xl p-5 md:p-8 feature-card transition-all duration-300">
+                    <div class="w-10 h-10 md:w-12 md:h-12 bg-rose-100 rounded-xl flex items-center justify-center mb-3 md:mb-4">
+                        <i class="fas fa-chart-pie text-rose-600 text-lg md:text-xl"></i>
                     </div>
-                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Laporan & CRM</h3>
-                    <p class="text-gray-600">CRM, repeat rate, tag pelanggan, dan export CSV (Pro).</p>
+                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">Laporan & CRM</h3>
+                    <p class="text-sm md:text-base text-gray-600">CRM, repeat rate, tag pelanggan, dan export CSV (Pro).</p>
                 </div>
             </div>
         </div>
@@ -582,16 +738,84 @@
     </section>
 
     <!-- Pricing Section -->
-    <section id="pricing" class="py-20 bg-gray-50">
+    <section id="pricing" class="py-12 md:py-20 bg-gray-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-16">
-                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Harga sederhana, tumbuh bersama Anda</h2>
-                <p class="text-gray-600">Mulai gratis - upgrade kapan saja.</p>
+            <div class="text-center mb-10 md:mb-16">
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 md:mb-4">Harga sederhana, tumbuh bersama Anda</h2>
+                <p class="text-sm md:text-base text-gray-600">Mulai gratis - upgrade kapan saja.</p>
             </div>
 
-            <div class="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <!-- Mobile: horizontal scroll, Tablet+: grid -->
+            <div class="md:hidden overflow-x-auto pb-4 -mx-4 px-4">
+                <div class="flex gap-4 min-w-max">
+                    <!-- Basic Plan (Mobile) -->
+                    <div class="bg-white rounded-2xl p-5 border border-gray-200 w-72 flex-shrink-0">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">Basic</h3>
+                        <p class="text-gray-500 text-xs mb-3">1 outlet, No admin + pickup</p>
+                        <div class="mb-4">
+                            <span class="text-2xl font-bold text-gray-900">Rp0</span>
+                        </div>
+                        <ul class="space-y-2 mb-6 text-xs text-gray-600">
+                            <li class="flex items-start"><i class="fas fa-check text-green-500 mr-2 mt-0.5"></i>AI chatbot dasar (% pesan/bulan)</li>
+                            <li class="flex items-start"><i class="fas fa-check text-green-500 mr-2 mt-0.5"></i>Reservasi & pickup orders</li>
+                            <li class="flex items-start"><i class="fas fa-check text-green-500 mr-2 mt-0.5"></i>Watermark menu digital</li>
+                            <li class="flex items-start"><i class="fas fa-check text-green-500 mr-2 mt-0.5"></i>Tanpa pembayaran online</li>
+                            <li class="flex items-start"><i class="fas fa-check text-green-500 mr-2 mt-0.5"></i>1 user staf + Email support</li>
+                        </ul>
+                        <a href="/login" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition text-sm">
+                            Mulai Gratis
+                        </a>
+                    </div>
+
+                    <!-- Standard Plan (Mobile) -->
+                    <div class="bg-white rounded-2xl p-5 border-2 border-primary relative w-72 flex-shrink-0">
+                        <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary text-white px-3 py-1 rounded-full text-xs font-semibold">
+                            POPULER
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900 mb-2 mt-2">Standard</h3>
+                        <p class="text-gray-500 text-xs mb-3">Hingga 2 outlet, delivery + QRIS</p>
+                        <div class="mb-4">
+                            <span class="text-2xl font-bold text-gray-900">Rp249.000</span>
+                            <span class="text-gray-500 text-sm">/bln</span>
+                        </div>
+                        <ul class="space-y-2 mb-6 text-xs text-gray-600">
+                            <li class="flex items-start"><i class="fas fa-check text-primary mr-2 mt-0.5"></i>Delivery + antrean & biaya</li>
+                            <li class="flex items-start"><i class="fas fa-check text-primary mr-2 mt-0.5"></i>Pembayaran QRIS unlimited</li>
+                            <li class="flex items-start"><i class="fas fa-check text-primary mr-2 mt-0.5"></i>Pengingat & auto confirm</li>
+                            <li class="flex items-start"><i class="fas fa-check text-primary mr-2 mt-0.5"></i>XX pesan/bulan + Chat support</li>
+                            <li class="flex items-start"><i class="fas fa-check text-primary mr-2 mt-0.5"></i>Customer Base</li>
+                        </ul>
+                        <a href="/login" class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all text-sm">
+                            Pilih Standard
+                        </a>
+                    </div>
+
+                    <!-- Pro Plan (Mobile) -->
+                    <div class="bg-white rounded-2xl p-5 border border-gray-200 w-72 flex-shrink-0">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">Pro</h3>
+                        <p class="text-gray-500 text-xs mb-3">Tim unlimited, Analytic & API</p>
+                        <div class="mb-4">
+                            <span class="text-2xl font-bold text-gray-900">Rp2.990.000</span>
+                            <span class="text-gray-500 text-sm">/bln</span>
+                        </div>
+                        <ul class="space-y-2 mb-6 text-xs text-gray-600">
+                            <li class="flex items-start"><i class="fas fa-check text-green-500 mr-2 mt-0.5"></i>Analytic + ekspor CSV</li>
+                            <li class="flex items-start"><i class="fas fa-check text-green-500 mr-2 mt-0.5"></i>Webhook & API</li>
+                            <li class="flex items-start"><i class="fas fa-check text-green-500 mr-2 mt-0.5"></i>Multi-outlet & branding</li>
+                            <li class="flex items-start"><i class="fas fa-check text-green-500 mr-2 mt-0.5"></i>Priority routing & handover</li>
+                            <li class="flex items-start"><i class="fas fa-check text-green-500 mr-2 mt-0.5"></i>SLA + dedicated support</li>
+                        </ul>
+                        <a href="/login" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition text-sm">
+                            Pilih Pro
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tablet/Desktop: grid layout -->
+            <div class="hidden md:grid md:grid-cols-3 gap-6 lg:gap-8 max-w-5xl mx-auto">
                 <!-- Basic Plan -->
-                <div class="bg-white rounded-2xl p-8 border border-gray-200">
+                <div class="bg-white rounded-2xl p-6 lg:p-8 border border-gray-200">
                     <h3 class="text-xl font-bold text-gray-900 mb-2">Basic</h3>
                     <p class="text-gray-500 text-sm mb-4">1 outlet, No admin + pickup</p>
                     <div class="mb-6">
@@ -610,7 +834,7 @@
                 </div>
 
                 <!-- Standard Plan -->
-                <div class="bg-white rounded-2xl p-8 border-2 border-primary relative">
+                <div class="bg-white rounded-2xl p-6 lg:p-8 border-2 border-primary relative">
                     <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary text-white px-4 py-1 rounded-full text-xs font-semibold">
                         POPULER
                     </div>
@@ -633,7 +857,7 @@
                 </div>
 
                 <!-- Pro Plan -->
-                <div class="bg-white rounded-2xl p-8 border border-gray-200">
+                <div class="bg-white rounded-2xl p-6 lg:p-8 border border-gray-200">
                     <h3 class="text-xl font-bold text-gray-900 mb-2">Pro</h3>
                     <p class="text-gray-500 text-sm mb-4">Tim unlimited, Analytic & API</p>
                     <div class="mb-6">

@@ -60,6 +60,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Business Profile
         Route::get('/profile', [WhatsAppController::class, 'getBusinessProfile']);
         Route::match(['put', 'post'], '/profile', [WhatsAppController::class, 'updateBusinessProfile']);
+        Route::post('/profile/picture', [WhatsAppController::class, 'uploadProfilePicture']);
 
         // Phone Number Info
         Route::get('/phone-info', [WhatsAppController::class, 'getPhoneNumberInfo']);

@@ -13,7 +13,7 @@
         @include('components.dashboard-header', ['title' => 'Business Profile', 'description' => 'Manage your WhatsApp Business profile'])
 
         <!-- Page Content -->
-        <main class="flex-1 p-6">
+        <main class="flex-1 p-4 md:p-6">
             <div class="max-w-6xl mx-auto" x-data="profileManager()">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <!-- Profile Form -->
@@ -177,14 +177,20 @@
                             </div>
                             <div class="p-6">
                                 <div class="flex items-center gap-4">
-                                    <div class="h-20 w-20 rounded-xl bg-gradient-to-br from-[hsl(var(--primary))] to-[hsl(var(--primary)/0.7)] flex items-center justify-center text-white text-2xl">
-                                        <i class="fas fa-building"></i>
+                                    <div class="h-20 w-20 rounded-xl overflow-hidden bg-gradient-to-br from-[hsl(var(--primary))] to-[hsl(var(--primary)/0.7)] flex items-center justify-center text-white text-2xl">
+                                        <template x-if="profile.profile_picture_url">
+                                            <img :src="profile.profile_picture_url" alt="Profile Picture" class="h-full w-full object-cover">
+                                        </template>
+                                        <template x-if="!profile.profile_picture_url">
+                                            <i class="fas fa-building"></i>
+                                        </template>
                                     </div>
                                     <div>
                                         <p class="text-sm text-[hsl(var(--muted-foreground))] mb-2">Upload your business profile picture</p>
-                                        <button x-show="editMode" class="btn btn-outline btn-sm">
-                                            <i class="fas fa-camera"></i>
-                                            <span>Change</span>
+                                        <input type="file" x-ref="profilePictureInput" @change="uploadProfilePicture" accept="image/jpeg,image/png,image/jpg" class="hidden">
+                                        <button x-show="editMode" @click="$refs.profilePictureInput.click()" :disabled="uploadingPicture" class="btn btn-outline btn-sm">
+                                            <i class="fas" :class="uploadingPicture ? 'fa-spinner animate-spin' : 'fa-camera'"></i>
+                                            <span x-text="uploadingPicture ? 'Uploading...' : 'Change'"></span>
                                         </button>
                                     </div>
                                 </div>
@@ -228,11 +234,35 @@
 <script>
 function profileApp() {
     return {
-        sidebarOpen: true, user: null, notifications: [],
+        sidebarOpen: window.innerWidth >= 1024, 
+        isMobile: window.innerWidth < 768,
+        user: null, 
+        notifications: [],
         init() {
-            let savedState = localStorage.getItem('sidebarOpen');
-            if (savedState !== null) this.sidebarOpen = JSON.parse(savedState);
-            this.$watch('sidebarOpen', v => localStorage.setItem('sidebarOpen', JSON.stringify(v)));
+            this.isMobile = window.innerWidth < 768;
+            if (this.isMobile) {
+                this.sidebarOpen = false;
+            } else {
+                let savedState = localStorage.getItem('sidebarOpen');
+                if (savedState !== null) this.sidebarOpen = JSON.parse(savedState);
+            }
+            this.$watch('sidebarOpen', v => {
+                if (!this.isMobile) localStorage.setItem('sidebarOpen', JSON.stringify(v));
+            });
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    const wasMobile = this.isMobile;
+                    this.isMobile = window.innerWidth < 768;
+                    if (wasMobile && !this.isMobile) {
+                        let savedState = localStorage.getItem('sidebarOpen');
+                        this.sidebarOpen = savedState !== null ? JSON.parse(savedState) : true;
+                    } else if (!wasMobile && this.isMobile) {
+                        this.sidebarOpen = false;
+                    }
+                }, 150);
+            });
             let storedUser = localStorage.getItem('user');
             if (storedUser) { try { this.user = JSON.parse(storedUser); } catch (e) { this.user = { name: 'User', email: 'user@example.com' }; } }
             else { this.user = { name: 'User', email: 'user@example.com' }; }
@@ -250,8 +280,8 @@ function profileApp() {
 function profileManager() {
     return {
         API_BASE_URL: window.location.origin + '/api',
-        loading: true, loadingPhone: true, editMode: false, saving: false,
-        profile: { about: '', address: '', description: '', email: '', vertical: '', websites: [''] },
+        loading: true, loadingPhone: true, editMode: false, saving: false, uploadingPicture: false,
+        profile: { about: '', address: '', description: '', email: '', vertical: '', websites: [''], profile_picture_url: '' },
         originalProfile: null,
         phoneInfo: {},
 
@@ -268,7 +298,8 @@ function profileManager() {
                     this.profile = {
                         about: p.about || '', address: p.address || '', description: p.description || '',
                         email: p.email || '', vertical: p.vertical || '',
-                        websites: p.websites?.length > 0 ? p.websites : ['']
+                        websites: p.websites?.length > 0 ? p.websites : [''],
+                        profile_picture_url: p.profile_picture_url || ''
                     };
                     this.originalProfile = JSON.parse(JSON.stringify(this.profile));
                 }
@@ -294,6 +325,51 @@ function profileManager() {
 
         addWebsite() { this.profile.websites.push(''); },
         removeWebsite(i) { this.profile.websites.splice(i, 1); },
+
+        async uploadProfilePicture(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Validate file type
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+            if (!allowedTypes.includes(file.type)) {
+                alert('Please select a valid image file (JPEG or PNG)');
+                return;
+            }
+
+            // Validate file size (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('File size must be less than 5MB');
+                return;
+            }
+
+            this.uploadingPicture = true;
+            try {
+                const token = localStorage.getItem('token');
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/profile/picture`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.profile.profile_picture_url = data.data.profile_picture_url;
+                    this.originalProfile.profile_picture_url = data.data.profile_picture_url;
+                    alert('Profile picture updated successfully!');
+                } else {
+                    alert(data.message || 'Failed to upload profile picture');
+                }
+            } catch (e) {
+                console.error('Error:', e);
+                alert('Failed to upload profile picture');
+            } finally {
+                this.uploadingPicture = false;
+                event.target.value = ''; // Reset input
+            }
+        },
 
         async saveProfile() {
             this.saving = true;

@@ -3,30 +3,30 @@
 @section('title', 'Daftar - QashierWise')
 
 @section('content')
-<div class="min-h-screen flex flex-col items-center justify-center py-12 px-4" x-data="registerForm()">
-    <!-- Logo -->
-    <div class="flex items-center gap-2 mb-8">
-        <img src="{{ asset('images/logo.png') }}" class="h-10 rounded-xl" alt="Logo">
-        <span class="text-2xl font-bold text-[hsl(var(--primary))]">QashierWise</span>
+<div class="min-h-screen flex flex-col items-center justify-center py-8 md:py-12 px-4 overflow-y-auto" x-data="registerForm()">
+    <!-- Logo - Responsive sizing -->
+    <div class="flex items-center gap-2 mb-6 md:mb-8 flex-shrink-0">
+        <img src="{{ asset('images/logo.png') }}" class="h-8 md:h-10 rounded-xl" alt="Logo">
+        <span class="text-xl md:text-2xl font-bold text-[hsl(var(--primary))]">QashierWise</span>
     </div>
 
-    <!-- Tab Switcher -->
-    <div class="w-full max-w-md mb-6">
+    <!-- Tab Switcher - Full width on mobile -->
+    <div class="w-full max-w-md mb-4 md:mb-6 px-0 flex-shrink-0">
         <div class="flex bg-[hsl(var(--muted))] rounded-lg p-1">
-            <button class="flex-1 py-2.5 text-center text-sm font-medium bg-white text-[hsl(var(--foreground))] shadow-sm rounded-md">
+            <button class="flex-1 py-2.5 md:py-2.5 text-center text-sm font-medium bg-white text-[hsl(var(--foreground))] shadow-sm rounded-md touch-target">
                 Daftar
             </button>
-            <a href="/login" class="flex-1 py-2.5 text-center text-sm font-medium text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition rounded-md">
+            <a href="/login" class="flex-1 py-2.5 md:py-2.5 text-center text-sm font-medium text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition rounded-md touch-target">
                 Masuk
             </a>
         </div>
     </div>
 
-    <!-- Register Card -->
-    <div class="card w-full max-w-md p-8">
-        <div class="mb-6">
-            <h2 class="text-2xl font-bold">Coba Gratis 14 Hari</h2>
-            <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">Buat akun dan mulai gunakan QashierWise sekarang</p>
+    <!-- Register Card - Full width minus padding on mobile, scrollable when keyboard is open -->
+    <div class="card w-full max-w-md p-5 md:p-8 flex-shrink-0">
+        <div class="mb-5 md:mb-6">
+            <h2 class="text-xl md:text-2xl font-bold">Coba Gratis 14 Hari</h2>
+            <p class="text-xs md:text-sm text-[hsl(var(--muted-foreground))] mt-1">Buat akun dan mulai gunakan QashierWise sekarang</p>
         </div>
 
         <!-- Error Alert -->
@@ -34,24 +34,24 @@
             <span x-text="errorMessage"></span>
         </div>
 
-        <form @submit.prevent="handleSubmit" class="space-y-5">
+        <form @submit.prevent="handleSubmit" class="space-y-4 md:space-y-5">
             <div>
                 <label for="name" class="text-sm font-medium mb-1.5 block">Nama Restoran/Bisnis</label>
-                <input x-model="formData.name" id="name" type="text" required class="input w-full" :class="{'border-red-500': errors.name}" placeholder="Contoh: Resto Nusantara">
+                <input x-model="formData.name" id="name" type="text" required class="input w-full touch-target-input" :class="{'border-red-500': errors.name}" placeholder="Contoh: Resto Nusantara">
                 <p x-show="errors.name" x-text="errors.name" class="mt-1 text-sm text-red-600" x-cloak></p>
             </div>
 
             <div>
                 <label for="email" class="text-sm font-medium mb-1.5 block">Email</label>
-                <input x-model="formData.email" id="email" type="email" required class="input w-full" :class="{'border-red-500': errors.email}" placeholder="john@example.com">
+                <input x-model="formData.email" id="email" type="email" required class="input w-full touch-target-input" :class="{'border-red-500': errors.email}" placeholder="john@example.com">
                 <p x-show="errors.email" x-text="errors.email" class="mt-1 text-sm text-red-600" x-cloak></p>
             </div>
 
             <div>
                 <label for="password" class="text-sm font-medium mb-1.5 block">Password</label>
                 <div class="relative">
-                    <input x-model="formData.password" id="password" :type="showPassword ? 'text' : 'password'" required class="input w-full pr-12" :class="{'border-red-500': errors.password}" placeholder="Minimal 8 karakter">
-                    <button type="button" @click="showPassword = !showPassword" class="absolute inset-y-0 right-0 pr-4 flex items-center text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]">
+                    <input x-model="formData.password" id="password" :type="showPassword ? 'text' : 'password'" required class="input w-full pr-12 touch-target-input" :class="{'border-red-500': errors.password}" placeholder="Minimal 8 karakter">
+                    <button type="button" @click="showPassword = !showPassword" class="absolute inset-y-0 right-0 pr-4 flex items-center text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] touch-target">
                         <i :class="showPassword ? 'fa-eye-slash' : 'fa-eye'" class="fas"></i>
                     </button>
                 </div>
@@ -61,14 +61,14 @@
             <div>
                 <label for="password_confirmation" class="text-sm font-medium mb-1.5 block">Konfirmasi Password</label>
                 <div class="relative">
-                    <input x-model="formData.password_confirmation" id="password_confirmation" :type="showPasswordConfirm ? 'text' : 'password'" required class="input w-full pr-12" placeholder="Masukkan password lagi">
-                    <button type="button" @click="showPasswordConfirm = !showPasswordConfirm" class="absolute inset-y-0 right-0 pr-4 flex items-center text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]">
+                    <input x-model="formData.password_confirmation" id="password_confirmation" :type="showPasswordConfirm ? 'text' : 'password'" required class="input w-full pr-12 touch-target-input" placeholder="Masukkan password lagi">
+                    <button type="button" @click="showPasswordConfirm = !showPasswordConfirm" class="absolute inset-y-0 right-0 pr-4 flex items-center text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] touch-target">
                         <i :class="showPasswordConfirm ? 'fa-eye-slash' : 'fa-eye'" class="fas"></i>
                     </button>
                 </div>
             </div>
 
-            <button type="submit" :disabled="loading" class="btn btn-primary w-full h-12">
+            <button type="submit" :disabled="loading" class="btn btn-primary w-full h-11 md:h-12 touch-target">
                 <span x-show="!loading">Daftar Sekarang</span>
                 <span x-show="loading" class="flex items-center justify-center">
                     <i class="fas fa-spinner animate-spin mr-2"></i> Memproses...
@@ -78,7 +78,7 @@
     </div>
 
     <!-- Back to Home -->
-    <a href="/" class="mt-6 text-sm text-[hsl(var(--primary))] hover:underline flex items-center gap-2">
+    <a href="/" class="mt-5 md:mt-6 text-sm text-[hsl(var(--primary))] hover:underline flex items-center gap-2 touch-target flex-shrink-0">
         <i class="fas fa-arrow-left"></i>
         Kembali ke beranda
     </a>
