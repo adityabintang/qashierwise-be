@@ -6,7 +6,7 @@
 <div class="min-h-screen flex flex-col items-center justify-center py-8 md:py-12 px-4" x-data="authForm()">
     <!-- Logo - Responsive sizing -->
     <div class="flex items-center gap-2 mb-6 md:mb-8">
-        <img src="{{ asset('images/logo.png') }}" class="h-8 md:h-10 rounded-xl" alt="Logo">
+        <img src="{{ asset('images/logo-64.png') }}" class="h-8 md:h-10 rounded-xl" alt="Logo" width="40" height="40" loading="eager">
         <span class="text-xl md:text-2xl font-bold text-[hsl(var(--primary))]">QashierWise</span>
     </div>
 

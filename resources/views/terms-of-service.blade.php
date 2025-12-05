@@ -38,7 +38,7 @@
             <div class="flex justify-between items-center h-16">
                 <!-- Logo -->
                 <div class="flex items-center space-x-2 mb-4">
-                        <img src="{{ asset('images/logo.png') }}" class="h-7 rounded-xl" alt="Logo">
+                        <img src="{{ asset('images/logo-48.png') }}" class="h-7 rounded-xl" alt="Logo" width="28" height="28" loading="eager">
                         <span class="text-xl font-bold text-primary">QashierWise</span>
                 </div>
 
@@ -159,7 +159,7 @@
                 <!-- Company Info -->
                 <div>
                     <div class="flex items-center space-x-2 mb-4">
-                        <img src="{{ asset('images/logo.png') }}" class="h-7 rounded-xl" alt="Logo">
+                        <img src="{{ asset('images/logo-48.png') }}" class="h-7 rounded-xl" alt="Logo" width="28" height="28" loading="lazy">
                         <span class="text-xl font-bold text-primary">QashierWise</span>
                     </div>
                     <p class="text-sm text-gray-600 mb-4">
@@ -173,7 +173,7 @@
 
                 <!-- Navigation -->
                 <div>
-                    <h4 class="text-gray-900 font-semibold mb-4">Navigasi</h4>
+                    <h3 class="text-gray-900 font-semibold mb-4">Navigasi</h3>
                     <ul class="space-y-2 text-sm">
                         <li><a href="/#fitur" class="text-gray-600 hover:text-primary transition">Fitur</a></li>
                         <li><a href="/#pricing" class="text-gray-600 hover:text-primary transition">Harga</a></li>
@@ -184,7 +184,7 @@
 
                 <!-- Legal -->
                 <div>
-                    <h4 class="text-gray-900 font-semibold mb-4">Legal</h4>
+                    <h3 class="text-gray-900 font-semibold mb-4">Legal</h3>
                     <ul class="space-y-2 text-sm">
                         <li><a href="/privacy-policy" class="text-gray-600 hover:text-primary transition">Kebijakan Privasi</a></li>
                         <li><a href="/terms-of-service" class="text-gray-600 hover:text-primary transition">Ketentuan Layanan</a></li>
@@ -193,7 +193,7 @@
 
                 <!-- Product -->
                 <div>
-                    <h4 class="text-gray-900 font-semibold mb-4">Produk</h4>
+                    <h3 class="text-gray-900 font-semibold mb-4">Produk</h3>
                     <ul class="space-y-2 text-sm">
                         <li><a href="#" class="text-gray-600 hover:text-primary transition">QashierWise Console</a></li>
                         <li><a href="#" class="text-gray-600 hover:text-primary transition">Chatbot WhatsApp</a></li>

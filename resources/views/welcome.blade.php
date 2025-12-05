@@ -16,11 +16,11 @@
     <!-- Canonical URL -->
     <link rel="canonical" href="https://qashierwise.com">
 
-     <!-- Favicon -->
+     <!-- Favicon - Optimized sizes -->
     <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
-    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/logo.png') }}">
-    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/logo.png') }}">
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/logo.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/logo-32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/logo-16.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/logo-180.png') }}">
     <link rel="manifest" href="{{ asset('site.webmanifest') }}">
     <meta name="theme-color" content="#4910ce">
 
@@ -44,10 +44,22 @@
     <meta name="twitter:image" content="https://qashierwise.com/images/og-image.png">
     <meta name="twitter:image:alt" content="QashierWise - AI Chatbot WhatsApp untuk Restoran">
 
-    <!-- Fonts -->
+    <!-- Preconnect for critical resources -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://cdn.tailwindcss.com">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="https://images.unsplash.com">
+
+    <!-- DNS Prefetch for additional resources -->
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+
+    <!-- Preload critical fonts (non-blocking) -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"></noscript>
 
     <!-- Additional SEO Meta -->
     <meta name="geo.region" content="ID-JT">
@@ -55,24 +67,79 @@
     <meta name="geo.position" content="-7.3305;110.5084">
     <meta name="ICBM" content="-7.3305, 110.5084">
 
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Critical CSS inline for above-the-fold content -->
+    <style>
+        /* Critical CSS - Inline for faster FCP */
+        *,::after,::before{box-sizing:border-box;border:0 solid #e5e7eb}
+        html{line-height:1.5;-webkit-text-size-adjust:100%;font-family:Inter,ui-sans-serif,system-ui,sans-serif}
+        body{margin:0;line-height:inherit}
+        .bg-white{background-color:#fff}
+        .text-gray-900{color:#111827}
+        .text-gray-600{color:#4b5563}
+        .font-bold{font-weight:700}
+        .font-semibold{font-weight:600}
+        .text-xl{font-size:1.25rem;line-height:1.75rem}
+        .text-3xl{font-size:1.875rem;line-height:2.25rem}
+        .rounded-xl{border-radius:.75rem}
+        .rounded-2xl{border-radius:1rem}
+        .px-4{padding-left:1rem;padding-right:1rem}
+        .py-2{padding-top:.5rem;padding-bottom:.5rem}
+        .mb-4{margin-bottom:1rem}
+        .flex{display:flex}
+        .items-center{align-items:center}
+        .justify-between{justify-content:space-between}
+        .space-x-2>:not([hidden])~:not([hidden]){margin-left:.5rem}
+        .fixed{position:fixed}
+        .top-0{top:0}
+        .left-0{left:0}
+        .right-0{right:0}
+        .z-50{z-index:50}
+        .h-16{height:4rem}
+        .h-7{height:1.75rem}
+        .max-w-7xl{max-width:80rem}
+        .mx-auto{margin-left:auto;margin-right:auto}
+        .hidden{display:none}
+        .pt-24{padding-top:6rem}
+        .pb-12{padding-bottom:3rem}
+        .text-center{text-align:center}
+        .leading-tight{line-height:1.25}
+        .gradient-text{background:linear-gradient(135deg,#4910ce 0%,#7c3aed 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .hero-gradient{background:linear-gradient(135deg,#f3e8ff 0%,#ede9fe 50%,#faf5ff 100%)}
+        .bg-primary{background-color:#4910ce}
+        .text-primary{color:#4910ce}
+        .text-white{color:#fff}
+        @media(min-width:768px){.md\\:flex{display:flex}.md\\:hidden{display:none}.md\\:pt-32{padding-top:8rem}.md\\:text-5xl{font-size:3rem;line-height:1}}
+        @media(min-width:1024px){.lg\\:grid{display:grid}.lg\\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.lg\\:text-left{text-align:left}.lg\\:text-6xl{font-size:3.75rem;line-height:1}}
+        [x-cloak]{display:none!important}
+        body{font-family:'Inter',sans-serif}
+    </style>
+
+    <!-- Tailwind CSS - Deferred loading -->
     <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#4910ce',
+        // Load Tailwind CSS asynchronously after critical content
+        (function() {
+            var tw = document.createElement('script');
+            tw.src = 'https://cdn.tailwindcss.com';
+            tw.onload = function() {
+                tailwind.config = {
+                    theme: {
+                        extend: {
+                            colors: {
+                                primary: '#4910ce',
+                            }
+                        }
                     }
                 }
-            }
-        }
+            };
+            document.head.appendChild(tw);
+        })();
     </script>
 
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Font Awesome - Deferred loading (non-critical icons) -->
+    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
 
-    <!-- Alpine.js -->
+    <!-- Alpine.js - Deferred -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
     <!-- Structured Data - Organization -->
@@ -341,7 +408,7 @@
             <div class="flex justify-between items-center h-16">
                 <!-- Logo -->
                 <div class="flex items-center space-x-2">
-                    <img src="{{ asset('images/logo.png') }}" class="h-7 rounded-xl" alt="Logo">
+                    <img src="{{ asset('images/logo-48.png') }}" class="h-7 rounded-xl" alt="Logo" width="28" height="28" loading="eager">
                     <span class="text-xl font-bold text-primary">QashierWise</span>
                 </div>
 
@@ -432,6 +499,8 @@
         ></div>
     </nav>
 
+    <!-- Main Content -->
+    <main>
     <!-- Hero Section -->
     <section class="hero-gradient pt-24 md:pt-32 pb-12 md:pb-20 overflow-hidden">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -467,19 +536,19 @@
 
                     <div class="flex flex-col gap-2 text-xs md:text-sm text-gray-500 items-center lg:items-start">
                         <div class="flex items-center">
-                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            <i class="fas fa-check text-green-600 mr-2"></i>
                             <span>Reservasi & Order via WhatsApp tanpa ribet</span>
                         </div>
                         <div class="flex items-center">
-                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            <i class="fas fa-check text-green-600 mr-2"></i>
                             <span>Kelola pesanan + laporan dengan mudah</span>
                         </div>
                         <div class="flex items-center">
-                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            <i class="fas fa-check text-green-600 mr-2"></i>
                             <span>Tanpa perubahan workflow (bayar di tempat)</span>
                         </div>
                         <div class="flex items-center">
-                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            <i class="fas fa-check text-green-600 mr-2"></i>
                             <span>Laporan Order & penjualan otomatis</span>
                         </div>
                     </div>
@@ -487,7 +556,19 @@
 
                 <!-- Right Content - Hero Image -->
                 <div class="relative order-2 w-full max-w-md lg:max-w-none mx-auto mt-8 lg:mt-0">
-                    <img src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" alt="Restaurant ordering" class="rounded-2xl shadow-2xl w-full">
+                    <img 
+                        src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=665&q=75" 
+                        srcset="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=75 400w,
+                                https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=665&q=75 665w,
+                                https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=75 800w"
+                        sizes="(max-width: 640px) 400px, (max-width: 1024px) 665px, 800px"
+                        alt="Restaurant ordering" 
+                        class="rounded-2xl shadow-2xl w-full"
+                        width="665"
+                        height="444"
+                        fetchpriority="high"
+                        decoding="async"
+                        loading="eager">
                     <!-- Floating Elements - Hidden on small mobile, visible on larger screens -->
                     <div class="hidden sm:block absolute -bottom-4 md:-bottom-6 -left-2 md:-left-6 bg-white rounded-xl p-3 md:p-4 shadow-xl">
                         <div class="flex items-center space-x-2 md:space-x-3">
@@ -507,7 +588,7 @@
                             </div>
                             <div>
                                 <p class="text-xs md:text-sm font-semibold text-gray-900">Penjualan</p>
-                                <p class="text-xs text-green-500">↑ 24% bulan ini</p>
+                                <p class="text-xs text-green-600">↑ 24% bulan ini</p>
                             </div>
                         </div>
                     </div>
@@ -686,7 +767,7 @@
                                                 <p class="text-xs text-gray-500">Mau pesan meja untuk 4 orang...</p>
                                             </div>
                                         </div>
-                                        <span class="text-xs text-gray-400">2m ago</span>
+                                        <span class="text-xs text-gray-500">2m ago</span>
                                     </div>
                                     <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                                         <div class="flex items-center space-x-3">
@@ -696,7 +777,7 @@
                                                 <p class="text-xs text-gray-500">Order delivery ke alamat...</p>
                                             </div>
                                         </div>
-                                        <span class="text-xs text-gray-400">5m ago</span>
+                                        <span class="text-xs text-gray-500">5m ago</span>
                                     </div>
                                 </div>
                             </div>
@@ -714,7 +795,7 @@
             <p class="text-gray-500 mb-8">Sambungkan QashierWise untuk bisnis Anda—tanpa ribet.</p>
             <div class="flex flex-wrap justify-center items-center gap-8 md:gap-12">
                 <div class="flex items-center space-x-2 text-gray-600">
-                    <i class="fab fa-whatsapp text-2xl text-green-500"></i>
+                    <i class="fab fa-whatsapp text-2xl text-green-600"></i>
                     <span class="font-medium">WhatsApp Business API</span>
                 </div>
                 <div class="flex items-center space-x-2 text-gray-600">
@@ -756,11 +837,11 @@
                             <span class="text-2xl font-bold text-gray-900">Rp0</span>
                         </div>
                         <ul class="space-y-2 mb-6 text-xs text-gray-600">
-                            <li class="flex items-start"><i class="fas fa-check text-green-500 mr-2 mt-0.5"></i>AI chatbot dasar (% pesan/bulan)</li>
-                            <li class="flex items-start"><i class="fas fa-check text-green-500 mr-2 mt-0.5"></i>Reservasi & pickup orders</li>
-                            <li class="flex items-start"><i class="fas fa-check text-green-500 mr-2 mt-0.5"></i>Watermark menu digital</li>
-                            <li class="flex items-start"><i class="fas fa-check text-green-500 mr-2 mt-0.5"></i>Tanpa pembayaran online</li>
-                            <li class="flex items-start"><i class="fas fa-check text-green-500 mr-2 mt-0.5"></i>1 user staf + Email support</li>
+                            <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>AI chatbot dasar (% pesan/bulan)</li>
+                            <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>Reservasi & pickup orders</li>
+                            <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>Watermark menu digital</li>
+                            <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>Tanpa pembayaran online</li>
+                            <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>1 user staf + Email support</li>
                         </ul>
                         <a href="/login" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition text-sm">
                             Mulai Gratis
@@ -799,11 +880,11 @@
                             <span class="text-gray-500 text-sm">/bln</span>
                         </div>
                         <ul class="space-y-2 mb-6 text-xs text-gray-600">
-                            <li class="flex items-start"><i class="fas fa-check text-green-500 mr-2 mt-0.5"></i>Analytic + ekspor CSV</li>
-                            <li class="flex items-start"><i class="fas fa-check text-green-500 mr-2 mt-0.5"></i>Webhook & API</li>
-                            <li class="flex items-start"><i class="fas fa-check text-green-500 mr-2 mt-0.5"></i>Multi-outlet & branding</li>
-                            <li class="flex items-start"><i class="fas fa-check text-green-500 mr-2 mt-0.5"></i>Priority routing & handover</li>
-                            <li class="flex items-start"><i class="fas fa-check text-green-500 mr-2 mt-0.5"></i>SLA + dedicated support</li>
+                            <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>Analytic + ekspor CSV</li>
+                            <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>Webhook & API</li>
+                            <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>Multi-outlet & branding</li>
+                            <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>Priority routing & handover</li>
+                            <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>SLA + dedicated support</li>
                         </ul>
                         <a href="/login" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition text-sm">
                             Pilih Pro
@@ -822,11 +903,11 @@
                         <span class="text-3xl font-bold text-gray-900">Rp0</span>
                     </div>
                     <ul class="space-y-3 mb-8 text-sm text-gray-600">
-                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>AI chatbot dasar (% pesan/bulan)</li>
-                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>Reservasi & pickup orders</li>
-                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>Watermark menu digital</li>
-                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>Tanpa pembayaran online (bayar di tempat)</li>
-                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>1 user staf + Email support (48hr)</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>AI chatbot dasar (% pesan/bulan)</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>Reservasi & pickup orders</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>Watermark menu digital</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>Tanpa pembayaran online (bayar di tempat)</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>1 user staf + Email support (48hr)</li>
                     </ul>
                     <a href="/login" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition">
                         Mulai Gratis
@@ -865,11 +946,11 @@
                         <span class="text-gray-500">/bln</span>
                     </div>
                     <ul class="space-y-3 mb-8 text-sm text-gray-600">
-                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>Analytic + ekspor CSV</li>
-                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>Webhook & API</li>
-                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>Multi-outlet & branding</li>
-                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>Priority routing & handover</li>
-                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>SLA + dedicated support</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>Analytic + ekspor CSV</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>Webhook & API</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>Multi-outlet & branding</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>Priority routing & handover</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>SLA + dedicated support</li>
                     </ul>
                     <a href="/login" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition">
                         Pilih Pro
@@ -904,7 +985,7 @@
                         AB
                     </div>
                     <div>
-                        <h4 class="font-semibold text-gray-900">Aditya Bintang Fadila</h4>
+                        <h3 class="font-semibold text-gray-900 text-base">Aditya Bintang Fadila</h3>
                         <p class="text-gray-600 text-sm">QashierWise dibuat oleh Aditya Bintang Fadila, yang berkomitmen untuk menghadirkan solusi teknologi terbaik bagi industri F&B di Indonesia.</p>
                     </div>
                 </div>
@@ -932,7 +1013,7 @@
                 <div class="bg-white rounded-xl border border-gray-200">
                     <button @click="open = open === 1 ? null : 1" class="w-full px-6 py-4 text-left flex items-center justify-between">
                         <span class="font-medium text-gray-900">Apa itu QashierWise?</span>
-                        <i class="fas fa-chevron-down text-gray-400 transform transition-transform" :class="{ 'rotate-180': open === 1 }"></i>
+                        <i class="fas fa-chevron-down text-gray-500 transform transition-transform" :class="{ 'rotate-180': open === 1 }"></i>
                     </button>
                     <div x-show="open === 1" x-transition class="px-6 pb-4 text-gray-600">
                         QashierWise adalah platform AI Chatbot WhatsApp yang dirancang khusus untuk restoran, membantu mengelola reservasi, pesanan, dan pembayaran QRIS dalam satu dashboard.
@@ -943,7 +1024,7 @@
                 <div class="bg-white rounded-xl border border-gray-200">
                     <button @click="open = open === 2 ? null : 2" class="w-full px-6 py-4 text-left flex items-center justify-between">
                         <span class="font-medium text-gray-900">Apakah perlu aplikasi terpisah untuk pelanggan?</span>
-                        <i class="fas fa-chevron-down text-gray-400 transform transition-transform" :class="{ 'rotate-180': open === 2 }"></i>
+                        <i class="fas fa-chevron-down text-gray-500 transform transition-transform" :class="{ 'rotate-180': open === 2 }"></i>
                     </button>
                     <div x-show="open === 2" x-transition class="px-6 pb-4 text-gray-600">
                         Tidak! Pelanggan cukup menggunakan WhatsApp yang sudah mereka miliki. Tidak perlu download aplikasi tambahan.
@@ -954,7 +1035,7 @@
                 <div class="bg-white rounded-xl border border-gray-200">
                     <button @click="open = open === 3 ? null : 3" class="w-full px-6 py-4 text-left flex items-center justify-between">
                         <span class="font-medium text-gray-900">Bagaimana pembayaran dilakukan?</span>
-                        <i class="fas fa-chevron-down text-gray-400 transform transition-transform" :class="{ 'rotate-180': open === 3 }"></i>
+                        <i class="fas fa-chevron-down text-gray-500 transform transition-transform" :class="{ 'rotate-180': open === 3 }"></i>
                     </button>
                     <div x-show="open === 3" x-transition class="px-6 pb-4 text-gray-600">
                         Pembayaran bisa dilakukan melalui QRIS yang terintegrasi dengan Midtrans, Xendit, atau penyedia QRIS lainnya. Pelanggan juga bisa bayar di tempat.
@@ -965,7 +1046,7 @@
                 <div class="bg-white rounded-xl border border-gray-200">
                     <button @click="open = open === 4 ? null : 4" class="w-full px-6 py-4 text-left flex items-center justify-between">
                         <span class="font-medium text-gray-900">Apakah bisa multi-outlet dan multi nomor?</span>
-                        <i class="fas fa-chevron-down text-gray-400 transform transition-transform" :class="{ 'rotate-180': open === 4 }"></i>
+                        <i class="fas fa-chevron-down text-gray-500 transform transition-transform" :class="{ 'rotate-180': open === 4 }"></i>
                     </button>
                     <div x-show="open === 4" x-transition class="px-6 pb-4 text-gray-600">
                         Ya! Paket Standard mendukung hingga 2 outlet, dan paket Pro mendukung unlimited outlet dengan fitur multi-branding.
@@ -975,6 +1056,8 @@
         </div>
     </section>
 
+    </main>
+
     <!-- Footer -->
     <footer class="bg-white border-t border-gray-200 py-16">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -982,7 +1065,7 @@
                 <!-- Company Info -->
                 <div>
                     <div class="flex items-center space-x-2 mb-4">
-                        <img src="{{ asset('images/logo.png') }}" class="h-7 rounded-xl" alt="Logo">
+                        <img src="{{ asset('images/logo-48.png') }}" class="h-7 rounded-xl" alt="Logo" width="28" height="28" loading="lazy">
                         <span class="text-xl font-bold text-primary">QashierWise</span>
                     </div>
                     <p class="text-sm text-gray-600 mb-4">
@@ -996,7 +1079,7 @@
 
                 <!-- Navigation -->
                 <div>
-                    <h4 class="text-gray-900 font-semibold mb-4">Navigasi</h4>
+                    <h3 class="text-gray-900 font-semibold mb-4 text-base">Navigasi</h3>
                     <ul class="space-y-2 text-sm">
                         <li><a href="#fitur" class="text-gray-600 hover:text-primary transition">Fitur</a></li>
                         <li><a href="#pricing" class="text-gray-600 hover:text-primary transition">Harga</a></li>
@@ -1007,7 +1090,7 @@
 
                 <!-- Legal -->
                 <div>
-                    <h4 class="text-gray-900 font-semibold mb-4">Legal</h4>
+                    <h3 class="text-gray-900 font-semibold mb-4 text-base">Legal</h3>
                     <ul class="space-y-2 text-sm">
                         <li><a href="/privacy-policy" class="text-gray-600 hover:text-primary transition">Kebijakan Privasi</a></li>
                         <li><a href="/terms-of-service" class="text-gray-600 hover:text-primary transition">Ketentuan Layanan</a></li>
@@ -1016,7 +1099,7 @@
 
                 <!-- Product -->
                 <div>
-                    <h4 class="text-gray-900 font-semibold mb-4">Produk</h4>
+                    <h3 class="text-gray-900 font-semibold mb-4 text-base">Produk</h3>
                     <ul class="space-y-2 text-sm">
                         <li><a href="#" class="text-gray-600 hover:text-primary transition">QashierWise Console</a></li>
                         <li><a href="#" class="text-gray-600 hover:text-primary transition">Chatbot WhatsApp</a></li>

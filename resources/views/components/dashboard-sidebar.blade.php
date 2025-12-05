@@ -26,10 +26,10 @@
     <!-- Logo -->
     <div class="h-16 flex items-center px-4 border-b border-[hsl(var(--sidebar-border))]">
         <div x-show="sidebarOpen || isMobile" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="flex items-center gap-3">
-            <img src="{{ asset('images/logo.png') }}" class="h-8 w-8 rounded-lg" alt="Logo">
+            <img src="{{ asset('images/logo-64.png') }}" class="h-8 w-8 rounded-lg" alt="Logo" width="32" height="32" loading="eager">
             <span class="text-lg font-semibold tracking-tight">QashierWise</span>
         </div>
-        <img x-show="!sidebarOpen && !isMobile" src="{{ asset('images/logo.png') }}" class="h-8 w-8 rounded-lg mx-auto" alt="Logo">
+        <img x-show="!sidebarOpen && !isMobile" src="{{ asset('images/logo-64.png') }}" class="h-8 w-8 rounded-lg mx-auto" alt="Logo" width="32" height="32" loading="eager">
     </div>
 
     <!-- Navigation -->
