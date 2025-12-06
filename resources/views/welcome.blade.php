@@ -819,18 +819,28 @@
     </section>
 
     <!-- Pricing Section -->
-    <section id="pricing" class="py-12 md:py-20 bg-gray-50">
+    <section id="pricing" class="py-12 md:py-20 bg-gray-50" x-data="pricingSection()">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-10 md:mb-16">
                 <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 md:mb-4">Harga sederhana, tumbuh bersama Anda</h2>
                 <p class="text-sm md:text-base text-gray-600">Mulai gratis - upgrade kapan saja.</p>
+            </div>
+            
+            <!-- Error Message -->
+            <div x-show="error" x-cloak class="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-xl text-center max-w-md mx-auto">
+                <span x-text="error"></span>
             </div>
 
             <!-- Mobile: horizontal scroll, Tablet+: grid -->
             <div class="md:hidden overflow-x-auto pb-4 -mx-4 px-4">
                 <div class="flex gap-4 min-w-max">
                     <!-- Basic Plan (Mobile) -->
-                    <div class="bg-white rounded-2xl p-5 border border-gray-200 w-72 flex-shrink-0">
+                    <div class="bg-white rounded-2xl p-5 border border-gray-200 w-72 flex-shrink-0 relative">
+                        <template x-if="token && isCurrentPlan('free_trial')">
+                            <div class="absolute -top-3 right-4 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                                Paket Saat Ini
+                            </div>
+                        </template>
                         <h3 class="text-lg font-bold text-gray-900 mb-2">Basic</h3>
                         <p class="text-gray-500 text-xs mb-3">1 outlet, No admin + pickup</p>
                         <div class="mb-4">
@@ -843,16 +853,23 @@
                             <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>Tanpa pembayaran online</li>
                             <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>1 user staf + Email support</li>
                         </ul>
-                        <a href="/login" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition text-sm">
+                        <a href="/register" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition text-sm">
                             Mulai Gratis
                         </a>
                     </div>
 
                     <!-- Standard Plan (Mobile) -->
                     <div class="bg-white rounded-2xl p-5 border-2 border-primary relative w-72 flex-shrink-0">
-                        <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary text-white px-3 py-1 rounded-full text-xs font-semibold">
-                            POPULER
-                        </div>
+                        <template x-if="token && isCurrentPlan('standard')">
+                            <div class="absolute -top-3 right-4 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                                Paket Saat Ini
+                            </div>
+                        </template>
+                        <template x-if="!token || !isCurrentPlan('standard')">
+                            <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary text-white px-3 py-1 rounded-full text-xs font-semibold">
+                                POPULER
+                            </div>
+                        </template>
                         <h3 class="text-lg font-bold text-gray-900 mb-2 mt-2">Standard</h3>
                         <p class="text-gray-500 text-xs mb-3">Hingga 2 outlet, delivery + QRIS</p>
                         <div class="mb-4">
@@ -866,13 +883,35 @@
                             <li class="flex items-start"><i class="fas fa-check text-primary mr-2 mt-0.5"></i>XX pesan/bulan + Chat support</li>
                             <li class="flex items-start"><i class="fas fa-check text-primary mr-2 mt-0.5"></i>Customer Base</li>
                         </ul>
-                        <a href="/login" class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all text-sm">
-                            Pilih Standard
-                        </a>
+                        <template x-if="token">
+                            <button 
+                                @click="checkout('standard')" 
+                                :disabled="loading || isCurrentPlan('standard')"
+                                class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <span x-show="!loading || selectedPlan !== 'standard'">
+                                    <span x-show="isCurrentPlan('standard')">Paket Aktif</span>
+                                    <span x-show="!isCurrentPlan('standard')">Pilih Standard</span>
+                                </span>
+                                <span x-show="loading && selectedPlan === 'standard'" x-cloak>
+                                    <i class="fas fa-spinner fa-spin mr-2"></i>Memproses...
+                                </span>
+                            </button>
+                        </template>
+                        <template x-if="!token">
+                            <a href="/login?redirect=pricing&plan=standard" class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all text-sm">
+                                Pilih Standard
+                            </a>
+                        </template>
                     </div>
 
                     <!-- Pro Plan (Mobile) -->
-                    <div class="bg-white rounded-2xl p-5 border border-gray-200 w-72 flex-shrink-0">
+                    <div class="bg-white rounded-2xl p-5 border border-gray-200 w-72 flex-shrink-0 relative">
+                        <template x-if="token && isCurrentPlan('pro')">
+                            <div class="absolute -top-3 right-4 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                                Paket Saat Ini
+                            </div>
+                        </template>
                         <h3 class="text-lg font-bold text-gray-900 mb-2">Pro</h3>
                         <p class="text-gray-500 text-xs mb-3">Tim unlimited, Analytic & API</p>
                         <div class="mb-4">
@@ -886,9 +925,26 @@
                             <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>Priority routing & handover</li>
                             <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>SLA + dedicated support</li>
                         </ul>
-                        <a href="/login" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition text-sm">
-                            Pilih Pro
-                        </a>
+                        <template x-if="token">
+                            <button 
+                                @click="checkout('pro')" 
+                                :disabled="loading || isCurrentPlan('pro')"
+                                class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <span x-show="!loading || selectedPlan !== 'pro'">
+                                    <span x-show="isCurrentPlan('pro')">Paket Aktif</span>
+                                    <span x-show="!isCurrentPlan('pro')">Pilih Pro</span>
+                                </span>
+                                <span x-show="loading && selectedPlan === 'pro'" x-cloak>
+                                    <i class="fas fa-spinner fa-spin mr-2"></i>Memproses...
+                                </span>
+                            </button>
+                        </template>
+                        <template x-if="!token">
+                            <a href="/login?redirect=pricing&plan=pro" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition text-sm">
+                                Pilih Pro
+                            </a>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -896,7 +952,12 @@
             <!-- Tablet/Desktop: grid layout -->
             <div class="hidden md:grid md:grid-cols-3 gap-6 lg:gap-8 max-w-5xl mx-auto">
                 <!-- Basic Plan -->
-                <div class="bg-white rounded-2xl p-6 lg:p-8 border border-gray-200">
+                <div class="bg-white rounded-2xl p-6 lg:p-8 border border-gray-200 relative">
+                    <template x-if="token && isCurrentPlan('free_trial')">
+                        <div class="absolute -top-3 right-4 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                            Paket Saat Ini
+                        </div>
+                    </template>
                     <h3 class="text-xl font-bold text-gray-900 mb-2">Basic</h3>
                     <p class="text-gray-500 text-sm mb-4">1 outlet, No admin + pickup</p>
                     <div class="mb-6">
@@ -909,16 +970,23 @@
                         <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>Tanpa pembayaran online (bayar di tempat)</li>
                         <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>1 user staf + Email support (48hr)</li>
                     </ul>
-                    <a href="/login" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition">
+                    <a href="/register" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition">
                         Mulai Gratis
                     </a>
                 </div>
 
                 <!-- Standard Plan -->
                 <div class="bg-white rounded-2xl p-6 lg:p-8 border-2 border-primary relative">
-                    <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary text-white px-4 py-1 rounded-full text-xs font-semibold">
-                        POPULER
-                    </div>
+                    <template x-if="token && isCurrentPlan('standard')">
+                        <div class="absolute -top-3 right-4 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                            Paket Saat Ini
+                        </div>
+                    </template>
+                    <template x-if="!token || !isCurrentPlan('standard')">
+                        <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary text-white px-4 py-1 rounded-full text-xs font-semibold">
+                            POPULER
+                        </div>
+                    </template>
                     <h3 class="text-xl font-bold text-gray-900 mb-2">Standard</h3>
                     <p class="text-gray-500 text-sm mb-4">Hingga 2 outlet, delivery + QRIS</p>
                     <div class="mb-6">
@@ -932,13 +1000,35 @@
                         <li class="flex items-center"><i class="fas fa-check text-primary mr-2"></i>XX pesan/bulan + Chat support (2hr)</li>
                         <li class="flex items-center"><i class="fas fa-check text-primary mr-2"></i>Customer Base</li>
                     </ul>
-                    <a href="/login" class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all">
-                        Pilih Standard
-                    </a>
+                    <template x-if="token">
+                        <button 
+                            @click="checkout('standard')" 
+                            :disabled="loading || isCurrentPlan('standard')"
+                            class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <span x-show="!loading || selectedPlan !== 'standard'">
+                                <span x-show="isCurrentPlan('standard')">Paket Aktif</span>
+                                <span x-show="!isCurrentPlan('standard')">Pilih Standard</span>
+                            </span>
+                            <span x-show="loading && selectedPlan === 'standard'" x-cloak>
+                                <i class="fas fa-spinner fa-spin mr-2"></i>Memproses...
+                            </span>
+                        </button>
+                    </template>
+                    <template x-if="!token">
+                        <a href="/login?redirect=pricing&plan=standard" class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all">
+                            Pilih Standard
+                        </a>
+                    </template>
                 </div>
 
                 <!-- Pro Plan -->
-                <div class="bg-white rounded-2xl p-6 lg:p-8 border border-gray-200">
+                <div class="bg-white rounded-2xl p-6 lg:p-8 border border-gray-200 relative">
+                    <template x-if="token && isCurrentPlan('pro')">
+                        <div class="absolute -top-3 right-4 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                            Paket Saat Ini
+                        </div>
+                    </template>
                     <h3 class="text-xl font-bold text-gray-900 mb-2">Pro</h3>
                     <p class="text-gray-500 text-sm mb-4">Tim unlimited, Analytic & API</p>
                     <div class="mb-6">
@@ -952,9 +1042,26 @@
                         <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>Priority routing & handover</li>
                         <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>SLA + dedicated support</li>
                     </ul>
-                    <a href="/login" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition">
-                        Pilih Pro
-                    </a>
+                    <template x-if="token">
+                        <button 
+                            @click="checkout('pro')" 
+                            :disabled="loading || isCurrentPlan('pro')"
+                            class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <span x-show="!loading || selectedPlan !== 'pro'">
+                                <span x-show="isCurrentPlan('pro')">Paket Aktif</span>
+                                <span x-show="!isCurrentPlan('pro')">Pilih Pro</span>
+                            </span>
+                            <span x-show="loading && selectedPlan === 'pro'" x-cloak>
+                                <i class="fas fa-spinner fa-spin mr-2"></i>Memproses...
+                            </span>
+                        </button>
+                    </template>
+                    <template x-if="!token">
+                        <a href="/login?redirect=pricing&plan=pro" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition">
+                            Pilih Pro
+                        </a>
+                    </template>
                 </div>
             </div>
         </div>
@@ -1112,5 +1219,105 @@
             </div>
         </div>
     </footer>
+
+    <!-- Pricing Section Alpine.js Component -->
+    <script>
+        function pricingSection() {
+            return {
+                loading: false,
+                error: null,
+                selectedPlan: null,
+                currentPlan: null,
+                token: null,
+
+                init() {
+                    // Get auth token from localStorage (stored as 'token' during login)
+                    this.token = localStorage.getItem('token');
+                    if (this.token) {
+                        this.fetchSubscriptionStatus();
+                        // Check if we need to auto-checkout after login redirect
+                        this.checkAutoCheckout();
+                    }
+                },
+
+                checkAutoCheckout() {
+                    // Check URL parameters for auto-checkout after login
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const plan = urlParams.get('plan');
+                    const shouldCheckout = urlParams.get('checkout') === 'true';
+                    
+                    if (plan && shouldCheckout && this.token) {
+                        // Clean up URL parameters but keep the hash
+                        const hash = window.location.hash || '';
+                        window.history.replaceState({}, document.title, window.location.pathname + hash);
+                        
+                        // Trigger checkout after a short delay to ensure component is ready
+                        setTimeout(() => {
+                            this.checkout(plan);
+                        }, 500);
+                    }
+                },
+
+                async fetchSubscriptionStatus() {
+                    try {
+                        const response = await fetch('/api/subscription/status', {
+                            headers: {
+                                'Authorization': `Bearer ${this.token}`,
+                                'Accept': 'application/json',
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data.success && data.data.subscription) {
+                                this.currentPlan = data.data.subscription.plan_name;
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Failed to fetch subscription status:', e);
+                    }
+                },
+
+                isCurrentPlan(plan) {
+                    return this.currentPlan === plan;
+                },
+
+                async checkout(planId) {
+                    if (this.loading) return;
+                    
+                    this.loading = true;
+                    this.error = null;
+                    this.selectedPlan = planId;
+
+                    try {
+                        const response = await fetch('/api/subscription/checkout', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${this.token}`,
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                            },
+                            body: JSON.stringify({ plan_id: planId })
+                        });
+
+                        const data = await response.json();
+
+                        if (data.success && data.data.checkout_url) {
+                            // Redirect to Polar.sh checkout
+                            window.location.href = data.data.checkout_url;
+                        } else {
+                            this.error = data.error?.message || 'Gagal membuat sesi checkout. Silakan coba lagi.';
+                        }
+                    } catch (e) {
+                        console.error('Checkout error:', e);
+                        this.error = 'Terjadi kesalahan. Silakan coba lagi.';
+                    } finally {
+                        this.loading = false;
+                        this.selectedPlan = null;
+                    }
+                }
+            };
+        }
+    </script>
 </body>
 </html>

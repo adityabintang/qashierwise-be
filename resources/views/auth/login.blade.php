@@ -80,6 +80,20 @@ function authForm() {
         error: '',
         success: '',
 
+        getRedirectUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const redirect = urlParams.get('redirect');
+            const plan = urlParams.get('plan');
+            
+            // If redirect=pricing and plan is specified, go to welcome page pricing section
+            // and trigger checkout after login
+            if (redirect === 'pricing' && plan) {
+                return `/?plan=${plan}&checkout=true#pricing`;
+            }
+            
+            return '/dashboard';
+        },
+
         async login() {
             this.loading = true;
             this.error = '';
@@ -98,7 +112,9 @@ function authForm() {
                     localStorage.setItem('token', data.data.access_token);
                     if (data.data.user) localStorage.setItem('user', JSON.stringify(data.data.user));
                     this.success = 'Login berhasil! Mengalihkan...';
-                    setTimeout(() => window.location.href = '/dashboard', 1000);
+                    
+                    const redirectUrl = this.getRedirectUrl();
+                    setTimeout(() => window.location.href = redirectUrl, 1000);
                 } else {
                     this.error = data.message || 'Login gagal. Periksa kredensial Anda.';
                 }

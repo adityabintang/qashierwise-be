@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BroadcastAuthController;
+use App\Http\Controllers\Api\PolarWebhookController;
+use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\WhatsAppController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
 use App\Http\Controllers\Api\Pos\ProductController;
@@ -34,6 +36,9 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::get('/whatsapp/webhook', [WhatsAppWebhookController::class, 'verify']);
 Route::post('/whatsapp/webhook', [WhatsAppWebhookController::class, 'handle']);
 
+// Polar.sh Webhook (must be public for Polar to access)
+Route::post('/webhooks/polar', [PolarWebhookController::class, 'handle']);
+
 // Broadcast authentication - Custom controller for Sanctum token auth
 Route::post('/broadcasting/auth', [BroadcastAuthController::class, 'authenticate'])
     ->middleware(['auth:sanctum', \App\Http\Middleware\LogBroadcastingAuth::class]);
@@ -44,6 +49,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::get('/user', [AuthController::class, 'me']); // Alias for /me
+
+    // Subscription routes
+    Route::prefix('subscription')->group(function () {
+        Route::get('/status', [SubscriptionController::class, 'status']);
+        Route::post('/checkout', [SubscriptionController::class, 'createCheckout']);
+        Route::get('/portal', [SubscriptionController::class, 'getPortalUrl']);
+    });
 
     // WhatsApp Business API routes
     Route::prefix('whatsapp')->group(function () {

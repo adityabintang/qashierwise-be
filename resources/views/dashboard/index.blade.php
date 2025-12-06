@@ -11,6 +11,27 @@
 
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto space-y-6">
+                <!-- Trial Expired Banner -->
+                <div x-data="subscriptionStatus()" x-init="init()">
+                    <div x-show="!loading && subscription.status === 'trial_expired'" x-cloak 
+                         class="bg-gradient-to-r from-red-500 to-orange-500 rounded-xl p-4 md:p-6 text-white shadow-lg">
+                        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                            <div class="flex items-center gap-4">
+                                <div class="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                                    <i class="fas fa-exclamation-triangle text-2xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-bold">Trial Period Expired</h3>
+                                    <p class="text-white/90 text-sm">Your free trial has ended. Upgrade now to continue using all features.</p>
+                                </div>
+                            </div>
+                            <a href="/#pricing" class="btn bg-white text-red-600 hover:bg-white/90 font-semibold px-6 py-2 rounded-lg transition-colors flex-shrink-0">
+                                <i class="fas fa-rocket mr-2"></i>Upgrade Now
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Stats Cards -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" x-data="dashboardStats()">
                     <!-- Loading Skeleton -->
@@ -208,7 +229,7 @@
                                     </div>
                                 </template>
                             </div>
-                            <div x-show="!loading" x-cloak class="space-y-2">
+                            <div x-show="!loading" class="space-y-2">
                                 <template x-for="message in messages" :key="message.id">
                                     <div @click="viewMessage(message)" class="flex items-start gap-3 p-3 rounded-lg hover:bg-[hsl(var(--muted)/0.5)] transition-colors cursor-pointer">
                                         <!-- Avatar with name -->
@@ -253,6 +274,86 @@
 
                     <!-- Right Column -->
                     <div class="space-y-6">
+                        <!-- Subscription Status Card -->
+                        <div class="card" x-data="subscriptionStatus()" x-init="init()">
+                            <div class="card-header">
+                                <h2 class="card-title">Subscription</h2>
+                            </div>
+                            <div class="card-content">
+                                <!-- Always show content, no loading state -->
+                                <div class="space-y-4">
+                                    <!-- Plan Badge -->
+                                    <div class="flex items-center gap-3">
+                                        <div class="h-10 w-10 rounded-lg flex items-center justify-center"
+                                             :class="{
+                                                 'bg-gray-100': subscription.plan_name === 'free_trial',
+                                                 'bg-blue-100': subscription.plan_name === 'standard',
+                                                 'bg-purple-100': subscription.plan_name === 'pro'
+                                             }">
+                                            <i class="fas"
+                                               :class="{
+                                                   'fa-gift text-gray-600': subscription.plan_name === 'free_trial',
+                                                   'fa-star text-blue-600': subscription.plan_name === 'standard',
+                                                   'fa-crown text-purple-600': subscription.plan_name === 'pro'
+                                               }"></i>
+                                        </div>
+                                        <div>
+                                            <p class="font-semibold capitalize" x-text="getPlanDisplayName()">Free Trial</p>
+                                            <p class="text-xs text-[hsl(var(--muted-foreground))]" x-text="getStatusText()">Active</p>
+                                        </div>
+                                    </div>
+
+                                    <!-- Trial Countdown (for trial users) -->
+                                    <div x-show="subscription.status === 'trial'" class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                        <div class="flex items-center gap-2 text-amber-700">
+                                            <i class="fas fa-clock"></i>
+                                            <span class="text-sm font-medium">
+                                                <span x-text="subscription.trial_days_remaining || 0"></span> days remaining
+                                            </span>
+                                        </div>
+                                        <p class="text-xs text-amber-600 mt-1">Upgrade to keep all features after trial ends</p>
+                                    </div>
+
+                                    <!-- Period End Date (for active subscriptions) -->
+                                    <div x-show="subscription.status === 'active' && subscription.period_end" class="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
+                                        <i class="fas fa-calendar-alt"></i>
+                                        <span>Next billing: <span x-text="formatDate(subscription.period_end)"></span></span>
+                                    </div>
+
+                                    <!-- Cancelled Notice -->
+                                    <div x-show="subscription.status === 'cancelled'" class="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                                        <div class="flex items-center gap-2 text-orange-700">
+                                            <i class="fas fa-info-circle"></i>
+                                            <span class="text-sm font-medium">Subscription cancelled</span>
+                                        </div>
+                                        <p class="text-xs text-orange-600 mt-1">
+                                            Access until: <span x-text="formatDate(subscription.period_end)"></span>
+                                        </p>
+                                    </div>
+
+                                    <!-- Action Buttons -->
+                                    <div class="pt-2 space-y-2">
+                                        <!-- Upgrade Button (for trial/expired users) -->
+                                        <a x-show="subscription.status === 'trial' || subscription.status === 'trial_expired' || subscription.status === 'expired'"
+                                           href="/#pricing"
+                                           class="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all font-medium text-sm">
+                                            <i class="fas fa-rocket"></i>
+                                            <span>Upgrade Plan</span>
+                                        </a>
+
+                                        <!-- Manage Subscription Button (for active/cancelled subscriptions) -->
+                                        <button x-show="subscription.status === 'active' || subscription.status === 'cancelled'"
+                                                @click="openCustomerPortal()"
+                                                :disabled="portalLoading"
+                                                class="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted)/0.8)] text-[hsl(var(--foreground))] rounded-lg transition-colors font-medium text-sm disabled:opacity-50">
+                                            <i class="fas" :class="portalLoading ? 'fa-spinner fa-spin' : 'fa-cog'"></i>
+                                            <span x-text="portalLoading ? 'Loading...' : 'Manage Subscription'"></span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Phone Info -->
                         <div class="card" x-data="phoneInfo()">
                             <div class="card-header"><h2 class="card-title">Phone Information</h2></div>
@@ -300,7 +401,7 @@
 <script>
 function dashboardApp() {
     return {
-        sidebarOpen: window.innerWidth >= 1024, 
+        sidebarOpen: true, 
         isMobile: window.innerWidth < 768,
         user: null, 
         notifications: [],
@@ -310,8 +411,9 @@ function dashboardApp() {
             if (this.isMobile) {
                 this.sidebarOpen = false;
             } else {
-                let savedState = localStorage.getItem('sidebarOpen');
-                if (savedState !== null) this.sidebarOpen = JSON.parse(savedState);
+                // Force sidebar to be open on desktop (ignore saved state for now)
+                this.sidebarOpen = true;
+                localStorage.setItem('sidebarOpen', 'true');
             }
             
             // Watch sidebar state changes (only save on desktop)
@@ -559,6 +661,119 @@ function phoneInfo() {
                 const data = await response.json();
                 this.info = data.data || {};
             } catch (e) { console.error('Error:', e); }
+        }
+    }
+}
+
+function subscriptionStatus() {
+    return {
+        API_BASE_URL: window.location.origin + '/api',
+        loading: true,
+        portalLoading: false,
+        error: false,
+        subscription: {
+            status: 'trial',
+            plan_name: 'free_trial',
+            trial_days_remaining: 14,
+            period_end: null,
+            cancelled_at: null
+        },
+
+        async init() {
+            console.log('[Subscription] Initializing...');
+            // Set timeout to prevent infinite loading
+            setTimeout(() => {
+                if (this.loading) {
+                    console.warn('[Subscription] Loading timeout, showing default state');
+                    this.loading = false;
+                }
+            }, 5000);
+            await this.fetchSubscriptionStatus();
+        },
+
+        async fetchSubscriptionStatus() {
+            this.loading = true;
+            this.error = false;
+            try {
+                const token = localStorage.getItem('token');
+                console.log('[Subscription] Token exists:', !!token);
+                if (!token) {
+                    console.warn('[Subscription] No token found');
+                    this.loading = false;
+                    return;
+                }
+                const response = await fetch(`${this.API_BASE_URL}/subscription/status`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
+                console.log('[Subscription] API response status:', response.status);
+                const data = await response.json();
+                console.log('[Subscription] API data:', data);
+                if (data.success && data.data?.subscription) {
+                    this.subscription = data.data.subscription;
+                    console.log('[Subscription] Updated subscription:', this.subscription);
+                } else {
+                    console.warn('[Subscription] API returned no data, using defaults');
+                }
+            } catch (e) {
+                console.error('[Subscription] Error:', e);
+                this.error = true;
+            } finally {
+                this.loading = false;
+                console.log('[Subscription] Loading complete, status:', this.subscription.status);
+            }
+        },
+
+        getPlanDisplayName() {
+            const names = {
+                'free_trial': 'Free Trial',
+                'standard': 'Standard',
+                'pro': 'Pro'
+            };
+            return names[this.subscription.plan_name] || this.subscription.plan_name;
+        },
+
+        getStatusText() {
+            const statuses = {
+                'trial': 'Trial Active',
+                'trial_expired': 'Trial Expired',
+                'active': 'Active',
+                'cancelled': 'Cancelled',
+                'expired': 'Expired'
+            };
+            return statuses[this.subscription.status] || this.subscription.status;
+        },
+
+        formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        },
+
+        async openCustomerPortal() {
+            this.portalLoading = true;
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`${this.API_BASE_URL}/subscription/portal`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
+                const data = await response.json();
+                if (data.success && data.data?.portal_url) {
+                    window.open(data.data.portal_url, '_blank');
+                } else {
+                    console.error('Failed to get portal URL:', data.error?.message);
+                    // More user-friendly error message
+                    if (data.error?.code === 'PORTAL_URL_FAILED') {
+                        alert('Subscription portal tidak tersedia saat ini. Untuk mengelola subscription, silakan hubungi support atau kunjungi Polar.sh dashboard.');
+                    } else {
+                        alert(data.error?.message || 'Gagal membuka subscription portal');
+                    }
+                }
+            } catch (e) {
+                console.error('Error opening customer portal:', e);
+                alert('Gagal membuka subscription portal. Silakan coba lagi.');
+            } finally {
+                this.portalLoading = false;
+            }
         }
     }
 }

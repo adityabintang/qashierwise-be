@@ -57,70 +57,66 @@
 
         <!-- POS Section - Orders & Payment -->
         <div class="pt-4">
-            <div x-show="sidebarOpen || isMobile" class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
+            <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
                 Point of Sale
             </div>
-            <div x-show="!sidebarOpen && !isMobile" class="border-t border-[hsl(var(--sidebar-border))] my-2"></div>
         </div>
         <a href="/dashboard/pos/orders" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-orders' ? 'active' : '' }}">
             <i class="fas fa-shopping-cart w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Orders</span>
+            <span>Orders</span>
         </a>
         <a href="/dashboard/pos/payment" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-payment' ? 'active' : '' }}">
             <i class="fas fa-credit-card w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Payment</span>
+            <span>Payment</span>
         </a>
 
         <!-- POS Inventory Section -->
         <div class="pt-4">
-            <div x-show="sidebarOpen || isMobile" class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
+            <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
                 Inventory
             </div>
-            <div x-show="!sidebarOpen && !isMobile" class="border-t border-[hsl(var(--sidebar-border))] my-2"></div>
         </div>
         <a href="/dashboard/pos/products" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-products' ? 'active' : '' }}">
             <i class="fas fa-box w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Products</span>
+            <span>Products</span>
         </a>
         <a href="/dashboard/pos/categories" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-categories' ? 'active' : '' }}">
             <i class="fas fa-tags w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Categories</span>
+            <span>Categories</span>
         </a>
 
         <!-- POS Operations Section -->
         <div class="pt-4">
-            <div x-show="sidebarOpen || isMobile" class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
+            <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
                 Operations
             </div>
-            <div x-show="!sidebarOpen && !isMobile" class="border-t border-[hsl(var(--sidebar-border))] my-2"></div>
         </div>
         <a href="/dashboard/pos/stores" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-stores' ? 'active' : '' }}">
             <i class="fas fa-store w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Stores</span>
+            <span>Stores</span>
         </a>
         <a href="/dashboard/pos/tables" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-tables' ? 'active' : '' }}">
             <i class="fas fa-chair w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Tables</span>
+            <span>Tables</span>
         </a>
         <a href="/dashboard/pos/users" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-users' ? 'active' : '' }}">
             <i class="fas fa-users w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Users</span>
+            <span>Users</span>
         </a>
 
         <!-- POS Analytics Section -->
         <div class="pt-4">
-            <div x-show="sidebarOpen || isMobile" class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
+            <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
                 Analytics
             </div>
-            <div x-show="!sidebarOpen && !isMobile" class="border-t border-[hsl(var(--sidebar-border))] my-2"></div>
         </div>
         <a href="/dashboard/pos/reports" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-reports' ? 'active' : '' }}">
             <i class="fas fa-chart-bar w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Reports</span>
+            <span>Reports</span>
         </a>
         <a href="/dashboard/pos/transactions" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-transactions' ? 'active' : '' }}">
             <i class="fas fa-receipt w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Transactions</span>
+            <span>Transactions</span>
         </a>
     </nav>
 
