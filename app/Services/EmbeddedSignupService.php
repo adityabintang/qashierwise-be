@@ -307,15 +307,16 @@ class EmbeddedSignupService
      * 
      * This method orchestrates the entire flow:
      * 1. Exchange code for token
-     * 2. Get WABA details
+     * 2. Get WABA details (from session info or API fallback)
      * 3. Get phone number details
      * 4. Store credentials
      *
      * @param int $userId User ID
      * @param string $code Authorization code from Facebook SDK
+     * @param array $sessionInfo Optional session info from embedded signup containing waba_id, phone_number_id, business_id
      * @return array{success: bool, account?: WhatsAppAccount, error?: string}
      */
-    public function processSignup(int $userId, string $code): array
+    public function processSignup(int $userId, string $code, array $sessionInfo = []): array
     {
         // Step 1: Exchange code for token
         $tokenResult = $this->exchangeCodeForToken($code);
@@ -328,16 +329,33 @@ class EmbeddedSignupService
 
         $accessToken = $tokenResult['access_token'];
 
-        // Step 2: Get WABA details
-        $wabaResult = $this->getWABADetails($accessToken);
-        if (!$wabaResult['success']) {
-            return [
-                'success' => false,
-                'error' => $wabaResult['error'],
-            ];
+        // Step 2: Get WABA ID - prefer session info from embedded signup, fallback to API
+        $wabaId = null;
+        $phoneNumberId = null;
+        
+        if (!empty($sessionInfo['waba_id'])) {
+            // Use waba_id directly from embedded signup session info
+            $wabaId = $sessionInfo['waba_id'];
+            $phoneNumberId = $sessionInfo['phone_number_id'] ?? null;
+            
+            Log::info('Using WABA ID from embedded signup session info', [
+                'waba_id' => $wabaId,
+                'phone_number_id' => $phoneNumberId,
+                'business_id' => $sessionInfo['business_id'] ?? null,
+            ]);
+        } else {
+            // Fallback: Get WABA details from debug_token API
+            $wabaResult = $this->getWABADetails($accessToken);
+            if (!$wabaResult['success']) {
+                return [
+                    'success' => false,
+                    'error' => $wabaResult['error'],
+                ];
+            }
+            $wabaId = $wabaResult['waba_id'];
+            
+            Log::info('Using WABA ID from debug_token API (fallback)', ['waba_id' => $wabaId]);
         }
-
-        $wabaId = $wabaResult['waba_id'];
 
         // Step 3: Get phone number details
         $phoneResult = $this->getPhoneNumberDetails($accessToken, $wabaId);
@@ -348,8 +366,22 @@ class EmbeddedSignupService
             ];
         }
 
-        // Use the first phone number
-        $phoneNumber = $phoneResult['phone_numbers'][0];
+        // Use phone_number_id from session info if available, otherwise use first from API
+        $phoneNumber = null;
+        if ($phoneNumberId) {
+            // Find matching phone number from API response
+            foreach ($phoneResult['phone_numbers'] as $pn) {
+                if ($pn['id'] === $phoneNumberId) {
+                    $phoneNumber = $pn;
+                    break;
+                }
+            }
+        }
+        
+        // Fallback to first phone number if not found
+        if (!$phoneNumber) {
+            $phoneNumber = $phoneResult['phone_numbers'][0];
+        }
 
         // Step 4: Store credentials
         $credentials = [

@@ -585,14 +585,21 @@ function whatsAppAccountApp() {
 
             // Try FB.login first if SDK is available
             if (typeof FB !== 'undefined') {
+                // Store reference to this for use in callback
+                const self = this;
+                
                 FB.login((response) => {
                     if (response.authResponse) {
                         const code = response.authResponse.code;
-                        this.sendCodeToBackend(code);
+                        // Get session info from extras if available (contains waba_id, phone_number_id, business_id)
+                        const sessionInfo = response.authResponse.extras?.session_info || null;
+                        console.log('FB.login response:', response);
+                        console.log('Session info from embedded signup:', sessionInfo);
+                        self.sendCodeToBackend(code, sessionInfo);
                     } else {
                         console.log('User cancelled login or did not fully authorize.');
-                        this.connecting = false;
-                        this.handleSignupCancel();
+                        self.connecting = false;
+                        self.handleSignupCancel();
                     }
                 }, {
                     config_id: this.config.config_id,
@@ -648,12 +655,23 @@ function whatsAppAccountApp() {
         },
 
         /**
-         * Send authorization code to backend for token exchange
+         * Send authorization code and session info to backend for token exchange
          * Requirements: 1.4
+         * @param {string} code - Authorization code from Facebook
+         * @param {object} sessionInfo - Session info object containing waba_id, phone_number_id, business_id, etc.
          */
-        async sendCodeToBackend(code) {
+        async sendCodeToBackend(code, sessionInfo = null) {
             try {
                 const token = localStorage.getItem('token');
+                
+                // Build request body with code and optional session info
+                const body = { code };
+                if (sessionInfo) {
+                    body.waba_id = sessionInfo.waba_id;
+                    body.phone_number_id = sessionInfo.phone_number_id;
+                    body.business_id = sessionInfo.business_id;
+                }
+                
                 const res = await fetch(`${this.API_BASE_URL}/whatsapp/embedded-signup/callback`, {
                     method: 'POST',
                     headers: {
@@ -661,7 +679,7 @@ function whatsAppAccountApp() {
                         'Authorization': `Bearer ${token}`,
                         'Accept': 'application/json'
                     },
-                    body: JSON.stringify({ code })
+                    body: JSON.stringify(body)
                 });
 
                 const data = await res.json();

@@ -47,15 +47,28 @@ class EmbeddedSignupController extends Controller
 
         $request->validate([
             'code' => 'required|string',
+            'waba_id' => 'nullable|string',
+            'phone_number_id' => 'nullable|string',
+            'business_id' => 'nullable|string',
         ]);
 
         $userId = auth()->id();
         $code = $request->input('code');
+        
+        // Get session info from embedded signup response (waba_id, phone_number_id, business_id)
+        $sessionInfo = [
+            'waba_id' => $request->input('waba_id'),
+            'phone_number_id' => $request->input('phone_number_id'),
+            'business_id' => $request->input('business_id'),
+        ];
 
-        Log::info('Processing Embedded Signup callback', ['user_id' => $userId]);
+        Log::info('Processing Embedded Signup callback', [
+            'user_id' => $userId,
+            'has_session_info' => !empty($sessionInfo['waba_id']),
+        ]);
 
-        // Process the complete signup flow
-        $result = $this->embeddedSignupService->processSignup($userId, $code);
+        // Process the complete signup flow with session info from embedded signup
+        $result = $this->embeddedSignupService->processSignup($userId, $code, $sessionInfo);
 
         if (!$result['success']) {
             Log::error('Embedded Signup failed', [
