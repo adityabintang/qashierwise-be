@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\WhatsAppNotConnectedException;
 use App\Http\Controllers\Controller;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
@@ -9,6 +10,7 @@ use App\Models\WhatsAppMessage;
 use App\Models\WhatsAppTemplate;
 use App\Services\MediaStorageService;
 use App\Services\TemplateService;
+use App\Services\WhatsAppAccountService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\UploadedFile;
@@ -25,31 +27,75 @@ use Netflie\WhatsAppCloudApi\WhatsAppCloudApi;
 
 class WhatsAppController extends Controller
 {
-    protected $whatsapp;
-
     protected $whatsappAccount;
 
     protected MediaStorageService $mediaStorageService;
 
     protected TemplateService $templateService;
 
-    public function __construct(MediaStorageService $mediaStorageService, TemplateService $templateService)
-    {
+    protected WhatsAppAccountService $whatsAppAccountService;
+
+    public function __construct(
+        MediaStorageService $mediaStorageService,
+        TemplateService $templateService,
+        WhatsAppAccountService $whatsAppAccountService
+    ) {
         $this->mediaStorageService = $mediaStorageService;
         $this->templateService = $templateService;
-        $this->whatsapp = new WhatsAppCloudApi([
-            'from_phone_number_id' => config('whatsapp.phone_number_id'),
-            'access_token' => config('whatsapp.access_token'),
-        ]);
+        $this->whatsAppAccountService = $whatsAppAccountService;
     }
 
     /**
-     * Upload media to WhatsApp with correct MIME type
+     * Get WhatsApp Cloud API client for the authenticated user.
+     * Uses user's stored credentials from WhatsAppAccountService.
+     *
+     * @return WhatsAppCloudApi
+     * @throws WhatsAppNotConnectedException
+     */
+    protected function getWhatsAppClient(): WhatsAppCloudApi
+    {
+        $userId = auth()->id();
+        if (!$userId) {
+            throw new WhatsAppNotConnectedException('Authentication required to access WhatsApp features.');
+        }
+
+        return $this->whatsAppAccountService->getClientForUser($userId);
+    }
+
+    /**
+     * Get the user's active WhatsApp account credentials.
+     *
+     * @return WhatsAppAccount
+     * @throws WhatsAppNotConnectedException
+     */
+    protected function getUserWhatsAppAccount(): WhatsAppAccount
+    {
+        $userId = auth()->id();
+        if (!$userId) {
+            throw new WhatsAppNotConnectedException('Authentication required to access WhatsApp features.');
+        }
+
+        $account = $this->whatsAppAccountService->getActiveAccount($userId);
+        if (!$account) {
+            throw new WhatsAppNotConnectedException('No connected WhatsApp account found for this user.');
+        }
+
+        return $account;
+    }
+
+    /**
+     * Upload media to WhatsApp with correct MIME type.
+     * Uses user's stored credentials for the API call.
+     *
+     * @param UploadedFile $file
+     * @return array
+     * @throws WhatsAppNotConnectedException
      */
     private function uploadMediaToWhatsApp(UploadedFile $file): array
     {
-        $phoneNumberId = config('whatsapp.phone_number_id');
-        $accessToken = config('whatsapp.access_token');
+        $account = $this->getUserWhatsAppAccount();
+        $phoneNumberId = $account->phone_number_id;
+        $accessToken = $account->access_token;
 
         $response = Http::withToken($accessToken)
             ->attach(
@@ -73,20 +119,16 @@ class WhatsAppController extends Controller
 
 
     /**
-     * Get WhatsApp account instance
+     * Get WhatsApp account instance for the authenticated user.
+     * Uses WhatsAppAccountService to retrieve user's connected account.
+     *
+     * @return WhatsAppAccount
+     * @throws WhatsAppNotConnectedException
      */
-    private function getWhatsAppAccount()
+    private function getWhatsAppAccount(): WhatsAppAccount
     {
         if (! $this->whatsappAccount) {
-            $this->whatsappAccount = WhatsAppAccount::firstOrCreate(
-                ['phone_number_id' => config('whatsapp.phone_number_id')],
-                [
-                    'user_id' => auth()->id() ?? 1,
-                    'business_account_id' => config('whatsapp.business_account_id', 'default'),
-                    'access_token' => config('whatsapp.access_token'),
-                    'is_active' => true,
-                ]
-            );
+            $this->whatsappAccount = $this->getUserWhatsAppAccount();
         }
 
         return $this->whatsappAccount;
@@ -206,7 +248,8 @@ class WhatsAppController extends Controller
         ]);
 
         try {
-            $response = $this->whatsapp->sendTextMessage(
+            $whatsapp = $this->getWhatsAppClient();
+            $response = $whatsapp->sendTextMessage(
                 $request->to,
                 $request->message
             );
@@ -220,6 +263,12 @@ class WhatsAppController extends Controller
                 'message' => 'Text message sent successfully',
                 'data' => $response->decodedBody(),
             ], 200);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -241,9 +290,11 @@ class WhatsAppController extends Controller
         ]);
 
         try {
+            $whatsapp = $this->getWhatsAppClient();
+
             // For simple template without parameters (like hello_world)
             if (! $request->has('header_params') && ! $request->has('body_params') && ! $request->has('button_params')) {
-                $response = $this->whatsapp->sendTemplate(
+                $response = $whatsapp->sendTemplate(
                     $request->to,
                     $request->template_name,
                     $request->language
@@ -267,7 +318,7 @@ class WhatsAppController extends Controller
                     $component_buttons = [new Component($request->button_params)];
                 }
 
-                $response = $this->whatsapp->sendTemplate(
+                $response = $whatsapp->sendTemplate(
                     $request->to,
                     $request->template_name,
                     $request->language,
@@ -293,6 +344,12 @@ class WhatsAppController extends Controller
                 'message' => 'Template message sent successfully',
                 'data' => $response->decodedBody(),
             ], 200);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -316,6 +373,7 @@ class WhatsAppController extends Controller
         ]);
 
         try {
+            $whatsapp = $this->getWhatsAppClient();
             $imageUrl = $request->image_url;
 
             // If file is uploaded, upload to WhatsApp first
@@ -336,7 +394,7 @@ class WhatsAppController extends Controller
                 // Use MediaObjectID for uploaded media
                 $media_id = new MediaObjectID($uploadData['id']);
 
-                $response = $this->whatsapp->sendImage(
+                $response = $whatsapp->sendImage(
                     $request->to,
                     $media_id,
                     $request->caption ?? ''
@@ -344,7 +402,7 @@ class WhatsAppController extends Controller
             } else {
                 $link_id = new LinkID($request->image_url);
 
-                $response = $this->whatsapp->sendImage(
+                $response = $whatsapp->sendImage(
                     $request->to,
                     $link_id,
                     $request->caption ?? ''
@@ -364,6 +422,12 @@ class WhatsAppController extends Controller
                 'message' => 'Image sent successfully',
                 'data' => $response->decodedBody(),
             ], 200);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -388,6 +452,7 @@ class WhatsAppController extends Controller
         ]);
 
         try {
+            $whatsapp = $this->getWhatsAppClient();
             $documentUrl = $request->document_url;
             $filename = $request->filename;
 
@@ -409,7 +474,7 @@ class WhatsAppController extends Controller
                 // Use MediaObjectID for uploaded media
                 $media_id = new MediaObjectID($uploadData['id']);
 
-                $response = $this->whatsapp->sendDocument(
+                $response = $whatsapp->sendDocument(
                     $request->to,
                     $media_id,
                     $filename,
@@ -418,7 +483,7 @@ class WhatsAppController extends Controller
             } else {
                 $link_id = new LinkID($request->document_url);
 
-                $response = $this->whatsapp->sendDocument(
+                $response = $whatsapp->sendDocument(
                     $request->to,
                     $link_id,
                     $filename ?? 'document',
@@ -440,6 +505,12 @@ class WhatsAppController extends Controller
                 'message' => 'Document sent successfully',
                 'data' => $response->decodedBody(),
             ], 200);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -462,6 +533,7 @@ class WhatsAppController extends Controller
         ]);
 
         try {
+            $whatsapp = $this->getWhatsAppClient();
             $audioUrl = $request->audio_url;
 
             // If file is uploaded, upload to WhatsApp first
@@ -481,14 +553,14 @@ class WhatsAppController extends Controller
                 // Use MediaObjectID for uploaded media
                 $media_id = new MediaObjectID($uploadData['id']);
 
-                $response = $this->whatsapp->sendAudio(
+                $response = $whatsapp->sendAudio(
                     $request->to,
                     $media_id
                 );
             } else {
                 $link_id = new LinkID($request->audio_url);
 
-                $response = $this->whatsapp->sendAudio(
+                $response = $whatsapp->sendAudio(
                     $request->to,
                     $link_id
                 );
@@ -504,6 +576,12 @@ class WhatsAppController extends Controller
                 'message' => 'Audio sent successfully',
                 'data' => $response->decodedBody(),
             ], 200);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -527,6 +605,7 @@ class WhatsAppController extends Controller
         ]);
 
         try {
+            $whatsapp = $this->getWhatsAppClient();
             $videoUrl = $request->video_url;
 
             // If file is uploaded, upload to WhatsApp first
@@ -546,7 +625,7 @@ class WhatsAppController extends Controller
                 // Use MediaObjectID for uploaded media
                 $media_id = new MediaObjectID($uploadData['id']);
 
-                $response = $this->whatsapp->sendVideo(
+                $response = $whatsapp->sendVideo(
                     $request->to,
                     $media_id,
                     $request->caption ?? ''
@@ -554,7 +633,7 @@ class WhatsAppController extends Controller
             } else {
                 $link_id = new LinkID($request->video_url);
 
-                $response = $this->whatsapp->sendVideo(
+                $response = $whatsapp->sendVideo(
                     $request->to,
                     $link_id,
                     $request->caption ?? ''
@@ -574,6 +653,12 @@ class WhatsAppController extends Controller
                 'message' => 'Video sent successfully',
                 'data' => $response->decodedBody(),
             ], 200);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -597,7 +682,8 @@ class WhatsAppController extends Controller
         ]);
 
         try {
-            $response = $this->whatsapp->sendLocation(
+            $whatsapp = $this->getWhatsAppClient();
+            $response = $whatsapp->sendLocation(
                 $request->to,
                 $request->longitude,
                 $request->latitude,
@@ -620,6 +706,12 @@ class WhatsAppController extends Controller
                 'message' => 'Location sent successfully',
                 'data' => $response->decodedBody(),
             ], 200);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -644,11 +736,13 @@ class WhatsAppController extends Controller
         ]);
 
         try {
+            $whatsapp = $this->getWhatsAppClient();
+
             // Format contacts for WhatsApp API
             $contacts = $request->contacts;
             $firstContact = $contacts[0];
 
-            $response = $this->whatsapp->sendContact(
+            $response = $whatsapp->sendContact(
                 $request->to,
                 $firstContact['name']['formatted_name'],
                 $firstContact['phones'][0]['phone']
@@ -664,6 +758,12 @@ class WhatsAppController extends Controller
                 'message' => 'Contact sent successfully',
                 'data' => $response->decodedBody(),
             ], 200);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -685,6 +785,8 @@ class WhatsAppController extends Controller
         ]);
 
         try {
+            $whatsapp = $this->getWhatsAppClient();
+
             $buttonObjects = [];
             $buttonData = [];
             foreach ($request->buttons as $index => $button) {
@@ -696,7 +798,7 @@ class WhatsAppController extends Controller
 
             $buttonAction = new ButtonAction($buttonObjects);
 
-            $response = $this->whatsapp->sendButton(
+            $response = $whatsapp->sendButton(
                 $request->to,
                 $request->body,
                 $buttonAction,
@@ -719,6 +821,12 @@ class WhatsAppController extends Controller
                 'message' => 'Button message sent successfully',
                 'data' => $response->decodedBody(),
             ], 200);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -741,6 +849,8 @@ class WhatsAppController extends Controller
         ]);
 
         try {
+            $whatsapp = $this->getWhatsAppClient();
+
             // Build sections with Row and Section objects
             $sectionObjects = [];
             foreach ($request->sections as $section) {
@@ -761,7 +871,7 @@ class WhatsAppController extends Controller
             // Create Action object
             $action = new ListAction($request->button_text, $sectionObjects);
 
-            $response = $this->whatsapp->sendList(
+            $response = $whatsapp->sendList(
                 $request->to,
                 $request->header ?? '',
                 $request->body,
@@ -785,6 +895,12 @@ class WhatsAppController extends Controller
                 'message' => 'List message sent successfully',
                 'data' => $response->decodedBody(),
             ], 200);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -804,13 +920,20 @@ class WhatsAppController extends Controller
         ]);
 
         try {
-            $response = $this->whatsapp->markMessageAsRead($request->message_id);
+            $whatsapp = $this->getWhatsAppClient();
+            $response = $whatsapp->markMessageAsRead($request->message_id);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Message marked as read',
                 'data' => $response->decodedBody(),
             ], 200);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -830,13 +953,20 @@ class WhatsAppController extends Controller
         ]);
 
         try {
-            $response = $this->whatsapp->downloadMedia($request->media_id);
+            $whatsapp = $this->getWhatsAppClient();
+            $response = $whatsapp->downloadMedia($request->media_id);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Media URL retrieved successfully',
                 'data' => $response->decodedBody(),
             ], 200);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -857,16 +987,23 @@ class WhatsAppController extends Controller
         ]);
 
         try {
+            $whatsapp = $this->getWhatsAppClient();
             $file = $request->file('file');
             $path = $file->getRealPath();
 
-            $response = $this->whatsapp->uploadMedia($path);
+            $response = $whatsapp->uploadMedia($path);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Media uploaded successfully',
                 'data' => $response->decodedBody(),
             ], 200);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -883,6 +1020,7 @@ class WhatsAppController extends Controller
     {
         try {
             $account = $this->getWhatsAppAccount();
+            $whatsapp = $this->getWhatsAppClient();
 
             // First check if we have profile data in database
             $localProfile = [
@@ -911,7 +1049,7 @@ class WhatsAppController extends Controller
 
             // If no local data, fetch from WhatsApp API and save to database
             $fields = 'about,address,description,email,profile_picture_url,websites,vertical';
-            $response = $this->whatsapp->businessProfile($fields);
+            $response = $whatsapp->businessProfile($fields);
             $apiData = $response->decodedBody();
 
             // Save API data to database for future use
@@ -934,6 +1072,12 @@ class WhatsAppController extends Controller
                 'data' => $apiData['data'][0] ?? $apiData,
                 'source' => 'whatsapp_api',
             ], 200);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -959,6 +1103,8 @@ class WhatsAppController extends Controller
                 'websites.*' => 'url',
             ]);
 
+            $whatsapp = $this->getWhatsAppClient();
+
             $data = $request->only([
                 'about',
                 'address',
@@ -974,7 +1120,7 @@ class WhatsAppController extends Controller
             });
 
             // Update WhatsApp API
-            $response = $this->whatsapp->updateBusinessProfile($data);
+            $response = $whatsapp->updateBusinessProfile($data);
 
             // Save to database
             $account = $this->getWhatsAppAccount();
@@ -996,6 +1142,12 @@ class WhatsAppController extends Controller
                 'message' => 'Business profile updated successfully',
                 'data' => $data,
             ], 200);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
@@ -1017,8 +1169,9 @@ class WhatsAppController extends Controller
     public function getPhoneNumberInfo()
     {
         try {
-            $phoneNumberId = config('whatsapp.phone_number_id');
-            $accessToken = config('whatsapp.access_token');
+            $account = $this->getUserWhatsAppAccount();
+            $phoneNumberId = $account->phone_number_id;
+            $accessToken = $account->access_token;
 
             // Call Graph API directly to get phone number details
             $response = Http::withToken($accessToken)
@@ -1035,6 +1188,12 @@ class WhatsAppController extends Controller
                 'message' => 'Phone number info retrieved successfully',
                 'data' => $response->json(),
             ], 200);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -1051,9 +1210,10 @@ class WhatsAppController extends Controller
     public function getBusinessAccount()
     {
         try {
-            $phoneNumberId = config('whatsapp.phone_number_id');
-            $businessAccountId = config('whatsapp.business_account_id');
-            $accessToken = config('whatsapp.access_token');
+            $account = $this->getUserWhatsAppAccount();
+            $phoneNumberId = $account->phone_number_id;
+            $businessAccountId = $account->waba_id ?? $account->business_account_id;
+            $accessToken = $account->access_token;
 
             // Get phone numbers associated with the business account
             // This endpoint works with Standard Access (no BSP required)
@@ -1083,6 +1243,12 @@ class WhatsAppController extends Controller
                     'total_phone_numbers' => count($data['data'] ?? []),
                 ],
             ], 200);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -1099,7 +1265,8 @@ class WhatsAppController extends Controller
     public function getAllBusinessAccounts()
     {
         try {
-            $accessToken = config('whatsapp.access_token');
+            $account = $this->getUserWhatsAppAccount();
+            $accessToken = $account->access_token;
             $appId = config('whatsapp.app_id');
 
             if (! $appId) {
@@ -1113,8 +1280,8 @@ class WhatsAppController extends Controller
             $allWABAs = [];
 
             // Fallback: Try to get from current business account and find related accounts
-            // Get current WABA details
-            $currentWABAId = config('whatsapp.business_account_id');
+            // Get current WABA details from user's account
+            $currentWABAId = $account->waba_id ?? $account->business_account_id;
 
             // Try multiple approaches to find all WABAs
             // Approach 1: Get phone numbers from current WABA
@@ -1141,7 +1308,7 @@ class WhatsAppController extends Controller
 
             // Approach 2: Try to find other WABAs by querying phone number's owner
             // Get on_behalf_of_business_info from current phone
-            $phoneNumberId = config('whatsapp.phone_number_id');
+            $phoneNumberId = $account->phone_number_id;
             $phoneInfoResponse = Http::withToken($accessToken)
                 ->get("https://graph.facebook.com/v21.0/{$phoneNumberId}", [
                     'fields' => 'verified_name,display_phone_number,account_mode,certificate,code_verification_status,quality_rating,name_status',
@@ -1191,6 +1358,12 @@ class WhatsAppController extends Controller
                         : null,
                 ],
             ], 200);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -1447,6 +1620,7 @@ class WhatsAppController extends Controller
     public function markContactMessagesAsRead($contactId)
     {
         try {
+            $whatsapp = $this->getWhatsAppClient();
             $userId = auth()->id() ?? 1;
 
             // Get all unread incoming messages from this contact
@@ -1462,7 +1636,7 @@ class WhatsAppController extends Controller
             foreach ($unreadMessages as $message) {
                 try {
                     // Call WhatsApp API to mark message as read
-                    $this->whatsapp->markMessageAsRead($message->message_id);
+                    $whatsapp->markMessageAsRead($message->message_id);
 
                     // Update in database
                     $message->is_read = true;
@@ -1497,6 +1671,12 @@ class WhatsAppController extends Controller
                 'message' => 'Messages marked as read',
                 'updated_count' => $markedCount,
             ], 200);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -1569,8 +1749,8 @@ class WhatsAppController extends Controller
      */
     private function syncTemplatesFromApi($account)
     {
-        $wabaId = config('whatsapp.business_account_id');
-        $accessToken = config('whatsapp.access_token');
+        $wabaId = $account->waba_id ?? $account->business_account_id;
+        $accessToken = $account->access_token;
 
         $response = Http::withToken($accessToken)
             ->get("https://graph.facebook.com/v21.0/{$wabaId}/message_templates", [
@@ -1640,8 +1820,9 @@ class WhatsAppController extends Controller
     public function getTemplateByName($name, Request $request)
     {
         try {
-            $wabaId = config('whatsapp.business_account_id');
-            $accessToken = config('whatsapp.access_token');
+            $account = $this->getUserWhatsAppAccount();
+            $wabaId = $account->waba_id ?? $account->business_account_id;
+            $accessToken = $account->access_token;
 
             $response = Http::withToken($accessToken)
                 ->get("https://graph.facebook.com/v21.0/{$wabaId}/message_templates", [
@@ -1671,6 +1852,12 @@ class WhatsAppController extends Controller
                 'data' => $templates,
             ], 200);
 
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -2014,9 +2201,10 @@ class WhatsAppController extends Controller
         ]);
 
         try {
+            $account = $this->getUserWhatsAppAccount();
             $file = $request->file('file');
-            $phoneNumberId = config('whatsapp.phone_number_id');
-            $accessToken = config('whatsapp.access_token');
+            $phoneNumberId = $account->phone_number_id;
+            $accessToken = $account->access_token;
             $appId = config('whatsapp.app_id');
 
             $fileContent = file_get_contents($file->getRealPath());
@@ -2086,6 +2274,12 @@ class WhatsAppController extends Controller
                     'profile_picture_url' => $storageResult['url'],
                 ],
             ], 200);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         } catch (\Exception $e) {
             \Log::error('Profile picture upload failed', [
                 'error' => $e->getMessage(),

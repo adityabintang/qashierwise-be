@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BroadcastAuthController;
 use App\Http\Controllers\Api\PolarWebhookController;
 use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\EmbeddedSignupController;
 use App\Http\Controllers\Api\WhatsAppController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
 use App\Http\Controllers\Api\Pos\ProductController;
@@ -59,6 +60,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // WhatsApp Business API routes
     Route::prefix('whatsapp')->group(function () {
+        // Embedded Signup routes
+        Route::post('/embedded-signup/callback', [EmbeddedSignupController::class, 'handleCallback']);
+        Route::get('/embedded-signup/config', [EmbeddedSignupController::class, 'getConfig']);
+        
+        // Account management routes
+        Route::delete('/account', [EmbeddedSignupController::class, 'disconnect']);
+        Route::get('/account', [EmbeddedSignupController::class, 'getAccountStatus']);
+
         // Send Messages
         Route::post('/send/text', [WhatsAppController::class, 'sendTextMessage']);
         Route::post('/send/template', [WhatsAppController::class, 'sendTemplateMessage']);

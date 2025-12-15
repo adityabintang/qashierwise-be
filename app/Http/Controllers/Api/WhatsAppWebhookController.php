@@ -10,6 +10,7 @@ use App\Models\WhatsAppContact;
 use App\Models\WhatsAppMessage;
 use App\Models\WhatsAppTemplate;
 use App\Services\MediaStorageService;
+use App\Services\WhatsAppAccountService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -18,10 +19,14 @@ use Illuminate\Support\Facades\Storage;
 class WhatsAppWebhookController extends Controller
 {
     protected MediaStorageService $mediaStorageService;
+    protected WhatsAppAccountService $whatsAppAccountService;
 
-    public function __construct(MediaStorageService $mediaStorageService)
-    {
+    public function __construct(
+        MediaStorageService $mediaStorageService,
+        WhatsAppAccountService $whatsAppAccountService
+    ) {
         $this->mediaStorageService = $mediaStorageService;
+        $this->whatsAppAccountService = $whatsAppAccountService;
     }
 
     /**
@@ -88,22 +93,30 @@ class WhatsAppWebhookController extends Controller
                             continue;
                         }
 
-                        // Find WhatsApp account and user
-                        $whatsappAccount = WhatsAppAccount::where('phone_number_id', $phoneNumberId)
-                            ->where('is_active', true)
-                            ->first();
+                        // Find WhatsApp account using the service for multi-tenant routing
+                        $whatsappAccount = $this->whatsAppAccountService->getAccountByPhoneNumberId($phoneNumberId);
 
                         if (!$whatsappAccount) {
-                            Log::warning('WhatsApp account not found', ['phone_number_id' => $phoneNumberId]);
+                            // Log and skip processing for unknown phone numbers (Requirement 5.2)
+                            Log::info('Webhook received for unknown phone number, skipping processing', [
+                                'phone_number_id' => $phoneNumberId,
+                                'waba_id' => $wabaId,
+                            ]);
                             continue;
                         }
 
                         $userId = $whatsappAccount->user_id;
 
-                        // Handle message events
+                        Log::info('Webhook routed to user', [
+                            'phone_number_id' => $phoneNumberId,
+                            'user_id' => $userId,
+                            'waba_id' => $wabaId,
+                        ]);
+
+                        // Handle message events - pass account for user-specific credentials
                         if (isset($change['value']['messages'])) {
                             foreach ($change['value']['messages'] as $message) {
-                                $this->handleIncomingMessage($message, $change['value'], $userId);
+                                $this->handleIncomingMessage($message, $change['value'], $userId, $whatsappAccount);
                             }
                         }
 
@@ -133,8 +146,13 @@ class WhatsAppWebhookController extends Controller
 
     /**
      * Handle incoming message
+     * 
+     * @param array $message Message data from webhook
+     * @param array $value Value object containing metadata and contacts
+     * @param int $userId User ID to associate the message with
+     * @param WhatsAppAccount $whatsappAccount The WhatsApp account for user-specific credentials
      */
-    protected function handleIncomingMessage($message, $value, $userId)
+    protected function handleIncomingMessage($message, $value, $userId, WhatsAppAccount $whatsappAccount)
     {
         $from = $message['from'];
         $messageId = $message['id'];
@@ -143,7 +161,8 @@ class WhatsAppWebhookController extends Controller
 
         Log::info("Incoming $type message from $from", [
             'message_id' => $messageId,
-            'user_id' => $userId
+            'user_id' => $userId,
+            'phone_number_id' => $whatsappAccount->phone_number_id,
         ]);
 
         // Get or create contact
@@ -170,7 +189,7 @@ class WhatsAppWebhookController extends Controller
             'type' => $message['type'],
         ];
 
-        // Handle different message types
+        // Handle different message types - pass account for user-specific credentials
         switch ($type) {
             case 'text':
                 $content = $message['text']['body'];
@@ -179,7 +198,7 @@ class WhatsAppWebhookController extends Controller
             case 'image':
                 $mediaId = $message['image']['id'];
                 $mimeType = $message['image']['mime_type'] ?? 'image/jpeg';
-                $mediaResult = $this->downloadAndStoreMedia($mediaId, 'image', $mimeType, null, $from);
+                $mediaResult = $this->downloadAndStoreMedia($mediaId, 'image', $mimeType, null, $from, $whatsappAccount);
                 $content = json_encode([
                     'url' => $mediaResult['url'],
                     'caption' => $message['image']['caption'] ?? '',
@@ -198,7 +217,7 @@ class WhatsAppWebhookController extends Controller
                 $mediaId = $message['document']['id'];
                 $mimeType = $message['document']['mime_type'] ?? 'application/octet-stream';
                 $filename = $message['document']['filename'] ?? 'document';
-                $mediaResult = $this->downloadAndStoreMedia($mediaId, 'document', $mimeType, $filename, $from);
+                $mediaResult = $this->downloadAndStoreMedia($mediaId, 'document', $mimeType, $filename, $from, $whatsappAccount);
                 $content = json_encode([
                     'url' => $mediaResult['url'],
                     'filename' => $filename,
@@ -218,7 +237,7 @@ class WhatsAppWebhookController extends Controller
             case 'audio':
                 $mediaId = $message['audio']['id'];
                 $mimeType = $message['audio']['mime_type'] ?? 'audio/ogg';
-                $mediaResult = $this->downloadAndStoreMedia($mediaId, 'audio', $mimeType, null, $from);
+                $mediaResult = $this->downloadAndStoreMedia($mediaId, 'audio', $mimeType, null, $from, $whatsappAccount);
                 $content = json_encode([
                     'url' => $mediaResult['url'],
                     'exceeded_limit' => $mediaResult['exceeded_limit'],
@@ -235,7 +254,7 @@ class WhatsAppWebhookController extends Controller
             case 'video':
                 $mediaId = $message['video']['id'];
                 $mimeType = $message['video']['mime_type'] ?? 'video/mp4';
-                $mediaResult = $this->downloadAndStoreMedia($mediaId, 'video', $mimeType, null, $from);
+                $mediaResult = $this->downloadAndStoreMedia($mediaId, 'video', $mimeType, null, $from, $whatsappAccount);
                 $content = json_encode([
                     'url' => $mediaResult['url'],
                     'caption' => $message['video']['caption'] ?? '',
@@ -475,12 +494,15 @@ class WhatsAppWebhookController extends Controller
      * @param string $mimeType MIME type of the media
      * @param string|null $filename Original filename (for documents)
      * @param string|null $senderPhone Sender phone number for reply
+     * @param WhatsAppAccount|null $whatsappAccount WhatsApp account for user-specific credentials
      * @return array{url: string|null, exceeded_limit: bool, file_size: int, max_size: int}
      */
-    protected function downloadAndStoreMedia(string $mediaId, string $type, string $mimeType, ?string $filename = null, ?string $senderPhone = null): array
+    protected function downloadAndStoreMedia(string $mediaId, string $type, string $mimeType, ?string $filename = null, ?string $senderPhone = null, ?WhatsAppAccount $whatsappAccount = null): array
     {
         try {
-            $accessToken = config('whatsapp.access_token');
+            // Use user-specific credentials if available, otherwise fall back to config
+            $accessToken = $whatsappAccount?->access_token ?? config('whatsapp.access_token');
+            $phoneNumberId = $whatsappAccount?->phone_number_id ?? config('whatsapp.phone_number_id');
 
             // Step 1: Get media URL and file size from WhatsApp
             $mediaInfoResponse = Http::withToken($accessToken)
@@ -515,7 +537,7 @@ class WhatsAppWebhookController extends Controller
 
                 // Send reply to client about file size limit
                 if ($senderPhone) {
-                    $this->sendFileSizeLimitReply($senderPhone, $type, $fileSize, $maxSize);
+                    $this->sendFileSizeLimitReply($senderPhone, $type, $fileSize, $maxSize, $accessToken, $phoneNumberId);
                 }
 
                 return ['url' => null, 'exceeded_limit' => true, 'file_size' => $fileSize, 'max_size' => $maxSize];
@@ -547,7 +569,7 @@ class WhatsAppWebhookController extends Controller
                 ]);
 
                 if ($senderPhone) {
-                    $this->sendFileSizeLimitReply($senderPhone, $type, $actualSize, $maxSize);
+                    $this->sendFileSizeLimitReply($senderPhone, $type, $actualSize, $maxSize, $accessToken, $phoneNumberId);
                 }
 
                 return ['url' => null, 'exceeded_limit' => true, 'file_size' => $actualSize, 'max_size' => $maxSize];
@@ -590,8 +612,15 @@ class WhatsAppWebhookController extends Controller
 
     /**
      * Send reply to client when file size exceeds limit
+     * 
+     * @param string $to Recipient phone number
+     * @param string $type Media type
+     * @param int $fileSize Actual file size in bytes
+     * @param int $maxSize Maximum allowed size in bytes
+     * @param string|null $accessToken User-specific access token (falls back to config)
+     * @param string|null $phoneNumberId User-specific phone number ID (falls back to config)
      */
-    protected function sendFileSizeLimitReply(string $to, string $type, int $fileSize, int $maxSize): void
+    protected function sendFileSizeLimitReply(string $to, string $type, int $fileSize, int $maxSize, ?string $accessToken = null, ?string $phoneNumberId = null): void
     {
         try {
             $fileSizeMB = round($fileSize / (1024 * 1024), 2);
@@ -609,8 +638,9 @@ class WhatsAppWebhookController extends Controller
                 . "Ukuran file yang Anda kirim ({$fileSizeMB} MB) melebihi batas maksimum ({$maxSizeMB} MB).\n\n"
                 . "Silakan kirim file dengan ukuran lebih kecil.";
 
-            $accessToken = config('whatsapp.access_token');
-            $phoneNumberId = config('whatsapp.phone_number_id');
+            // Use provided credentials or fall back to config
+            $accessToken = $accessToken ?? config('whatsapp.access_token');
+            $phoneNumberId = $phoneNumberId ?? config('whatsapp.phone_number_id');
 
             Http::withToken($accessToken)
                 ->post("https://graph.facebook.com/v21.0/{$phoneNumberId}/messages", [

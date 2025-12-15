@@ -132,8 +132,9 @@ class PaymentService
         $existingPaymentsTotal = (float) $order->payments()->sum('amount');
         $remainingAmount = (float) $order->total - $existingPaymentsTotal;
 
-        // Validate total payment covers remaining amount
-        if ($totalPaymentAmount < $remainingAmount) {
+        // Validate total payment covers remaining amount (using tolerance for floating-point comparison)
+        $tolerance = 0.001; // 0.1 cent tolerance for floating-point precision
+        if ($totalPaymentAmount < $remainingAmount - $tolerance) {
             throw new InvalidArgumentException(
                 "Total payment amount ({$totalPaymentAmount}) is less than remaining order amount ({$remainingAmount})"
             );
