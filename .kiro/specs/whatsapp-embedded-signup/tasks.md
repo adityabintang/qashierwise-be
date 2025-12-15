@@ -1,0 +1,157 @@
+# Implementation Plan
+
+- [ ] 1. Database Schema Updates
+  - [ ] 1.1 Create migration to add embedded signup fields to whatsapp_accounts table
+    - Add `waba_id` (string, nullable)
+    - Add `coexistence_enabled` (boolean, default false)
+    - Add `token_expires_at` (timestamp, nullable)
+    - Add `connection_method` (string, default 'manual')
+    - _Requirements: 2.1, 2.2, 8.2_
+  - [ ] 1.2 Update WhatsAppAccount model with new fields and encrypted cast for access_token
+    - Add new fillable fields
+    - Add `'access_token' => 'encrypted'` to casts
+    - Add `'token_expires_at' => 'datetime'` to casts
+    - _Requirements: 2.2, 2.4_
+  - [ ] 1.3 Write property test for access token encryption
+    - **Property 2: Access Token Encryption**
+    - **Validates: Requirements 2.2**
+
+- [ ] 2. Configuration Updates
+  - [ ] 2.1 Update config/whatsapp.php with embedded signup configuration
+    - Add `embedded_signup` array with app_id, app_secret, config_id
+    - Add `es_version` set to 'v4'
+    - Keep legacy config for backward compatibility
+    - _Requirements: 6.1, 6.3_
+  - [ ] 2.2 Update .env.example with new environment variables
+    - Add WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID
+    - Document ES v4 configuration
+    - _Requirements: 6.1_
+  - [ ] 2.3 Write property test for missing config disables feature
+    - **Property 12: Missing Config Disables Feature**
+    - **Validates: Requirements 6.2**
+
+- [ ] 3. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 4. Backend Service Layer
+  - [ ] 4.1 Create EmbeddedSignupService class
+    - Implement `exchangeCodeForToken(string $code): array`
+    - Implement `getWABADetails(string $accessToken): array`
+    - Implement `getPhoneNumberDetails(string $accessToken, string $wabaId): array`
+    - Implement `storeCredentials(int $userId, array $credentials): WhatsAppAccount`
+    - Implement `validateToken(string $accessToken): bool`
+    - _Requirements: 1.4, 1.5, 2.1, 2.4_
+  - [ ] 4.2 Write property test for credential storage completeness
+    - **Property 1: Credential Storage Completeness**
+    - **Validates: Requirements 2.1, 2.4**
+  - [ ] 4.3 Write property test for upsert prevents duplicates
+    - **Property 3: Upsert Prevents Duplicates**
+    - **Validates: Requirements 2.3**
+  - [ ] 4.4 Create WhatsAppAccountService class
+    - Implement `getClientForUser(int $userId): WhatsAppCloudApi`
+    - Implement `getActiveAccount(int $userId): ?WhatsAppAccount`
+    - Implement `hasConnectedAccount(int $userId): bool`
+    - _Requirements: 3.1, 3.3_
+  - [ ] 4.5 Write property test for dynamic credential usage
+    - **Property 4: Dynamic Credential Usage**
+    - **Validates: Requirements 3.1, 3.3**
+  - [ ] 4.6 Write property test for missing account error
+    - **Property 5: Missing Account Error**
+    - **Validates: Requirements 3.2**
+
+- [ ] 5. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 6. Custom Exceptions
+  - [ ] 6.1 Create custom exception classes
+    - Create `WhatsAppNotConnectedException`
+    - Create `WhatsAppTokenExpiredException`
+    - Create `WhatsAppTokenInvalidException`
+    - Create `EmbeddedSignupDisabledException`
+    - _Requirements: 3.2, 3.4, 6.2_
+  - [ ] 6.2 Register exceptions in exception handler
+    - Add handlers for custom exceptions with appropriate error codes
+    - Return JSON responses with error_code field
+    - _Requirements: 3.2, 3.4_
+  - [ ] 6.3 Write property test for invalid token error
+    - **Property 6: Invalid Token Error**
+    - **Validates: Requirements 3.4**
+
+- [ ] 7. API Controller
+  - [ ] 7.1 Create EmbeddedSignupController
+    - Implement `handleCallback(Request $request): JsonResponse`
+    - Implement `getConfig(): JsonResponse`
+    - Implement `disconnect(): JsonResponse`
+    - Implement `getAccountStatus(): JsonResponse`
+    - _Requirements: 1.3, 1.4, 4.1, 4.2_
+  - [ ] 7.2 Write property test for account status completeness
+    - **Property 7: Account Status Completeness**
+    - **Validates: Requirements 4.1, 4.3**
+  - [ ] 7.3 Write property test for disconnect deactivates account
+    - **Property 8: Disconnect Deactivates Account**
+    - **Validates: Requirements 4.2**
+  - [ ] 7.4 Register API routes for embedded signup
+    - POST `/api/whatsapp/embedded-signup/callback`
+    - GET `/api/whatsapp/embedded-signup/config`
+    - DELETE `/api/whatsapp/account`
+    - GET `/api/whatsapp/account`
+    - _Requirements: 1.3, 4.1, 4.2_
+  - [ ] 7.5 Write property test for coexistence flag persistence
+    - **Property 13: Coexistence Flag Persistence**
+    - **Validates: Requirements 8.2, 8.3**
+
+- [ ] 8. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 9. Update Existing WhatsApp Controller
+  - [ ] 9.1 Refactor WhatsAppController to use WhatsAppAccountService
+    - Replace hardcoded config with dynamic user credentials
+    - Inject WhatsAppAccountService dependency
+    - Update all methods to use user's WhatsApp account
+    - _Requirements: 3.1, 3.3_
+  - [ ] 9.2 Add account validation middleware or checks
+    - Check for connected account before processing requests
+    - Throw WhatsAppNotConnectedException if no account
+    - _Requirements: 3.2_
+
+- [ ] 10. Webhook Routing Updates
+  - [ ] 10.1 Update WhatsAppWebhookController for multi-tenant routing
+    - Match phone_number_id from payload to whatsapp_accounts
+    - Associate messages with correct user
+    - Skip processing for unknown phone numbers
+    - _Requirements: 5.1, 5.2, 5.3_
+  - [ ] 10.2 Write property test for webhook routing correctness
+    - **Property 9: Webhook Routing Correctness**
+    - **Validates: Requirements 5.1**
+  - [ ] 10.3 Write property test for unknown phone number handling
+    - **Property 10: Unknown Phone Number Handling**
+    - **Validates: Requirements 5.2**
+  - [ ] 10.4 Write property test for message isolation
+    - **Property 11: Message Isolation**
+    - **Validates: Requirements 5.4**
+
+- [ ] 11. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 12. Frontend Integration
+  - [ ] 12.1 Create WhatsApp connect button component
+    - Initialize Facebook SDK with app ID and version v24.0
+    - Implement launchWhatsAppSignup() function with config_id
+    - Handle FB.login response and send code to backend
+    - _Requirements: 1.1, 1.2, 6.3_
+  - [ ] 12.2 Add session info message listener
+    - Listen for WA_EMBEDDED_SIGNUP messages from Facebook
+    - Handle FINISH, CANCEL, and ERROR events
+    - _Requirements: 1.3, 7.4_
+  - [ ] 12.3 Create WhatsApp account status display component
+    - Show connected phone number and business name
+    - Display quality rating and coexistence status
+    - Add disconnect button
+    - _Requirements: 4.1, 4.3, 8.3_
+  - [ ] 12.4 Add loading states and error handling UI
+    - Show loading indicator during signup flow
+    - Display success/error messages
+    - _Requirements: 7.1, 7.2, 7.3_
+
+- [ ] 13. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
