@@ -242,8 +242,13 @@ class PolarService
         $signatureValue = null;
         $embeddedTimestamp = null;
 
-        // Format 1: "t=timestamp,v1=signature" (legacy format with embedded timestamp)
-        if (str_contains($signature, '=')) {
+        // Format 1: "v1,base64_signature" (Standard Webhooks format - check FIRST)
+        // This must be checked before legacy format because base64 signatures contain '='
+        if (str_starts_with($signature, 'v1,')) {
+            $signatureValue = substr($signature, 3);
+        }
+        // Format 2: "t=timestamp,v1=signature" (legacy format with embedded timestamp)
+        elseif (str_contains($signature, 't=') && str_contains($signature, 'v1=')) {
             $parts = explode(',', $signature);
             foreach ($parts as $part) {
                 $keyValue = explode('=', $part, 2);
@@ -255,10 +260,6 @@ class PolarService
                     }
                 }
             }
-        }
-        // Format 2: "v1,base64_signature" (Standard Webhooks format)
-        elseif (str_starts_with($signature, 'v1,')) {
-            $signatureValue = substr($signature, 3);
         }
 
         if ($signatureValue === null) {
