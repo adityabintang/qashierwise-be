@@ -172,11 +172,27 @@ class PolarService
      */
     public function getCustomerPortalUrl(string $customerId): ?string
     {
+        $result = $this->getCustomerPortalUrlWithError($customerId);
+        return $result['url'];
+    }
+
+    /**
+     * Get the customer portal URL with detailed error information.
+     * 
+     * Customer portal should be accessible even for cancelled subscriptions,
+     * as users may want to view their billing history or resubscribe.
+     * 
+     * @param string $customerId The Polar customer ID
+     * @return array{url: string|null, error: string|null}
+     */
+    public function getCustomerPortalUrlWithError(string $customerId): array
+    {
         $client = $this->getClient();
         
         if ($client === null) {
-            Log::error('Cannot get customer portal URL: Polar client not available');
-            return null;
+            $error = 'Polar client not available - check POLAR_API_TOKEN';
+            Log::error('Cannot get customer portal URL: ' . $error);
+            return ['url' => null, 'error' => $error];
         }
 
         try {
@@ -191,21 +207,23 @@ class PolarService
             $response = $client->customerSessions->create($sessionCreate);
             
             if ($response->customerSession === null) {
-                Log::error('Customer session creation returned null', [
+                $error = 'Customer session creation returned null';
+                Log::error($error, [
                     'customerId' => $customerId,
                 ]);
-                return null;
+                return ['url' => null, 'error' => $error];
             }
 
-            return $response->customerSession->customerPortalUrl;
+            return ['url' => $response->customerSession->customerPortalUrl, 'error' => null];
         } catch (\Exception $e) {
             // Common causes: customer deleted, invalid customer ID, API error
+            $error = $e->getMessage();
             Log::error('Failed to get customer portal URL', [
-                'error' => $e->getMessage(),
+                'error' => $error,
                 'errorCode' => $e->getCode(),
                 'customerId' => $customerId,
             ]);
-            return null;
+            return ['url' => null, 'error' => $error];
         }
     }
 

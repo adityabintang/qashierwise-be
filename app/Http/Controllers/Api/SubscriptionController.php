@@ -109,6 +109,9 @@ class SubscriptionController extends Controller
     /**
      * Get the customer portal URL for managing subscription.
      * 
+     * Users should be able to access the portal even if their subscription
+     * is cancelled - they may want to view history or resubscribe.
+     * 
      * @param Request $request
      * @return JsonResponse
      */
@@ -122,7 +125,7 @@ class SubscriptionController extends Controller
                 'success' => false,
                 'error' => [
                     'code' => 'SUBSCRIPTION_NOT_FOUND',
-                    'message' => 'No active subscription found',
+                    'message' => 'No subscription record found',
                 ],
             ], 404);
         }
@@ -144,21 +147,23 @@ class SubscriptionController extends Controller
             'subscriptionStatus' => $subscription->status,
         ]);
 
-        $portalUrl = $this->polarService->getCustomerPortalUrl($subscription->polar_customer_id);
+        $result = $this->polarService->getCustomerPortalUrlWithError($subscription->polar_customer_id);
 
-        if ($portalUrl === null) {
-            // Customer may have been deleted in Polar or subscription is cancelled/revoked
+        if ($result['url'] === null) {
+            // Customer may have been deleted in Polar entirely
             Log::warning('Failed to get customer portal URL', [
                 'userId' => $user->id,
                 'polarCustomerId' => $subscription->polar_customer_id,
                 'subscriptionStatus' => $subscription->status,
+                'error' => $result['error'],
             ]);
             
             return response()->json([
                 'success' => false,
                 'error' => [
                     'code' => 'PORTAL_URL_FAILED',
-                    'message' => 'Unable to access customer portal. Your subscription may have been cancelled.',
+                    'message' => 'Unable to access customer portal. The customer record may no longer exist.',
+                    'detail' => config('app.debug') ? $result['error'] : null,
                 ],
             ], 500);
         }
@@ -166,7 +171,7 @@ class SubscriptionController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'portal_url' => $portalUrl,
+                'portal_url' => $result['url'],
             ],
         ]);
     }
