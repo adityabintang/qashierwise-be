@@ -1935,6 +1935,13 @@ class WhatsAppController extends Controller
                 }
             }
 
+            // Set user's credentials for multi-tenant support
+            $account = $this->getWhatsAppAccount();
+            $this->templateService->setCredentials(
+                $account->access_token,
+                $account->waba_id
+            );
+
             // Call TemplateService to create template via WhatsApp API
             $result = $this->templateService->createTemplate($data);
 
@@ -2072,6 +2079,13 @@ class WhatsAppController extends Controller
                 }
             }
 
+            // Set user's credentials for multi-tenant support
+            $account = $this->getWhatsAppAccount();
+            $this->templateService->setCredentials(
+                $account->access_token,
+                $account->waba_id
+            );
+
             // Call TemplateService to update template via WhatsApp API
             $result = $this->templateService->updateTemplate($template->template_id, $data);
 
@@ -2157,10 +2171,32 @@ class WhatsAppController extends Controller
                 ], 404);
             }
 
+            // Set user's credentials for multi-tenant support
+            $this->templateService->setCredentials(
+                $account->access_token,
+                $account->waba_id
+            );
+
             // Call TemplateService to delete template via WhatsApp API
-            $result = $this->templateService->deleteTemplate($name);
+            // Pass template_id (hsm_id) for more reliable deletion
+            $result = $this->templateService->deleteTemplate($name, $template->template_id);
 
             if (!$result['success']) {
+                // Check if template was not found on WhatsApp (error_subcode 2593002)
+                // In this case, we should still delete from local database
+                $isTemplateNotFound = str_contains($result['error'] ?? '', 'Invalid parameter') ||
+                                      str_contains($result['error'] ?? '', 'not found');
+                
+                if ($isTemplateNotFound) {
+                    // Template doesn't exist on WhatsApp, remove from local database
+                    $template->delete();
+                    
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Template removed from local database (was not found on WhatsApp)',
+                    ], 200);
+                }
+                
                 return response()->json([
                     'success' => false,
                     'message' => 'Failed to delete template',
