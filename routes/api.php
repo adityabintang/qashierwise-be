@@ -2,8 +2,19 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BroadcastAuthController;
+use App\Http\Controllers\Api\PolarWebhookController;
+use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\WhatsAppController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
+use App\Http\Controllers\Api\Pos\ProductController;
+use App\Http\Controllers\Api\Pos\CategoryController;
+use App\Http\Controllers\Api\Pos\OrderController;
+use App\Http\Controllers\Api\Pos\PaymentController;
+use App\Http\Controllers\Api\Pos\StoreController;
+use App\Http\Controllers\Api\Pos\TableController;
+use App\Http\Controllers\Api\Pos\PosUserController;
+use App\Http\Controllers\Api\Pos\ReportController;
+use App\Http\Controllers\Api\Pos\TransactionController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -25,6 +36,9 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::get('/whatsapp/webhook', [WhatsAppWebhookController::class, 'verify']);
 Route::post('/whatsapp/webhook', [WhatsAppWebhookController::class, 'handle']);
 
+// Polar.sh Webhook (must be public for Polar to access)
+Route::post('/webhooks/polar', [PolarWebhookController::class, 'handle']);
+
 // Broadcast authentication - Custom controller for Sanctum token auth
 Route::post('/broadcasting/auth', [BroadcastAuthController::class, 'authenticate'])
     ->middleware(['auth:sanctum', \App\Http\Middleware\LogBroadcastingAuth::class]);
@@ -35,6 +49,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::get('/user', [AuthController::class, 'me']); // Alias for /me
+
+    // Subscription routes
+    Route::prefix('subscription')->group(function () {
+        Route::get('/status', [SubscriptionController::class, 'status']);
+        Route::post('/checkout', [SubscriptionController::class, 'createCheckout']);
+        Route::get('/portal', [SubscriptionController::class, 'getPortalUrl']);
+    });
 
     // WhatsApp Business API routes
     Route::prefix('whatsapp')->group(function () {
@@ -86,5 +107,56 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/contacts', [WhatsAppController::class, 'getContacts']);
         Route::get('/contacts/{id}/messages', [WhatsAppController::class, 'getContactMessages']);
         Route::post('/contacts/{id}/mark-read', [WhatsAppController::class, 'markContactMessagesAsRead']);
+    });
+
+    // POS (Point of Sale) API routes
+    Route::prefix('pos')->group(function () {
+        // Products
+        Route::get('/products/search', [ProductController::class, 'search']);
+        Route::apiResource('products', ProductController::class);
+
+        // Categories
+        Route::apiResource('categories', CategoryController::class);
+
+        // Orders
+        Route::post('/orders/{order}/items', [OrderController::class, 'addItem']);
+        Route::delete('/orders/{order}/items/{item}', [OrderController::class, 'removeItem']);
+        Route::post('/orders/{order}/discount', [OrderController::class, 'applyDiscount']);
+        Route::post('/orders/{order}/complete', [OrderController::class, 'complete']);
+        Route::post('/orders/{order}/cancel', [OrderController::class, 'cancel']);
+        Route::apiResource('orders', OrderController::class)->except(['update', 'destroy']);
+
+        // Payments
+        Route::get('/payments/methods', [PaymentController::class, 'methods']);
+        Route::post('/payments/calculate-change', [PaymentController::class, 'calculateChange']);
+        Route::post('/payments/split', [PaymentController::class, 'splitPayment']);
+        Route::post('/payments', [PaymentController::class, 'store']);
+
+        // Stores
+        Route::post('/stores/{store}/deactivate', [StoreController::class, 'deactivate']);
+        Route::post('/stores/{store}/activate', [StoreController::class, 'activate']);
+        Route::apiResource('stores', StoreController::class)->except(['destroy']);
+
+        // Tables
+        Route::apiResource('tables', TableController::class);
+
+        // POS Users
+        Route::post('/pos-users/{posUser}/deactivate', [PosUserController::class, 'deactivate']);
+        Route::post('/pos-users/{posUser}/activate', [PosUserController::class, 'activate']);
+        Route::apiResource('pos-users', PosUserController::class)->except(['destroy']);
+
+        // Reports
+        Route::get('/reports/daily', [ReportController::class, 'dailySales']);
+        Route::get('/reports/range', [ReportController::class, 'salesByRange']);
+        Route::get('/reports/top-products', [ReportController::class, 'topProducts']);
+        Route::get('/reports/payment-methods', [ReportController::class, 'salesByPaymentMethod']);
+        Route::get('/reports/hourly', [ReportController::class, 'hourlySales']);
+
+        // Transactions
+        Route::get('/transactions/search', [TransactionController::class, 'search']);
+        Route::get('/transactions/filter-by-date', [TransactionController::class, 'filterByDate']);
+        Route::get('/transactions/filter-by-date-range', [TransactionController::class, 'filterByDateRange']);
+        Route::get('/transactions', [TransactionController::class, 'index']);
+        Route::get('/transactions/{id}', [TransactionController::class, 'show']);
     });
 });

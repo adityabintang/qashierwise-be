@@ -787,9 +787,11 @@ class TemplateServicePropertyTest extends TestCase
                 use ($categories, $languages, $validChars) {
                 
                 // Generate valid template name (always at least 1 character)
+                // Start with a letter to avoid PHP empty('0') edge case
+                $letters = 'abcdefghijklmnopqrstuvwxyz';
                 $nameLength = random_int(1, 30);
-                $name = '';
-                for ($i = 0; $i < $nameLength; $i++) {
+                $name = $letters[random_int(0, strlen($letters) - 1)];
+                for ($i = 1; $i < $nameLength; $i++) {
                     $name .= $validChars[random_int(0, strlen($validChars) - 1)];
                 }
                 

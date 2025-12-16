@@ -26,10 +26,10 @@
     <!-- Logo -->
     <div class="h-16 flex items-center px-4 border-b border-[hsl(var(--sidebar-border))]">
         <div x-show="sidebarOpen || isMobile" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="flex items-center gap-3">
-            <img src="{{ asset('images/logo.png') }}" class="h-8 w-8 rounded-lg" alt="Logo">
+            <img src="{{ asset('images/logo-64.png') }}" class="h-8 w-8 rounded-lg" alt="Logo" width="32" height="32" loading="eager">
             <span class="text-lg font-semibold tracking-tight">QashierWise</span>
         </div>
-        <img x-show="!sidebarOpen && !isMobile" src="{{ asset('images/logo.png') }}" class="h-8 w-8 rounded-lg mx-auto" alt="Logo">
+        <img x-show="!sidebarOpen && !isMobile" src="{{ asset('images/logo-64.png') }}" class="h-8 w-8 rounded-lg mx-auto" alt="Logo" width="32" height="32" loading="eager">
     </div>
 
     <!-- Navigation -->
@@ -53,6 +53,70 @@
         <a href="/dashboard/profile" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'profile' ? 'active' : '' }}">
             <i class="fas fa-building w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>Business Profile</span>
+        </a>
+
+        <!-- POS Section - Orders & Payment -->
+        <div class="pt-4">
+            <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
+                Point of Sale
+            </div>
+        </div>
+        <a href="/dashboard/pos/orders" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-orders' ? 'active' : '' }}">
+            <i class="fas fa-shopping-cart w-5 text-center"></i>
+            <span>Orders</span>
+        </a>
+        <a href="/dashboard/pos/payment" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-payment' ? 'active' : '' }}">
+            <i class="fas fa-credit-card w-5 text-center"></i>
+            <span>Payment</span>
+        </a>
+
+        <!-- POS Inventory Section -->
+        <div class="pt-4">
+            <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
+                Inventory
+            </div>
+        </div>
+        <a href="/dashboard/pos/products" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-products' ? 'active' : '' }}">
+            <i class="fas fa-box w-5 text-center"></i>
+            <span>Products</span>
+        </a>
+        <a href="/dashboard/pos/categories" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-categories' ? 'active' : '' }}">
+            <i class="fas fa-tags w-5 text-center"></i>
+            <span>Categories</span>
+        </a>
+
+        <!-- POS Operations Section -->
+        <div class="pt-4">
+            <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
+                Operations
+            </div>
+        </div>
+        <a href="/dashboard/pos/stores" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-stores' ? 'active' : '' }}">
+            <i class="fas fa-store w-5 text-center"></i>
+            <span>Stores</span>
+        </a>
+        <a href="/dashboard/pos/tables" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-tables' ? 'active' : '' }}">
+            <i class="fas fa-chair w-5 text-center"></i>
+            <span>Tables</span>
+        </a>
+        <a href="/dashboard/pos/users" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-users' ? 'active' : '' }}">
+            <i class="fas fa-users w-5 text-center"></i>
+            <span>Users</span>
+        </a>
+
+        <!-- POS Analytics Section -->
+        <div class="pt-4">
+            <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
+                Analytics
+            </div>
+        </div>
+        <a href="/dashboard/pos/reports" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-reports' ? 'active' : '' }}">
+            <i class="fas fa-chart-bar w-5 text-center"></i>
+            <span>Reports</span>
+        </a>
+        <a href="/dashboard/pos/transactions" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-transactions' ? 'active' : '' }}">
+            <i class="fas fa-receipt w-5 text-center"></i>
+            <span>Transactions</span>
         </a>
     </nav>
 

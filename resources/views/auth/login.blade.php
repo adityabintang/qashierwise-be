@@ -6,7 +6,7 @@
 <div class="min-h-screen flex flex-col items-center justify-center py-8 md:py-12 px-4" x-data="authForm()">
     <!-- Logo - Responsive sizing -->
     <div class="flex items-center gap-2 mb-6 md:mb-8">
-        <img src="{{ asset('images/logo.png') }}" class="h-8 md:h-10 rounded-xl" alt="Logo">
+        <img src="{{ asset('images/logo-64.png') }}" class="h-8 md:h-10 rounded-xl" alt="Logo" width="40" height="40" loading="eager">
         <span class="text-xl md:text-2xl font-bold text-[hsl(var(--primary))]">QashierWise</span>
     </div>
 
@@ -80,6 +80,20 @@ function authForm() {
         error: '',
         success: '',
 
+        getRedirectUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const redirect = urlParams.get('redirect');
+            const plan = urlParams.get('plan');
+            
+            // If redirect=pricing and plan is specified, go to welcome page pricing section
+            // and trigger checkout after login
+            if (redirect === 'pricing' && plan) {
+                return `/?plan=${plan}&checkout=true#pricing`;
+            }
+            
+            return '/dashboard';
+        },
+
         async login() {
             this.loading = true;
             this.error = '';
@@ -98,7 +112,9 @@ function authForm() {
                     localStorage.setItem('token', data.data.access_token);
                     if (data.data.user) localStorage.setItem('user', JSON.stringify(data.data.user));
                     this.success = 'Login berhasil! Mengalihkan...';
-                    setTimeout(() => window.location.href = '/dashboard', 1000);
+                    
+                    const redirectUrl = this.getRedirectUrl();
+                    setTimeout(() => window.location.href = redirectUrl, 1000);
                 } else {
                     this.error = data.message || 'Login gagal. Periksa kredensial Anda.';
                 }
