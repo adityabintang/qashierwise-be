@@ -54,6 +54,10 @@
             <i class="fas fa-building w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>Business Profile</span>
         </a>
+        <a href="/dashboard/whatsapp-account" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'whatsapp-account' ? 'active' : '' }}">
+            <i class="fab fa-whatsapp w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>WhatsApp Account</span>
+        </a>
 
         <!-- POS Section - Orders & Payment -->
         <div class="pt-4">

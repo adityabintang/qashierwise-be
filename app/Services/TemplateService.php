@@ -19,6 +19,21 @@ class TemplateService
     }
 
     /**
+     * Set credentials dynamically for multi-tenant support.
+     * This allows using user-specific WhatsApp account credentials instead of global config.
+     *
+     * @param string $accessToken User's WhatsApp access token
+     * @param string $businessAccountId User's WABA ID (WhatsApp Business Account ID)
+     * @return self
+     */
+    public function setCredentials(string $accessToken, string $businessAccountId): self
+    {
+        $this->accessToken = $accessToken;
+        $this->businessAccountId = $businessAccountId;
+        return $this;
+    }
+
+    /**
      * Get the base URL for WhatsApp Business Management API
      */
     protected function getBaseUrl(): string
@@ -544,9 +559,10 @@ class TemplateService
      * Delete a template via WhatsApp Business Management API
      *
      * @param string $templateName Template name to delete
+     * @param string|null $templateId Optional template ID (hsm_id) for more reliable deletion
      * @return array{success: bool, data: array|null, error: string|null}
      */
-    public function deleteTemplate(string $templateName): array
+    public function deleteTemplate(string $templateName, ?string $templateId = null): array
     {
         if (empty($templateName)) {
             return [
@@ -558,12 +574,24 @@ class TemplateService
 
         try {
             // WhatsApp API uses DELETE to /{waba-id}/message_templates?name={template-name}
-            $url = $this->getBaseUrl() . "/{$this->businessAccountId}/message_templates";
+            // Can also use hsm_id for more reliable deletion
+            $queryParams = ['name' => $templateName];
+            if ($templateId) {
+                $queryParams['hsm_id'] = $templateId;
+            }
             
-            $response = Http::withToken($this->accessToken)
-                ->delete($url, [
-                    'name' => $templateName
-                ]);
+            $queryString = http_build_query($queryParams);
+            $url = $this->getBaseUrl() . "/{$this->businessAccountId}/message_templates?{$queryString}";
+            
+            Log::info('Attempting to delete template', [
+                'url' => $url,
+                'template_name' => $templateName,
+                'template_id' => $templateId,
+                'waba_id' => $this->businessAccountId,
+                'has_token' => !empty($this->accessToken),
+            ]);
+            
+            $response = Http::withToken($this->accessToken)->delete($url);
 
             if ($response->successful()) {
                 $responseData = $response->json();
@@ -583,8 +611,11 @@ class TemplateService
             
             Log::error('Template deletion failed', [
                 'template_name' => $templateName,
+                'waba_id' => $this->businessAccountId,
+                'url' => $url,
                 'error' => $errorMessage,
-                'response' => $errorData
+                'response' => $errorData,
+                'status_code' => $response->status(),
             ]);
 
             return [

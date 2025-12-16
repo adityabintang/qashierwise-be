@@ -15,12 +15,16 @@ class WhatsAppAccount extends Model
         'user_id',
         'phone_number_id',
         'business_account_id',
+        'waba_id',
         'access_token',
+        'token_expires_at',
         'is_active',
+        'coexistence_enabled',
+        'connection_method',
         'webhook_config',
-        'display_name',
+        'display_phone_number', // Maps to display_name in API
         'quality_rating',
-        'verified_name',
+        'name', // Maps to verified_name in API
         'about',
         'address',
         'description',
@@ -32,8 +36,11 @@ class WhatsAppAccount extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'coexistence_enabled' => 'boolean',
         'webhook_config' => 'array',
         'websites' => 'array',
+        'token_expires_at' => 'datetime',
+        'access_token' => 'encrypted',
     ];
 
     public function user()

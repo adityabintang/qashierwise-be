@@ -11,6 +11,32 @@ return [
     */
 
     'api_version' => env('WHATSAPP_API_VERSION', 'v22.0'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Embedded Signup Configuration (ES v4)
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for WhatsApp Embedded Signup v4 with coexistence support.
+    | This allows users to connect their own WhatsApp Business accounts.
+    |
+    */
+    'embedded_signup' => [
+        'app_id' => env('WHATSAPP_APP_ID'),
+        'app_secret' => env('WHATSAPP_APP_SECRET'),
+        'config_id' => env('WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID'),
+        'es_version' => 'v4', // ES v4 for coexistence support
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Legacy Single-Account Configuration (Deprecated)
+    |--------------------------------------------------------------------------
+    |
+    | These settings are maintained for backward compatibility.
+    | New implementations should use Embedded Signup for per-user credentials.
+    |
+    */
     'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID'),
     'access_token' => env('WHATSAPP_ACCESS_TOKEN'),
     'business_account_id' => env('WHATSAPP_BUSINESS_ACCOUNT_ID'),
