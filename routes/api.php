@@ -56,6 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/status', [SubscriptionController::class, 'status']);
         Route::post('/checkout', [SubscriptionController::class, 'createCheckout']);
         Route::get('/portal', [SubscriptionController::class, 'getPortalUrl']);
+        Route::post('/sync', [SubscriptionController::class, 'syncFromPolar']);
     });
 
     // WhatsApp Business API routes

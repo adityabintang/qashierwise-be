@@ -32,14 +32,25 @@ class PolarWebhookController extends Controller
      */
     public function handle(Request $request): Response
     {
-        // Get the raw payload for signature validation
+        // Get the raw payload and headers for signature validation
         $payload = $request->getContent();
         $signature = $request->header('webhook-signature', '');
+        $webhookId = $request->header('webhook-id', '');
+        $webhookTimestamp = $request->header('webhook-timestamp', '');
+
+        Log::debug('Polar webhook received', [
+            'signature' => $signature,
+            'webhookId' => $webhookId,
+            'webhookTimestamp' => $webhookTimestamp,
+            'payload_preview' => substr($payload, 0, 200),
+        ]);
 
         // Validate webhook signature
-        if (!$this->polarService->validateWebhookSignature($payload, $signature)) {
+        if (!$this->polarService->validateWebhookSignature($payload, $signature, $webhookId, $webhookTimestamp)) {
             Log::warning('Invalid Polar webhook signature', [
                 'signature' => $signature,
+                'webhookId' => $webhookId,
+                'webhookTimestamp' => $webhookTimestamp,
             ]);
 
             return response('Invalid signature', 401);

@@ -204,21 +204,24 @@ class PolarService
     /**
      * Validate a webhook signature.
      * 
-     * Polar.sh uses HMAC-SHA256 for webhook signature validation.
-     * The signature is sent in the 'webhook-signature' header.
-     * 
-     * Supports multiple formats:
-     * - Standard format: "t=timestamp,v1=signature"
-     * - Sandbox format: "v1,signature" (no timestamp)
+     * Supports multiple signature formats:
+     * 1. Standard Webhooks format: "v1,base64_signature" with webhook-id and webhook-timestamp headers
+     * 2. Legacy format: "t=timestamp,v1=hex_signature" (timestamp embedded in signature header)
      * 
      * @param string $payload The raw webhook payload
-     * @param string $signature The signature from the webhook header
+     * @param string $signature The signature from the webhook-signature header
+     * @param string|null $webhookId The webhook-id header value (for Standard Webhooks format)
+     * @param string|null $timestamp The webhook-timestamp header value (for Standard Webhooks format)
      * @return bool
      */
-    public function validateWebhookSignature(string $payload, string $signature): bool
-    {
+    public function validateWebhookSignature(
+        string $payload,
+        string $signature,
+        ?string $webhookId = null,
+        ?string $timestamp = null
+    ): bool {
         $webhookSecret = config('polar.webhook_secret');
-        
+
         if (empty($webhookSecret)) {
             Log::error('Webhook secret is not configured');
             return false;
@@ -230,30 +233,32 @@ class PolarService
 
         Log::debug('Validating webhook signature', [
             'signature' => $signature,
+            'webhookId' => $webhookId,
+            'timestamp' => $timestamp,
             'payload_length' => strlen($payload),
         ]);
 
-        // Try to parse signature - Polar has different formats
-        $timestamp = null;
+        // Parse signature and determine format
         $signatureValue = null;
+        $embeddedTimestamp = null;
 
-        // Format 1: "t=timestamp,v1=signature" (standard/production)
+        // Format 1: "t=timestamp,v1=signature" (legacy format with embedded timestamp)
         if (str_contains($signature, '=')) {
             $parts = explode(',', $signature);
             foreach ($parts as $part) {
                 $keyValue = explode('=', $part, 2);
                 if (count($keyValue) === 2) {
                     if ($keyValue[0] === 't') {
-                        $timestamp = $keyValue[1];
+                        $embeddedTimestamp = $keyValue[1];
                     } elseif ($keyValue[0] === 'v1') {
                         $signatureValue = $keyValue[1];
                     }
                 }
             }
         }
-        // Format 2: "v1,signature" (sandbox format without timestamp)
+        // Format 2: "v1,base64_signature" (Standard Webhooks format)
         elseif (str_starts_with($signature, 'v1,')) {
-            $signatureValue = substr($signature, 3); // Remove "v1," prefix
+            $signatureValue = substr($signature, 3);
         }
 
         if ($signatureValue === null) {
@@ -261,28 +266,50 @@ class PolarService
             return false;
         }
 
-        // Compute expected signature based on whether timestamp is present
-        if ($timestamp !== null) {
-            // With timestamp: HMAC-SHA256(timestamp.payload, secret)
-            $signedPayload = $timestamp . '.' . $payload;
-        } else {
-            // Without timestamp (sandbox): HMAC-SHA256(payload, secret)
-            $signedPayload = $payload;
+        // Decode the webhook secret if it has a prefix
+        $secretKey = $webhookSecret;
+        if (str_starts_with($webhookSecret, 'whsec_')) {
+            $secretKey = base64_decode(substr($webhookSecret, 6));
+        } elseif (str_starts_with($webhookSecret, 'polar_whs_')) {
+            $secretKey = substr($webhookSecret, 10);
         }
 
-        $expectedSignature = hash_hmac('sha256', $signedPayload, $webhookSecret);
-        
-        // Also try base64 encoded comparison for sandbox
-        $expectedSignatureBase64 = base64_encode(hash_hmac('sha256', $signedPayload, $webhookSecret, true));
+        // Determine signed payload based on format
+        if ($embeddedTimestamp !== null) {
+            // Legacy format: timestamp.payload
+            $signedPayload = $embeddedTimestamp . '.' . $payload;
+            // Legacy uses hex encoding
+            $expectedSignature = hash_hmac('sha256', $signedPayload, $webhookSecret);
+            $isValid = hash_equals($expectedSignature, $signatureValue);
+        } elseif ($webhookId !== null && $timestamp !== null) {
+            // Standard Webhooks format: webhook_id.timestamp.payload
+            $signedPayload = "{$webhookId}.{$timestamp}.{$payload}";
+            $expectedSignature = base64_encode(hash_hmac('sha256', $signedPayload, $secretKey, true));
+            $isValid = hash_equals($expectedSignature, $signatureValue);
 
-        $isValid = hash_equals($expectedSignature, $signatureValue) 
-            || hash_equals($expectedSignatureBase64, $signatureValue);
+            // Try with raw secret if decoded secret fails
+            if (!$isValid) {
+                $expectedSignatureAlt = base64_encode(hash_hmac('sha256', $signedPayload, $webhookSecret, true));
+                $isValid = hash_equals($expectedSignatureAlt, $signatureValue);
+            }
+        } else {
+            // Fallback: just payload (for simple testing)
+            $signedPayload = $payload;
+            $expectedSignature = base64_encode(hash_hmac('sha256', $signedPayload, $secretKey, true));
+            $isValid = hash_equals($expectedSignature, $signatureValue);
+
+            if (!$isValid) {
+                $expectedSignatureAlt = base64_encode(hash_hmac('sha256', $signedPayload, $webhookSecret, true));
+                $isValid = hash_equals($expectedSignatureAlt, $signatureValue);
+            }
+        }
 
         if (!$isValid) {
             Log::warning('Webhook signature mismatch', [
                 'received' => $signatureValue,
-                'expected_hex' => $expectedSignature,
-                'expected_base64' => $expectedSignatureBase64,
+                'webhookId' => $webhookId,
+                'timestamp' => $timestamp,
+                'embeddedTimestamp' => $embeddedTimestamp,
             ]);
         }
 
