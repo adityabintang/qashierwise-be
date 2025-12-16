@@ -362,6 +362,51 @@ class PolarService
     }
 
     /**
+     * Get checkout session by customer session token.
+     * 
+     * @param string $token The customer session token (polar_cst_xxx)
+     * @return array|null Checkout data including subscription_id, or null on failure
+     */
+    public function getCheckoutByToken(string $token): ?array
+    {
+        $client = $this->getClient();
+        
+        if ($client === null) {
+            Log::error('Cannot get checkout by token: Polar client not available');
+            return null;
+        }
+
+        try {
+            // Use clientGet to fetch checkout by client secret (customer session token)
+            $response = $client->checkouts->clientGet($token);
+            
+            if ($response->checkoutPublic === null) {
+                Log::warning('Checkout not found for token', [
+                    'token' => substr($token, 0, 20) . '...',
+                ]);
+                return null;
+            }
+
+            $checkout = $response->checkoutPublic;
+
+            return [
+                'id' => $checkout->id,
+                'status' => $checkout->status->value ?? (string) $checkout->status,
+                'subscription_id' => $checkout->subscriptionId,
+                'customer_id' => $checkout->customerId,
+                'product_id' => $checkout->productId,
+                'metadata' => $checkout->metadata ?? [],
+            ];
+        } catch (\Exception $e) {
+            Log::error('Failed to get checkout by token', [
+                'error' => $e->getMessage(),
+                'token' => substr($token, 0, 20) . '...',
+            ]);
+            return null;
+        }
+    }
+
+    /**
      * Check if the Polar service is properly configured.
      * 
      * @return bool
