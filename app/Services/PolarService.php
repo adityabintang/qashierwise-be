@@ -207,6 +207,10 @@ class PolarService
      * Polar.sh uses HMAC-SHA256 for webhook signature validation.
      * The signature is sent in the 'webhook-signature' header.
      * 
+     * Supports multiple formats:
+     * - Standard format: "t=timestamp,v1=signature"
+     * - Sandbox format: "v1,signature" (no timestamp)
+     * 
      * @param string $payload The raw webhook payload
      * @param string $signature The signature from the webhook header
      * @return bool
@@ -224,33 +228,65 @@ class PolarService
             return false;
         }
 
-        // Polar uses standard webhook signature format: t=timestamp,v1=signature
-        // Parse the signature header
-        $parts = explode(',', $signature);
+        Log::debug('Validating webhook signature', [
+            'signature' => $signature,
+            'payload_length' => strlen($payload),
+        ]);
+
+        // Try to parse signature - Polar has different formats
         $timestamp = null;
         $signatureValue = null;
 
-        foreach ($parts as $part) {
-            $keyValue = explode('=', $part, 2);
-            if (count($keyValue) === 2) {
-                if ($keyValue[0] === 't') {
-                    $timestamp = $keyValue[1];
-                } elseif ($keyValue[0] === 'v1') {
-                    $signatureValue = $keyValue[1];
+        // Format 1: "t=timestamp,v1=signature" (standard/production)
+        if (str_contains($signature, '=')) {
+            $parts = explode(',', $signature);
+            foreach ($parts as $part) {
+                $keyValue = explode('=', $part, 2);
+                if (count($keyValue) === 2) {
+                    if ($keyValue[0] === 't') {
+                        $timestamp = $keyValue[1];
+                    } elseif ($keyValue[0] === 'v1') {
+                        $signatureValue = $keyValue[1];
+                    }
                 }
             }
         }
+        // Format 2: "v1,signature" (sandbox format without timestamp)
+        elseif (str_starts_with($signature, 'v1,')) {
+            $signatureValue = substr($signature, 3); // Remove "v1," prefix
+        }
 
-        if ($timestamp === null || $signatureValue === null) {
+        if ($signatureValue === null) {
             Log::warning('Invalid webhook signature format', ['signature' => $signature]);
             return false;
         }
 
-        // Compute expected signature: HMAC-SHA256(timestamp.payload, secret)
-        $signedPayload = $timestamp . '.' . $payload;
-        $expectedSignature = hash_hmac('sha256', $signedPayload, $webhookSecret);
+        // Compute expected signature based on whether timestamp is present
+        if ($timestamp !== null) {
+            // With timestamp: HMAC-SHA256(timestamp.payload, secret)
+            $signedPayload = $timestamp . '.' . $payload;
+        } else {
+            // Without timestamp (sandbox): HMAC-SHA256(payload, secret)
+            $signedPayload = $payload;
+        }
 
-        return hash_equals($expectedSignature, $signatureValue);
+        $expectedSignature = hash_hmac('sha256', $signedPayload, $webhookSecret);
+        
+        // Also try base64 encoded comparison for sandbox
+        $expectedSignatureBase64 = base64_encode(hash_hmac('sha256', $signedPayload, $webhookSecret, true));
+
+        $isValid = hash_equals($expectedSignature, $signatureValue) 
+            || hash_equals($expectedSignatureBase64, $signatureValue);
+
+        if (!$isValid) {
+            Log::warning('Webhook signature mismatch', [
+                'received' => $signatureValue,
+                'expected_hex' => $expectedSignature,
+                'expected_base64' => $expectedSignatureBase64,
+            ]);
+        }
+
+        return $isValid;
     }
 
     /**

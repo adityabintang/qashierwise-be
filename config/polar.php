@@ -58,8 +58,8 @@ return [
     |
     */
     'urls' => [
-        'success' => env('POLAR_SUCCESS_URL', '/dashboard?subscription=success'),
-        'cancel' => env('POLAR_CANCEL_URL', '/pricing?subscription=cancelled'),
+        'success' => env('POLAR_SUCCESS_URL') ?: (env('FRONTEND_URL', env('APP_URL')) . '/dashboard?subscription=success'),
+        'cancel' => env('POLAR_CANCEL_URL') ?: (env('FRONTEND_URL', env('APP_URL')) . '/pricing?subscription=cancelled'),
     ],
 
     /*
