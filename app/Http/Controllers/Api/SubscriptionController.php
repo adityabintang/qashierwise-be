@@ -138,14 +138,27 @@ class SubscriptionController extends Controller
             ], 503);
         }
 
+        Log::debug('Fetching customer portal URL', [
+            'userId' => $user->id,
+            'polarCustomerId' => $subscription->polar_customer_id,
+            'subscriptionStatus' => $subscription->status,
+        ]);
+
         $portalUrl = $this->polarService->getCustomerPortalUrl($subscription->polar_customer_id);
 
         if ($portalUrl === null) {
+            // Customer may have been deleted in Polar or subscription is cancelled/revoked
+            Log::warning('Failed to get customer portal URL', [
+                'userId' => $user->id,
+                'polarCustomerId' => $subscription->polar_customer_id,
+                'subscriptionStatus' => $subscription->status,
+            ]);
+            
             return response()->json([
                 'success' => false,
                 'error' => [
                     'code' => 'PORTAL_URL_FAILED',
-                    'message' => 'Failed to retrieve customer portal URL',
+                    'message' => 'Unable to access customer portal. Your subscription may have been cancelled.',
                 ],
             ], 500);
         }

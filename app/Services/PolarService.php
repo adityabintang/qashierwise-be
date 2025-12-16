@@ -180,6 +180,10 @@ class PolarService
         }
 
         try {
+            Log::debug('Creating customer session for portal', [
+                'customerId' => $customerId,
+            ]);
+
             $sessionCreate = new CustomerSessionCustomerIDCreate(
                 customerId: $customerId,
             );
@@ -187,14 +191,18 @@ class PolarService
             $response = $client->customerSessions->create($sessionCreate);
             
             if ($response->customerSession === null) {
-                Log::error('Customer session creation returned null');
+                Log::error('Customer session creation returned null', [
+                    'customerId' => $customerId,
+                ]);
                 return null;
             }
 
             return $response->customerSession->customerPortalUrl;
         } catch (\Exception $e) {
+            // Common causes: customer deleted, invalid customer ID, API error
             Log::error('Failed to get customer portal URL', [
                 'error' => $e->getMessage(),
+                'errorCode' => $e->getCode(),
                 'customerId' => $customerId,
             ]);
             return null;
