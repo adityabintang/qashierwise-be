@@ -72,24 +72,54 @@ class PolarService
      */
     public function createCheckoutSession(User $user, string $planId): ?CheckoutSession
     {
+        $result = $this->createCheckoutSessionWithError($user, $planId);
+        return $result['session'];
+    }
+
+    /**
+     * Create a checkout session with detailed error information.
+     * 
+     * @param User $user The user initiating checkout
+     * @param string $planId The internal plan identifier (standard, pro)
+     * @return array{session: CheckoutSession|null, error: string|null}
+     */
+    public function createCheckoutSessionWithError(User $user, string $planId): array
+    {
         $client = $this->getClient();
         
         if ($client === null) {
-            Log::error('Cannot create checkout session: Polar client not available');
-            return null;
+            $error = 'Polar client not available - check POLAR_API_TOKEN';
+            Log::error('Cannot create checkout session: ' . $error);
+            return ['session' => null, 'error' => $error];
         }
 
         $polarProductId = $this->planConfig->getPolarProductId($planId);
         
         if ($polarProductId === null) {
-            Log::error('Invalid plan ID for checkout', ['planId' => $planId]);
-            return null;
+            $error = "Invalid plan ID: {$planId} - check POLAR_PRODUCT_STANDARD/PRO config";
+            Log::error($error);
+            return ['session' => null, 'error' => $error];
         }
 
         $successUrl = config('polar.urls.success');
         $cancelUrl = config('polar.urls.cancel');
 
+        if (empty($successUrl)) {
+            $error = 'POLAR_SUCCESS_URL not configured';
+            Log::error($error);
+            return ['session' => null, 'error' => $error];
+        }
+
         try {
+            Log::info('Creating checkout session', [
+                'userId' => $user->id,
+                'planId' => $planId,
+                'polarProductId' => $polarProductId,
+                'successUrl' => $successUrl,
+                'cancelUrl' => $cancelUrl,
+                'sandbox' => config('polar.sandbox'),
+            ]);
+
             $checkoutCreate = new CheckoutCreate(
                 products: [$polarProductId],
                 customerEmail: $user->email,
@@ -104,13 +134,14 @@ class PolarService
             $response = $client->checkouts->create($checkoutCreate);
             
             if ($response->checkout === null) {
-                Log::error('Checkout session creation returned null');
-                return null;
+                $error = 'Polar API returned null checkout';
+                Log::error($error, ['response' => json_encode($response)]);
+                return ['session' => null, 'error' => $error];
             }
 
             $checkout = $response->checkout;
 
-            return new CheckoutSession(
+            $session = new CheckoutSession(
                 id: $checkout->id,
                 url: $checkout->url,
                 planId: $planId,
@@ -118,13 +149,18 @@ class PolarService
                 successUrl: $checkout->successUrl,
                 cancelUrl: $cancelUrl,
             );
+
+            return ['session' => $session, 'error' => null];
         } catch (\Exception $e) {
+            $error = $e->getMessage();
             Log::error('Failed to create checkout session', [
-                'error' => $e->getMessage(),
+                'error' => $error,
+                'trace' => $e->getTraceAsString(),
                 'userId' => $user->id,
                 'planId' => $planId,
+                'polarProductId' => $polarProductId,
             ]);
-            return null;
+            return ['session' => null, 'error' => $error];
         }
     }
 

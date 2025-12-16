@@ -81,17 +81,20 @@ class SubscriptionController extends Controller
             ], 503);
         }
 
-        $checkoutSession = $this->polarService->createCheckoutSession($user, $planId);
+        $result = $this->polarService->createCheckoutSessionWithError($user, $planId);
 
-        if ($checkoutSession === null) {
+        if ($result['session'] === null) {
             return response()->json([
                 'success' => false,
                 'error' => [
                     'code' => 'CHECKOUT_FAILED',
                     'message' => 'Failed to create checkout session',
+                    'detail' => config('app.debug') ? $result['error'] : null,
                 ],
             ], 500);
         }
+
+        $checkoutSession = $result['session'];
 
         return response()->json([
             'success' => true,
