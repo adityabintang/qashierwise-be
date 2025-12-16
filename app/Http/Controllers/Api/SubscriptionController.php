@@ -156,4 +156,73 @@ class SubscriptionController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Manually sync subscription from Polar (for debugging/fallback).
+     * 
+     * This endpoint allows manually creating/updating a subscription
+     * when webhook delivery fails.
+     * 
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function syncFromPolar(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'polar_subscription_id' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'VALIDATION_ERROR',
+                    'message' => 'Polar subscription ID is required',
+                ],
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $user = $request->user();
+        $polarSubscriptionId = $request->input('polar_subscription_id');
+
+        // Fetch subscription from Polar API
+        $polarSubscription = $this->polarService->getSubscription($polarSubscriptionId);
+
+        if ($polarSubscription === null) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'SUBSCRIPTION_NOT_FOUND',
+                    'message' => 'Subscription not found in Polar',
+                ],
+            ], 404);
+        }
+
+        // Determine plan name from product ID
+        $planName = $this->planConfig->getPlanNameFromProductId($polarSubscription['product_id']) ?? 'standard';
+
+        // Create or update subscription
+        $subscription = $this->subscriptionService->createOrUpdateSubscription($user, [
+            'polar_subscription_id' => $polarSubscription['id'],
+            'polar_customer_id' => $polarSubscription['customer_id'],
+            'plan_name' => $planName,
+            'status' => $polarSubscription['status'],
+            'current_period_start' => $polarSubscription['current_period_start'],
+            'current_period_end' => $polarSubscription['current_period_end'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Subscription synced successfully',
+            'data' => [
+                'subscription' => [
+                    'id' => $subscription->id,
+                    'plan_name' => $subscription->plan_name,
+                    'status' => $subscription->status,
+                    'current_period_end' => $subscription->current_period_end?->toIso8601String(),
+                ],
+            ],
+        ]);
+    }
 }

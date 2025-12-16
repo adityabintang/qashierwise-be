@@ -152,4 +152,30 @@ class PlanConfig
             self::TIER_PRO,
         ], true);
     }
+
+    /**
+     * Get plan name from Polar product ID.
+     *
+     * @param string|null $productId The Polar product ID
+     * @return string|null The plan name or null if not found
+     */
+    public function getPlanNameFromProductId(?string $productId): ?string
+    {
+        if ($productId === null) {
+            return null;
+        }
+
+        $standardProductId = config('polar.products.standard');
+        $proProductId = config('polar.products.pro');
+
+        if ($productId === $standardProductId) {
+            return self::PLAN_STANDARD;
+        }
+
+        if ($productId === $proProductId) {
+            return self::PLAN_PRO;
+        }
+
+        return null;
+    }
 }
