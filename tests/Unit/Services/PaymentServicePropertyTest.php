@@ -221,9 +221,11 @@ class PaymentServicePropertyTest extends TestCase
                 $totalPaid = $createdPayments->sum('amount');
 
                 // Property: sum of all payment amounts >= order total
+                // Use bccomp for precise decimal comparison to avoid floating point issues
+                $comparison = bccomp((string) $totalPaid, (string) $orderTotal, 2);
                 $this->assertGreaterThanOrEqual(
-                    $orderTotal,
-                    $totalPaid,
+                    0,
+                    $comparison,
                     "Total paid ({$totalPaid}) should be >= order total ({$orderTotal})"
                 );
 
