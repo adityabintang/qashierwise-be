@@ -267,11 +267,13 @@ class PolarService
         }
 
         // Decode the webhook secret if it has a prefix
+        // Both whsec_ and polar_whs_ prefixes indicate base64-encoded secrets
         $secretKey = $webhookSecret;
         if (str_starts_with($webhookSecret, 'whsec_')) {
             $secretKey = base64_decode(substr($webhookSecret, 6));
         } elseif (str_starts_with($webhookSecret, 'polar_whs_')) {
-            $secretKey = substr($webhookSecret, 10);
+            // Polar webhook secret: remove prefix and base64 decode
+            $secretKey = base64_decode(substr($webhookSecret, 10));
         }
 
         // Determine signed payload based on format
