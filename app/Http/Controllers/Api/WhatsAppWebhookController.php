@@ -438,25 +438,59 @@ class WhatsAppWebhookController extends Controller
 
         $newStatus = $statusMap[$event] ?? $event;
 
-        // Find template by name and language
-        $query = WhatsAppTemplate::where('name', $templateName);
-        
-        if ($templateLanguage) {
-            $query->where('language', $templateLanguage);
-        }
+        // Find template - try multiple strategies
+        $template = null;
 
-        // If we have template_id from Meta, also try to match by that
+        // Strategy 1: Find by template_id if available (most reliable)
         if ($templateId) {
-            $query->orWhere('template_id', $templateId);
+            $template = WhatsAppTemplate::where('template_id', $templateId)->first();
+            
+            if ($template) {
+                Log::info('Template found by template_id', ['template_id' => $templateId]);
+            }
         }
 
-        $template = $query->first();
+        // Strategy 2: Find by name and language
+        if (!$template && $templateName) {
+            $query = WhatsAppTemplate::where('name', $templateName);
+            
+            if ($templateLanguage) {
+                $query->where('language', $templateLanguage);
+            }
+            
+            // If we have waba_id, try to find the account's template
+            if ($wabaId) {
+                $whatsappAccount = WhatsAppAccount::where('waba_id', $wabaId)->first();
+                if ($whatsappAccount) {
+                    $query->where('whatsapp_account_id', $whatsappAccount->id);
+                }
+            }
+            
+            $template = $query->first();
+            
+            if ($template) {
+                Log::info('Template found by name and language', [
+                    'template_name' => $templateName,
+                    'language' => $templateLanguage,
+                ]);
+            }
+        }
+
+        // Strategy 3: Find by name only (fallback for single-tenant or when language doesn't match)
+        if (!$template && $templateName) {
+            $template = WhatsAppTemplate::where('name', $templateName)->first();
+            
+            if ($template) {
+                Log::info('Template found by name only (fallback)', ['template_name' => $templateName]);
+            }
+        }
 
         if (!$template) {
             Log::warning('Template not found for status update', [
                 'template_name' => $templateName,
                 'template_id' => $templateId,
                 'language' => $templateLanguage,
+                'waba_id' => $wabaId,
             ]);
             return;
         }
@@ -473,6 +507,7 @@ class WhatsAppWebhookController extends Controller
         $template->save();
 
         Log::info('Template status updated successfully', [
+            'template_id' => $template->id,
             'template_name' => $templateName,
             'old_status' => $oldStatus,
             'new_status' => $newStatus,
