@@ -1750,7 +1750,7 @@ class WhatsAppController extends Controller
 
             // Check if we need to sync from API (no templates in DB or refresh requested)
             $templateCount = WhatsAppTemplate::where('whatsapp_account_id', $account->id)->count();
-            
+
             if ($templateCount === 0 || $refresh) {
                 $this->syncTemplatesFromApi($account);
             }
@@ -1921,7 +1921,7 @@ class WhatsAppController extends Controller
 
     /**
      * Create a new WhatsApp message template
-     * 
+     *
      * @param Request $request
      * @return JsonResponse
      */
@@ -1930,7 +1930,7 @@ class WhatsAppController extends Controller
         try {
             // Validate request data using TemplateService
             $data = $request->all();
-            
+
             // Validate required fields
             $requiredValidation = $this->templateService->validateRequiredFields($data);
             if (!$requiredValidation['valid']) {
@@ -2008,7 +2008,7 @@ class WhatsAppController extends Controller
             // Store result in database
             $account = $this->getWhatsAppAccount();
             $components = $this->templateService->buildComponents($data);
-            
+
             // Extract component details for storage
             $header = null;
             $headerType = null;
@@ -2070,7 +2070,7 @@ class WhatsAppController extends Controller
 
     /**
      * Update an existing WhatsApp message template
-     * 
+     *
      * @param Request $request
      * @param string $id Template ID (local database ID)
      * @return JsonResponse
@@ -2151,7 +2151,7 @@ class WhatsAppController extends Controller
 
             // Update database record
             $components = $this->templateService->buildComponents($data);
-            
+
             $updateData = [
                 'components' => $components,
             ];
@@ -2203,7 +2203,7 @@ class WhatsAppController extends Controller
 
     /**
      * Delete a WhatsApp message template
-     * 
+     *
      * @param string $name Template name
      * @return JsonResponse
      */
@@ -2238,17 +2238,17 @@ class WhatsAppController extends Controller
                 // In this case, we should still delete from local database
                 $isTemplateNotFound = str_contains($result['error'] ?? '', 'Invalid parameter') ||
                                       str_contains($result['error'] ?? '', 'not found');
-                
+
                 if ($isTemplateNotFound) {
                     // Template doesn't exist on WhatsApp, remove from local database
                     $template->delete();
-                    
+
                     return response()->json([
                         'success' => true,
                         'message' => 'Template removed from local database (was not found on WhatsApp)',
                     ], 200);
                 }
-                
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Failed to delete template',

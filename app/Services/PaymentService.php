@@ -60,8 +60,12 @@ class PaymentService
             ]);
 
             // Check if order is fully paid
+            // Use bccomp for precise decimal comparison to avoid floating-point issues
             $totalPaid = $order->payments()->sum('amount') + $amount;
-            if ($totalPaid >= (float) $order->total) {
+            $orderTotal = (float) $order->total;
+
+            // bccomp returns 0 if equal, 1 if first > second, -1 if first < second
+            if (bccomp((string) $totalPaid, (string) $orderTotal, 2) >= 0) {
                 $order->status = Order::STATUS_PAID;
                 $order->save();
             }
@@ -155,8 +159,12 @@ class PaymentService
             }
 
             // Check if order is fully paid
+            // Use bccomp for precise decimal comparison to avoid floating-point issues
             $newTotalPaid = $existingPaymentsTotal + $totalPaymentAmount;
-            if ($newTotalPaid >= (float) $order->total) {
+            $orderTotal = (float) $order->total;
+
+            // bccomp returns 0 if equal, 1 if first > second, -1 if first < second
+            if (bccomp((string) $newTotalPaid, (string) $orderTotal, 2) >= 0) {
                 $order->status = Order::STATUS_PAID;
                 $order->save();
             }

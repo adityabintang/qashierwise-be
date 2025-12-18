@@ -94,7 +94,7 @@ class CategoryService
     private function slugExists(string $slug, ?int $excludeId = null): bool
     {
         $query = Category::where('slug', $slug);
-        
+
         if ($excludeId) {
             $query->where('id', '!=', $excludeId);
         }
@@ -143,11 +143,11 @@ class CategoryService
     public function getAllWithProductCounts(?int $userId = null): Collection
     {
         $query = Category::withCount('products');
-        
+
         if ($userId !== null) {
             $query->where('user_id', $userId);
         }
-        
+
         return $query->get();
     }
 }

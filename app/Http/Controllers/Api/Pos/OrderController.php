@@ -65,14 +65,14 @@ class OrderController extends Controller
                 $posUser = \App\Models\PosUser::where('user_id', $user->id)
                     ->where('is_active', true)
                     ->first();
-                
+
                 // If no PosUser exists, create one with default role
                 if (!$posUser) {
                     $defaultRole = \App\Models\Role::firstOrCreate(
                         ['name' => 'Cashier'],
                         ['permissions' => ['orders.create', 'orders.view', 'payments.create']]
                     );
-                    
+
                     $posUser = \App\Models\PosUser::create([
                         'user_id' => $user->id,
                         'store_id' => $validated['store_id'],
@@ -80,7 +80,7 @@ class OrderController extends Controller
                         'is_active' => true,
                     ]);
                 }
-                
+
                 $validated['pos_user_id'] = $posUser->id;
             }
         }

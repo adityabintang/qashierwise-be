@@ -33,10 +33,10 @@ class ReportController extends Controller
             'store_id' => 'nullable|exists:stores,id',
         ]);
 
-        $date = isset($validated['date']) 
-            ? Carbon::parse($validated['date']) 
+        $date = isset($validated['date'])
+            ? Carbon::parse($validated['date'])
             : Carbon::today();
-        
+
         $storeId = $validated['store_id'] ?? null;
 
         $report = $this->reportService->dailySales($date, $storeId, $userId);
@@ -91,14 +91,14 @@ class ReportController extends Controller
             'store_id' => 'nullable|exists:stores,id',
         ]);
 
-        $start = isset($validated['start_date']) 
-            ? Carbon::parse($validated['start_date']) 
+        $start = isset($validated['start_date'])
+            ? Carbon::parse($validated['start_date'])
             : Carbon::today()->subDays(30);
-        
-        $end = isset($validated['end_date']) 
-            ? Carbon::parse($validated['end_date']) 
+
+        $end = isset($validated['end_date'])
+            ? Carbon::parse($validated['end_date'])
             : Carbon::today();
-        
+
         $limit = $validated['limit'] ?? 10;
         $storeId = $validated['store_id'] ?? null;
 
@@ -135,14 +135,14 @@ class ReportController extends Controller
             'store_id' => 'nullable|exists:stores,id',
         ]);
 
-        $start = isset($validated['start_date']) 
-            ? Carbon::parse($validated['start_date']) 
+        $start = isset($validated['start_date'])
+            ? Carbon::parse($validated['start_date'])
             : Carbon::today()->subDays(30);
-        
-        $end = isset($validated['end_date']) 
-            ? Carbon::parse($validated['end_date']) 
+
+        $end = isset($validated['end_date'])
+            ? Carbon::parse($validated['end_date'])
             : Carbon::today();
-        
+
         $storeId = $validated['store_id'] ?? null;
 
         $report = $this->reportService->salesByPaymentMethod($start, $end, $storeId);
@@ -168,10 +168,10 @@ class ReportController extends Controller
             'store_id' => 'nullable|exists:stores,id',
         ]);
 
-        $date = isset($validated['date']) 
-            ? Carbon::parse($validated['date']) 
+        $date = isset($validated['date'])
+            ? Carbon::parse($validated['date'])
             : Carbon::today();
-        
+
         $storeId = $validated['store_id'] ?? null;
 
         $report = $this->reportService->hourlySales($date, $storeId);
