@@ -7,17 +7,19 @@ use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Polar\Models\Components\CheckoutCreate;
 use Polar\Models\Components\CustomerSessionCustomerIDCreate;
+use Polar\Models\Errors\APIException;
 use Polar\Polar;
 
 /**
  * Service for communicating with Polar.sh API.
- * 
+ *
  * Handles checkout session creation, customer portal access,
  * webhook signature validation, and subscription retrieval.
  */
 class PolarService
 {
     private ?Polar $client = null;
+
     private PlanConfig $planConfig;
 
     public function __construct(PlanConfig $planConfig)
@@ -27,8 +29,6 @@ class PolarService
 
     /**
      * Get the Polar SDK client instance.
-     * 
-     * @return Polar|null
      */
     protected function getClient(): ?Polar
     {
@@ -37,67 +37,71 @@ class PolarService
         }
 
         $apiToken = config('polar.api_token');
-        
+
         if (empty($apiToken)) {
             Log::error('Polar.sh API token is not configured');
+
             return null;
         }
 
         try {
             $builder = Polar::builder()
                 ->setSecurity($apiToken);
-            
+
             // Use sandbox server if configured
             if (config('polar.sandbox', false)) {
                 $builder->setServer('sandbox');
             }
-            
+
             $this->client = $builder->build();
-            
+
             return $this->client;
         } catch (\Exception $e) {
             Log::error('Failed to initialize Polar.sh client', [
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
 
     /**
      * Create a checkout session for a user and plan.
-     * 
-     * @param User $user The user initiating checkout
-     * @param string $planId The internal plan identifier (standard, pro)
-     * @return CheckoutSession|null
+     *
+     * @param  User  $user  The user initiating checkout
+     * @param  string  $planId  The internal plan identifier (standard, pro)
      */
     public function createCheckoutSession(User $user, string $planId): ?CheckoutSession
     {
         $result = $this->createCheckoutSessionWithError($user, $planId);
+
         return $result['session'];
     }
 
     /**
      * Create a checkout session with detailed error information.
-     * 
-     * @param User $user The user initiating checkout
-     * @param string $planId The internal plan identifier (standard, pro)
+     *
+     * @param  User  $user  The user initiating checkout
+     * @param  string  $planId  The internal plan identifier (standard, pro)
      * @return array{session: CheckoutSession|null, error: string|null}
      */
     public function createCheckoutSessionWithError(User $user, string $planId): array
     {
         $client = $this->getClient();
-        
+
         if ($client === null) {
             $error = 'Polar client not available - check POLAR_API_TOKEN';
-            Log::error('Cannot create checkout session: ' . $error);
+            Log::error('Cannot create checkout session: '.$error);
+
             return ['session' => null, 'error' => $error];
         }
 
         $polarProductId = $this->planConfig->getPolarProductId($planId);
-        
+
         if ($polarProductId === null) {
             $error = "Invalid plan ID: {$planId} - check POLAR_PRODUCT_STANDARD/PRO config";
             Log::error($error);
+
             return ['session' => null, 'error' => $error];
         }
 
@@ -107,6 +111,7 @@ class PolarService
         if (empty($successUrl)) {
             $error = 'POLAR_SUCCESS_URL not configured';
             Log::error($error);
+
             return ['session' => null, 'error' => $error];
         }
 
@@ -132,10 +137,11 @@ class PolarService
             );
 
             $response = $client->checkouts->create($checkoutCreate);
-            
+
             if ($response->checkout === null) {
                 $error = 'Polar API returned null checkout';
                 Log::error($error, ['response' => json_encode($response)]);
+
                 return ['session' => null, 'error' => $error];
             }
 
@@ -151,47 +157,67 @@ class PolarService
             );
 
             return ['session' => $session, 'error' => null];
+        } catch (APIException $e) {
+            // Capture the full API error details from Polar
+            $errorDetails = [
+                'message' => $e->getMessage(),
+                'statusCode' => $e->statusCode,
+                'body' => $e->body,
+                'userId' => $user->id,
+                'planId' => $planId,
+                'polarProductId' => $polarProductId,
+            ];
+            Log::error('Failed to create checkout session - Polar API error', $errorDetails);
+
+            // Try to decode the body for a more specific error message
+            $bodyData = json_decode($e->body, true);
+            $specificError = $bodyData['detail'] ?? $bodyData['message'] ?? $e->body ?? $e->getMessage();
+
+            return ['session' => null, 'error' => "Polar API error ({$e->statusCode}): {$specificError}"];
         } catch (\Exception $e) {
             $error = $e->getMessage();
             Log::error('Failed to create checkout session', [
                 'error' => $error,
+                'exceptionClass' => get_class($e),
                 'trace' => $e->getTraceAsString(),
                 'userId' => $user->id,
                 'planId' => $planId,
                 'polarProductId' => $polarProductId,
             ]);
+
             return ['session' => null, 'error' => $error];
         }
     }
 
     /**
      * Get the customer portal URL for a customer.
-     * 
-     * @param string $customerId The Polar customer ID
-     * @return string|null
+     *
+     * @param  string  $customerId  The Polar customer ID
      */
     public function getCustomerPortalUrl(string $customerId): ?string
     {
         $result = $this->getCustomerPortalUrlWithError($customerId);
+
         return $result['url'];
     }
 
     /**
      * Get the customer portal URL with detailed error information.
-     * 
+     *
      * Customer portal should be accessible even for cancelled subscriptions,
      * as users may want to view their billing history or resubscribe.
-     * 
-     * @param string $customerId The Polar customer ID
+     *
+     * @param  string  $customerId  The Polar customer ID
      * @return array{url: string|null, error: string|null}
      */
     public function getCustomerPortalUrlWithError(string $customerId): array
     {
         $client = $this->getClient();
-        
+
         if ($client === null) {
             $error = 'Polar client not available - check POLAR_API_TOKEN';
-            Log::error('Cannot get customer portal URL: ' . $error);
+            Log::error('Cannot get customer portal URL: '.$error);
+
             return ['url' => null, 'error' => $error];
         }
 
@@ -205,12 +231,13 @@ class PolarService
             );
 
             $response = $client->customerSessions->create($sessionCreate);
-            
+
             if ($response->customerSession === null) {
                 $error = 'Customer session creation returned null';
                 Log::error($error, [
                     'customerId' => $customerId,
                 ]);
+
                 return ['url' => null, 'error' => $error];
             }
 
@@ -223,22 +250,22 @@ class PolarService
                 'errorCode' => $e->getCode(),
                 'customerId' => $customerId,
             ]);
+
             return ['url' => null, 'error' => $error];
         }
     }
 
     /**
      * Validate a webhook signature.
-     * 
+     *
      * Supports multiple signature formats:
      * 1. Standard Webhooks format: "v1,base64_signature" with webhook-id and webhook-timestamp headers
      * 2. Legacy format: "t=timestamp,v1=hex_signature" (timestamp embedded in signature header)
-     * 
-     * @param string $payload The raw webhook payload
-     * @param string $signature The signature from the webhook-signature header
-     * @param string|null $webhookId The webhook-id header value (for Standard Webhooks format)
-     * @param string|null $timestamp The webhook-timestamp header value (for Standard Webhooks format)
-     * @return bool
+     *
+     * @param  string  $payload  The raw webhook payload
+     * @param  string  $signature  The signature from the webhook-signature header
+     * @param  string|null  $webhookId  The webhook-id header value (for Standard Webhooks format)
+     * @param  string|null  $timestamp  The webhook-timestamp header value (for Standard Webhooks format)
      */
     public function validateWebhookSignature(
         string $payload,
@@ -250,6 +277,7 @@ class PolarService
 
         if (empty($webhookSecret)) {
             Log::error('Webhook secret is not configured');
+
             return false;
         }
 
@@ -290,6 +318,7 @@ class PolarService
 
         if ($signatureValue === null) {
             Log::warning('Invalid webhook signature format', ['signature' => $signature]);
+
             return false;
         }
 
@@ -306,7 +335,7 @@ class PolarService
         // Determine signed payload based on format
         if ($embeddedTimestamp !== null) {
             // Legacy format: timestamp.payload
-            $signedPayload = $embeddedTimestamp . '.' . $payload;
+            $signedPayload = $embeddedTimestamp.'.'.$payload;
             // Legacy uses hex encoding
             $expectedSignature = hash_hmac('sha256', $signedPayload, $webhookSecret);
             $isValid = hash_equals($expectedSignature, $signatureValue);
@@ -317,7 +346,7 @@ class PolarService
             $isValid = hash_equals($expectedSignature, $signatureValue);
 
             // Try with raw secret if decoded secret fails
-            if (!$isValid) {
+            if (! $isValid) {
                 $expectedSignatureAlt = base64_encode(hash_hmac('sha256', $signedPayload, $webhookSecret, true));
                 $isValid = hash_equals($expectedSignatureAlt, $signatureValue);
             }
@@ -327,13 +356,13 @@ class PolarService
             $expectedSignature = base64_encode(hash_hmac('sha256', $signedPayload, $secretKey, true));
             $isValid = hash_equals($expectedSignature, $signatureValue);
 
-            if (!$isValid) {
+            if (! $isValid) {
                 $expectedSignatureAlt = base64_encode(hash_hmac('sha256', $signedPayload, $webhookSecret, true));
                 $isValid = hash_equals($expectedSignatureAlt, $signatureValue);
             }
         }
 
-        if (!$isValid) {
+        if (! $isValid) {
             Log::warning('Webhook signature mismatch', [
                 'received' => $signatureValue,
                 'webhookId' => $webhookId,
@@ -347,22 +376,23 @@ class PolarService
 
     /**
      * Get a subscription by ID from Polar.sh.
-     * 
-     * @param string $subscriptionId The Polar subscription ID
+     *
+     * @param  string  $subscriptionId  The Polar subscription ID
      * @return array|null Subscription data as array, or null on failure
      */
     public function getSubscription(string $subscriptionId): ?array
     {
         $client = $this->getClient();
-        
+
         if ($client === null) {
             Log::error('Cannot get subscription: Polar client not available');
+
             return null;
         }
 
         try {
             $response = $client->subscriptions->get($subscriptionId);
-            
+
             if ($response->subscription === null) {
                 return null;
             }
@@ -384,33 +414,36 @@ class PolarService
                 'error' => $e->getMessage(),
                 'subscriptionId' => $subscriptionId,
             ]);
+
             return null;
         }
     }
 
     /**
      * Get checkout session by customer session token.
-     * 
-     * @param string $token The customer session token (polar_cst_xxx)
+     *
+     * @param  string  $token  The customer session token (polar_cst_xxx)
      * @return array|null Checkout data including subscription_id, or null on failure
      */
     public function getCheckoutByToken(string $token): ?array
     {
         $client = $this->getClient();
-        
+
         if ($client === null) {
             Log::error('Cannot get checkout by token: Polar client not available');
+
             return null;
         }
 
         try {
             // Use clientGet to fetch checkout by client secret (customer session token)
             $response = $client->checkouts->clientGet($token);
-            
+
             if ($response->checkoutPublic === null) {
                 Log::warning('Checkout not found for token', [
-                    'token' => substr($token, 0, 20) . '...',
+                    'token' => substr($token, 0, 20).'...',
                 ]);
+
                 return null;
             }
 
@@ -427,27 +460,23 @@ class PolarService
         } catch (\Exception $e) {
             Log::error('Failed to get checkout by token', [
                 'error' => $e->getMessage(),
-                'token' => substr($token, 0, 20) . '...',
+                'token' => substr($token, 0, 20).'...',
             ]);
+
             return null;
         }
     }
 
     /**
      * Check if the Polar service is properly configured.
-     * 
-     * @return bool
      */
     public function isConfigured(): bool
     {
-        return !empty(config('polar.api_token'));
+        return ! empty(config('polar.api_token'));
     }
 
     /**
      * Set a custom client (useful for testing).
-     * 
-     * @param Polar|null $client
-     * @return void
      */
     public function setClient(?Polar $client): void
     {

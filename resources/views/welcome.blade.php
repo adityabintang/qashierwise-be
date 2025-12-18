@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
@@ -142,17 +142,18 @@
     <!-- Alpine.js - Deferred -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
+    @verbatim
     <!-- Structured Data - Organization -->
     <script type="application/ld+json">
     {
-        "@@context": "https://schema.org",
-        "@@type": "Organization",
+        "@context": "https://schema.org",
+        "@type": "Organization",
         "name": "QashierWise",
         "url": "https://qashierwise.com",
         "logo": "https://qashierwise.com/images/logo.png",
         "description": "Platform AI Chatbot WhatsApp untuk restoran dengan integrasi QRIS",
         "address": {
-            "@@type": "PostalAddress",
+            "@type": "PostalAddress",
             "streetAddress": "Jl. Widosari No. 55, Tegalrejo Raya",
             "addressLocality": "Salatiga",
             "addressRegion": "Jawa Tengah",
@@ -160,7 +161,7 @@
             "addressCountry": "ID"
         },
         "founder": {
-            "@@type": "Person",
+            "@type": "Person",
             "name": "Aditya Bintang Fadila"
         },
         "foundingDate": "2025",
@@ -171,15 +172,15 @@
     <!-- Structured Data - SoftwareApplication -->
     <script type="application/ld+json">
     {
-        "@@context": "https://schema.org",
-        "@@type": "SoftwareApplication",
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
         "name": "QashierWise",
         "applicationCategory": "BusinessApplication",
         "applicationSubCategory": "Restaurant Management Software",
         "operatingSystem": "Web Browser",
         "description": "AI Chatbot WhatsApp untuk restoran dengan integrasi QRIS. Kelola reservasi, pesanan, dan pembayaran dalam satu dashboard.",
         "offers": {
-            "@@type": "AggregateOffer",
+            "@type": "AggregateOffer",
             "lowPrice": "0",
             "highPrice": "2990000",
             "priceCurrency": "IDR",
@@ -199,13 +200,13 @@
     <!-- Structured Data - WebSite -->
     <script type="application/ld+json">
     {
-        "@@context": "https://schema.org",
-        "@@type": "WebSite",
+        "@context": "https://schema.org",
+        "@type": "WebSite",
         "name": "QashierWise",
         "url": "https://qashierwise.com",
         "description": "Platform AI Chatbot WhatsApp untuk restoran dengan integrasi QRIS",
         "publisher": {
-            "@@type": "Organization",
+            "@type": "Organization",
             "name": "QashierWise"
         }
     }
@@ -214,38 +215,38 @@
     <!-- Structured Data - FAQ -->
     <script type="application/ld+json">
     {
-        "@@context": "https://schema.org",
-        "@@type": "FAQPage",
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
         "mainEntity": [
             {
-                "@@type": "Question",
+                "@type": "Question",
                 "name": "Apa itu QashierWise?",
                 "acceptedAnswer": {
-                    "@@type": "Answer",
+                    "@type": "Answer",
                     "text": "QashierWise adalah platform AI Chatbot WhatsApp yang dirancang khusus untuk restoran, membantu mengelola reservasi, pesanan, dan pembayaran QRIS dalam satu dashboard."
                 }
             },
             {
-                "@@type": "Question",
+                "@type": "Question",
                 "name": "Apakah perlu aplikasi terpisah untuk pelanggan?",
                 "acceptedAnswer": {
-                    "@@type": "Answer",
+                    "@type": "Answer",
                     "text": "Tidak! Pelanggan cukup menggunakan WhatsApp yang sudah mereka miliki. Tidak perlu download aplikasi tambahan."
                 }
             },
             {
-                "@@type": "Question",
+                "@type": "Question",
                 "name": "Bagaimana pembayaran dilakukan?",
                 "acceptedAnswer": {
-                    "@@type": "Answer",
+                    "@type": "Answer",
                     "text": "Pembayaran bisa dilakukan melalui QRIS yang terintegrasi dengan Midtrans, Xendit, atau penyedia QRIS lainnya. Pelanggan juga bisa bayar di tempat."
                 }
             },
             {
-                "@@type": "Question",
+                "@type": "Question",
                 "name": "Apakah bisa multi-outlet dan multi nomor?",
                 "acceptedAnswer": {
-                    "@@type": "Answer",
+                    "@type": "Answer",
                     "text": "Ya! Paket Standard mendukung hingga 2 outlet, dan paket Pro mendukung unlimited outlet dengan fitur multi-branding."
                 }
             }
@@ -256,11 +257,11 @@
     <!-- Structured Data - BreadcrumbList -->
     <script type="application/ld+json">
     {
-        "@@context": "https://schema.org",
-        "@@type": "BreadcrumbList",
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
         "itemListElement": [
             {
-                "@@type": "ListItem",
+                "@type": "ListItem",
                 "position": 1,
                 "name": "Home",
                 "item": "https://qashierwise.com"
@@ -272,8 +273,8 @@
     <!-- Structured Data - Product/Pricing -->
     <script type="application/ld+json">
     {
-        "@@context": "https://schema.org",
-        "@@type": "Product",
+        "@context": "https://schema.org",
+        "@type": "Product",
         "name": "QashierWise Standard",
         "description": "Paket Standard QashierWise dengan fitur delivery, QRIS unlimited, dan dukungan hingga 2 outlet",
         "image": [
@@ -281,11 +282,11 @@
             "https://qashierwise.com/images/og-image.png"
         ],
         "brand": {
-            "@@type": "Brand",
+            "@type": "Brand",
             "name": "QashierWise"
         },
         "aggregateRating": {
-            "@@type": "AggregateRating",
+            "@type": "AggregateRating",
             "ratingValue": "4.8",
             "reviewCount": "24",
             "bestRating": "5",
@@ -293,76 +294,76 @@
         },
         "review": [
             {
-                "@@type": "Review",
+                "@type": "Review",
                 "author": {
-                    "@@type": "Person",
+                    "@type": "Person",
                     "name": "Budi Santoso"
                 },
                 "datePublished": "2025-11-15",
                 "reviewBody": "QashierWise sangat membantu restoran kami. Reservasi jadi lebih teratur dan otomatis, pelanggan puas dengan respons cepat.",
                 "reviewRating": {
-                    "@@type": "Rating",
+                    "@type": "Rating",
                     "ratingValue": "5",
                     "bestRating": "5"
                 }
             },
             {
-                "@@type": "Review",
+                "@type": "Review",
                 "author": {
-                    "@@type": "Person",
+                    "@type": "Person",
                     "name": "Siti Nurhaliza"
                 },
                 "datePublished": "2025-11-20",
                 "reviewBody": "Fitur QRIS dan order via WhatsApp sangat praktis. Dashboard mudah digunakan dan laporan lengkap.",
                 "reviewRating": {
-                    "@@type": "Rating",
+                    "@type": "Rating",
                     "ratingValue": "5",
                     "bestRating": "5"
                 }
             },
             {
-                "@@type": "Review",
+                "@type": "Review",
                 "author": {
-                    "@@type": "Person",
+                    "@type": "Person",
                     "name": "Ahmad Rizki"
                 },
                 "datePublished": "2025-11-25",
                 "reviewBody": "Sistem yang bagus untuk restoran. AI chatbot cukup pintar dalam merespons pelanggan. Recommended!",
                 "reviewRating": {
-                    "@@type": "Rating",
+                    "@type": "Rating",
                     "ratingValue": "4",
                     "bestRating": "5"
                 }
             }
         ],
         "offers": {
-            "@@type": "Offer",
+            "@type": "Offer",
             "price": "249000",
             "priceCurrency": "IDR",
             "priceValidUntil": "2025-12-31",
             "availability": "https://schema.org/InStock",
             "url": "https://qashierwise.com/#pricing",
             "shippingDetails": {
-                "@@type": "OfferShippingDetails",
+                "@type": "OfferShippingDetails",
                 "shippingRate": {
-                    "@@type": "MonetaryAmount",
+                    "@type": "MonetaryAmount",
                     "value": "0",
                     "currency": "IDR"
                 },
                 "shippingDestination": {
-                    "@@type": "DefinedRegion",
+                    "@type": "DefinedRegion",
                     "addressCountry": "ID"
                 },
                 "deliveryTime": {
-                    "@@type": "ShippingDeliveryTime",
+                    "@type": "ShippingDeliveryTime",
                     "handlingTime": {
-                        "@@type": "QuantitativeValue",
+                        "@type": "QuantitativeValue",
                         "minValue": "0",
                         "maxValue": "1",
                         "unitCode": "DAY"
                     },
                     "transitTime": {
-                        "@@type": "QuantitativeValue",
+                        "@type": "QuantitativeValue",
                         "minValue": "0",
                         "maxValue": "0",
                         "unitCode": "DAY"
@@ -370,7 +371,7 @@
                 }
             },
             "hasMerchantReturnPolicy": {
-                "@@type": "MerchantReturnPolicy",
+                "@type": "MerchantReturnPolicy",
                 "applicableCountry": "ID",
                 "returnPolicyCategory": "https://schema.org/MerchantReturnFiniteReturnWindow",
                 "merchantReturnDays": 7,
@@ -380,6 +381,7 @@
         }
     }
     </script>
+    @endverbatim
 
     <style>
         [x-cloak] { display: none !important; }
@@ -436,8 +438,8 @@
                 </div>
 
                 <!-- Mobile Hamburger Button -->
-                <button 
-                    @click="menuOpen = !menuOpen" 
+                <button
+                    @click="menuOpen = !menuOpen"
                     class="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/50 min-h-[44px] min-w-[44px] flex items-center justify-center"
                     aria-label="Toggle menu"
                     :aria-expanded="menuOpen"
@@ -449,8 +451,8 @@
         </div>
 
         <!-- Mobile Menu Panel -->
-        <div 
-            x-show="menuOpen" 
+        <div
+            x-show="menuOpen"
             x-cloak
             x-transition:enter="transition ease-out duration-300"
             x-transition:enter-start="opacity-0 -translate-y-2"
@@ -466,7 +468,7 @@
                 <a href="#pricing" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">Harga</a>
                 <a href="#about" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">Tentang Kami</a>
                 <a href="#faq" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">FAQ</a>
-                
+
                 <!-- Mobile CTA Buttons -->
                 <div class="pt-4 border-t border-gray-100 space-y-3">
                     @if (Route::has('login'))
@@ -484,8 +486,8 @@
         </div>
 
         <!-- Mobile Menu Backdrop Overlay -->
-        <div 
-            x-show="menuOpen" 
+        <div
+            x-show="menuOpen"
             x-cloak
             @click="menuOpen = false"
             x-transition:enter="transition ease-out duration-300"
@@ -556,13 +558,13 @@
 
                 <!-- Right Content - Hero Image -->
                 <div class="relative order-2 w-full max-w-md lg:max-w-none mx-auto mt-8 lg:mt-0">
-                    <img 
-                        src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=665&q=75" 
+                    <img
+                        src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=665&q=75"
                         srcset="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=75 400w,
                                 https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=665&q=75 665w,
                                 https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=75 800w"
                         sizes="(max-width: 640px) 400px, (max-width: 1024px) 665px, 800px"
-                        alt="Restaurant ordering" 
+                        alt="Restaurant ordering"
                         class="rounded-2xl shadow-2xl w-full"
                         width="665"
                         height="444"
@@ -825,7 +827,7 @@
                 <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 md:mb-4">Harga sederhana, tumbuh bersama Anda</h2>
                 <p class="text-sm md:text-base text-gray-600">Mulai gratis - upgrade kapan saja.</p>
             </div>
-            
+
             <!-- Error Message -->
             <div x-show="error" x-cloak class="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-xl text-center max-w-md mx-auto">
                 <span x-text="error"></span>
@@ -884,8 +886,8 @@
                             <li class="flex items-start"><i class="fas fa-check text-primary mr-2 mt-0.5"></i>Customer Base</li>
                         </ul>
                         <template x-if="token">
-                            <button 
-                                @click="checkout('standard')" 
+                            <button
+                                @click="checkout('standard')"
                                 :disabled="loading || isCurrentPlan('standard')"
                                 class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
@@ -926,8 +928,8 @@
                             <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>SLA + dedicated support</li>
                         </ul>
                         <template x-if="token">
-                            <button 
-                                @click="checkout('pro')" 
+                            <button
+                                @click="checkout('pro')"
                                 :disabled="loading || isCurrentPlan('pro')"
                                 class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
@@ -1001,8 +1003,8 @@
                         <li class="flex items-center"><i class="fas fa-check text-primary mr-2"></i>Customer Base</li>
                     </ul>
                     <template x-if="token">
-                        <button 
-                            @click="checkout('standard')" 
+                        <button
+                            @click="checkout('standard')"
                             :disabled="loading || isCurrentPlan('standard')"
                             class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -1043,8 +1045,8 @@
                         <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>SLA + dedicated support</li>
                     </ul>
                     <template x-if="token">
-                        <button 
-                            @click="checkout('pro')" 
+                        <button
+                            @click="checkout('pro')"
                             :disabled="loading || isCurrentPlan('pro')"
                             class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -1245,12 +1247,12 @@
                     const urlParams = new URLSearchParams(window.location.search);
                     const plan = urlParams.get('plan');
                     const shouldCheckout = urlParams.get('checkout') === 'true';
-                    
+
                     if (plan && shouldCheckout && this.token) {
                         // Clean up URL parameters but keep the hash
                         const hash = window.location.hash || '';
                         window.history.replaceState({}, document.title, window.location.pathname + hash);
-                        
+
                         // Trigger checkout after a short delay to ensure component is ready
                         setTimeout(() => {
                             this.checkout(plan);
@@ -1266,7 +1268,7 @@
                                 'Accept': 'application/json',
                             }
                         });
-                        
+
                         if (response.ok) {
                             const data = await response.json();
                             if (data.success && data.data.subscription) {
@@ -1284,7 +1286,7 @@
 
                 async checkout(planId) {
                     if (this.loading) return;
-                    
+
                     this.loading = true;
                     this.error = null;
                     this.selectedPlan = planId;

@@ -19,7 +19,16 @@ class CategoryController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $categories = $this->categoryService->getAllWithProductCounts();
+        $userId = auth()->id();
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
+        $categories = $this->categoryService->getAllWithProductCounts($userId);
 
         if ($request->boolean('active_only', false)) {
             $categories = $categories->where('is_active', true)->values();
@@ -36,11 +45,22 @@ class CategoryController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $userId = auth()->id();
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:categories,name',
             'description' => 'nullable|string',
             'is_active' => 'nullable|boolean',
         ]);
+
+        $validated['user_id'] = $userId;
 
         $category = $this->categoryService->create($validated);
 

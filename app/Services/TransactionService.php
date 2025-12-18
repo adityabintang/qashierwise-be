@@ -15,12 +15,17 @@ class TransactionService
      *
      * @param int $perPage Items per page
      * @param int|null $storeId Optional store filter
+     * @param int|null $userId Optional user filter
      * @return LengthAwarePaginator
      */
-    public function list(int $perPage = 20, ?int $storeId = null): LengthAwarePaginator
+    public function list(int $perPage = 20, ?int $storeId = null, ?int $userId = null): LengthAwarePaginator
     {
         $query = Order::whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_PAID])
             ->with(['items.product', 'payments', 'store', 'posUser.user']);
+
+        if ($userId !== null) {
+            $query->whereHas('store', fn($q) => $q->where('user_id', $userId));
+        }
 
         if ($storeId !== null) {
             $query->where('store_id', $storeId);
@@ -34,13 +39,18 @@ class TransactionService
      *
      * @param string $orderNumber Order number to search for
      * @param int|null $storeId Optional store filter
+     * @param int|null $userId Optional user filter
      * @return Collection
      */
-    public function searchByOrderNumber(string $orderNumber, ?int $storeId = null): Collection
+    public function searchByOrderNumber(string $orderNumber, ?int $storeId = null, ?int $userId = null): Collection
     {
         $query = Order::whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_PAID])
             ->where('order_number', 'LIKE', "%{$orderNumber}%")
             ->with(['items.product', 'payments', 'store', 'posUser.user']);
+
+        if ($userId !== null) {
+            $query->whereHas('store', fn($q) => $q->where('user_id', $userId));
+        }
 
         if ($storeId !== null) {
             $query->where('store_id', $storeId);
@@ -54,13 +64,18 @@ class TransactionService
      *
      * @param Carbon $date Date to filter by
      * @param int|null $storeId Optional store filter
+     * @param int|null $userId Optional user filter
      * @return Collection
      */
-    public function filterByDate(Carbon $date, ?int $storeId = null): Collection
+    public function filterByDate(Carbon $date, ?int $storeId = null, ?int $userId = null): Collection
     {
         $query = Order::whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_PAID])
             ->whereDate('created_at', $date->toDateString())
             ->with(['items.product', 'payments', 'store', 'posUser.user']);
+
+        if ($userId !== null) {
+            $query->whereHas('store', fn($q) => $q->where('user_id', $userId));
+        }
 
         if ($storeId !== null) {
             $query->where('store_id', $storeId);
@@ -76,14 +91,19 @@ class TransactionService
      * @param Carbon $startDate Start date
      * @param Carbon $endDate End date
      * @param int|null $storeId Optional store filter
+     * @param int|null $userId Optional user filter
      * @return Collection
      */
-    public function filterByDateRange(Carbon $startDate, Carbon $endDate, ?int $storeId = null): Collection
+    public function filterByDateRange(Carbon $startDate, Carbon $endDate, ?int $storeId = null, ?int $userId = null): Collection
     {
         $query = Order::whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_PAID])
             ->whereDate('created_at', '>=', $startDate->toDateString())
             ->whereDate('created_at', '<=', $endDate->toDateString())
             ->with(['items.product', 'payments', 'store', 'posUser.user']);
+
+        if ($userId !== null) {
+            $query->whereHas('store', fn($q) => $q->where('user_id', $userId));
+        }
 
         if ($storeId !== null) {
             $query->where('store_id', $storeId);
@@ -96,13 +116,19 @@ class TransactionService
      * Get transaction details by ID
      *
      * @param int $id Order/Transaction ID
+     * @param int|null $userId Optional user filter
      * @return Order|null
      */
-    public function find(int $id): ?Order
+    public function find(int $id, ?int $userId = null): ?Order
     {
-        return Order::whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_PAID])
-            ->with(['items.product', 'payments', 'store', 'table', 'posUser.user'])
-            ->find($id);
+        $query = Order::whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_PAID])
+            ->with(['items.product', 'payments', 'store', 'table', 'posUser.user']);
+
+        if ($userId !== null) {
+            $query->whereHas('store', fn($q) => $q->where('user_id', $userId));
+        }
+
+        return $query->find($id);
     }
 
     /**

@@ -21,8 +21,18 @@ class OrderController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $userId = auth()->id();
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
         $perPage = $request->input('per_page', 20);
         $orders = Order::with(['store', 'table', 'posUser.user', 'items.product'])
+            ->whereHas('store', fn($q) => $q->where('user_id', $userId))
             ->when($request->input('store_id'), fn($q, $storeId) => $q->where('store_id', $storeId))
             ->when($request->input('status'), fn($q, $status) => $q->where('status', $status))
             ->orderBy('created_at', 'desc')
@@ -55,14 +65,14 @@ class OrderController extends Controller
                 $posUser = \App\Models\PosUser::where('user_id', $user->id)
                     ->where('is_active', true)
                     ->first();
-                
+
                 // If no PosUser exists, create one with default role
                 if (!$posUser) {
                     $defaultRole = \App\Models\Role::firstOrCreate(
                         ['name' => 'Cashier'],
                         ['permissions' => ['orders.create', 'orders.view', 'payments.create']]
                     );
-                    
+
                     $posUser = \App\Models\PosUser::create([
                         'user_id' => $user->id,
                         'store_id' => $validated['store_id'],
@@ -70,7 +80,7 @@ class OrderController extends Controller
                         'is_active' => true,
                     ]);
                 }
-                
+
                 $validated['pos_user_id'] = $posUser->id;
             }
         }

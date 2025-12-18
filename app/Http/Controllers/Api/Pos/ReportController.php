@@ -19,18 +19,27 @@ class ReportController extends Controller
      */
     public function dailySales(Request $request): JsonResponse
     {
+        $userId = auth()->id();
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
         $validated = $request->validate([
             'date' => 'nullable|date',
             'store_id' => 'nullable|exists:stores,id',
         ]);
 
-        $date = isset($validated['date']) 
-            ? Carbon::parse($validated['date']) 
+        $date = isset($validated['date'])
+            ? Carbon::parse($validated['date'])
             : Carbon::today();
-        
+
         $storeId = $validated['store_id'] ?? null;
 
-        $report = $this->reportService->dailySales($date, $storeId);
+        $report = $this->reportService->dailySales($date, $storeId, $userId);
 
         return response()->json([
             'success' => true,
@@ -43,6 +52,15 @@ class ReportController extends Controller
      */
     public function salesByRange(Request $request): JsonResponse
     {
+        $userId = auth()->id();
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
         $validated = $request->validate([
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
@@ -53,7 +71,7 @@ class ReportController extends Controller
         $end = Carbon::parse($validated['end_date']);
         $storeId = $validated['store_id'] ?? null;
 
-        $report = $this->reportService->salesByRange($start, $end, $storeId);
+        $report = $this->reportService->salesByRange($start, $end, $storeId, $userId);
 
         return response()->json([
             'success' => true,
@@ -73,18 +91,27 @@ class ReportController extends Controller
             'store_id' => 'nullable|exists:stores,id',
         ]);
 
-        $start = isset($validated['start_date']) 
-            ? Carbon::parse($validated['start_date']) 
+        $start = isset($validated['start_date'])
+            ? Carbon::parse($validated['start_date'])
             : Carbon::today()->subDays(30);
-        
-        $end = isset($validated['end_date']) 
-            ? Carbon::parse($validated['end_date']) 
+
+        $end = isset($validated['end_date'])
+            ? Carbon::parse($validated['end_date'])
             : Carbon::today();
-        
+
         $limit = $validated['limit'] ?? 10;
         $storeId = $validated['store_id'] ?? null;
 
-        $products = $this->reportService->topProducts($start, $end, $limit, $storeId);
+        $userId = auth()->id();
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
+        $products = $this->reportService->topProducts($start, $end, $limit, $storeId, $userId);
 
         return response()->json([
             'success' => true,
@@ -108,14 +135,14 @@ class ReportController extends Controller
             'store_id' => 'nullable|exists:stores,id',
         ]);
 
-        $start = isset($validated['start_date']) 
-            ? Carbon::parse($validated['start_date']) 
+        $start = isset($validated['start_date'])
+            ? Carbon::parse($validated['start_date'])
             : Carbon::today()->subDays(30);
-        
-        $end = isset($validated['end_date']) 
-            ? Carbon::parse($validated['end_date']) 
+
+        $end = isset($validated['end_date'])
+            ? Carbon::parse($validated['end_date'])
             : Carbon::today();
-        
+
         $storeId = $validated['store_id'] ?? null;
 
         $report = $this->reportService->salesByPaymentMethod($start, $end, $storeId);
@@ -141,10 +168,10 @@ class ReportController extends Controller
             'store_id' => 'nullable|exists:stores,id',
         ]);
 
-        $date = isset($validated['date']) 
-            ? Carbon::parse($validated['date']) 
+        $date = isset($validated['date'])
+            ? Carbon::parse($validated['date'])
             : Carbon::today();
-        
+
         $storeId = $validated['store_id'] ?? null;
 
         $report = $this->reportService->hourlySales($date, $storeId);

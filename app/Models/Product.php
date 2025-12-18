@@ -18,6 +18,7 @@ class Product extends Model
      * @var array<int, string>
      */
     protected $fillable = [
+        'user_id',
         'category_id',
         'name',
         'sku',
@@ -39,6 +40,14 @@ class Product extends Model
             'stock_quantity' => 'integer',
             'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * Get the user that owns this product.
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     /**

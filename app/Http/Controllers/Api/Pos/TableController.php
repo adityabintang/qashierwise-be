@@ -14,9 +14,19 @@ class TableController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $tables = Table::with('store')
-            ->when($request->input('store_id'), fn($q, $storeId) => $q->where('store_id', $storeId))
-            ->when($request->input('status'), fn($q, $status) => $q->where('status', $status))
+        $userId = auth()->id();
+
+        if (! $userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
+        $tables = Table::where('user_id', $userId)
+            ->with('store')
+            ->when($request->input('store_id'), fn ($q, $storeId) => $q->where('store_id', $storeId))
+            ->when($request->input('status'), fn ($q, $status) => $q->where('status', $status))
             ->orderBy('store_id')
             ->orderBy('number')
             ->get();
@@ -32,6 +42,15 @@ class TableController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $userId = auth()->id();
+
+        if (! $userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
         $validated = $request->validate([
             'store_id' => 'required|exists:stores,id',
             'number' => 'required|string|max:50',
@@ -40,6 +59,7 @@ class TableController extends Controller
         ]);
 
         $validated['status'] = $validated['status'] ?? Table::STATUS_AVAILABLE;
+        $validated['user_id'] = $userId;
 
         $table = Table::create($validated);
 
@@ -55,9 +75,25 @@ class TableController extends Controller
      */
     public function show(Table $table): JsonResponse
     {
+        $userId = auth()->id();
+
+        if (! $userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
+        if ((int) $table->user_id !== (int) $userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access',
+            ], 403);
+        }
+
         return response()->json([
             'success' => true,
-            'data' => $table->load(['store', 'orders' => fn($q) => $q->where('status', 'pending')->latest()]),
+            'data' => $table->load(['store', 'orders' => fn ($q) => $q->where('status', 'pending')->latest()]),
         ]);
     }
 
@@ -66,6 +102,22 @@ class TableController extends Controller
      */
     public function update(Request $request, Table $table): JsonResponse
     {
+        $userId = auth()->id();
+
+        if (! $userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
+        if ($table->user_id !== $userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'store_id' => 'sometimes|exists:stores,id',
             'number' => 'sometimes|string|max:50',
@@ -87,6 +139,22 @@ class TableController extends Controller
      */
     public function destroy(Table $table): JsonResponse
     {
+        $userId = auth()->id();
+
+        if (! $userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
+        if ($table->user_id !== $userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access',
+            ], 403);
+        }
+
         // Check if table has active orders
         if ($table->orders()->whereIn('status', ['pending', 'paid'])->exists()) {
             return response()->json([

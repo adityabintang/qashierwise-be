@@ -19,7 +19,17 @@ class StoreController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $userId = auth()->id();
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
         $stores = Store::withCount(['orders', 'tables', 'posUsers'])
+            ->where('user_id', $userId)
             ->when($request->boolean('active_only', false), fn($q) => $q->where('is_active', true))
             ->orderBy('name')
             ->get();
@@ -35,6 +45,15 @@ class StoreController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $userId = auth()->id();
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'code' => 'nullable|string|max:50|unique:stores,code',
@@ -42,6 +61,8 @@ class StoreController extends Controller
             'phone' => 'nullable|string|max:20',
             'is_active' => 'nullable|boolean',
         ]);
+
+        $validated['user_id'] = $userId;
 
         $store = $this->storeService->create($validated);
 
