@@ -4,13 +4,22 @@
 User-agent: *
 Allow: /
 Disallow: /dashboard
+Disallow: /dashboard/*
 Disallow: /admin
-Disallow: /api/
+Disallow: /admin/*
 Disallow: /login
 Disallow: /register
 Disallow: /password
+Disallow: /password/*
 Disallow: /sanctum/
+Disallow: /sanctum/*
 Disallow: /_debugbar/
+Disallow: /api/auth/
+Disallow: /api/pos/
+Disallow: /api/whatsapp/
+Disallow: /api/subscriptions/
+Allow: /api/products$
+Allow: /api/categories$
 
 # Crawl-delay for respectful crawling
 Crawl-delay: 1

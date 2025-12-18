@@ -11,8 +11,8 @@ use App\Models\WhatsAppTemplate;
 use App\Services\MediaStorageService;
 use App\Services\TemplateService;
 use App\Services\WhatsAppAccountService;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Netflie\WhatsAppCloudApi\Message\ButtonReply\Button;
@@ -49,13 +49,12 @@ class WhatsAppController extends Controller
      * Get WhatsApp Cloud API client for the authenticated user.
      * Uses user's stored credentials from WhatsAppAccountService.
      *
-     * @return WhatsAppCloudApi
      * @throws WhatsAppNotConnectedException
      */
     protected function getWhatsAppClient(): WhatsAppCloudApi
     {
         $userId = auth()->id();
-        if (!$userId) {
+        if (! $userId) {
             throw new WhatsAppNotConnectedException('Authentication required to access WhatsApp features.');
         }
 
@@ -65,18 +64,17 @@ class WhatsAppController extends Controller
     /**
      * Get the user's active WhatsApp account credentials.
      *
-     * @return WhatsAppAccount
      * @throws WhatsAppNotConnectedException
      */
     protected function getUserWhatsAppAccount(): WhatsAppAccount
     {
         $userId = auth()->id();
-        if (!$userId) {
+        if (! $userId) {
             throw new WhatsAppNotConnectedException('Authentication required to access WhatsApp features.');
         }
 
         $account = $this->whatsAppAccountService->getActiveAccount($userId);
-        if (!$account) {
+        if (! $account) {
             throw new WhatsAppNotConnectedException('No connected WhatsApp account found for this user.');
         }
 
@@ -87,8 +85,6 @@ class WhatsAppController extends Controller
      * Upload media to WhatsApp with correct MIME type.
      * Uses user's stored credentials for the API call.
      *
-     * @param UploadedFile $file
-     * @return array
      * @throws WhatsAppNotConnectedException
      */
     private function uploadMediaToWhatsApp(UploadedFile $file): array
@@ -116,13 +112,10 @@ class WhatsAppController extends Controller
         return $response->json();
     }
 
-
-
     /**
      * Get WhatsApp account instance for the authenticated user.
      * Uses WhatsAppAccountService to retrieve user's connected account.
      *
-     * @return WhatsAppAccount
      * @throws WhatsAppNotConnectedException
      */
     private function getWhatsAppAccount(): WhatsAppAccount
@@ -143,8 +136,8 @@ class WhatsAppController extends Controller
         $cleanNumber = preg_replace('/[^0-9]/', '', $phoneNumber);
         $userId = auth()->id();
 
-        if (!$userId) {
-            throw new \Exception('Authentication required');
+        if (! $userId) {
+            throw new WhatsAppNotConnectedException('Authentication required');
         }
 
         return WhatsAppContact::firstOrCreate(
@@ -1387,7 +1380,7 @@ class WhatsAppController extends Controller
         try {
             $userId = auth()->id();
 
-            if (!$userId) {
+            if (! $userId) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Authentication required',
@@ -1458,7 +1451,7 @@ class WhatsAppController extends Controller
         try {
             $userId = auth()->id();
 
-            if (!$userId) {
+            if (! $userId) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Authentication required',
@@ -1512,7 +1505,7 @@ class WhatsAppController extends Controller
         try {
             $userId = auth()->id();
 
-            if (!$userId) {
+            if (! $userId) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Authentication required',
@@ -1589,7 +1582,7 @@ class WhatsAppController extends Controller
         try {
             $userId = auth()->id();
 
-            if (!$userId) {
+            if (! $userId) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Authentication required',
@@ -1630,7 +1623,7 @@ class WhatsAppController extends Controller
         try {
             $userId = auth()->id();
 
-            if (!$userId) {
+            if (! $userId) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Authentication required',
@@ -1666,7 +1659,7 @@ class WhatsAppController extends Controller
         try {
             $userId = auth()->id();
 
-            if (!$userId) {
+            if (! $userId) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Authentication required',
@@ -1807,13 +1800,14 @@ class WhatsAppController extends Controller
         $response = Http::withToken($accessToken)
             ->get("https://graph.facebook.com/v21.0/{$wabaId}/message_templates", [
                 'limit' => 100,
-                'fields' => 'name,status,category,language,components,id,quality_score'
+                'fields' => 'name,status,category,language,components,id,quality_score',
             ]);
 
         if ($response->failed()) {
             \Log::error('Failed to fetch templates from Meta API', [
-                'response' => $response->body()
+                'response' => $response->body(),
             ]);
+
             return;
         }
 
@@ -1856,7 +1850,7 @@ class WhatsAppController extends Controller
                     'header_type' => $headerType,
                     'body' => $body,
                     'footer' => $footer,
-                    'buttons' => !empty($buttons) ? json_encode($buttons) : null,
+                    'buttons' => ! empty($buttons) ? json_encode($buttons) : null,
                     'components' => $components,
                     'quality_score' => $templateData['quality_score']['score'] ?? null,
                 ]
@@ -1921,9 +1915,6 @@ class WhatsAppController extends Controller
 
     /**
      * Create a new WhatsApp message template
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function createTemplate(Request $request): JsonResponse
     {
@@ -1933,7 +1924,7 @@ class WhatsAppController extends Controller
 
             // Validate required fields
             $requiredValidation = $this->templateService->validateRequiredFields($data);
-            if (!$requiredValidation['valid']) {
+            if (! $requiredValidation['valid']) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Validation failed',
@@ -1943,7 +1934,7 @@ class WhatsAppController extends Controller
 
             // Validate template name
             $nameValidation = $this->templateService->validateTemplateName($data['name']);
-            if (!$nameValidation['valid']) {
+            if (! $nameValidation['valid']) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Validation failed',
@@ -1954,7 +1945,7 @@ class WhatsAppController extends Controller
             // Validate body
             $bodyText = is_array($data['body']) ? ($data['body']['text'] ?? '') : $data['body'];
             $bodyValidation = $this->templateService->validateBody($bodyText);
-            if (!$bodyValidation['valid']) {
+            if (! $bodyValidation['valid']) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Validation failed',
@@ -1963,10 +1954,10 @@ class WhatsAppController extends Controller
             }
 
             // Validate footer if present
-            if (!empty($data['footer'])) {
+            if (! empty($data['footer'])) {
                 $footerText = is_array($data['footer']) ? ($data['footer']['text'] ?? '') : $data['footer'];
                 $footerValidation = $this->templateService->validateFooter($footerText);
-                if (!$footerValidation['valid']) {
+                if (! $footerValidation['valid']) {
                     return response()->json([
                         'success' => false,
                         'message' => 'Validation failed',
@@ -1976,9 +1967,9 @@ class WhatsAppController extends Controller
             }
 
             // Validate buttons if present
-            if (!empty($data['buttons'])) {
+            if (! empty($data['buttons'])) {
                 $buttonsValidation = $this->templateService->validateButtons($data['buttons']);
-                if (!$buttonsValidation['valid']) {
+                if (! $buttonsValidation['valid']) {
                     return response()->json([
                         'success' => false,
                         'message' => 'Validation failed',
@@ -1997,7 +1988,7 @@ class WhatsAppController extends Controller
             // Call TemplateService to create template via WhatsApp API
             $result = $this->templateService->createTemplate($data);
 
-            if (!$result['success']) {
+            if (! $result['success']) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Failed to create template',
@@ -2015,16 +2006,16 @@ class WhatsAppController extends Controller
             $footer = null;
             $buttons = null;
 
-            if (!empty($data['header'])) {
+            if (! empty($data['header'])) {
                 $headerType = $data['header']['type'] ?? 'TEXT';
                 $header = $data['header']['text'] ?? null;
             }
 
-            if (!empty($data['footer'])) {
+            if (! empty($data['footer'])) {
                 $footer = is_array($data['footer']) ? ($data['footer']['text'] ?? '') : $data['footer'];
             }
 
-            if (!empty($data['buttons'])) {
+            if (! empty($data['buttons'])) {
                 $buttons = json_encode($data['buttons']);
             }
 
@@ -2071,9 +2062,7 @@ class WhatsAppController extends Controller
     /**
      * Update an existing WhatsApp message template
      *
-     * @param Request $request
-     * @param string $id Template ID (local database ID)
-     * @return JsonResponse
+     * @param  string  $id  Template ID (local database ID)
      */
     public function updateTemplate(Request $request, string $id): JsonResponse
     {
@@ -2084,7 +2073,7 @@ class WhatsAppController extends Controller
                 ->where('id', $id)
                 ->first();
 
-            if (!$template) {
+            if (! $template) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Template not found',
@@ -2094,10 +2083,10 @@ class WhatsAppController extends Controller
             $data = $request->all();
 
             // Validate body if present
-            if (!empty($data['body'])) {
+            if (! empty($data['body'])) {
                 $bodyText = is_array($data['body']) ? ($data['body']['text'] ?? '') : $data['body'];
                 $bodyValidation = $this->templateService->validateBody($bodyText);
-                if (!$bodyValidation['valid']) {
+                if (! $bodyValidation['valid']) {
                     return response()->json([
                         'success' => false,
                         'message' => 'Validation failed',
@@ -2107,10 +2096,10 @@ class WhatsAppController extends Controller
             }
 
             // Validate footer if present
-            if (!empty($data['footer'])) {
+            if (! empty($data['footer'])) {
                 $footerText = is_array($data['footer']) ? ($data['footer']['text'] ?? '') : $data['footer'];
                 $footerValidation = $this->templateService->validateFooter($footerText);
-                if (!$footerValidation['valid']) {
+                if (! $footerValidation['valid']) {
                     return response()->json([
                         'success' => false,
                         'message' => 'Validation failed',
@@ -2120,9 +2109,9 @@ class WhatsAppController extends Controller
             }
 
             // Validate buttons if present
-            if (!empty($data['buttons'])) {
+            if (! empty($data['buttons'])) {
                 $buttonsValidation = $this->templateService->validateButtons($data['buttons']);
-                if (!$buttonsValidation['valid']) {
+                if (! $buttonsValidation['valid']) {
                     return response()->json([
                         'success' => false,
                         'message' => 'Validation failed',
@@ -2141,7 +2130,7 @@ class WhatsAppController extends Controller
             // Call TemplateService to update template via WhatsApp API
             $result = $this->templateService->updateTemplate($template->template_id, $data);
 
-            if (!$result['success']) {
+            if (! $result['success']) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Failed to update template',
@@ -2156,12 +2145,12 @@ class WhatsAppController extends Controller
                 'components' => $components,
             ];
 
-            if (!empty($data['header'])) {
+            if (! empty($data['header'])) {
                 $updateData['header_type'] = $data['header']['type'] ?? 'TEXT';
                 $updateData['header'] = $data['header']['text'] ?? null;
             }
 
-            if (!empty($data['body'])) {
+            if (! empty($data['body'])) {
                 $updateData['body'] = is_array($data['body']) ? ($data['body']['text'] ?? '') : $data['body'];
             }
 
@@ -2170,7 +2159,7 @@ class WhatsAppController extends Controller
             }
 
             if (isset($data['buttons'])) {
-                $updateData['buttons'] = !empty($data['buttons']) ? json_encode($data['buttons']) : null;
+                $updateData['buttons'] = ! empty($data['buttons']) ? json_encode($data['buttons']) : null;
             }
 
             $template->update($updateData);
@@ -2204,8 +2193,7 @@ class WhatsAppController extends Controller
     /**
      * Delete a WhatsApp message template
      *
-     * @param string $name Template name
-     * @return JsonResponse
+     * @param  string  $name  Template name
      */
     public function deleteTemplate(string $name): JsonResponse
     {
@@ -2216,7 +2204,7 @@ class WhatsAppController extends Controller
                 ->where('name', $name)
                 ->first();
 
-            if (!$template) {
+            if (! $template) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Template not found',
@@ -2233,7 +2221,7 @@ class WhatsAppController extends Controller
             // Pass template_id (hsm_id) for more reliable deletion
             $result = $this->templateService->deleteTemplate($name, $template->template_id);
 
-            if (!$result['success']) {
+            if (! $result['success']) {
                 // Check if template was not found on WhatsApp (error_subcode 2593002)
                 // In this case, we should still delete from local database
                 $isTemplateNotFound = str_contains($result['error'] ?? '', 'Invalid parameter') ||
@@ -2307,31 +2295,31 @@ class WhatsAppController extends Controller
                     'file_name' => $file->getClientOriginalName(),
                 ]);
 
-            if (!$sessionResponse->successful()) {
-                throw new \Exception('Failed to create upload session: ' . $sessionResponse->body());
+            if (! $sessionResponse->successful()) {
+                throw new \Exception('Failed to create upload session: '.$sessionResponse->body());
             }
 
             $uploadSessionId = $sessionResponse->json()['id'] ?? null;
 
-            if (!$uploadSessionId) {
+            if (! $uploadSessionId) {
                 throw new \Exception('Failed to get upload session ID');
             }
 
             // Step 2: Upload the file content
             $uploadResponse = Http::withHeaders([
-                'Authorization' => 'OAuth ' . $accessToken,
+                'Authorization' => 'OAuth '.$accessToken,
                 'file_offset' => '0',
             ])
                 ->withBody($fileContent, $mimeType)
                 ->post("https://graph.facebook.com/v21.0/{$uploadSessionId}");
 
-            if (!$uploadResponse->successful()) {
-                throw new \Exception('Failed to upload file: ' . $uploadResponse->body());
+            if (! $uploadResponse->successful()) {
+                throw new \Exception('Failed to upload file: '.$uploadResponse->body());
             }
 
             $handle = $uploadResponse->json()['h'] ?? null;
 
-            if (!$handle) {
+            if (! $handle) {
                 throw new \Exception('Failed to get file handle from upload');
             }
 
@@ -2342,8 +2330,8 @@ class WhatsAppController extends Controller
                     'profile_picture_handle' => $handle,
                 ]);
 
-            if (!$updateResponse->successful()) {
-                throw new \Exception('Failed to update profile picture: ' . $updateResponse->body());
+            if (! $updateResponse->successful()) {
+                throw new \Exception('Failed to update profile picture: '.$updateResponse->body());
             }
 
             // Store locally using MediaStorageService

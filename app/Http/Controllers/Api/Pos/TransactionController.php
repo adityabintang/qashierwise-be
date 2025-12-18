@@ -21,13 +21,6 @@ class TransactionController extends Controller
     {
         $userId = auth()->id();
 
-        if (!$userId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Authentication required',
-            ], 401);
-        }
-
         $validated = $request->validate([
             'per_page' => 'nullable|integer|min:1|max:100',
             'store_id' => 'nullable|exists:stores,id',
@@ -51,16 +44,9 @@ class TransactionController extends Controller
     {
         $userId = auth()->id();
 
-        if (!$userId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Authentication required',
-            ], 401);
-        }
-
         $transaction = $this->transactionService->find($id, $userId);
 
-        if (!$transaction) {
+        if (! $transaction) {
             return response()->json([
                 'success' => false,
                 'message' => 'Transaction not found',
@@ -79,13 +65,6 @@ class TransactionController extends Controller
     public function search(Request $request): JsonResponse
     {
         $userId = auth()->id();
-
-        if (!$userId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Authentication required',
-            ], 401);
-        }
 
         $validated = $request->validate([
             'order_number' => 'required|string|min:1',
@@ -113,13 +92,6 @@ class TransactionController extends Controller
     {
         $userId = auth()->id();
 
-        if (!$userId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Authentication required',
-            ], 401);
-        }
-
         $validated = $request->validate([
             'date' => 'required|date',
             'store_id' => 'nullable|exists:stores,id',
@@ -142,13 +114,6 @@ class TransactionController extends Controller
     public function filterByDateRange(Request $request): JsonResponse
     {
         $userId = auth()->id();
-
-        if (!$userId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Authentication required',
-            ], 401);
-        }
 
         $validated = $request->validate([
             'start_date' => 'required|date',

@@ -13,9 +13,9 @@ class PaymentService
     /**
      * Process a payment for an order
      *
-     * @param Order $order Order to pay for
-     * @param array $paymentData Payment data (method, amount, reference, metadata)
-     * @return Payment
+     * @param  Order  $order  Order to pay for
+     * @param  array  $paymentData  Payment data (method, amount, reference, metadata)
+     *
      * @throws InvalidArgumentException If payment is invalid
      */
     public function processPayment(Order $order, array $paymentData): Payment
@@ -45,7 +45,7 @@ class PaymentService
         ];
 
         $method = $paymentData['method'] ?? Payment::METHOD_CASH;
-        if (!in_array($method, $validMethods)) {
+        if (! in_array($method, $validMethods)) {
             throw new InvalidArgumentException('Invalid payment method');
         }
 
@@ -77,9 +77,10 @@ class PaymentService
     /**
      * Calculate change for a cash payment
      *
-     * @param float $amountPaid Amount paid by customer
-     * @param float $orderTotal Order total amount
+     * @param  float  $amountPaid  Amount paid by customer
+     * @param  float  $orderTotal  Order total amount
      * @return float Change to return
+     *
      * @throws InvalidArgumentException If amount paid is less than order total
      */
     public function calculateChange(float $amountPaid, float $orderTotal): float
@@ -102,9 +103,10 @@ class PaymentService
     /**
      * Process split payment across multiple methods
      *
-     * @param Order $order Order to pay for
-     * @param array $payments Array of payment data [{method, amount, reference?, metadata?}, ...]
+     * @param  Order  $order  Order to pay for
+     * @param  array  $payments  Array of payment data [{method, amount, reference?, metadata?}, ...]
      * @return Collection Collection of Payment records
+     *
      * @throws InvalidArgumentException If payments are invalid
      */
     public function splitPayment(Order $order, array $payments): Collection
@@ -176,7 +178,7 @@ class PaymentService
     /**
      * Get total amount paid for an order
      *
-     * @param Order $order Order to check
+     * @param  Order  $order  Order to check
      * @return float Total amount paid
      */
     public function getTotalPaid(Order $order): float
@@ -187,30 +189,36 @@ class PaymentService
     /**
      * Get remaining amount to be paid for an order
      *
-     * @param Order $order Order to check
+     * @param  Order  $order  Order to check
      * @return float Remaining amount
      */
     public function getRemainingAmount(Order $order): float
     {
         $totalPaid = $this->getTotalPaid($order);
+
         return max(0, (float) $order->total - $totalPaid);
     }
 
     /**
      * Check if an order is fully paid
      *
-     * @param Order $order Order to check
+     * @param  Order  $order  Order to check
      * @return bool True if fully paid
      */
     public function isFullyPaid(Order $order): bool
     {
-        return $this->getTotalPaid($order) >= (float) $order->total;
+        $totalPaid = $this->getTotalPaid($order);
+        $orderTotal = (float) $order->total;
+
+        // Use bccomp for precise decimal comparison to avoid floating-point issues
+        // bccomp returns 0 if equal, 1 if first > second, -1 if first < second
+        return bccomp((string) $totalPaid, (string) $orderTotal, 2) >= 0;
     }
 
     /**
      * Get payments for an order
      *
-     * @param Order $order Order to get payments for
+     * @param  Order  $order  Order to get payments for
      * @return Collection Collection of Payment records
      */
     public function getPayments(Order $order): Collection

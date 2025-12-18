@@ -16,7 +16,7 @@ class TableController extends Controller
     {
         $userId = auth()->id();
 
-        if (!$userId) {
+        if (! $userId) {
             return response()->json([
                 'success' => false,
                 'message' => 'Authentication required',
@@ -25,8 +25,8 @@ class TableController extends Controller
 
         $tables = Table::where('user_id', $userId)
             ->with('store')
-            ->when($request->input('store_id'), fn($q, $storeId) => $q->where('store_id', $storeId))
-            ->when($request->input('status'), fn($q, $status) => $q->where('status', $status))
+            ->when($request->input('store_id'), fn ($q, $storeId) => $q->where('store_id', $storeId))
+            ->when($request->input('status'), fn ($q, $status) => $q->where('status', $status))
             ->orderBy('store_id')
             ->orderBy('number')
             ->get();
@@ -44,7 +44,7 @@ class TableController extends Controller
     {
         $userId = auth()->id();
 
-        if (!$userId) {
+        if (! $userId) {
             return response()->json([
                 'success' => false,
                 'message' => 'Authentication required',
@@ -77,14 +77,14 @@ class TableController extends Controller
     {
         $userId = auth()->id();
 
-        if (!$userId) {
+        if (! $userId) {
             return response()->json([
                 'success' => false,
                 'message' => 'Authentication required',
             ], 401);
         }
 
-        if ($table->user_id !== $userId) {
+        if ((int) $table->user_id !== (int) $userId) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized access',
@@ -93,7 +93,7 @@ class TableController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $table->load(['store', 'orders' => fn($q) => $q->where('status', 'pending')->latest()]),
+            'data' => $table->load(['store', 'orders' => fn ($q) => $q->where('status', 'pending')->latest()]),
         ]);
     }
 
@@ -104,7 +104,7 @@ class TableController extends Controller
     {
         $userId = auth()->id();
 
-        if (!$userId) {
+        if (! $userId) {
             return response()->json([
                 'success' => false,
                 'message' => 'Authentication required',
@@ -141,7 +141,7 @@ class TableController extends Controller
     {
         $userId = auth()->id();
 
-        if (!$userId) {
+        if (! $userId) {
             return response()->json([
                 'success' => false,
                 'message' => 'Authentication required',

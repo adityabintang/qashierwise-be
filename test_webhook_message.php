@@ -1,12 +1,13 @@
 <?php
+
 /**
  * Script untuk test webhook incoming message
  * Jalankan: php test_webhook_message.php
  */
 
-require __DIR__ . '/vendor/autoload.php';
+require __DIR__.'/vendor/autoload.php';
 
-$app = require_once __DIR__ . '/bootstrap/app.php';
+$app = require_once __DIR__.'/bootstrap/app.php';
 $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 use App\Models\WhatsAppAccount;
@@ -57,27 +58,27 @@ $webhookPayload = [
                         'contacts' => [
                             [
                                 'profile' => [
-                                    'name' => 'Test User'
+                                    'name' => 'Test User',
                                 ],
-                                'wa_id' => '6281234567890'
-                            ]
+                                'wa_id' => '6281234567890',
+                            ],
                         ],
                         'messages' => [
                             [
                                 'from' => '6281234567890',
-                                'id' => 'wamid.test_' . time(),
+                                'id' => 'wamid.test_'.time(),
                                 'timestamp' => (string) time(),
                                 'type' => 'text',
                                 'text' => [
-                                    'body' => 'Test message from webhook simulation'
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            ]
-        ]
-    ]
+                                    'body' => 'Test message from webhook simulation',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ],
 ];
 
 echo "   Payload created for phone_number_id: {$testPhoneNumberId}\n";
@@ -85,15 +86,15 @@ echo "   Payload created for phone_number_id: {$testPhoneNumberId}\n";
 // 3. Send test webhook to local endpoint
 echo "\n3. Sending test webhook...\n";
 
-$webhookUrl = env('APP_URL', 'http://localhost') . '/api/whatsapp/webhook';
+$webhookUrl = config('app.url', 'http://localhost').'/api/whatsapp/webhook';
 echo "   URL: {$webhookUrl}\n";
 
 try {
     $response = Http::post($webhookUrl, $webhookPayload);
-    
+
     echo "   Response Status: {$response->status()}\n";
     echo "   Response Body: {$response->body()}\n";
-    
+
     if ($response->successful()) {
         echo "   ✅ Webhook processed successfully!\n";
     } else {
@@ -120,7 +121,7 @@ if ($contact) {
 $message = WhatsAppMessage::where('message_id', 'LIKE', 'wamid.test_%')
     ->orderBy('created_at', 'desc')
     ->first();
-    
+
 if ($message) {
     echo "   ✅ Message created:\n";
     echo "      - ID: {$message->id}\n";

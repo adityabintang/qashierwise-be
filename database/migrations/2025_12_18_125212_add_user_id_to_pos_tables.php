@@ -15,19 +15,16 @@ return new class extends Migration
         // Add user_id to stores table
         Schema::table('stores', function (Blueprint $table) {
             $table->foreignId('user_id')->nullable()->after('id')->constrained()->onDelete('cascade');
-            $table->index('user_id');
         });
 
         // Add user_id to categories table
         Schema::table('categories', function (Blueprint $table) {
             $table->foreignId('user_id')->nullable()->after('id')->constrained()->onDelete('cascade');
-            $table->index('user_id');
         });
 
         // Add user_id to products table
         Schema::table('products', function (Blueprint $table) {
             $table->foreignId('user_id')->nullable()->after('id')->constrained()->onDelete('cascade');
-            $table->index('user_id');
         });
     }
 
@@ -38,19 +35,16 @@ return new class extends Migration
     {
         Schema::table('stores', function (Blueprint $table) {
             $table->dropForeign(['user_id']);
-            $table->dropIndex(['user_id']);
             $table->dropColumn('user_id');
         });
 
         Schema::table('categories', function (Blueprint $table) {
             $table->dropForeign(['user_id']);
-            $table->dropIndex(['user_id']);
             $table->dropColumn('user_id');
         });
 
         Schema::table('products', function (Blueprint $table) {
             $table->dropForeign(['user_id']);
-            $table->dropIndex(['user_id']);
             $table->dropColumn('user_id');
         });
     }

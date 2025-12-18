@@ -14,7 +14,6 @@ return new class extends Migration
     {
         Schema::table('tables', function (Blueprint $table) {
             $table->foreignId('user_id')->nullable()->after('id')->constrained()->onDelete('cascade');
-            $table->index('user_id');
         });
     }
 
@@ -25,7 +24,6 @@ return new class extends Migration
     {
         Schema::table('tables', function (Blueprint $table) {
             $table->dropForeign(['user_id']);
-            $table->dropIndex(['user_id']);
             $table->dropColumn('user_id');
         });
     }
