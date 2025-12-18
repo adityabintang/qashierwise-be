@@ -137,10 +137,17 @@ class CategoryService
     /**
      * Get all categories with product counts
      *
+     * @param int|null $userId Filter by user ID (null for all)
      * @return Collection
      */
-    public function getAllWithProductCounts(): Collection
+    public function getAllWithProductCounts(?int $userId = null): Collection
     {
-        return Category::withCount('products')->get();
+        $query = Category::withCount('products');
+        
+        if ($userId !== null) {
+            $query->where('user_id', $userId);
+        }
+        
+        return $query->get();
     }
 }

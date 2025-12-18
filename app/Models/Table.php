@@ -25,6 +25,7 @@ class Table extends Model
      * @var array<int, string>
      */
     protected $fillable = [
+        'user_id',
         'store_id',
         'number',
         'capacity',
@@ -41,6 +42,14 @@ class Table extends Model
         return [
             'capacity' => 'integer',
         ];
+    }
+
+    /**
+     * Get the user that owns this table.
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     /**

@@ -16,12 +16,17 @@ class ReportService
      *
      * @param Carbon $date The date to get sales for
      * @param int|null $storeId Optional store filter
+     * @param int|null $userId Optional user filter for data isolation
      * @return array
      */
-    public function dailySales(Carbon $date, ?int $storeId = null): array
+    public function dailySales(Carbon $date, ?int $storeId = null, ?int $userId = null): array
     {
         $query = Order::whereDate('created_at', $date->toDateString())
             ->whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_PAID]);
+
+        if ($userId !== null) {
+            $query->whereHas('store', fn($q) => $q->where('user_id', $userId));
+        }
 
         if ($storeId !== null) {
             $query->where('store_id', $storeId);
@@ -57,13 +62,18 @@ class ReportService
      * @param Carbon $start Start date
      * @param Carbon $end End date
      * @param int|null $storeId Optional store filter
+     * @param int|null $userId Optional user filter for data isolation
      * @return array
      */
-    public function salesByRange(Carbon $start, Carbon $end, ?int $storeId = null): array
+    public function salesByRange(Carbon $start, Carbon $end, ?int $storeId = null, ?int $userId = null): array
     {
         $query = Order::whereDate('created_at', '>=', $start->toDateString())
             ->whereDate('created_at', '<=', $end->toDateString())
             ->whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_PAID]);
+
+        if ($userId !== null) {
+            $query->whereHas('store', fn($q) => $q->where('user_id', $userId));
+        }
 
         if ($storeId !== null) {
             $query->where('store_id', $storeId);
@@ -85,7 +95,7 @@ class ReportService
         $dailyBreakdown = [];
         $currentDate = $start->copy();
         while ($currentDate->lte($end)) {
-            $dailyBreakdown[] = $this->dailySales($currentDate->copy(), $storeId);
+            $dailyBreakdown[] = $this->dailySales($currentDate->copy(), $storeId, $userId);
             $currentDate->addDay();
         }
 
@@ -110,17 +120,24 @@ class ReportService
      * @param Carbon $end End date
      * @param int $limit Number of products to return
      * @param int|null $storeId Optional store filter
+     * @param int|null $userId Optional user filter for data isolation
      * @return Collection
      */
-    public function topProducts(Carbon $start, Carbon $end, int $limit = 10, ?int $storeId = null): Collection
+    public function topProducts(Carbon $start, Carbon $end, int $limit = 10, ?int $storeId = null, ?int $userId = null): Collection
     {
         $query = OrderItem::select(
                 'order_items.product_id',
                 DB::raw('SUM(order_items.quantity) as total_quantity'),
                 DB::raw('SUM(order_items.subtotal) as total_revenue')
             )
-            ->join('orders', 'order_items.order_id', '=', 'orders.id')
-            ->whereDate('orders.created_at', '>=', $start->toDateString())
+            ->join('orders', 'order_items.order_id', '=', 'orders.id');
+
+        if ($userId !== null) {
+            $query->join('stores', 'orders.store_id', '=', 'stores.id')
+                ->where('stores.user_id', $userId);
+        }
+
+        $query->whereDate('orders.created_at', '>=', $start->toDateString())
             ->whereDate('orders.created_at', '<=', $end->toDateString())
             ->whereIn('orders.status', [Order::STATUS_COMPLETED, Order::STATUS_PAID]);
 

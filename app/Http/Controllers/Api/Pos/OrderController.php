@@ -21,8 +21,18 @@ class OrderController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $userId = auth()->id();
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
         $perPage = $request->input('per_page', 20);
         $orders = Order::with(['store', 'table', 'posUser.user', 'items.product'])
+            ->whereHas('store', fn($q) => $q->where('user_id', $userId))
             ->when($request->input('store_id'), fn($q, $storeId) => $q->where('store_id', $storeId))
             ->when($request->input('status'), fn($q, $status) => $q->where('status', $status))
             ->orderBy('created_at', 'desc')

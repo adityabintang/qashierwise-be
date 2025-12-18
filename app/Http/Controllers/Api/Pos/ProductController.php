@@ -19,8 +19,18 @@ class ProductController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $userId = auth()->id();
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
         $perPage = $request->input('per_page', 20);
         $products = Product::with('category')
+            ->where('user_id', $userId)
             ->when($request->input('category_id'), fn($q, $categoryId) => $q->where('category_id', $categoryId))
             ->when($request->boolean('active_only', true), fn($q) => $q->where('is_active', true))
             ->orderBy('name')
@@ -37,6 +47,15 @@ class ProductController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $userId = auth()->id();
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'category_id' => 'required|exists:categories,id',
@@ -45,6 +64,8 @@ class ProductController extends Controller
             'description' => 'nullable|string',
             'is_active' => 'nullable|boolean',
         ]);
+
+        $validated['user_id'] = $userId;
 
         $product = $this->productService->create($validated);
 

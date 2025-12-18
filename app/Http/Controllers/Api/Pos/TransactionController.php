@@ -19,6 +19,15 @@ class TransactionController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $userId = auth()->id();
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
         $validated = $request->validate([
             'per_page' => 'nullable|integer|min:1|max:100',
             'store_id' => 'nullable|exists:stores,id',
@@ -27,7 +36,7 @@ class TransactionController extends Controller
         $perPage = $validated['per_page'] ?? 20;
         $storeId = $validated['store_id'] ?? null;
 
-        $transactions = $this->transactionService->list($perPage, $storeId);
+        $transactions = $this->transactionService->list($perPage, $storeId, $userId);
 
         return response()->json([
             'success' => true,
@@ -40,7 +49,16 @@ class TransactionController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $transaction = $this->transactionService->find($id);
+        $userId = auth()->id();
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
+        $transaction = $this->transactionService->find($id, $userId);
 
         if (!$transaction) {
             return response()->json([
@@ -60,6 +78,15 @@ class TransactionController extends Controller
      */
     public function search(Request $request): JsonResponse
     {
+        $userId = auth()->id();
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
         $validated = $request->validate([
             'order_number' => 'required|string|min:1',
             'store_id' => 'nullable|exists:stores,id',
@@ -69,7 +96,8 @@ class TransactionController extends Controller
 
         $transactions = $this->transactionService->searchByOrderNumber(
             $validated['order_number'],
-            $storeId
+            $storeId,
+            $userId
         );
 
         return response()->json([
@@ -83,6 +111,15 @@ class TransactionController extends Controller
      */
     public function filterByDate(Request $request): JsonResponse
     {
+        $userId = auth()->id();
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
         $validated = $request->validate([
             'date' => 'required|date',
             'store_id' => 'nullable|exists:stores,id',
@@ -91,7 +128,7 @@ class TransactionController extends Controller
         $date = Carbon::parse($validated['date']);
         $storeId = $validated['store_id'] ?? null;
 
-        $transactions = $this->transactionService->filterByDate($date, $storeId);
+        $transactions = $this->transactionService->filterByDate($date, $storeId, $userId);
 
         return response()->json([
             'success' => true,
@@ -104,6 +141,15 @@ class TransactionController extends Controller
      */
     public function filterByDateRange(Request $request): JsonResponse
     {
+        $userId = auth()->id();
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
         $validated = $request->validate([
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
@@ -114,7 +160,7 @@ class TransactionController extends Controller
         $endDate = Carbon::parse($validated['end_date']);
         $storeId = $validated['store_id'] ?? null;
 
-        $transactions = $this->transactionService->filterByDateRange($startDate, $endDate, $storeId);
+        $transactions = $this->transactionService->filterByDateRange($startDate, $endDate, $storeId, $userId);
 
         return response()->json([
             'success' => true,
