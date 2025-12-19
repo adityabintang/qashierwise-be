@@ -364,7 +364,7 @@ class EmbeddedSignupService
      *
      * @param  string  $accessToken  Access token
      * @param  string  $wabaId  WABA ID
-     * @return array{success: bool, subscribed?: bool, error?: string}
+     * @return array{success: bool, subscribed?: bool, apps?: array, error?: string}
      */
     public function checkWebhookSubscription(string $accessToken, string $wabaId): array
     {
