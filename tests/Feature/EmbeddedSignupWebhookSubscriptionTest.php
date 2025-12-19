@@ -114,7 +114,10 @@ class EmbeddedSignupWebhookSubscriptionTest extends TestCase
      */
     public function test_embedded_signup_service_check_subscription_subscribed(): void
     {
-        $appId = config('whatsapp.embedded_signup.app_id') ?: '1484241559512577';
+        $appId = '1484241559512577';
+
+        // Set the config so the service can match the app ID
+        config(['whatsapp.embedded_signup.app_id' => $appId]);
 
         Http::fake([
             'graph.facebook.com/*/subscribed_apps' => Http::response([
