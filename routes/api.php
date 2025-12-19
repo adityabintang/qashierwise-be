@@ -2,20 +2,20 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BroadcastAuthController;
-use App\Http\Controllers\Api\PolarWebhookController;
-use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\EmbeddedSignupController;
-use App\Http\Controllers\Api\WhatsAppController;
-use App\Http\Controllers\Api\WhatsAppWebhookController;
-use App\Http\Controllers\Api\Pos\ProductController;
+use App\Http\Controllers\Api\PolarWebhookController;
 use App\Http\Controllers\Api\Pos\CategoryController;
 use App\Http\Controllers\Api\Pos\OrderController;
 use App\Http\Controllers\Api\Pos\PaymentController;
+use App\Http\Controllers\Api\Pos\PosUserController;
+use App\Http\Controllers\Api\Pos\ProductController;
+use App\Http\Controllers\Api\Pos\ReportController;
 use App\Http\Controllers\Api\Pos\StoreController;
 use App\Http\Controllers\Api\Pos\TableController;
-use App\Http\Controllers\Api\Pos\PosUserController;
-use App\Http\Controllers\Api\Pos\ReportController;
 use App\Http\Controllers\Api\Pos\TransactionController;
+use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\WhatsAppController;
+use App\Http\Controllers\Api\WhatsAppWebhookController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -65,10 +65,14 @@ Route::middleware('auth:sanctum')->group(function () {
         // Embedded Signup routes
         Route::post('/embedded-signup/callback', [EmbeddedSignupController::class, 'handleCallback']);
         Route::get('/embedded-signup/config', [EmbeddedSignupController::class, 'getConfig']);
-        
+
         // Account management routes
         Route::delete('/account', [EmbeddedSignupController::class, 'disconnect']);
         Route::get('/account', [EmbeddedSignupController::class, 'getAccountStatus']);
+
+        // Webhook subscription management
+        Route::post('/subscribe-webhooks', [EmbeddedSignupController::class, 'subscribeToWebhooks']);
+        Route::get('/webhook-status', [EmbeddedSignupController::class, 'getWebhookStatus']);
 
         // Send Messages
         Route::post('/send/text', [WhatsAppController::class, 'sendTextMessage']);
