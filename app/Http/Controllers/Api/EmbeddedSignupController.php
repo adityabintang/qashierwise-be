@@ -12,13 +12,14 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Controller for handling WhatsApp Embedded Signup v4 flow.
- * 
+ *
  * This controller manages the OAuth callback, configuration retrieval,
  * account status, and disconnection for WhatsApp Business accounts.
  */
 class EmbeddedSignupController extends Controller
 {
     protected EmbeddedSignupService $embeddedSignupService;
+
     protected WhatsAppAccountService $whatsAppAccountService;
 
     public function __construct(
@@ -31,18 +32,16 @@ class EmbeddedSignupController extends Controller
 
     /**
      * Handle the OAuth callback from Facebook Embedded Signup.
-     * 
+     *
      * POST /api/whatsapp/embedded-signup/callback
-     * 
-     * @param Request $request
-     * @return JsonResponse
+     *
      * @throws EmbeddedSignupDisabledException
      */
     public function handleCallback(Request $request): JsonResponse
     {
         // Check if Embedded Signup is enabled
-        if (!$this->embeddedSignupService->isEnabled()) {
-            throw new EmbeddedSignupDisabledException();
+        if (! $this->embeddedSignupService->isEnabled()) {
+            throw new EmbeddedSignupDisabledException;
         }
 
         $request->validate([
@@ -54,7 +53,7 @@ class EmbeddedSignupController extends Controller
 
         $userId = auth()->id();
         $code = $request->input('code');
-        
+
         // Get session info from embedded signup response (waba_id, phone_number_id, business_id)
         $sessionInfo = [
             'waba_id' => $request->input('waba_id'),
@@ -64,13 +63,13 @@ class EmbeddedSignupController extends Controller
 
         Log::info('Processing Embedded Signup callback', [
             'user_id' => $userId,
-            'has_session_info' => !empty($sessionInfo['waba_id']),
+            'has_session_info' => ! empty($sessionInfo['waba_id']),
         ]);
 
         // Process the complete signup flow with session info from embedded signup
         $result = $this->embeddedSignupService->processSignup($userId, $code, $sessionInfo);
 
-        if (!$result['success']) {
+        if (! $result['success']) {
             Log::error('Embedded Signup failed', [
                 'user_id' => $userId,
                 'error' => $result['error'],
@@ -106,17 +105,16 @@ class EmbeddedSignupController extends Controller
 
     /**
      * Get the Embedded Signup configuration for the frontend.
-     * 
+     *
      * GET /api/whatsapp/embedded-signup/config
-     * 
-     * @return JsonResponse
+     *
      * @throws EmbeddedSignupDisabledException
      */
     public function getConfig(): JsonResponse
     {
         // Check if Embedded Signup is enabled
-        if (!$this->embeddedSignupService->isEnabled()) {
-            throw new EmbeddedSignupDisabledException();
+        if (! $this->embeddedSignupService->isEnabled()) {
+            throw new EmbeddedSignupDisabledException;
         }
 
         return response()->json([
@@ -132,10 +130,8 @@ class EmbeddedSignupController extends Controller
 
     /**
      * Disconnect the user's WhatsApp account.
-     * 
+     *
      * DELETE /api/whatsapp/account
-     * 
-     * @return JsonResponse
      */
     public function disconnect(): JsonResponse
     {
@@ -143,7 +139,7 @@ class EmbeddedSignupController extends Controller
 
         $deactivated = $this->whatsAppAccountService->deactivateAccount($userId);
 
-        if (!$deactivated) {
+        if (! $deactivated) {
             return response()->json([
                 'success' => false,
                 'message' => 'No connected WhatsApp account found',
@@ -160,10 +156,8 @@ class EmbeddedSignupController extends Controller
 
     /**
      * Get the current user's WhatsApp account status.
-     * 
+     *
      * GET /api/whatsapp/account
-     * 
-     * @return JsonResponse
      */
     public function getAccountStatus(): JsonResponse
     {
@@ -171,7 +165,7 @@ class EmbeddedSignupController extends Controller
 
         $status = $this->whatsAppAccountService->getAccountStatus($userId);
 
-        if (!$status) {
+        if (! $status) {
             return response()->json([
                 'success' => true,
                 'data' => null,
@@ -182,6 +176,90 @@ class EmbeddedSignupController extends Controller
         return response()->json([
             'success' => true,
             'data' => $status,
+        ]);
+    }
+
+    /**
+     * Subscribe the current user's WABA to webhooks.
+     * This enables receiving template status updates, message status updates, etc.
+     *
+     * POST /api/whatsapp/subscribe-webhooks
+     */
+    public function subscribeToWebhooks(): JsonResponse
+    {
+        $userId = auth()->id();
+
+        $account = $this->whatsAppAccountService->getActiveAccount($userId);
+
+        if (! $account) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No WhatsApp account connected',
+            ], 404);
+        }
+
+        $result = $this->embeddedSignupService->subscribeToWebhooks(
+            $account->access_token,
+            $account->waba_id
+        );
+
+        if (! $result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to subscribe to webhooks',
+                'error' => $result['error'] ?? 'Unknown error',
+            ], 400);
+        }
+
+        Log::info('Successfully subscribed WABA to webhooks via API', [
+            'user_id' => $userId,
+            'waba_id' => $account->waba_id,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Successfully subscribed to webhooks',
+        ]);
+    }
+
+    /**
+     * Check if the current user's WABA is subscribed to webhooks.
+     *
+     * GET /api/whatsapp/webhook-status
+     */
+    public function getWebhookStatus(): JsonResponse
+    {
+        $userId = auth()->id();
+
+        $account = $this->whatsAppAccountService->getActiveAccount($userId);
+
+        if (! $account) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No WhatsApp account connected',
+            ], 404);
+        }
+
+        $result = $this->embeddedSignupService->checkWebhookSubscription(
+            $account->access_token,
+            $account->waba_id
+        );
+
+        if (! $result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to check webhook status',
+                'error' => $result['error'] ?? 'Unknown error',
+            ], 400);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'subscribed' => $result['subscribed'],
+                'waba_id' => $account->waba_id,
+                'apps' => $result['apps'] ?? [],
+            ],
         ]);
     }
 }
