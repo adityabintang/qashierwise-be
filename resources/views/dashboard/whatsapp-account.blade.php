@@ -47,9 +47,9 @@
                             <p class="text-[hsl(var(--muted-foreground))] mb-6 max-w-md mx-auto">
                                 Connect your WhatsApp Business account to start sending and receiving messages through QashierWise.
                             </p>
-                            
+
                             <!-- Connect Button -->
-                            <button 
+                            <button
                                 @click="launchWhatsAppSignup()"
                                 :disabled="connecting || !sdkLoaded"
                                 class="btn btn-primary btn-lg inline-flex items-center gap-2"
@@ -59,7 +59,7 @@
                                 <i class="fas fa-spinner animate-spin" x-show="connecting"></i>
                                 <span x-text="connecting ? 'Connecting...' : (sdkLoaded ? 'Connect with Facebook' : 'Loading...')"></span>
                             </button>
-                            
+
                             <p class="text-xs text-[hsl(var(--muted-foreground))] mt-4">
                                 You'll be redirected to Facebook to authorize your WhatsApp Business account
                             </p>
@@ -115,7 +115,7 @@
                                     <span class="text-xs text-[hsl(var(--muted-foreground))]">Quality Rating</span>
                                 </div>
                                 <p class="font-medium">
-                                    <span 
+                                    <span
                                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
                                         :class="{
                                             'bg-emerald-100 text-emerald-700': account?.quality_rating === 'GREEN',
@@ -135,7 +135,7 @@
                                     <span class="text-xs text-[hsl(var(--muted-foreground))]">Status</span>
                                 </div>
                                 <p class="font-medium">
-                                    <span 
+                                    <span
                                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
                                         :class="account?.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'"
                                     >
@@ -152,7 +152,7 @@
                                     <span class="text-xs text-[hsl(var(--muted-foreground))]">Coexistence Mode</span>
                                 </div>
                                 <p class="font-medium">
-                                    <span 
+                                    <span
                                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
                                         :class="account?.coexistence_enabled ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'"
                                         x-text="account?.coexistence_enabled ? 'Enabled' : 'Disabled'"
@@ -168,10 +168,10 @@
                                     <p class="font-medium text-[hsl(var(--destructive))]">Disconnect Account</p>
                                     <p class="text-sm text-[hsl(var(--muted-foreground))]">Remove this WhatsApp account from QashierWise</p>
                                 </div>
-                                <button 
+                                <button
                                     @click="confirmDisconnect()"
                                     :disabled="disconnecting"
-                                    class="btn btn-outline text-[hsl(var(--destructive))] border-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))] hover:text-white"
+                                    class="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border-2 border-red-200 text-red-600 bg-red-50 hover:bg-red-500 hover:text-white hover:border-red-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <i class="fas fa-unlink" x-show="!disconnecting"></i>
                                     <i class="fas fa-spinner animate-spin" x-show="disconnecting"></i>
@@ -218,8 +218,8 @@
     </div>
 
     <!-- Toast Notifications -->
-    <div 
-        x-show="toast.show" 
+    <div
+        x-show="toast.show"
         x-transition:enter="transition ease-out duration-300"
         x-transition:enter-start="opacity-0 transform translate-y-2"
         x-transition:enter-end="opacity-100 transform translate-y-0"
@@ -228,7 +228,7 @@
         x-transition:leave-end="opacity-0 transform translate-y-2"
         class="fixed bottom-4 right-4 z-50"
     >
-        <div 
+        <div
             class="rounded-lg shadow-lg p-4 flex items-center gap-3 max-w-md"
             :class="{
                 'bg-emerald-50 border border-emerald-200 text-emerald-800': toast.type === 'success',
@@ -249,8 +249,8 @@
     </div>
 
     <!-- Disconnect Confirmation Modal -->
-    <div 
-        x-show="showDisconnectModal" 
+    <div
+        x-show="showDisconnectModal"
         x-transition:enter="transition ease-out duration-200"
         x-transition:enter-start="opacity-0"
         x-transition:enter-end="opacity-100"
@@ -270,11 +270,18 @@
             <p class="text-[hsl(var(--muted-foreground))] mb-6">
                 Are you sure you want to disconnect your WhatsApp Business account? You will no longer be able to send or receive messages until you reconnect.
             </p>
-            <div class="flex gap-3 justify-end">
-                <button @click="showDisconnectModal = false" class="btn btn-outline">
+            <div class="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
+                <button
+                    @click="showDisconnectModal = false"
+                    class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 transition-all duration-200"
+                >
                     Cancel
                 </button>
-                <button @click="disconnect()" :disabled="disconnecting" class="btn bg-[hsl(var(--destructive))] text-white hover:bg-[hsl(var(--destructive)/0.9)]">
+                <button
+                    @click="disconnect()"
+                    :disabled="disconnecting"
+                    class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-red-500 text-white hover:bg-red-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                     <i class="fas fa-spinner animate-spin" x-show="disconnecting"></i>
                     <span x-text="disconnecting ? 'Disconnecting...' : 'Yes, Disconnect'"></span>
                 </button>
@@ -294,7 +301,7 @@
             xfbml: true,
             version: 'v24.0'
         });
-        
+
         // Dispatch event when SDK is ready
         window.dispatchEvent(new CustomEvent('fb-sdk-ready'));
     };
@@ -333,7 +340,7 @@ function whatsAppAccountApp() {
         isMobile: window.innerWidth < 768,
         user: null,
         notifications: [],
-        
+
         // WhatsApp account state
         loading: true,
         connecting: false,
@@ -341,7 +348,7 @@ function whatsAppAccountApp() {
         sdkLoaded: false,
         account: null,
         config: null,
-        
+
         // UI state
         toast: { show: false, message: '', type: 'info' },
         showDisconnectModal: false,
@@ -357,7 +364,7 @@ function whatsAppAccountApp() {
                 let savedState = localStorage.getItem('sidebarOpen');
                 if (savedState !== null) this.sidebarOpen = JSON.parse(savedState);
             }
-            
+
             this.$watch('sidebarOpen', v => {
                 if (!this.isMobile) localStorage.setItem('sidebarOpen', JSON.stringify(v));
             });
@@ -381,7 +388,7 @@ function whatsAppAccountApp() {
             // Load user info
             let storedUser = localStorage.getItem('user');
             if (storedUser) {
-                try { this.user = JSON.parse(storedUser); } 
+                try { this.user = JSON.parse(storedUser); }
                 catch (e) { this.user = { name: 'User', email: 'user@example.com' }; }
             } else {
                 this.user = { name: 'User', email: 'user@example.com' };
@@ -390,7 +397,7 @@ function whatsAppAccountApp() {
             // Load notifications
             let savedNotifs = localStorage.getItem('notifications');
             if (savedNotifs) {
-                try { this.notifications = JSON.parse(savedNotifs); } 
+                try { this.notifications = JSON.parse(savedNotifs); }
                 catch (e) { this.notifications = []; }
             }
 
@@ -430,7 +437,7 @@ function whatsAppAccountApp() {
         setupMessageListener() {
             window.addEventListener('message', (event) => {
                 // Only accept messages from Facebook
-                if (event.origin !== "https://www.facebook.com" && 
+                if (event.origin !== "https://www.facebook.com" &&
                     event.origin !== "https://web.facebook.com") {
                     return;
                 }
@@ -466,14 +473,14 @@ function whatsAppAccountApp() {
         async loadConfig() {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-            
+
             try {
                 const token = localStorage.getItem('token');
                 if (!token) {
                     console.warn('No auth token found for config');
                     return;
                 }
-                
+
                 const res = await fetch(`${this.API_BASE_URL}/whatsapp/embedded-signup/config`, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -481,21 +488,21 @@ function whatsAppAccountApp() {
                     },
                     signal: controller.signal
                 });
-                
+
                 clearTimeout(timeoutId);
-                
+
                 if (!res.ok) {
                     console.error('Config API error:', res.status);
                     return;
                 }
-                
+
                 const data = await res.json();
-                
+
                 if (data.success) {
                     this.config = data.data;
                     // Store config globally for Facebook SDK
                     window.whatsAppConfig = data.data;
-                    
+
                     // Re-initialize FB SDK if already loaded
                     if (typeof FB !== 'undefined' && this.config.app_id) {
                         FB.init({
@@ -525,7 +532,7 @@ function whatsAppAccountApp() {
             this.loading = true;
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-            
+
             try {
                 const token = localStorage.getItem('token');
                 if (!token) {
@@ -533,7 +540,7 @@ function whatsAppAccountApp() {
                     this.account = null;
                     return;
                 }
-                
+
                 const res = await fetch(`${this.API_BASE_URL}/whatsapp/account`, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -541,17 +548,17 @@ function whatsAppAccountApp() {
                     },
                     signal: controller.signal
                 });
-                
+
                 clearTimeout(timeoutId);
-                
+
                 if (!res.ok) {
                     console.error('API error:', res.status);
                     this.account = null;
                     return;
                 }
-                
+
                 const data = await res.json();
-                
+
                 if (data.success && data.data) {
                     this.account = data.data;
                 } else {
@@ -587,7 +594,7 @@ function whatsAppAccountApp() {
             if (typeof FB !== 'undefined') {
                 // Store reference to this for use in callback
                 const self = this;
-                
+
                 FB.login((response) => {
                     if (response.authResponse) {
                         const code = response.authResponse.code;
@@ -631,13 +638,13 @@ function whatsAppAccountApp() {
             }));
 
             const url = `https://business.facebook.com/messaging/whatsapp/onboard/?app_id=${appId}&config_id=${configId}&extras=${extras}`;
-            
+
             // Open in popup window
             const width = 600;
             const height = 700;
             const left = (window.innerWidth - width) / 2;
             const top = (window.innerHeight - height) / 2;
-            
+
             const popup = window.open(
                 url,
                 'whatsapp_signup',
@@ -663,7 +670,7 @@ function whatsAppAccountApp() {
         async sendCodeToBackend(code, sessionInfo = null) {
             try {
                 const token = localStorage.getItem('token');
-                
+
                 // Build request body with code and optional session info
                 const body = { code };
                 if (sessionInfo) {
@@ -671,7 +678,7 @@ function whatsAppAccountApp() {
                     body.phone_number_id = sessionInfo.phone_number_id;
                     body.business_id = sessionInfo.business_id;
                 }
-                
+
                 const res = await fetch(`${this.API_BASE_URL}/whatsapp/embedded-signup/callback`, {
                     method: 'POST',
                     headers: {
@@ -782,17 +789,17 @@ function whatsAppAccountApp() {
             if (this.notifications.length > 50) this.notifications = this.notifications.slice(0, 50);
             localStorage.setItem('notifications', JSON.stringify(this.notifications));
         },
-        
+
         clearNotifications() {
             this.notifications = [];
             localStorage.removeItem('notifications');
         },
-        
+
         removeNotification(id) {
             this.notifications = this.notifications.filter(n => n.id !== id);
             localStorage.setItem('notifications', JSON.stringify(this.notifications));
         },
-        
+
         formatNotificationTime(t) {
             let d = new Date(t), diff = Math.floor((new Date() - d) / 1000);
             if (diff < 60) return 'Just now';
@@ -800,7 +807,7 @@ function whatsAppAccountApp() {
             if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
             return d.toLocaleDateString();
         },
-        
+
         logout() {
             let token = localStorage.getItem('token');
             if (token) {

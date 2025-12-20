@@ -25,18 +25,19 @@
                 </div>
 
                 <!-- No WhatsApp Account Connected -->
-                <div x-show="!loading && !hasWhatsAppAccount" class="card p-6">
-                    <div class="text-center py-8">
-                        <div class="h-16 w-16 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center mx-auto mb-4">
-                            <i class="fab fa-whatsapp text-3xl text-[hsl(var(--muted-foreground))]"></i>
+                <div x-show="!loading && !hasWhatsAppAccount" class="card p-8 md:p-12">
+                    <div class="text-center max-w-sm mx-auto">
+                        <div class="h-20 w-20 rounded-full bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center mx-auto mb-6 shadow-sm">
+                            <i class="fab fa-whatsapp text-4xl text-emerald-500"></i>
                         </div>
-                        <h3 class="text-lg font-semibold mb-2">WhatsApp Account Required</h3>
-                        <p class="text-[hsl(var(--muted-foreground))] mb-6 max-w-md mx-auto">
+                        <h3 class="text-xl font-semibold text-[hsl(var(--foreground))] mb-3">WhatsApp Account Required</h3>
+                        <p class="text-[hsl(var(--muted-foreground))] mb-8 leading-relaxed">
                             Please connect your WhatsApp Business account first before configuring AI Agent.
                         </p>
-                        <a href="/dashboard/whatsapp-account" class="btn btn-primary">
-                            <i class="fab fa-whatsapp mr-2"></i>
-                            Connect WhatsApp Account
+                        <a href="/dashboard/whatsapp-account"
+                           class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow-md">
+                            <i class="fab fa-whatsapp text-lg"></i>
+                            <span>Connect WhatsApp Account</span>
                         </a>
                     </div>
                 </div>
@@ -386,21 +387,22 @@
             </div>
 
             <!-- Input Area -->
-            <div class="p-4 border-t">
-                <form @submit.prevent="sendTestMessage()" class="flex gap-2">
+            <div class="p-4 border-t bg-gray-50/50">
+                <form @submit.prevent="sendTestMessage()" class="flex items-center gap-3">
                     <input
                         type="text"
                         x-model="testInput"
                         placeholder="Ketik pesan untuk test AI Agent..."
-                        class="input flex-1"
+                        class="flex-1 px-4 py-2.5 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                         :disabled="testLoading"
                     >
                     <button
                         type="submit"
                         :disabled="testLoading || !testInput.trim()"
-                        class="btn btn-primary"
+                        class="flex items-center justify-center h-10 w-10 rounded-full bg-purple-500 hover:bg-purple-600 text-white transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-purple-500 disabled:hover:shadow-sm"
                     >
-                        <i class="fas fa-paper-plane"></i>
+                        <i class="fas fa-paper-plane text-sm" :class="testLoading ? 'opacity-0' : ''"></i>
+                        <i x-show="testLoading" class="fas fa-spinner animate-spin text-sm absolute"></i>
                     </button>
                 </form>
             </div>

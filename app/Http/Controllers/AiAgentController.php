@@ -272,11 +272,11 @@ class AiAgentController extends Controller
                 ], 404);
             }
 
-            // Create a temporary test contact
+            // Create or reuse test contact for this user (use fixed wa_id to avoid creating new contacts)
             $testContact = WhatsAppContact::firstOrCreate(
                 [
                     'user_id' => $userId,
-                    'wa_id' => 'test_'.time(),
+                    'wa_id' => 'test_user_'.$userId,
                 ],
                 [
                     'name' => 'Test Contact',
