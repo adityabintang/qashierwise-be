@@ -1,7 +1,7 @@
 @props(['activePage' => 'dashboard'])
 
 <!-- Mobile Backdrop Overlay -->
-<div 
+<div
     x-show="isMobile && sidebarOpen"
     x-transition:enter="transition ease-out duration-300"
     x-transition:enter-start="opacity-0"
@@ -16,7 +16,7 @@
 
 <!-- Sidebar -->
 <!-- Requirements: 5.2 - Collapsed sidebar (icons only) on tablet by default -->
-<aside 
+<aside
     :class="[
         sidebarOpen ? 'w-64' : (isMobile ? 'w-64' : 'w-[70px]'),
         isMobile ? (sidebarOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0'
@@ -58,69 +58,73 @@
             <i class="fab fa-whatsapp w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>WhatsApp Account</span>
         </a>
+        <a href="/dashboard/ai-agent" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'ai-agent' ? 'active' : '' }}">
+            <i class="fas fa-robot w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>AI Agent</span>
+        </a>
 
         <!-- POS Section - Orders & Payment -->
-        <div class="pt-4">
+        <div x-show="sidebarOpen || isMobile" x-transition class="pt-4">
             <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
                 Point of Sale
             </div>
         </div>
         <a href="/dashboard/pos/orders" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-orders' ? 'active' : '' }}">
             <i class="fas fa-shopping-cart w-5 text-center"></i>
-            <span>Orders</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>Orders</span>
         </a>
         <a href="/dashboard/pos/payment" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-payment' ? 'active' : '' }}">
             <i class="fas fa-credit-card w-5 text-center"></i>
-            <span>Payment</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>Payment</span>
         </a>
 
         <!-- POS Inventory Section -->
-        <div class="pt-4">
+        <div x-show="sidebarOpen || isMobile" x-transition class="pt-4">
             <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
                 Inventory
             </div>
         </div>
         <a href="/dashboard/pos/products" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-products' ? 'active' : '' }}">
             <i class="fas fa-box w-5 text-center"></i>
-            <span>Products</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>Products</span>
         </a>
         <a href="/dashboard/pos/categories" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-categories' ? 'active' : '' }}">
             <i class="fas fa-tags w-5 text-center"></i>
-            <span>Categories</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>Categories</span>
         </a>
 
         <!-- POS Operations Section -->
-        <div class="pt-4">
+        <div x-show="sidebarOpen || isMobile" x-transition class="pt-4">
             <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
                 Operations
             </div>
         </div>
         <a href="/dashboard/pos/stores" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-stores' ? 'active' : '' }}">
             <i class="fas fa-store w-5 text-center"></i>
-            <span>Stores</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>Stores</span>
         </a>
         <a href="/dashboard/pos/tables" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-tables' ? 'active' : '' }}">
             <i class="fas fa-chair w-5 text-center"></i>
-            <span>Tables</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>Tables</span>
         </a>
         <a href="/dashboard/pos/users" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-users' ? 'active' : '' }}">
             <i class="fas fa-users w-5 text-center"></i>
-            <span>Users</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>Users</span>
         </a>
 
         <!-- POS Analytics Section -->
-        <div class="pt-4">
+        <div x-show="sidebarOpen || isMobile" x-transition class="pt-4">
             <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
                 Analytics
             </div>
         </div>
         <a href="/dashboard/pos/reports" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-reports' ? 'active' : '' }}">
             <i class="fas fa-chart-bar w-5 text-center"></i>
-            <span>Reports</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>Reports</span>
         </a>
         <a href="/dashboard/pos/transactions" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-transactions' ? 'active' : '' }}">
             <i class="fas fa-receipt w-5 text-center"></i>
-            <span>Transactions</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>Transactions</span>
         </a>
     </nav>
 
@@ -129,8 +133,8 @@
         <!-- User Info (expanded) -->
         <div x-show="sidebarOpen || isMobile" x-transition class="mb-3">
             <div class="flex items-center gap-3 p-2 rounded-lg bg-[hsl(var(--muted))]">
-                <img 
-                    :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user?.name || 'User')}&backgroundColor=a855f7`" 
+                <img
+                    :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user?.name || 'User')}&backgroundColor=a855f7`"
                     :alt="user?.name || 'User'"
                     class="avatar avatar-sm"
                 >
@@ -143,8 +147,8 @@
 
         <!-- Actions -->
         <div class="flex items-center gap-2" :class="(sidebarOpen || isMobile) ? 'justify-between' : 'justify-center flex-col'">
-            <button 
-                @click="logout()" 
+            <button
+                @click="logout()"
                 class="btn btn-ghost btn-sm text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.1)]"
                 :class="(sidebarOpen || isMobile) ? '' : 'btn-icon'"
                 :title="!(sidebarOpen || isMobile) ? 'Logout' : ''"
@@ -152,8 +156,8 @@
                 <i class="fas fa-sign-out-alt"></i>
                 <span x-show="sidebarOpen || isMobile">Logout</span>
             </button>
-            <button 
-                @click="sidebarOpen = !sidebarOpen" 
+            <button
+                @click="sidebarOpen = !sidebarOpen"
                 class="btn btn-ghost btn-icon hidden lg:flex"
             >
                 <i class="fas transition-transform duration-200" :class="sidebarOpen ? 'fa-chevron-left' : 'fa-chevron-right'"></i>

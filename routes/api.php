@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AiAgentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BroadcastAuthController;
 use App\Http\Controllers\Api\EmbeddedSignupController;
@@ -122,6 +123,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/contacts', [WhatsAppController::class, 'getContacts']);
         Route::get('/contacts/{id}/messages', [WhatsAppController::class, 'getContactMessages']);
         Route::post('/contacts/{id}/mark-read', [WhatsAppController::class, 'markContactMessagesAsRead']);
+    });
+
+    // AI Agent routes
+    Route::prefix('ai-agent')->group(function () {
+        Route::get('/', [AiAgentController::class, 'show']);
+        Route::post('/', [AiAgentController::class, 'store']);
+        Route::put('/toggle-active', [AiAgentController::class, 'toggleActive']);
+        Route::put('/toggle-order', [AiAgentController::class, 'toggleOrder']);
+        Route::post('/test', [AiAgentController::class, 'test']);
+        Route::delete('/conversations/{contactId}', [AiAgentController::class, 'clearConversation']);
     });
 
     // POS (Point of Sale) API routes

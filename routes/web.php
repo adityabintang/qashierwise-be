@@ -51,6 +51,10 @@ Route::middleware(['web', 'check.web.auth'])->group(function () {
         return view('dashboard.whatsapp-account');
     })->name('dashboard.whatsapp-account');
 
+    Route::get('/dashboard/ai-agent', function () {
+        return view('dashboard.ai-agent');
+    })->name('dashboard.ai-agent');
+
     // POS Routes
     Route::prefix('dashboard/pos')->name('dashboard.pos.')->group(function () {
         Route::get('/products', function () {

@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'byteplus_ark' => [
+        'api_key' => env('BYTEPLUS_ARK_API_KEY'),
+        'base_url' => env('BYTEPLUS_ARK_BASE_URL', 'https://ark.ap-southeast.bytepluses.com/api/v3'),
+        'model' => env('BYTEPLUS_ARK_MODEL', 'GPT-OSS-120B'),
+    ],
+
 ];
