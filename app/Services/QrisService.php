@@ -187,10 +187,48 @@ class QrisService
 
         $data = $response->json();
 
+        Log::info('Midtrans QRIS response', [
+            'order_id' => $transaction->order_id,
+            'response' => $data,
+        ]);
+
+        // Extract QR code URL from actions array
+        // Midtrans returns actions with name "generate-qr-code" containing the QR image URL
+        $qrCodeUrl = null;
+        if (!empty($data['actions'])) {
+            foreach ($data['actions'] as $action) {
+                if (($action['name'] ?? '') === 'generate-qr-code') {
+                    $qrCodeUrl = $action['url'] ?? null;
+                    break;
+                }
+            }
+            // Fallback to first action URL if no generate-qr-code found
+            if (!$qrCodeUrl && !empty($data['actions'][0]['url'])) {
+                $qrCodeUrl = $data['actions'][0]['url'];
+            }
+        }
+
+        // If still no QR URL, try to generate from qr_string
+        if (!$qrCodeUrl && !empty($data['qr_string'])) {
+            $qrCodeUrl = $this->generateQrCodeFromString($data['qr_string']);
+        }
+
         return [
-            'qr_code_url' => $data['actions'][0]['url'] ?? null,
+            'qr_code_url' => $qrCodeUrl,
             'transaction_id' => $data['transaction_id'] ?? null,
         ];
+    }
+
+    /**
+     * Generate QR code image URL from QRIS string.
+     *
+     * @param string $qrString The QRIS string data
+     * @return string QR code image URL
+     */
+    private function generateQrCodeFromString(string $qrString): string
+    {
+        $encodedData = urlencode($qrString);
+        return "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={$encodedData}";
     }
 
     /**
