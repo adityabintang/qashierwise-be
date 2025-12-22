@@ -99,7 +99,7 @@ Route::middleware(['web', 'check.web.auth'])->group(function () {
     });
 
     // Admin Routes
-    Route::prefix('admin')->name('admin.')->group(function () {
+    Route::prefix('dashboard/admin')->name('dashboard.admin.')->group(function () {
         Route::get('/withdrawals', function () {
             return view('dashboard.admin.withdrawals');
         })->name('withdrawals');
