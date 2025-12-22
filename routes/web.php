@@ -25,6 +25,10 @@ Route::get('/terms-of-service', function () {
     return view('terms-of-service');
 })->name('terms-of-service');
 
+// Public QRIS Payment Page
+Route::get('/pay/qris/{orderId}', [App\Http\Controllers\QrisPaymentPageController::class, 'show'])
+    ->name('qris.payment.page');
+
 // Dashboard routes (protected by authentication middleware)
 Route::middleware(['web', 'check.web.auth'])->group(function () {
     Route::get('/dashboard', function () {
