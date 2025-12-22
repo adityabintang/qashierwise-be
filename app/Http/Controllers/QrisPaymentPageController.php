@@ -21,9 +21,9 @@ class QrisPaymentPageController extends Controller
         }
 
         // Check if transaction is still valid for payment
-        $isExpired = $transaction->isExpired() || $transaction->expires_at < now();
+        $isExpired = $transaction->status === QrisTransaction::STATUS_EXPIRE || $transaction->isExpired();
         $isPaid = $transaction->isSettled();
-        $isCancelled = $transaction->isCancelled();
+        $isCancelled = $transaction->status === QrisTransaction::STATUS_CANCEL;
 
         return view('payment.qris', [
             'transaction' => $transaction,
