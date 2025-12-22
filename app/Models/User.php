@@ -55,4 +55,20 @@ class User extends Authenticatable
     {
         return $this->hasOne(Subscription::class);
     }
+
+    /**
+     * Get the sub-merchant profile associated with the user.
+     */
+    public function subMerchant(): HasOne
+    {
+        return $this->hasOne(SubMerchant::class);
+    }
+
+    /**
+     * Check if the user is a sub-merchant.
+     */
+    public function isSubMerchant(): bool
+    {
+        return $this->subMerchant !== null;
+    }
 }

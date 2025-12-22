@@ -36,6 +36,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'check.web.auth' => \App\Http\Middleware\CheckWebAuth::class,
             'whatsapp.connected' => \App\Http\Middleware\EnsureWhatsAppConnected::class,
+            'qris.rate_limit' => \App\Http\Middleware\QrisRateLimiter::class,
+            'withdrawal.auth' => \App\Http\Middleware\WithdrawalAuthentication::class,
+            'admin.session' => \App\Http\Middleware\AdminSessionValidation::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

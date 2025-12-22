@@ -93,4 +93,38 @@ Route::middleware(['web', 'check.web.auth'])->group(function () {
             return view('dashboard.pos.transactions');
         })->name('transactions');
     });
+
+    // Admin Routes
+    Route::prefix('admin')->name('admin.')->group(function () {
+        Route::get('/withdrawals', function () {
+            return view('dashboard.admin.withdrawals');
+        })->name('withdrawals');
+    });
+
+    // Sub-Merchant Routes
+    Route::prefix('dashboard/sub-merchant')->name('dashboard.sub-merchant.')->group(function () {
+        Route::get('/', function () {
+            return view('dashboard.sub-merchant.index');
+        })->name('index');
+
+        Route::get('/register', function () {
+            return view('dashboard.sub-merchant.register');
+        })->name('register');
+
+        Route::get('/settings', function () {
+            return view('dashboard.sub-merchant.settings');
+        })->name('settings');
+
+        Route::get('/qris', function () {
+            return view('dashboard.sub-merchant.qris');
+        })->name('qris');
+
+        Route::get('/balance', function () {
+            return view('dashboard.sub-merchant.balance');
+        })->name('balance');
+
+        Route::get('/withdrawals', function () {
+            return view('dashboard.sub-merchant.withdrawals');
+        })->name('withdrawals');
+    });
 });
