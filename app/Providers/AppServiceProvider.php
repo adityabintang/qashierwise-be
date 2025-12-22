@@ -62,6 +62,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Force HTTPS when behind proxy (Easypanel, Cloudflare, etc.)
+        if ($this->app->environment('production') || str_starts_with(config('app.url'), 'https')) {
+            \Illuminate\Support\Facades\URL::forceScheme('https');
+        }
     }
 }
