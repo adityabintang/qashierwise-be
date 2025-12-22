@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Storage;
 class WhatsAppWebhookController extends Controller
 {
     protected MediaStorageService $mediaStorageService;
+
     protected WhatsAppAccountService $whatsAppAccountService;
 
     public function __construct(
@@ -44,10 +45,12 @@ class WhatsAppWebhookController extends Controller
             if ($mode === 'subscribe' && $token === config('whatsapp.webhook_verify_token')) {
                 // Respond with 200 OK and challenge token from the request
                 Log::info('Webhook verified successfully');
+
                 return response($challenge, 200)->header('Content-Type', 'text/plain');
             } else {
                 // Responds with '403 Forbidden' if verify tokens do not match
                 Log::warning('Webhook verification failed - invalid token');
+
                 return response()->json(['error' => 'Forbidden'], 403);
             }
         }
@@ -75,33 +78,35 @@ class WhatsAppWebhookController extends Controller
                     foreach ($entry['changes'] as $change) {
                         $field = $change['field'] ?? null;
 
-                           Log::info('Webhook change received', [
+                        Log::info('Webhook change received', [
                             'field' => $field,
                             'waba_id' => $wabaId,
                         ]);
 
                         // Handle template status updates (message_template_status_update field)
                         if ($field === 'message_template_status_update') {
-                             Log::info('Template status update webhook detected', $change['value']);
+                            Log::info('Template status update webhook detected', $change['value']);
                             $this->handleTemplateStatusUpdate($change['value'], $wabaId);
+
                             continue;
                         }
 
                         $phoneNumberId = $change['value']['metadata']['phone_number_id'] ?? null;
 
-                        if (!$phoneNumberId) {
+                        if (! $phoneNumberId) {
                             continue;
                         }
 
                         // Find WhatsApp account using the service for multi-tenant routing
                         $whatsappAccount = $this->whatsAppAccountService->getAccountByPhoneNumberId($phoneNumberId);
 
-                        if (!$whatsappAccount) {
+                        if (! $whatsappAccount) {
                             // Log and skip processing for unknown phone numbers (Requirement 5.2)
                             Log::info('Webhook received for unknown phone number, skipping processing', [
                                 'phone_number_id' => $phoneNumberId,
                                 'waba_id' => $wabaId,
                             ]);
+
                             continue;
                         }
 
@@ -137,7 +142,7 @@ class WhatsAppWebhookController extends Controller
         } catch (\Exception $e) {
             Log::error('Webhook processing error', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json(['error' => 'Internal Server Error'], 500);
@@ -146,11 +151,11 @@ class WhatsAppWebhookController extends Controller
 
     /**
      * Handle incoming message
-     * 
-     * @param array $message Message data from webhook
-     * @param array $value Value object containing metadata and contacts
-     * @param int $userId User ID to associate the message with
-     * @param WhatsAppAccount $whatsappAccount The WhatsApp account for user-specific credentials
+     *
+     * @param  array  $message  Message data from webhook
+     * @param  array  $value  Value object containing metadata and contacts
+     * @param  int  $userId  User ID to associate the message with
+     * @param  WhatsAppAccount  $whatsappAccount  The WhatsApp account for user-specific credentials
      */
     protected function handleIncomingMessage($message, $value, $userId, WhatsAppAccount $whatsappAccount)
     {
@@ -335,8 +340,27 @@ class WhatsAppWebhookController extends Controller
 
         Log::info('Message saved and broadcasted', [
             'message_id' => $messageId,
-            'contact_id' => $contact->id
+            'contact_id' => $contact->id,
         ]);
+
+        // Check if AI Agent is active for this account
+        $aiAgent = \App\Models\AiAgent::where('whatsapp_account_id', $whatsappAccount->id)
+            ->where('is_active', true)
+            ->first();
+
+        if ($aiAgent && $type === 'text') {
+            // Dispatch AI Agent processing to queue
+            \App\Jobs\ProcessAiAgentMessage::dispatch(
+                $whatsappAccount,
+                $contact,
+                $content
+            )->onQueue('ai-agent');
+
+            Log::info('AI Agent message dispatched to queue', [
+                'contact_id' => $contact->id,
+                'ai_agent_id' => $aiAgent->id,
+            ]);
+        }
 
         return $messageData;
     }
@@ -357,8 +381,9 @@ class WhatsAppWebhookController extends Controller
             ->where('user_id', $userId)
             ->first();
 
-        if (!$message) {
+        if (! $message) {
             Log::warning('Message not found for status update', ['message_id' => $messageId]);
+
             return;
         }
 
@@ -379,20 +404,20 @@ class WhatsAppWebhookController extends Controller
 
         Log::info('Message status updated and broadcasted', [
             'message_id' => $messageId,
-            'status' => $statusValue
+            'status' => $statusValue,
         ]);
 
         if ($statusValue === 'failed' && isset($status['errors'])) {
             Log::error('Message delivery failed', [
                 'message_id' => $messageId,
-                'errors' => $status['errors']
+                'errors' => $status['errors'],
             ]);
         }
     }
 
     /**
      * Handle template status update webhook from Meta
-     * 
+     *
      * Webhook payload example:
      * {
      *   "event": "APPROVED" | "PENDING" | "REJECTED" | "DISABLED" | "PENDING_DELETION" | "DELETED",
@@ -419,8 +444,9 @@ class WhatsAppWebhookController extends Controller
             'waba_id' => $wabaId,
         ]);
 
-        if (!$templateName || !$event) {
+        if (! $templateName || ! $event) {
             Log::warning('Template status update missing required fields', $value);
+
             return;
         }
 
@@ -444,20 +470,20 @@ class WhatsAppWebhookController extends Controller
         // Strategy 1: Find by template_id if available (most reliable)
         if ($templateId) {
             $template = WhatsAppTemplate::where('template_id', $templateId)->first();
-            
+
             if ($template) {
                 Log::info('Template found by template_id', ['template_id' => $templateId]);
             }
         }
 
         // Strategy 2: Find by name and language
-        if (!$template && $templateName) {
+        if (! $template && $templateName) {
             $query = WhatsAppTemplate::where('name', $templateName);
-            
+
             if ($templateLanguage) {
                 $query->where('language', $templateLanguage);
             }
-            
+
             // If we have waba_id, try to find the account's template
             if ($wabaId) {
                 $whatsappAccount = WhatsAppAccount::where('waba_id', $wabaId)->first();
@@ -465,9 +491,9 @@ class WhatsAppWebhookController extends Controller
                     $query->where('whatsapp_account_id', $whatsappAccount->id);
                 }
             }
-            
+
             $template = $query->first();
-            
+
             if ($template) {
                 Log::info('Template found by name and language', [
                     'template_name' => $templateName,
@@ -477,21 +503,22 @@ class WhatsAppWebhookController extends Controller
         }
 
         // Strategy 3: Find by name only (fallback for single-tenant or when language doesn't match)
-        if (!$template && $templateName) {
+        if (! $template && $templateName) {
             $template = WhatsAppTemplate::where('name', $templateName)->first();
-            
+
             if ($template) {
                 Log::info('Template found by name only (fallback)', ['template_name' => $templateName]);
             }
         }
 
-        if (!$template) {
+        if (! $template) {
             Log::warning('Template not found for status update', [
                 'template_name' => $templateName,
                 'template_id' => $templateId,
                 'language' => $templateLanguage,
                 'waba_id' => $wabaId,
             ]);
+
             return;
         }
 
@@ -500,7 +527,7 @@ class WhatsAppWebhookController extends Controller
         $template->status = $newStatus;
 
         // Update template_id if we received it from Meta and don't have it yet
-        if ($templateId && !$template->template_id) {
+        if ($templateId && ! $template->template_id) {
             $template->template_id = $templateId;
         }
 
@@ -524,12 +551,12 @@ class WhatsAppWebhookController extends Controller
     /**
      * Download media from WhatsApp and store to R2/local storage
      *
-     * @param string $mediaId WhatsApp media ID
-     * @param string $type Media type (image, document, audio, video)
-     * @param string $mimeType MIME type of the media
-     * @param string|null $filename Original filename (for documents)
-     * @param string|null $senderPhone Sender phone number for reply
-     * @param WhatsAppAccount|null $whatsappAccount WhatsApp account for user-specific credentials
+     * @param  string  $mediaId  WhatsApp media ID
+     * @param  string  $type  Media type (image, document, audio, video)
+     * @param  string  $mimeType  MIME type of the media
+     * @param  string|null  $filename  Original filename (for documents)
+     * @param  string|null  $senderPhone  Sender phone number for reply
+     * @param  WhatsAppAccount|null  $whatsappAccount  WhatsApp account for user-specific credentials
      * @return array{url: string|null, exceeded_limit: bool, file_size: int, max_size: int}
      */
     protected function downloadAndStoreMedia(string $mediaId, string $type, string $mimeType, ?string $filename = null, ?string $senderPhone = null, ?WhatsAppAccount $whatsappAccount = null): array
@@ -543,11 +570,12 @@ class WhatsAppWebhookController extends Controller
             $mediaInfoResponse = Http::withToken($accessToken)
                 ->get("https://graph.facebook.com/v21.0/{$mediaId}");
 
-            if (!$mediaInfoResponse->successful()) {
+            if (! $mediaInfoResponse->successful()) {
                 Log::error('Failed to get media info from WhatsApp', [
                     'media_id' => $mediaId,
                     'response' => $mediaInfoResponse->body(),
                 ]);
+
                 return null;
             }
 
@@ -555,8 +583,9 @@ class WhatsAppWebhookController extends Controller
             $mediaUrl = $mediaInfo['url'] ?? null;
             $fileSize = $mediaInfo['file_size'] ?? 0;
 
-            if (!$mediaUrl) {
+            if (! $mediaUrl) {
                 Log::error('Media URL not found in WhatsApp response', ['media_id' => $mediaId]);
+
                 return ['url' => null, 'exceeded_limit' => false, 'file_size' => 0, 'max_size' => 0];
             }
 
@@ -583,11 +612,12 @@ class WhatsAppWebhookController extends Controller
                 ->timeout(60)
                 ->get($mediaUrl);
 
-            if (!$mediaResponse->successful()) {
+            if (! $mediaResponse->successful()) {
                 Log::error('Failed to download media from WhatsApp', [
                     'media_id' => $mediaId,
                     'url' => $mediaUrl,
                 ]);
+
                 return null;
             }
 
@@ -641,19 +671,20 @@ class WhatsAppWebhookController extends Controller
                 'type' => $type,
                 'error' => $e->getMessage(),
             ]);
+
             return ['url' => null, 'exceeded_limit' => false, 'file_size' => 0, 'max_size' => 0];
         }
     }
 
     /**
      * Send reply to client when file size exceeds limit
-     * 
-     * @param string $to Recipient phone number
-     * @param string $type Media type
-     * @param int $fileSize Actual file size in bytes
-     * @param int $maxSize Maximum allowed size in bytes
-     * @param string|null $accessToken User-specific access token (falls back to config)
-     * @param string|null $phoneNumberId User-specific phone number ID (falls back to config)
+     *
+     * @param  string  $to  Recipient phone number
+     * @param  string  $type  Media type
+     * @param  int  $fileSize  Actual file size in bytes
+     * @param  int  $maxSize  Maximum allowed size in bytes
+     * @param  string|null  $accessToken  User-specific access token (falls back to config)
+     * @param  string|null  $phoneNumberId  User-specific phone number ID (falls back to config)
      */
     protected function sendFileSizeLimitReply(string $to, string $type, int $fileSize, int $maxSize, ?string $accessToken = null, ?string $phoneNumberId = null): void
     {
@@ -670,8 +701,8 @@ class WhatsAppWebhookController extends Controller
             $typeLabel = $typeLabels[$type] ?? 'File';
 
             $message = "⚠️ *{$typeLabel} tidak dapat diproses*\n\n"
-                . "Ukuran file yang Anda kirim ({$fileSizeMB} MB) melebihi batas maksimum ({$maxSizeMB} MB).\n\n"
-                . "Silakan kirim file dengan ukuran lebih kecil.";
+                ."Ukuran file yang Anda kirim ({$fileSizeMB} MB) melebihi batas maksimum ({$maxSizeMB} MB).\n\n"
+                .'Silakan kirim file dengan ukuran lebih kecil.';
 
             // Use provided credentials or fall back to config
             $accessToken = $accessToken ?? config('whatsapp.access_token');

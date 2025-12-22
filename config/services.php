@@ -35,4 +35,17 @@ return [
         ],
     ],
 
+    'byteplus_ark' => [
+        'api_key' => env('BYTEPLUS_ARK_API_KEY'),
+        'base_url' => env('BYTEPLUS_ARK_BASE_URL', 'https://ark.ap-southeast.bytepluses.com/api/v3'),
+        'model' => env('BYTEPLUS_ARK_MODEL', 'GPT-OSS-120B'),
+    ],
+
+    'midtrans' => [
+        'server_key' => env('MIDTRANS_SERVER_KEY'),
+        'client_key' => env('MIDTRANS_CLIENT_KEY'),
+        'is_production' => env('MIDTRANS_IS_PRODUCTION', false),
+        'merchant_id' => env('MIDTRANS_MERCHANT_ID'),
+    ],
+
 ];

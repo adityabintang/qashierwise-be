@@ -1,0 +1,185 @@
+# Implementation Plan
+
+- [ ] 1. Set up database schema and models
+  - [ ] 1.1 Create migration for ai_agent_configs table
+    - Create migration file with all columns: user_id, whatsapp_account_id, is_enabled, order_enabled, agent_name, persona, business_info, operating_hours, memory_window_size, system_prompt_json
+    - Add foreign keys and unique constraint
+    - _Requirements: 1.2, 1.4_
+  - [ ] 1.2 Create migration for conversation_memories table
+    - Create migration with columns: whatsapp_contact_id, role, content, metadata, expires_at
+    - Add foreign key and index for efficient queries
+    - _Requirements: 4.1, 4.2_
+  - [ ] 1.3 Create migration for ai_agent_logs table
+    - Create migration with columns: user_id, whatsapp_contact_id, action, request_data, response_data, tokens_used, processing_time_ms, error_message
+    - Add indexes for user_id and created_at
+    - _Requirements: 8.4_
+  - [ ] 1.4 Create AIAgentConfig model
+    - Define fillable fields, casts, and relationships (belongsTo User, belongsTo WhatsAppAccount)
+    - _Requirements: 1.1, 1.2_
+  - [ ] 1.5 Write property test for AIAgentConfig serialization round-trip
+
+    - **Property 1: Configuration Round-Trip Consistency**
+    - **Validates: Requirements 1.4, 1.5**
+  - [ ] 1.6 Create ConversationMemory model
+    - Define fillable fields, casts, and relationship (belongsTo WhatsAppContact)
+    - _Requirements: 4.1_
+  - [ ] 1.7 Create AIAgentLog model
+    - Define fillable fields, casts, and relationships
+    - _Requirements: 8.4_
+
+- [ ] 2. Implement configuration service and validation
+  - [ ] 2.1 Create AIAgentService with configuration methods
+    - Implement getConfig(), updateConfig(), isEnabled() methods
+    - Implement buildSystemPrompt() to construct prompt from config fields
+    - _Requirements: 1.1, 1.2, 1.3_
+  - [ ]* 2.2 Write property test for required field validation
+    - **Property 2: Required Field Validation**
+    - **Validates: Requirements 1.3**
+  - [ ]* 2.3 Write property test for state persistence consistency
+    - **Property 4: State Persistence Consistency**
+    - **Validates: Requirements 2.4**
+
+- [ ] 3. Implement memory window service
+  - [ ] 3.1 Create MemoryWindowService
+    - Implement getConversationHistory() with window size limit
+    - Implement addMessage() to store new messages
+    - Implement clearExpiredMemories() for cleanup
+    - Implement shouldStartNewConversation() for 24-hour check
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+  - [ ]* 3.2 Write property test for memory window size enforcement
+    - **Property 7: Memory Window Size Enforcement**
+    - **Validates: Requirements 4.2, 4.3**
+  - [ ]* 3.3 Write property test for chronological ordering
+    - **Property 8: Memory Chronological Ordering**
+    - **Validates: Requirements 4.4**
+  - [ ]* 3.4 Write property test for memory expiration
+    - **Property 9: Memory Expiration**
+    - **Validates: Requirements 4.5**
+
+- [ ] 4. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 5. Implement LLM service integration
+  - [ ] 5.1 Create config file for AI Agent settings
+    - Create config/ai-agent.php with LLM provider settings, retry config, memory settings
+    - _Requirements: 9.1_
+  - [ ] 5.2 Create LLMService for OpenAI integration
+    - Implement chat() method for basic chat completion
+    - Implement chatWithFunctions() for function calling support
+    - Implement retry logic with exponential backoff
+    - _Requirements: 9.1, 9.2, 9.3_
+  - [ ]* 5.3 Write property test for retry behavior
+    - **Property 17: Retry Behavior on LLM Failure**
+    - **Validates: Requirements 9.3**
+  - [ ]* 5.4 Write property test for response truncation
+    - **Property 16: Response Length Truncation**
+    - **Validates: Requirements 9.4**
+
+- [ ] 6. Implement function caller service
+  - [ ] 6.1 Create FunctionCallerService
+    - Implement execute() method to route function calls
+    - Implement getAvailableFunctions() based on order_enabled flag
+    - Define function schemas for get_products, create_order, get_order_status
+    - _Requirements: 2.1, 2.2, 9.5_
+  - [ ]* 6.2 Write property test for function availability based on toggle
+    - **Property 3: Order Function Availability Based on Toggle**
+    - **Validates: Requirements 2.1, 2.2**
+  - [ ] 6.3 Implement get_products function
+    - Query products with fuzzy search capability
+    - Return product name, price, description, stock_quantity
+    - _Requirements: 5.1, 5.2, 5.4_
+  - [ ]* 6.4 Write property test for product information completeness
+    - **Property 10: Product Information Completeness**
+    - **Validates: Requirements 5.2**
+  - [ ]* 6.5 Write property test for stock availability accuracy
+    - **Property 11: Stock Availability Accuracy**
+    - **Validates: Requirements 5.3**
+  - [ ] 6.6 Implement create_order function
+    - Validate stock availability before order creation
+    - Create order using existing OrderService
+    - Associate order with WhatsApp contact
+    - Return order confirmation with order_number and total
+    - _Requirements: 6.1, 6.2, 6.3, 6.5_
+  - [ ]* 6.7 Write property test for order stock validation
+    - **Property 12: Order Stock Validation**
+    - **Validates: Requirements 6.2, 6.4**
+  - [ ]* 6.8 Write property test for order confirmation content
+    - **Property 13: Order Confirmation Content**
+    - **Validates: Requirements 6.3**
+  - [ ]* 6.9 Write property test for order contact association
+    - **Property 14: Order Contact Association**
+    - **Validates: Requirements 6.5**
+
+- [ ] 7. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 8. Implement AI Agent message processing
+  - [ ] 8.1 Create processMessage() in AIAgentService
+    - Check if AI Agent is enabled for the account
+    - Build conversation context from memory window
+    - Send to LLM with system prompt and functions
+    - Handle function calls and generate final response
+    - Store messages in conversation memory
+    - _Requirements: 3.1, 3.2, 4.1_
+  - [ ]* 8.2 Write property test for conditional message processing
+    - **Property 5: Conditional Message Processing**
+    - **Validates: Requirements 3.1, 3.5, 8.1, 8.2**
+  - [ ]* 8.3 Write property test for system prompt inclusion
+    - **Property 6: System Prompt Inclusion**
+    - **Validates: Requirements 3.2**
+  - [ ] 8.4 Integrate AI Agent into WhatsAppWebhookController
+    - Modify handleIncomingMessage() to check for AI Agent
+    - Call AIAgentService.processMessage() when enabled
+    - Send AI response via WhatsApp API
+    - _Requirements: 3.1, 3.3_
+  - [ ] 8.5 Implement error handling and fallback message
+    - Create AIAgentErrorHandler class
+    - Return fallback message on any processing error
+    - _Requirements: 3.4_
+
+- [ ] 9. Implement audit logging
+  - [ ] 9.1 Add logging to AIAgentService
+    - Log status changes (is_enabled toggle)
+    - Log message processing with tokens used and processing time
+    - Log errors with full context
+    - _Requirements: 8.4_
+  - [ ]* 9.2 Write property test for status change audit logging
+    - **Property 15: Status Change Audit Logging**
+    - **Validates: Requirements 8.4**
+
+- [ ] 10. Implement API endpoints
+  - [ ] 10.1 Create AIAgentController
+    - Implement getConfig() endpoint
+    - Implement updateConfig() endpoint with validation
+    - Implement toggleEnabled() endpoint
+    - Implement toggleOrderEnabled() endpoint
+    - _Requirements: 1.1, 7.1, 8.1, 8.2_
+  - [ ] 10.2 Add routes for AI Agent API
+    - Add routes to routes/api.php under authenticated middleware
+    - _Requirements: 7.1_
+  - [ ]* 10.3 Write unit tests for AIAgentController
+    - Test all endpoints with valid and invalid inputs
+    - Test authentication requirements
+    - _Requirements: 1.1, 7.1, 7.2_
+
+- [ ] 11. Implement dashboard UI
+  - [ ] 11.1 Create AI Agent dashboard view
+    - Create resources/views/dashboard/ai-agent.blade.php
+    - Display configuration form with all fields
+    - Add master switch toggle for is_enabled
+    - Add order button toggle for order_enabled
+    - Show connection status and visual indicators
+    - _Requirements: 1.1, 2.3, 7.1, 7.3, 7.4_
+  - [ ] 11.2 Add AI Agent menu to sidebar
+    - Update dashboard-sidebar component
+    - Add menu item with appropriate icon
+    - _Requirements: 7.1_
+  - [ ] 11.3 Implement JavaScript for form handling
+    - Handle form submission via AJAX
+    - Handle toggle switches with immediate persistence
+    - Show success/error notifications
+    - _Requirements: 2.4, 7.1_
+
+- [ ] 12. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+

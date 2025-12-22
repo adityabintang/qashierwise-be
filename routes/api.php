@@ -1,8 +1,11 @@
 <?php
 
+use App\Http\Controllers\AiAgentController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BalanceController;
 use App\Http\Controllers\Api\BroadcastAuthController;
 use App\Http\Controllers\Api\EmbeddedSignupController;
+use App\Http\Controllers\Api\MidtransWebhookController;
 use App\Http\Controllers\Api\PolarWebhookController;
 use App\Http\Controllers\Api\Pos\CategoryController;
 use App\Http\Controllers\Api\Pos\OrderController;
@@ -13,9 +16,13 @@ use App\Http\Controllers\Api\Pos\ReportController;
 use App\Http\Controllers\Api\Pos\StoreController;
 use App\Http\Controllers\Api\Pos\TableController;
 use App\Http\Controllers\Api\Pos\TransactionController;
+use App\Http\Controllers\Api\QrisController;
+use App\Http\Controllers\Api\SubMerchantController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\WhatsAppController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
+use App\Http\Controllers\Api\WithdrawalController;
+use App\Http\Controllers\Api\Admin\AdminWithdrawalController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -39,6 +46,9 @@ Route::post('/whatsapp/webhook', [WhatsAppWebhookController::class, 'handle']);
 
 // Polar.sh Webhook (must be public for Polar to access)
 Route::post('/webhooks/polar', [PolarWebhookController::class, 'handle']);
+
+// Midtrans Webhook (must be public for Midtrans to access)
+Route::post('/webhooks/midtrans', [MidtransWebhookController::class, 'handleNotification']);
 
 // Broadcast authentication - Custom controller for Sanctum token auth
 Route::post('/broadcasting/auth', [BroadcastAuthController::class, 'authenticate'])
@@ -124,6 +134,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/contacts/{id}/mark-read', [WhatsAppController::class, 'markContactMessagesAsRead']);
     });
 
+    // AI Agent routes
+    Route::prefix('ai-agent')->group(function () {
+        Route::get('/', [AiAgentController::class, 'show']);
+        Route::post('/', [AiAgentController::class, 'store']);
+        Route::put('/toggle-active', [AiAgentController::class, 'toggleActive']);
+        Route::put('/toggle-order', [AiAgentController::class, 'toggleOrder']);
+        Route::post('/test', [AiAgentController::class, 'test']);
+        Route::delete('/conversations/{contactId}', [AiAgentController::class, 'clearConversation']);
+    });
+
     // POS (Point of Sale) API routes
     Route::prefix('pos')->group(function () {
         // Products
@@ -173,5 +193,64 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/transactions/filter-by-date-range', [TransactionController::class, 'filterByDateRange']);
         Route::get('/transactions', [TransactionController::class, 'index']);
         Route::get('/transactions/{id}', [TransactionController::class, 'show']);
+    });
+
+    // Sub-Merchant QRIS routes
+    Route::prefix('sub-merchant')->group(function () {
+        // Sub-Merchant registration and management
+        Route::get('/status', [SubMerchantController::class, 'status']);
+        Route::post('/register', [SubMerchantController::class, 'register']);
+        Route::get('/profile', [SubMerchantController::class, 'profile']);
+        Route::put('/bank-account', [SubMerchantController::class, 'updateBankAccount']);
+        Route::post('/deactivate', [SubMerchantController::class, 'deactivate']);
+        Route::post('/activate', [SubMerchantController::class, 'activate']);
+
+        // QRIS generation and management
+        Route::prefix('qris')->group(function () {
+            Route::post('/generate', [QrisController::class, 'generate'])->middleware('qris.rate_limit');
+            Route::get('/history', [QrisController::class, 'history']);
+            Route::get('/pending', [QrisController::class, 'pending']);
+            Route::get('/{orderId}', [QrisController::class, 'show']);
+            Route::get('/{orderId}/qr-code', [QrisController::class, 'getQrCode']);
+            Route::get('/{orderId}/share-link', [QrisController::class, 'getShareableLink']);
+            Route::get('/{orderId}/status', [QrisController::class, 'checkStatus']);
+            Route::post('/{orderId}/cancel', [QrisController::class, 'cancel']);
+        });
+
+        // Balance management
+        Route::prefix('balance')->group(function () {
+            Route::get('/', [BalanceController::class, 'current']);
+            Route::get('/breakdown', [BalanceController::class, 'breakdown']);
+            Route::get('/transactions', [BalanceController::class, 'transactions']);
+            Route::get('/earnings', [BalanceController::class, 'earnings']);
+            Route::get('/daily-earnings', [BalanceController::class, 'dailyEarnings']);
+            Route::post('/calculate-fee', [BalanceController::class, 'calculateFee']);
+        });
+
+        // Withdrawal management
+        Route::prefix('withdrawals')->group(function () {
+            Route::post('/', [WithdrawalController::class, 'store'])->middleware('withdrawal.auth');
+            Route::get('/history', [WithdrawalController::class, 'history']);
+            Route::get('/stats', [WithdrawalController::class, 'stats']);
+            Route::post('/validate', [WithdrawalController::class, 'validate']);
+            Route::post('/confirm-password', [WithdrawalController::class, 'confirmPassword']);
+            Route::get('/password-status', [WithdrawalController::class, 'checkPasswordConfirmation']);
+            Route::get('/{id}', [WithdrawalController::class, 'show']);
+            Route::post('/{id}/cancel', [WithdrawalController::class, 'cancel'])->middleware('withdrawal.auth');
+        });
+    });
+
+    // Admin routes for withdrawal management
+    Route::prefix('admin')->middleware('admin.session')->group(function () {
+        Route::prefix('withdrawals')->group(function () {
+            Route::get('/', [AdminWithdrawalController::class, 'index']);
+            Route::get('/pending', [AdminWithdrawalController::class, 'pending']);
+            Route::get('/stats', [AdminWithdrawalController::class, 'stats']);
+            Route::get('/{id}', [AdminWithdrawalController::class, 'show']);
+            Route::get('/{id}/audit-trail', [AdminWithdrawalController::class, 'auditTrail']);
+            Route::post('/{id}/approve', [AdminWithdrawalController::class, 'approve']);
+            Route::post('/{id}/reject', [AdminWithdrawalController::class, 'reject']);
+            Route::post('/{id}/mark-processed', [AdminWithdrawalController::class, 'markProcessed']);
+        });
     });
 });

@@ -25,6 +25,10 @@ Route::get('/terms-of-service', function () {
     return view('terms-of-service');
 })->name('terms-of-service');
 
+// Public QRIS Payment Page
+Route::get('/pay/qris/{orderId}', [App\Http\Controllers\QrisPaymentPageController::class, 'show'])
+    ->name('qris.payment.page');
+
 // Dashboard routes (protected by authentication middleware)
 Route::middleware(['web', 'check.web.auth'])->group(function () {
     Route::get('/dashboard', function () {
@@ -50,6 +54,10 @@ Route::middleware(['web', 'check.web.auth'])->group(function () {
     Route::get('/dashboard/whatsapp-account', function () {
         return view('dashboard.whatsapp-account');
     })->name('dashboard.whatsapp-account');
+
+    Route::get('/dashboard/ai-agent', function () {
+        return view('dashboard.ai-agent');
+    })->name('dashboard.ai-agent');
 
     // POS Routes
     Route::prefix('dashboard/pos')->name('dashboard.pos.')->group(function () {
@@ -88,5 +96,39 @@ Route::middleware(['web', 'check.web.auth'])->group(function () {
         Route::get('/transactions', function () {
             return view('dashboard.pos.transactions');
         })->name('transactions');
+    });
+
+    // Admin Routes
+    Route::prefix('admin')->name('admin.')->group(function () {
+        Route::get('/withdrawals', function () {
+            return view('dashboard.admin.withdrawals');
+        })->name('withdrawals');
+    });
+
+    // Sub-Merchant Routes
+    Route::prefix('dashboard/sub-merchant')->name('dashboard.sub-merchant.')->group(function () {
+        Route::get('/', function () {
+            return view('dashboard.sub-merchant.index');
+        })->name('index');
+
+        Route::get('/register', function () {
+            return view('dashboard.sub-merchant.register');
+        })->name('register');
+
+        Route::get('/settings', function () {
+            return view('dashboard.sub-merchant.settings');
+        })->name('settings');
+
+        Route::get('/qris', function () {
+            return view('dashboard.sub-merchant.qris');
+        })->name('qris');
+
+        Route::get('/balance', function () {
+            return view('dashboard.sub-merchant.balance');
+        })->name('balance');
+
+        Route::get('/withdrawals', function () {
+            return view('dashboard.sub-merchant.withdrawals');
+        })->name('withdrawals');
     });
 });
