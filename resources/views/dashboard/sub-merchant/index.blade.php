@@ -53,9 +53,9 @@
                                     <p class="text-sm text-[hsl(var(--muted-foreground))]">Monitor your balance in real-time</p>
                                 </div>
                                 <div class="p-4 rounded-lg bg-[hsl(var(--muted)/0.5)]">
-                                    <i class="fas fa-money-bill-transfer text-2xl text-blue-500 mb-2"></i>
-                                    <h3 class="font-semibold">Easy Withdrawals</h3>
-                                    <p class="text-sm text-[hsl(var(--muted-foreground))]">Withdraw to your bank account</p>
+                                    <i class="fas fa-cogs text-2xl text-purple-500 mb-2"></i>
+                                    <h3 class="font-semibold">Provider Settings</h3>
+                                    <p class="text-sm text-[hsl(var(--muted-foreground))]">Configure your payment providers</p>
                                 </div>
                             </div>
                             <a href="/dashboard/sub-merchant/register" class="btn btn-primary btn-lg">
@@ -81,8 +81,8 @@
                                         <i class="fas fa-wallet text-xl text-emerald-500"></i>
                                     </div>
                                 </div>
-                                <a href="/dashboard/sub-merchant/withdrawals" class="text-sm text-[hsl(var(--primary))] hover:underline mt-3 inline-block">
-                                    Withdraw funds →
+                                <a href="/dashboard/sub-merchant/balance" class="text-sm text-[hsl(var(--primary))] hover:underline mt-3 inline-block">
+                                    View details →
                                 </a>
                             </div>
 
@@ -117,15 +117,15 @@
                             <div class="card p-5 hover:shadow-md transition-shadow">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Total Withdrawn</p>
-                                        <p class="text-2xl font-bold mt-1" x-text="formatCurrency(balance.total_withdrawn)">Rp 0</p>
+                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Total Transactions</p>
+                                        <p class="text-2xl font-bold mt-1" x-text="balance.total_transactions || 0">0</p>
                                     </div>
                                     <div class="h-12 w-12 rounded-xl bg-purple-50 flex items-center justify-center">
-                                        <i class="fas fa-money-bill-transfer text-xl text-purple-500"></i>
+                                        <i class="fas fa-receipt text-xl text-purple-500"></i>
                                     </div>
                                 </div>
-                                <a href="/dashboard/sub-merchant/withdrawals" class="text-sm text-[hsl(var(--primary))] hover:underline mt-3 inline-block">
-                                    View history →
+                                <a href="/dashboard/sub-merchant/balance" class="text-sm text-[hsl(var(--primary))] hover:underline mt-3 inline-block">
+                                    View transactions →
                                 </a>
                             </div>
                         </div>
@@ -140,6 +140,16 @@
                                 </div>
                                 <div class="card-content">
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <a href="/dashboard/sub-merchant/provider-settings" class="flex items-center gap-4 p-4 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors">
+                                            <div class="h-12 w-12 rounded-xl bg-purple-500 flex items-center justify-center">
+                                                <i class="fas fa-cogs text-xl text-white"></i>
+                                            </div>
+                                            <div>
+                                                <h3 class="font-semibold">Provider Settings</h3>
+                                                <p class="text-sm text-[hsl(var(--muted-foreground))]">Configure payment providers</p>
+                                            </div>
+                                        </a>
+
                                         <a href="/dashboard/sub-merchant/qris" class="flex items-center gap-4 p-4 rounded-lg bg-[hsl(var(--primary)/0.1)] hover:bg-[hsl(var(--primary)/0.15)] transition-colors">
                                             <div class="h-12 w-12 rounded-xl bg-[hsl(var(--primary))] flex items-center justify-center">
                                                 <i class="fas fa-qrcode text-xl text-white"></i>
@@ -160,56 +170,6 @@
                                             </div>
                                         </a>
 
-                                        <a href="/dashboard/sub-merchant/withdrawals" class="flex items-center gap-4 p-4 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors">
-                                            <div class="h-12 w-12 rounded-xl bg-blue-500 flex items-center justify-center">
-                                                <i class="fas fa-money-bill-transfer text-xl text-white"></i>
-                                            </div>
-                                            <div>
-                                                <h3 class="font-semibold">Withdrawals</h3>
-                                                <p class="text-sm text-[hsl(var(--muted-foreground))]">Request & track withdrawals</p>
-                                            </div>
-                                        </a>
-
-                                        <a href="/dashboard/sub-merchant/settings" class="flex items-center gap-4 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-                                            <div class="h-12 w-12 rounded-xl bg-gray-500 flex items-center justify-center">
-                                                <i class="fas fa-cog text-xl text-white"></i>
-                                            </div>
-                                            <div>
-                                                <h3 class="font-semibold">Settings</h3>
-                                                <p class="text-sm text-[hsl(var(--muted-foreground))]">Manage bank account</p>
-                                            </div>
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Account Status -->
-                            <div class="card">
-                                <div class="card-header">
-                                    <h2 class="card-title">Account Status</h2>
-                                </div>
-                                <div class="card-content space-y-4">
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-sm text-[hsl(var(--muted-foreground))]">Status</span>
-                                        <span class="badge" :class="subMerchant.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'" x-text="subMerchant.is_active ? 'Active' : 'Inactive'"></span>
-                                    </div>
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-sm text-[hsl(var(--muted-foreground))]">Verified</span>
-                                        <span class="badge" :class="subMerchant.is_verified ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'" x-text="subMerchant.is_verified ? 'Verified' : 'Pending'"></span>
-                                    </div>
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-sm text-[hsl(var(--muted-foreground))]">Bank</span>
-                                        <span class="text-sm font-medium" x-text="subMerchant.bank_name"></span>
-                                    </div>
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-sm text-[hsl(var(--muted-foreground))]">Account</span>
-                                        <span class="text-sm font-medium" x-text="subMerchant.account_number"></span>
-                                    </div>
-                                    <div class="pt-4 border-t border-[hsl(var(--border))]">
-                                        <a href="/dashboard/sub-merchant/settings" class="btn btn-outline btn-sm w-full">
-                                            <i class="fas fa-edit mr-2"></i>
-                                            Edit Bank Account
-                                        </a>
                                     </div>
                                 </div>
                             </div>
@@ -228,7 +188,7 @@ function subMerchantDashboard() {
         loading: true,
         isSubMerchant: false,
         subMerchant: {},
-        balance: { available: 0, pending: 0, total_earned: 0, total_withdrawn: 0 },
+        balance: { available: 0, pending: 0, total_earned: 0, total_transactions: 0 },
         sidebarOpen: window.innerWidth >= 1024,
         isMobile: window.innerWidth < 768,
         user: null,
@@ -264,7 +224,7 @@ function subMerchantDashboard() {
                     this.isSubMerchant = data.data.is_sub_merchant;
                     if (this.isSubMerchant) {
                         this.subMerchant = data.data.sub_merchant;
-                        this.balance = data.data.balance || { available: 0, pending: 0, total_earned: 0, total_withdrawn: 0 };
+                        this.balance = data.data.balance || { available: 0, pending: 0, total_earned: 0, total_transactions: 0 };
                     }
                 }
             } catch (e) {

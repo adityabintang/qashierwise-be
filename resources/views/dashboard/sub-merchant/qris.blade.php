@@ -104,19 +104,12 @@
                                     <!-- Submit Button -->
                                     <button 
                                         type="submit" 
-                                        :disabled="generating || !subMerchant.is_active" 
+                                        :disabled="generating" 
                                         class="btn btn-primary btn-md w-full"
                                     >
                                         <i class="fas" :class="generating ? 'fa-spinner animate-spin' : 'fa-qrcode'"></i>
                                         <span x-text="generating ? 'Generating...' : 'Generate QRIS'"></span>
                                     </button>
-
-                                    <template x-if="!subMerchant.is_active">
-                                        <p class="text-sm text-amber-600 text-center">
-                                            <i class="fas fa-exclamation-triangle mr-1"></i>
-                                            Your account is inactive
-                                        </p>
-                                    </template>
                                 </form>
                             </div>
                         </div>

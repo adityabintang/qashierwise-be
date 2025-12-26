@@ -292,6 +292,72 @@
                             </div>
                         </div>
 
+                        <!-- QRIS Payment Feature Card -->
+                        <div class="card" x-show="config.order_enabled && form.default_store_id">
+                            <div class="card-header border-b border-[hsl(var(--border))]">
+                                <h3 class="card-title flex items-center gap-2">
+                                    <i class="fas fa-qrcode text-blue-500"></i>
+                                    QRIS Payment
+                                </h3>
+                                <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                                    Aktifkan pembayaran QRIS otomatis saat pelanggan konfirmasi pembelian
+                                </p>
+                            </div>
+                            <div class="p-4 sm:p-6 space-y-5">
+                                <!-- QRIS Toggle -->
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl" :class="config.qris_enabled ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50 border border-gray-200'">
+                                    <div class="flex-1">
+                                        <p class="font-medium" :class="config.qris_enabled ? 'text-blue-900' : 'text-gray-600'">Enable QRIS Payment</p>
+                                        <p class="text-sm" :class="config.qris_enabled ? 'text-blue-700' : 'text-gray-500'">
+                                            <span x-show="config.qris_enabled">QRIS akan otomatis di-generate saat pelanggan konfirmasi pembelian</span>
+                                            <span x-show="!config.qris_enabled">Pembayaran manual - pelanggan akan diarahkan ke kasir</span>
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        @click="config.qris_enabled = !config.qris_enabled"
+                                        :class="config.qris_enabled ? 'bg-blue-500' : 'bg-gray-300'"
+                                        class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex-shrink-0 cursor-pointer"
+                                    >
+                                        <span
+                                            :class="config.qris_enabled ? 'translate-x-6' : 'translate-x-1'"
+                                            class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md"
+                                        ></span>
+                                    </button>
+                                </div>
+
+                                <!-- QRIS Enabled Info -->
+                                <div x-show="config.qris_enabled" x-transition class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                                    <p class="text-sm text-blue-800 font-medium">
+                                        <i class="fas fa-check-circle mr-2"></i>
+                                        QRIS Payment aktif! Saat pelanggan konfirmasi pembelian:
+                                    </p>
+                                    <ul class="text-sm text-blue-700 mt-2 ml-6 list-disc space-y-1">
+                                        <li>QRIS akan otomatis di-generate dengan total harga pesanan</li>
+                                        <li>Pelanggan dapat scan QR code untuk bayar</li>
+                                        <li>Setelah pembayaran sukses, AI akan mengirim konfirmasi dengan Order ID, nama produk, dan total harga</li>
+                                    </ul>
+                                    <p class="text-xs text-blue-600 mt-3 flex items-center gap-1">
+                                        <i class="fas fa-info-circle"></i>
+                                        Pastikan payment provider sudah dikonfigurasi di <a href="/dashboard/sub-merchant/provider-settings" class="underline hover:no-underline">Provider Settings</a>
+                                    </p>
+                                </div>
+
+                                <!-- QRIS Disabled Info -->
+                                <div x-show="!config.qris_enabled" x-transition class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                                    <p class="text-sm text-amber-800 font-medium">
+                                        <i class="fas fa-info-circle mr-2"></i>
+                                        Mode Manual - Saat pelanggan konfirmasi pembelian:
+                                    </p>
+                                    <ul class="text-sm text-amber-700 mt-2 ml-6 list-disc space-y-1">
+                                        <li>AI akan mengirim ringkasan pesanan (Order ID, nama produk, total harga)</li>
+                                        <li>Status pembayaran: <span class="font-medium">Pending</span></li>
+                                        <li>Pelanggan diminta menunjukkan pesan tersebut ke kasir untuk diproses</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Action Buttons -->
                         <div class="card">
                             <div class="p-4 sm:p-6">
@@ -432,6 +498,7 @@ function aiAgentApp() {
             id: null,
             is_active: false,
             order_enabled: false,
+            qris_enabled: false,
         },
         form: {
             bot_name: '',
@@ -510,6 +577,7 @@ function aiAgentApp() {
                         id: data.data.id,
                         is_active: data.data.is_active,
                         order_enabled: data.data.order_enabled,
+                        qris_enabled: data.data.qris_enabled || false,
                     };
                     this.form = {
                         bot_name: data.data.bot_name || '',
@@ -555,6 +623,7 @@ function aiAgentApp() {
                         default_store_id: this.form.default_store_id || null,
                         is_active: this.config.is_active,
                         order_enabled: this.config.order_enabled,
+                        qris_enabled: this.config.qris_enabled,
                     }),
                 });
 

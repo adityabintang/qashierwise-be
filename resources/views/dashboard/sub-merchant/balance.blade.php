@@ -41,7 +41,6 @@
                                         <i class="fas fa-wallet text-xl text-emerald-500"></i>
                                     </div>
                                 </div>
-                                <p class="text-xs text-[hsl(var(--muted-foreground))] mt-3">Ready for withdrawal</p>
                             </div>
 
                             <div class="card p-5 hover:shadow-md transition-shadow">
@@ -73,117 +72,70 @@
                             <div class="card p-5 hover:shadow-md transition-shadow">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Total Withdrawn</p>
-                                        <p class="text-2xl font-bold mt-1" x-text="formatCurrency(balance.total_withdrawn)">Rp 0</p>
+                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Total Transactions</p>
+                                        <p class="text-2xl font-bold mt-1" x-text="balance.total_transactions || 0">0</p>
                                     </div>
                                     <div class="h-12 w-12 rounded-xl bg-purple-50 flex items-center justify-center">
-                                        <i class="fas fa-money-bill-transfer text-xl text-purple-500"></i>
+                                        <i class="fas fa-receipt text-xl text-purple-500"></i>
                                     </div>
                                 </div>
-                                <p class="text-xs text-[hsl(var(--muted-foreground))] mt-3">Successfully withdrawn</p>
                             </div>
                         </div>
 
-                        <!-- Withdrawal Info & Quick Action -->
-                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <div class="lg:col-span-2">
-                                <!-- Earnings Summary -->
-                                <div class="card">
-                                    <div class="card-header !flex-row items-center justify-between">
-                                        <div>
-                                            <h2 class="card-title">Earnings Summary</h2>
-                                            <p class="card-description">Monthly breakdown</p>
-                                        </div>
-                                        <div class="flex gap-2">
-                                            <select x-model="selectedMonth" @change="fetchDailyEarnings()" class="input w-auto text-sm">
-                                                <template x-for="m in months" :key="m.value">
-                                                    <option :value="m.value" x-text="m.label"></option>
-                                                </template>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="card-content">
-                                        <!-- Summary Stats -->
-                                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                                            <div class="text-center p-3 bg-[hsl(var(--muted)/0.5)] rounded-lg">
-                                                <p class="text-2xl font-bold" x-text="earningsSummary.transaction_count">0</p>
-                                                <p class="text-xs text-[hsl(var(--muted-foreground))]">Transactions</p>
-                                            </div>
-                                            <div class="text-center p-3 bg-[hsl(var(--muted)/0.5)] rounded-lg">
-                                                <p class="text-2xl font-bold" x-text="formatCurrencyShort(earningsSummary.gross_earnings)">Rp 0</p>
-                                                <p class="text-xs text-[hsl(var(--muted-foreground))]">Gross</p>
-                                            </div>
-                                            <div class="text-center p-3 bg-[hsl(var(--muted)/0.5)] rounded-lg">
-                                                <p class="text-2xl font-bold text-red-500" x-text="formatCurrencyShort(earningsSummary.total_fees)">Rp 0</p>
-                                                <p class="text-xs text-[hsl(var(--muted-foreground))]">Fees (2.5%)</p>
-                                            </div>
-                                            <div class="text-center p-3 bg-emerald-50 rounded-lg">
-                                                <p class="text-2xl font-bold text-emerald-600" x-text="formatCurrencyShort(earningsSummary.net_earnings)">Rp 0</p>
-                                                <p class="text-xs text-[hsl(var(--muted-foreground))]">Net Earnings</p>
-                                            </div>
-                                        </div>
-
-                                        <!-- Daily Chart Placeholder -->
-                                        <div class="h-64 flex items-center justify-center bg-[hsl(var(--muted)/0.3)] rounded-lg">
-                                            <template x-if="loadingDaily">
-                                                <div class="text-center">
-                                                    <i class="fas fa-spinner animate-spin text-2xl text-[hsl(var(--muted-foreground))]"></i>
-                                                    <p class="text-sm text-[hsl(var(--muted-foreground))] mt-2">Loading...</p>
-                                                </div>
-                                            </template>
-                                            <template x-if="!loadingDaily && dailyEarnings.length === 0">
-                                                <div class="text-center">
-                                                    <i class="fas fa-chart-bar text-4xl text-[hsl(var(--muted-foreground))]"></i>
-                                                    <p class="text-sm text-[hsl(var(--muted-foreground))] mt-2">No data for this period</p>
-                                                </div>
-                                            </template>
-                                            <template x-if="!loadingDaily && dailyEarnings.length > 0">
-                                                <div class="w-full h-full p-4">
-                                                    <div id="earningsChart" class="w-full h-full"></div>
-                                                </div>
-                                            </template>
-                                        </div>
-                                    </div>
+                        <!-- Earnings Summary -->
+                        <div class="card">
+                            <div class="card-header !flex-row items-center justify-between">
+                                <div>
+                                    <h2 class="card-title">Earnings Summary</h2>
+                                    <p class="card-description">Monthly breakdown</p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <select x-model="selectedMonth" @change="fetchDailyEarnings()" class="input w-auto text-sm">
+                                        <template x-for="m in months" :key="m.value">
+                                            <option :value="m.value" x-text="m.label"></option>
+                                        </template>
+                                    </select>
                                 </div>
                             </div>
-
-                            <!-- Withdrawal Card -->
-                            <div class="card">
-                                <div class="card-header">
-                                    <h2 class="card-title">Withdraw Funds</h2>
-                                    <p class="card-description">Transfer to your bank account</p>
+                            <div class="card-content">
+                                <!-- Summary Stats -->
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                                    <div class="text-center p-3 bg-[hsl(var(--muted)/0.5)] rounded-lg">
+                                        <p class="text-2xl font-bold" x-text="earningsSummary.transaction_count">0</p>
+                                        <p class="text-xs text-[hsl(var(--muted-foreground))]">Transactions</p>
+                                    </div>
+                                    <div class="text-center p-3 bg-[hsl(var(--muted)/0.5)] rounded-lg">
+                                        <p class="text-2xl font-bold" x-text="formatCurrencyShort(earningsSummary.gross_earnings)">Rp 0</p>
+                                        <p class="text-xs text-[hsl(var(--muted-foreground))]">Gross</p>
+                                    </div>
+                                    <div class="text-center p-3 bg-[hsl(var(--muted)/0.5)] rounded-lg">
+                                        <p class="text-2xl font-bold text-red-500" x-text="formatCurrencyShort(earningsSummary.total_fees)">Rp 0</p>
+                                        <p class="text-xs text-[hsl(var(--muted-foreground))]">Fees (2.5%)</p>
+                                    </div>
+                                    <div class="text-center p-3 bg-emerald-50 rounded-lg">
+                                        <p class="text-2xl font-bold text-emerald-600" x-text="formatCurrencyShort(earningsSummary.net_earnings)">Rp 0</p>
+                                        <p class="text-xs text-[hsl(var(--muted-foreground))]">Net Earnings</p>
+                                    </div>
                                 </div>
-                                <div class="card-content space-y-4">
-                                    <div class="bg-emerald-50 rounded-lg p-4 text-center">
-                                        <p class="text-sm text-[hsl(var(--muted-foreground))]">Available for withdrawal</p>
-                                        <p class="text-3xl font-bold text-emerald-600 mt-1" x-text="formatCurrency(balance.available)">Rp 0</p>
-                                    </div>
 
-                                    <div class="space-y-2 text-sm">
-                                        <div class="flex justify-between">
-                                            <span class="text-[hsl(var(--muted-foreground))]">Minimum withdrawal</span>
-                                            <span class="font-medium">Rp 10,000</span>
+                                <!-- Daily Chart Placeholder -->
+                                <div class="h-64 flex items-center justify-center bg-[hsl(var(--muted)/0.3)] rounded-lg">
+                                    <template x-if="loadingDaily">
+                                        <div class="text-center">
+                                            <i class="fas fa-spinner animate-spin text-2xl text-[hsl(var(--muted-foreground))]"></i>
+                                            <p class="text-sm text-[hsl(var(--muted-foreground))] mt-2">Loading...</p>
                                         </div>
-                                        <div class="flex justify-between">
-                                            <span class="text-[hsl(var(--muted-foreground))]">Bank account</span>
-                                            <span class="font-medium" x-text="subMerchant.bank_name"></span>
+                                    </template>
+                                    <template x-if="!loadingDaily && dailyEarnings.length === 0">
+                                        <div class="text-center">
+                                            <i class="fas fa-chart-bar text-4xl text-[hsl(var(--muted-foreground))]"></i>
+                                            <p class="text-sm text-[hsl(var(--muted-foreground))] mt-2">No data for this period</p>
                                         </div>
-                                    </div>
-
-                                    <a 
-                                        href="/dashboard/sub-merchant/withdrawals" 
-                                        class="btn btn-primary btn-md w-full"
-                                        :class="{ 'opacity-50 pointer-events-none': balance.available < 10000 }"
-                                    >
-                                        <i class="fas fa-money-bill-transfer mr-2"></i>
-                                        Request Withdrawal
-                                    </a>
-
-                                    <template x-if="balance.available < 10000">
-                                        <p class="text-xs text-amber-600 text-center">
-                                            <i class="fas fa-info-circle mr-1"></i>
-                                            Minimum balance required: Rp 10,000
-                                        </p>
+                                    </template>
+                                    <template x-if="!loadingDaily && dailyEarnings.length > 0">
+                                        <div class="w-full h-full p-4">
+                                            <div id="earningsChart" class="w-full h-full"></div>
+                                        </div>
                                     </template>
                                 </div>
                             </div>

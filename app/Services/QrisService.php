@@ -2,8 +2,14 @@
 
 namespace App\Services;
 
+use App\Contracts\PaymentProviderInterface;
+use App\DTOs\QrisRequest;
+use App\DTOs\QrisResponse;
+use App\Exceptions\UnsupportedProviderException;
 use App\Models\QrisTransaction;
 use App\Models\SubMerchant;
+use App\Models\User;
+use App\Services\PaymentProviders\ProviderFactory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -13,7 +19,7 @@ use RuntimeException;
 class QrisService
 {
     /**
-     * Midtrans API configuration.
+     * Midtrans API configuration (legacy support).
      */
     private string $serverKey;
     private string $clientKey;
@@ -25,8 +31,11 @@ class QrisService
      */
     protected ?FinancialAuditService $auditService = null;
 
-    public function __construct()
-    {
+    public function __construct(
+        private ProviderCredentialService $credentialService,
+        private EncryptionService $encryptionService,
+        private ProviderFactory $providerFactory
+    ) {
         $this->serverKey = config('services.midtrans.server_key') ?? '';
         $this->clientKey = config('services.midtrans.client_key') ?? '';
         $this->isProduction = config('services.midtrans.is_production') ?? false;
@@ -45,14 +54,14 @@ class QrisService
     }
 
     /**
-     * Generate a QRIS code for a sub-merchant transaction.
+     * Generate a QRIS code for a sub-merchant transaction using multi-provider system.
      *
      * @param SubMerchant $merchant The sub-merchant generating the QRIS
      * @param float $amount Transaction amount in IDR
      * @param array $details Additional transaction details (description, customer_name, etc.)
      * @return QrisTransaction The created QRIS transaction
      * @throws InvalidArgumentException If validation fails
-     * @throws RuntimeException If Midtrans API call fails
+     * @throws RuntimeException If provider API call fails
      */
     public function generateQris(SubMerchant $merchant, float $amount, array $details = []): QrisTransaction
     {
@@ -66,6 +75,23 @@ class QrisService
             throw new InvalidArgumentException('Amount must be positive');
         }
 
+        // Get the merchant's user
+        $user = $merchant->user;
+        if (!$user) {
+            throw new InvalidArgumentException('Sub-merchant must be associated with a user');
+        }
+
+        // Get active provider credentials
+        $activeCredential = $this->credentialService->getActiveProvider($user);
+        if (!$activeCredential) {
+            throw new RuntimeException('No active payment provider configured. Please configure a provider in settings.');
+        }
+
+        // Validate provider connection status
+        if ($activeCredential->connection_status !== 'valid') {
+            throw new RuntimeException("Provider {$activeCredential->provider} is not properly configured. Please validate your credentials.");
+        }
+
         // Generate unique order ID
         $orderId = QrisTransaction::generateOrderId();
 
@@ -74,9 +100,9 @@ class QrisService
         $netAmount = QrisTransaction::calculateNetAmount($amount);
 
         // Set expiration time
-        $expiresAt = now()->addMinutes(QrisTransaction::DEFAULT_EXPIRY_MINUTES);
+        $expiresAt = now()->addMinutes($details['expiry_minutes'] ?? QrisTransaction::DEFAULT_EXPIRY_MINUTES);
 
-        return DB::transaction(function () use ($merchant, $orderId, $amount, $platformFee, $netAmount, $expiresAt, $details) {
+        return DB::transaction(function () use ($merchant, $user, $activeCredential, $orderId, $amount, $platformFee, $netAmount, $expiresAt, $details) {
             // Create transaction record first
             $transaction = QrisTransaction::create([
                 'sub_merchant_id' => $merchant->id,
@@ -85,33 +111,70 @@ class QrisService
                 'platform_fee' => $platformFee,
                 'net_amount' => $netAmount,
                 'status' => QrisTransaction::STATUS_PENDING,
+                'provider' => $activeCredential->provider,
                 'expires_at' => $expiresAt,
             ]);
 
-            // Call Midtrans API to generate QRIS
+            // Decrypt credentials for API call
             try {
-                $qrisData = $this->createMidtransQris($transaction, $merchant, $details);
-                
+                $decryptedCredentials = $this->encryptionService->decryptCredentials(
+                    $user,
+                    $activeCredential->credentials_encrypted
+                );
+
+                // Get provider implementation
+                $provider = $this->providerFactory->make($activeCredential->provider);
+
+                // Create QRIS request DTO
+                $qrisRequest = new QrisRequest(
+                    orderId: $orderId,
+                    amount: $amount,
+                    description: $details['description'] ?? null,
+                    expiryMinutes: $details['expiry_minutes'] ?? QrisTransaction::DEFAULT_EXPIRY_MINUTES,
+                    metadata: $details
+                );
+
+                // Generate QRIS using provider
+                $qrisResponse = $provider->generateQris($decryptedCredentials, $qrisRequest);
+
+                // Update transaction with provider response
                 $transaction->update([
-                    'qr_code_url' => $qrisData['qr_code_url'] ?? null,
-                    'midtrans_transaction_id' => $qrisData['transaction_id'] ?? null,
+                    'qr_code_url' => $qrisResponse->qrCodeUrl,
+                    'provider_transaction_id' => $qrisResponse->providerTransactionId,
+                    // Keep midtrans_transaction_id for backward compatibility
+                    'midtrans_transaction_id' => $activeCredential->provider === 'midtrans' 
+                        ? $qrisResponse->providerTransactionId 
+                        : null,
                 ]);
-            } catch (\Exception $e) {
-                Log::error('Midtrans QRIS generation failed', [
+
+                Log::info('QRIS generated via multi-provider', [
                     'order_id' => $orderId,
+                    'provider' => $activeCredential->provider,
+                    'sub_merchant_id' => $merchant->id,
+                    'amount' => $amount,
+                ]);
+
+            } catch (UnsupportedProviderException $e) {
+                Log::error('Unsupported provider', [
+                    'order_id' => $orderId,
+                    'provider' => $activeCredential->provider,
+                    'error' => $e->getMessage(),
+                ]);
+                throw new RuntimeException("Provider {$activeCredential->provider} is not supported");
+                
+            } catch (\Exception $e) {
+                Log::error('QRIS generation failed', [
+                    'order_id' => $orderId,
+                    'provider' => $activeCredential->provider,
                     'error' => $e->getMessage(),
                 ]);
                 
-                // If Midtrans fails, we still have the transaction record
-                // The QR code URL will be null, but we can retry later
-                // For now, generate a placeholder shareable link
+                // If provider fails, we still have the transaction record
+                // Generate a fallback QR code URL
+                $transaction->update([
+                    'qr_code_url' => $this->generateMockQrCodeUrl($orderId),
+                ]);
             }
-
-            Log::info('QRIS generated', [
-                'order_id' => $orderId,
-                'sub_merchant_id' => $merchant->id,
-                'amount' => $amount,
-            ]);
 
             // Log to financial audit trail
             if ($this->auditService !== null) {
@@ -333,7 +396,7 @@ class QrisService
     }
 
     /**
-     * Find a QRIS transaction by Midtrans transaction ID.
+     * Find a QRIS transaction by Midtrans transaction ID (legacy support).
      *
      * @param string $transactionId The Midtrans transaction ID
      * @return QrisTransaction|null
@@ -341,6 +404,24 @@ class QrisService
     public function findByMidtransId(string $transactionId): ?QrisTransaction
     {
         return QrisTransaction::where('midtrans_transaction_id', $transactionId)->first();
+    }
+
+    /**
+     * Find a QRIS transaction by provider transaction ID.
+     *
+     * @param string $transactionId The provider transaction ID
+     * @param string|null $provider Optional provider filter
+     * @return QrisTransaction|null
+     */
+    public function findByProviderTransactionId(string $transactionId, ?string $provider = null): ?QrisTransaction
+    {
+        $query = QrisTransaction::where('provider_transaction_id', $transactionId);
+        
+        if ($provider !== null) {
+            $query->where('provider', $provider);
+        }
+        
+        return $query->first();
     }
 
     /**
@@ -353,6 +434,23 @@ class QrisService
     public function getTransactionHistory(SubMerchant $merchant, int $limit = 50)
     {
         return $merchant->transactions()
+            ->orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Get transaction history for a sub-merchant filtered by provider.
+     *
+     * @param SubMerchant $merchant The sub-merchant
+     * @param string $provider The provider to filter by
+     * @param int $limit Number of transactions to return
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getTransactionHistoryByProvider(SubMerchant $merchant, string $provider, int $limit = 50)
+    {
+        return $merchant->transactions()
+            ->byProvider($provider)
             ->orderBy('created_at', 'desc')
             ->limit($limit)
             ->get();

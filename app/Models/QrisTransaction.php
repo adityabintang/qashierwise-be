@@ -21,6 +21,14 @@ class QrisTransaction extends Model
     public const STATUS_CANCEL = 'cancel';
 
     /**
+     * Payment provider constants.
+     */
+    public const PROVIDER_DOKU = 'doku';
+    public const PROVIDER_XENDIT = 'xendit';
+    public const PROVIDER_MIDTRANS = 'midtrans';
+    public const PROVIDER_DUITKU = 'duitku';
+
+    /**
      * Platform fee percentage (2.5%).
      */
     public const PLATFORM_FEE_PERCENTAGE = 2.5;
@@ -37,11 +45,14 @@ class QrisTransaction extends Model
      */
     protected $fillable = [
         'sub_merchant_id',
+        'linked_order_id',
         'order_id',
         'amount',
         'platform_fee',
         'net_amount',
         'status',
+        'provider',
+        'provider_transaction_id',
         'midtrans_transaction_id',
         'qr_code_url',
         'expires_at',
@@ -70,6 +81,22 @@ class QrisTransaction extends Model
     public function subMerchant(): BelongsTo
     {
         return $this->belongsTo(SubMerchant::class);
+    }
+
+    /**
+     * Get the order associated with this QRIS transaction.
+     */
+    public function linkedOrder(): BelongsTo
+    {
+        return $this->belongsTo(Order::class, 'linked_order_id');
+    }
+
+    /**
+     * Get the payment associated with this QRIS transaction.
+     */
+    public function payment(): HasOne
+    {
+        return $this->hasOne(Payment::class);
     }
 
     /**
@@ -222,5 +249,27 @@ class QrisTransaction extends Model
     {
         return $query->where('status', self::STATUS_PENDING)
             ->where('expires_at', '<', now());
+    }
+
+    /**
+     * Scope to filter transactions by provider.
+     */
+    public function scopeByProvider($query, string $provider)
+    {
+        return $query->where('provider', $provider);
+    }
+
+    /**
+     * Get the provider name for display.
+     */
+    public function getProviderDisplayName(): string
+    {
+        return match($this->provider) {
+            self::PROVIDER_DOKU => 'Doku',
+            self::PROVIDER_XENDIT => 'Xendit',
+            self::PROVIDER_MIDTRANS => 'Midtrans',
+            self::PROVIDER_DUITKU => 'Duitku',
+            default => 'Unknown',
+        };
     }
 }

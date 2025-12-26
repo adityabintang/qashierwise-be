@@ -221,11 +221,17 @@ class MidtransWebhookController extends Controller
         $transaction->save();
 
         // Dispatch job to process payment asynchronously
+        // This job will:
+        // 1. Update merchant balance
+        // 2. Create platform fee record
+        // 3. Update Payment & Order status
+        // 4. Send WhatsApp notification to customer automatically
         ProcessQrisPayment::dispatch($transaction, $payload)
             ->onQueue('payments');
 
-        Log::info('Settlement processed, payment job dispatched', [
+        Log::info('Settlement processed, payment job dispatched (will send WhatsApp notification)', [
             'order_id' => $transaction->order_id,
+            'queue' => 'payments',
         ]);
     }
 
@@ -243,6 +249,9 @@ class MidtransWebhookController extends Controller
 
         $transaction->markAsCancelled();
         $transaction->save();
+
+        // Cascade status update to linked Payment
+        $this->updateLinkedPaymentStatus($transaction, 'failed');
 
         Log::info('Transaction cancelled', [
             'order_id' => $transaction->order_id,
@@ -264,8 +273,36 @@ class MidtransWebhookController extends Controller
         $transaction->markAsExpired();
         $transaction->save();
 
+        // Cascade status update to linked Payment
+        $this->updateLinkedPaymentStatus($transaction, 'expired');
+
         Log::info('Transaction expired', [
             'order_id' => $transaction->order_id,
         ]);
+    }
+
+    /**
+     * Update linked Payment record status when QRIS transaction status changes.
+     *
+     * @param QrisTransaction $transaction
+     * @param string $status The status to set ('failed' or 'expired')
+     */
+    private function updateLinkedPaymentStatus(QrisTransaction $transaction, string $status): void
+    {
+        $payment = \App\Models\Payment::where('qris_transaction_id', $transaction->id)->first();
+
+        if ($payment) {
+            if ($status === 'expired') {
+                $payment->markAsExpired();
+            } else {
+                $payment->markAsFailed();
+            }
+
+            Log::info('Linked Payment status updated', [
+                'qris_order_id' => $transaction->order_id,
+                'payment_id' => $payment->id,
+                'new_status' => $status,
+            ]);
+        }
     }
 }

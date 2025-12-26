@@ -30,8 +30,10 @@ class QrisController extends Controller
      * Generate a new QRIS code for a transaction.
      * 
      * Requirement 2.1: Generate unique order_id for each transaction
-     * Requirement 2.2: Create QR code through Midtrans API
+     * Requirement 2.2: Create QR code through multi-provider API
      * Requirement 2.3: Provide both image and shareable link formats
+     * Requirement 4.5: Prevent QRIS generation when no provider is active
+     * Requirement 7.5: Provide provider-specific error messages
      * 
      * @param Request $request
      * @return JsonResponse
@@ -72,16 +74,6 @@ class QrisController extends Controller
             ], 403);
         }
 
-        if (!$subMerchant->is_active) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'MERCHANT_INACTIVE',
-                    'message' => 'Sub-merchant account is not active',
-                ],
-            ], 403);
-        }
-
         try {
             $transaction = $this->qrisService->generateQris(
                 $subMerchant,
@@ -98,6 +90,7 @@ class QrisController extends Controller
                 'sub_merchant_id' => $subMerchant->id,
                 'order_id' => $transaction->order_id,
                 'amount' => $transaction->amount,
+                'provider' => $transaction->provider,
             ]);
 
             return response()->json([
@@ -121,11 +114,37 @@ class QrisController extends Controller
                 'error' => $e->getMessage(),
             ]);
 
+            // Check if error is about no active provider (Requirement 4.5)
+            if (str_contains($e->getMessage(), 'No active payment provider')) {
+                return response()->json([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'NO_ACTIVE_PROVIDER',
+                        'message' => $e->getMessage(),
+                        'action_required' => 'Please configure and activate a payment provider in settings.',
+                    ],
+                ], 428); // 428 Precondition Required
+            }
+
+            // Check if error is about invalid provider configuration
+            if (str_contains($e->getMessage(), 'not properly configured')) {
+                return response()->json([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'PROVIDER_INVALID',
+                        'message' => $e->getMessage(),
+                        'action_required' => 'Please validate your provider credentials in settings.',
+                    ],
+                ], 428);
+            }
+
+            // Generic provider error (Requirement 7.5)
             return response()->json([
                 'success' => false,
                 'error' => [
-                    'code' => 'MIDTRANS_ERROR',
+                    'code' => 'PROVIDER_ERROR',
                     'message' => 'Failed to generate QRIS code. Please try again.',
+                    'details' => $e->getMessage(),
                 ],
             ], 500);
         }
@@ -462,6 +481,8 @@ class QrisController extends Controller
     /**
      * Format transaction data for API response.
      * 
+     * Requirement 7.5: Include provider information in response
+     * 
      * @param QrisTransaction $transaction
      * @return array
      */
@@ -473,6 +494,8 @@ class QrisController extends Controller
             'platform_fee' => (float) $transaction->platform_fee,
             'net_amount' => (float) $transaction->net_amount,
             'status' => $transaction->status,
+            'provider' => $transaction->provider,
+            'provider_transaction_id' => $transaction->provider_transaction_id,
             'qr_code_url' => $transaction->qr_code_url,
             'shareable_link' => $transaction->getShareableLink(),
             'is_expired' => $transaction->isExpired(),

@@ -2,8 +2,10 @@
 
 namespace App\Jobs;
 
+use App\Models\Payment;
 use App\Models\PlatformFee;
 use App\Models\QrisTransaction;
+use App\Services\AiAgentService;
 use App\Services\BalanceService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -17,6 +19,7 @@ use Illuminate\Support\Facades\Log;
  * - Balance updates with platform fee calculation
  * - Platform fee record creation
  * - Transaction logging and audit trail
+ * - Cascading status updates to Payment and Order records
  */
 class ProcessQrisPayment implements ShouldQueue
 {
@@ -62,8 +65,9 @@ class ProcessQrisPayment implements ShouldQueue
      * Execute the job.
      *
      * @param BalanceService $balanceService
+     * @param AiAgentService $aiAgentService
      */
-    public function handle(BalanceService $balanceService): void
+    public function handle(BalanceService $balanceService, AiAgentService $aiAgentService): void
     {
         Log::info('ProcessQrisPayment job started', [
             'order_id' => $this->transaction->order_id,
@@ -94,7 +98,11 @@ class ProcessQrisPayment implements ShouldQueue
             // Process the payment within a database transaction
             DB::transaction(function () use ($balanceService) {
                 $this->processPayment($balanceService);
+                $this->updateLinkedPaymentAndOrder();
             });
+
+            // Send WhatsApp notification to customer (outside DB transaction)
+            $this->sendPaymentNotification($aiAgentService);
 
             Log::info('ProcessQrisPayment job completed successfully', [
                 'order_id' => $this->transaction->order_id,
@@ -188,6 +196,45 @@ class ProcessQrisPayment implements ShouldQueue
     }
 
     /**
+     * Update linked Payment and Order records when QRIS is settled.
+     */
+    private function updateLinkedPaymentAndOrder(): void
+    {
+        // Find Payment record linked to this QRIS transaction
+        $payment = Payment::where('qris_transaction_id', $this->transaction->id)->first();
+
+        if ($payment) {
+            Log::info('Updating linked Payment record', [
+                'qris_order_id' => $this->transaction->order_id,
+                'payment_id' => $payment->id,
+                'order_id' => $payment->order_id,
+            ]);
+
+            // Mark payment as paid (this also updates the linked Order)
+            $payment->markAsPaid();
+
+            Log::info('Payment and Order status updated', [
+                'payment_id' => $payment->id,
+                'payment_status' => $payment->status,
+                'order_status' => $payment->order?->status,
+            ]);
+        } else {
+            // Check if there's a linked order directly on the QRIS transaction
+            if ($this->transaction->linked_order_id) {
+                $order = $this->transaction->linkedOrder;
+                if ($order) {
+                    Log::info('Updating linked Order directly', [
+                        'qris_order_id' => $this->transaction->order_id,
+                        'order_id' => $order->id,
+                    ]);
+
+                    $order->update(['status' => 'paid']);
+                }
+            }
+        }
+    }
+
+    /**
      * Handle a job failure.
      *
      * @param \Throwable $exception
@@ -204,5 +251,33 @@ class ProcessQrisPayment implements ShouldQueue
         // - Send notification to admin
         // - Create a failed payment record for manual review
         // - Trigger an alert in monitoring system
+    }
+
+    /**
+     * Send payment notification to customer via WhatsApp if applicable.
+     *
+     * @param AiAgentService $aiAgentService
+     */
+    private function sendPaymentNotification(AiAgentService $aiAgentService): void
+    {
+        Log::info('Attempting to send WhatsApp payment notification', [
+            'order_id' => $this->transaction->order_id,
+            'qris_transaction_id' => $this->transaction->id,
+        ]);
+
+        try {
+            $aiAgentService->sendPaymentConfirmation($this->transaction);
+            
+            Log::info('WhatsApp payment notification sent successfully', [
+                'order_id' => $this->transaction->order_id,
+            ]);
+        } catch (\Exception $e) {
+            // Log but don't fail the job - notification is optional
+            Log::warning('Failed to send payment notification, continuing', [
+                'order_id' => $this->transaction->order_id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
     }
 }

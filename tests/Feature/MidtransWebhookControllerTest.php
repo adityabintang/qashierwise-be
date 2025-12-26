@@ -28,9 +28,7 @@ class MidtransWebhookControllerTest extends TestCase
         
         $this->subMerchant = SubMerchant::create([
             'user_id' => $this->user->id,
-            'bank_name' => 'BCA',
-            'account_number' => '1234567890',
-            'account_holder_name' => 'Test User',
+            'business_name' => 'Test User',
             'is_active' => true,
         ]);
 

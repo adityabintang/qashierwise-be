@@ -29,9 +29,7 @@ class ProcessQrisPaymentJobTest extends TestCase
         
         $this->subMerchant = SubMerchant::create([
             'user_id' => $this->user->id,
-            'bank_name' => 'BCA',
-            'account_number' => '1234567890',
-            'account_holder_name' => 'Test User',
+            'business_name' => 'Test User',
             'is_active' => true,
         ]);
 
@@ -59,7 +57,10 @@ class ProcessQrisPaymentJobTest extends TestCase
     public function test_job_updates_merchant_balance(): void
     {
         $job = new ProcessQrisPayment($this->transaction, []);
-        $job->handle(app(\App\Services\BalanceService::class));
+        $job->handle(
+            app(\App\Services\BalanceService::class),
+            app(\App\Services\AiAgentService::class)
+        );
 
         // Refresh balance
         $this->balance->refresh();
@@ -72,7 +73,10 @@ class ProcessQrisPaymentJobTest extends TestCase
     public function test_job_creates_platform_fee_record(): void
     {
         $job = new ProcessQrisPayment($this->transaction, []);
-        $job->handle(app(\App\Services\BalanceService::class));
+        $job->handle(
+            app(\App\Services\BalanceService::class),
+            app(\App\Services\AiAgentService::class)
+        );
 
         // Verify platform fee record was created
         $platformFee = PlatformFee::where('qris_transaction_id', $this->transaction->id)->first();
@@ -90,7 +94,10 @@ class ProcessQrisPaymentJobTest extends TestCase
         $this->transaction->save();
 
         $job = new ProcessQrisPayment($this->transaction, []);
-        $job->handle(app(\App\Services\BalanceService::class));
+        $job->handle(
+            app(\App\Services\BalanceService::class),
+            app(\App\Services\AiAgentService::class)
+        );
 
         // Refresh balance
         $this->balance->refresh();
@@ -103,7 +110,10 @@ class ProcessQrisPaymentJobTest extends TestCase
     {
         // Process once
         $job1 = new ProcessQrisPayment($this->transaction, []);
-        $job1->handle(app(\App\Services\BalanceService::class));
+        $job1->handle(
+            app(\App\Services\BalanceService::class),
+            app(\App\Services\AiAgentService::class)
+        );
 
         // Refresh balance
         $this->balance->refresh();
@@ -111,7 +121,10 @@ class ProcessQrisPaymentJobTest extends TestCase
 
         // Process again (should be skipped)
         $job2 = new ProcessQrisPayment($this->transaction, []);
-        $job2->handle(app(\App\Services\BalanceService::class));
+        $job2->handle(
+            app(\App\Services\BalanceService::class),
+            app(\App\Services\AiAgentService::class)
+        );
 
         // Refresh balance
         $this->balance->refresh();
@@ -128,7 +141,10 @@ class ProcessQrisPaymentJobTest extends TestCase
     {
         // Process first transaction
         $job1 = new ProcessQrisPayment($this->transaction, []);
-        $job1->handle(app(\App\Services\BalanceService::class));
+        $job1->handle(
+            app(\App\Services\BalanceService::class),
+            app(\App\Services\AiAgentService::class)
+        );
 
         // Create and process second transaction
         $transaction2 = QrisTransaction::create([
@@ -143,7 +159,10 @@ class ProcessQrisPaymentJobTest extends TestCase
         ]);
 
         $job2 = new ProcessQrisPayment($transaction2, []);
-        $job2->handle(app(\App\Services\BalanceService::class));
+        $job2->handle(
+            app(\App\Services\BalanceService::class),
+            app(\App\Services\AiAgentService::class)
+        );
 
         // Refresh balance
         $this->balance->refresh();

@@ -7,7 +7,7 @@
     @include('components.dashboard-sidebar', ['activePage' => 'sub-merchant'])
 
     <div class="flex-1 flex flex-col min-h-screen">
-        @include('components.dashboard-header', ['title' => 'Register as Sub-Merchant', 'description' => 'Set up your bank account to start accepting payments'])
+        @include('components.dashboard-header', ['title' => 'Register as Sub-Merchant', 'description' => 'Start accepting QRIS payments from your customers'])
 
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-2xl mx-auto">
@@ -30,70 +30,23 @@
                 <template x-if="!alreadyRegistered">
                     <div class="card">
                         <div class="card-header">
-                            <h2 class="card-title">Bank Account Information</h2>
-                            <p class="card-description">Enter your bank account details for receiving withdrawals</p>
+                            <h2 class="card-title">Business Information</h2>
+                            <p class="card-description">Enter your business details to start accepting payments</p>
                         </div>
                         <form @submit.prevent="register()" class="card-content space-y-6">
-                            <!-- Bank Name -->
+                            <!-- Business Name -->
                             <div>
-                                <label class="text-sm font-medium mb-1.5 block">Bank Name <span class="text-red-500">*</span></label>
-                                <select x-model="form.bank_name" required class="input w-full min-h-[44px]">
-                                    <option value="">Select Bank</option>
-                                    <option value="BCA">BCA</option>
-                                    <option value="BNI">BNI</option>
-                                    <option value="BRI">BRI</option>
-                                    <option value="Mandiri">Mandiri</option>
-                                    <option value="CIMB Niaga">CIMB Niaga</option>
-                                    <option value="Danamon">Danamon</option>
-                                    <option value="Permata">Permata</option>
-                                    <option value="BTN">BTN</option>
-                                    <option value="OCBC NISP">OCBC NISP</option>
-                                    <option value="Maybank">Maybank</option>
-                                    <option value="Panin">Panin</option>
-                                    <option value="BTPN">BTPN</option>
-                                    <option value="Jago">Bank Jago</option>
-                                    <option value="Jenius">Jenius (BTPN)</option>
-                                    <option value="SeaBank">SeaBank</option>
-                                    <option value="Bank Neo Commerce">Bank Neo Commerce</option>
-                                    <option value="Other">Other</option>
-                                </select>
-                                <template x-if="errors.bank_name">
-                                    <p class="text-sm text-red-500 mt-1" x-text="errors.bank_name[0]"></p>
-                                </template>
-                            </div>
-
-                            <!-- Account Number -->
-                            <div>
-                                <label class="text-sm font-medium mb-1.5 block">Account Number <span class="text-red-500">*</span></label>
+                                <label class="text-sm font-medium mb-1.5 block">Business Name <span class="text-[hsl(var(--muted-foreground))]">(optional)</span></label>
                                 <input 
                                     type="text" 
-                                    x-model="form.account_number" 
-                                    @input="form.account_number = form.account_number.replace(/[^0-9]/g, '')"
-                                    required 
+                                    x-model="form.business_name" 
                                     class="input w-full min-h-[44px]" 
-                                    placeholder="Enter your bank account number"
-                                    maxlength="50"
+                                    placeholder="Enter your business name (leave empty to use your account name)"
+                                    maxlength="255"
                                 >
-                                <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Only numbers allowed</p>
-                                <template x-if="errors.account_number">
-                                    <p class="text-sm text-red-500 mt-1" x-text="errors.account_number[0]"></p>
-                                </template>
-                            </div>
-
-                            <!-- Account Holder Name -->
-                            <div>
-                                <label class="text-sm font-medium mb-1.5 block">Account Holder Name <span class="text-red-500">*</span></label>
-                                <input 
-                                    type="text" 
-                                    x-model="form.account_holder_name" 
-                                    required 
-                                    class="input w-full min-h-[44px]" 
-                                    placeholder="Enter the name on your bank account"
-                                    maxlength="100"
-                                >
-                                <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Must match the name registered with your bank</p>
-                                <template x-if="errors.account_holder_name">
-                                    <p class="text-sm text-red-500 mt-1" x-text="errors.account_holder_name[0]"></p>
+                                <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">This will be displayed on payment receipts</p>
+                                <template x-if="errors.business_name">
+                                    <p class="text-sm text-red-500 mt-1" x-text="errors.business_name[0]"></p>
                                 </template>
                             </div>
 
@@ -140,24 +93,24 @@
                     <div class="card-content">
                         <h3 class="font-semibold mb-3">
                             <i class="fas fa-info-circle text-[hsl(var(--primary))] mr-2"></i>
-                            Important Information
+                            Getting Started
                         </h3>
                         <ul class="space-y-2 text-sm text-[hsl(var(--muted-foreground))]">
                             <li class="flex items-start gap-2">
                                 <i class="fas fa-check text-emerald-500 mt-1"></i>
-                                <span>Your bank account information is encrypted and stored securely</span>
+                                <span>Register as a sub-merchant to start accepting QRIS payments</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check text-emerald-500 mt-1"></i>
+                                <span>Configure your payment provider credentials in Provider Settings</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check text-emerald-500 mt-1"></i>
+                                <span>Generate QRIS codes for your customers to pay</span>
                             </li>
                             <li class="flex items-start gap-2">
                                 <i class="fas fa-check text-emerald-500 mt-1"></i>
                                 <span>A 2.5% platform fee is deducted from each successful transaction</span>
-                            </li>
-                            <li class="flex items-start gap-2">
-                                <i class="fas fa-check text-emerald-500 mt-1"></i>
-                                <span>Minimum withdrawal amount is Rp 10,000</span>
-                            </li>
-                            <li class="flex items-start gap-2">
-                                <i class="fas fa-check text-emerald-500 mt-1"></i>
-                                <span>Withdrawals are processed within 1-3 business days</span>
                             </li>
                         </ul>
                     </div>
@@ -175,7 +128,7 @@ function subMerchantRegister() {
         saving: false,
         alreadyRegistered: false,
         acceptTerms: false,
-        form: { bank_name: '', account_number: '', account_holder_name: '' },
+        form: { business_name: '' },
         errors: {},
         errorMessage: '',
         sidebarOpen: window.innerWidth >= 1024,

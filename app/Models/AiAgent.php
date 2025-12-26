@@ -20,6 +20,7 @@ class AiAgent extends Model
         'system_prompt',
         'business_info',
         'order_enabled',
+        'qris_enabled',
         'is_active',
         'settings',
     ];
@@ -34,6 +35,7 @@ class AiAgent extends Model
         return [
             'business_info' => 'array',
             'order_enabled' => 'boolean',
+            'qris_enabled' => 'boolean',
             'is_active' => 'boolean',
             'settings' => 'array',
         ];
@@ -69,6 +71,82 @@ class AiAgent extends Model
     public function isOrderEnabled(): bool
     {
         return $this->order_enabled && $this->default_store_id !== null;
+    }
+
+    /**
+     * Check if QRIS feature is properly enabled.
+     * Requires qris_enabled flag, active SubMerchant, and active payment provider.
+     */
+    public function isQrisEnabled(): bool
+    {
+        return $this->qris_enabled 
+            && $this->hasActiveSubMerchant()
+            && $this->hasActivePaymentProvider();
+    }
+
+    /**
+     * Get the user associated with this AI Agent.
+     */
+    public function getUser(): ?User
+    {
+        return $this->whatsappAccount?->user;
+    }
+
+    /**
+     * Get the user's active SubMerchant.
+     */
+    public function getSubMerchant(): ?SubMerchant
+    {
+        $user = $this->getUser();
+        if (!$user) {
+            return null;
+        }
+
+        return SubMerchant::where('user_id', $user->id)
+            ->where('is_active', true)
+            ->first();
+    }
+
+    /**
+     * Check if user has an active SubMerchant.
+     */
+    public function hasActiveSubMerchant(): bool
+    {
+        return $this->getSubMerchant() !== null;
+    }
+
+    /**
+     * Check if user has active payment provider credentials.
+     */
+    public function hasActivePaymentProvider(): bool
+    {
+        $user = $this->getUser();
+        if (!$user) {
+            return false;
+        }
+
+        return PaymentProviderCredential::where('user_id', $user->id)
+            ->where('is_active', true)
+            ->where('connection_status', 'valid')
+            ->exists();
+    }
+
+    /**
+     * Validate QRIS configuration and return error messages if invalid.
+     */
+    public function validateQrisConfiguration(): array
+    {
+        $errors = [];
+
+        if (!$this->hasActiveSubMerchant()) {
+            $errors[] = 'Sub-merchant belum dikonfigurasi atau tidak aktif. Silakan daftarkan sub-merchant terlebih dahulu.';
+        }
+
+        if (!$this->hasActivePaymentProvider()) {
+            $errors[] = 'Payment provider belum dikonfigurasi atau tidak valid. Silakan konfigurasi provider di menu Provider Settings.';
+        }
+
+        return $errors;
     }
 
     /**
@@ -149,6 +227,60 @@ JANGAN PERNAH:
                 }
                 $prompt .= "\nUntuk produk lainnya, gunakan function 'search_products' untuk mencari.";
             }
+
+            // Add ordering instructions
+            $prompt .= "\n\n## INSTRUKSI PEMESANAN - WAJIB DIPATUHI:
+
+1. **JANGAN PERNAH menghitung harga sendiri**
+   - SELALU gunakan hasil dari function tools
+   - JANGAN tambahkan atau kurangi angka sendiri
+   - JANGAN hitung pajak atau total sendiri
+
+2. **Saat menambahkan produk ke keranjang:**
+   - Gunakan function 'add_to_cart' dengan parameter 'products' (array)
+   - **PENTING: Untuk MULTIPLE produk, masukkan SEMUA produk dalam SATU array**
+   - Format: products: [{product_id: X, quantity: Y}, {product_id: Z, quantity: W}]
+   - Tampilkan PERSIS hasil yang dikembalikan function
+   - JANGAN ubah atau hitung ulang harga
+
+3. **Saat menampilkan keranjang:**
+   - Gunakan function 'get_cart_summary'
+   - Tampilkan PERSIS hasil yang dikembalikan function
+   - JANGAN hitung ulang subtotal, pajak, atau total
+
+4. **Saat konfirmasi pesanan:**
+   - Gunakan function 'confirm_order'
+   - Tampilkan PERSIS hasil yang dikembalikan function
+   - Function akan otomatis generate QRIS jika enabled
+
+5. **Format response:**
+   - Salin PERSIS output dari function
+   - Boleh tambahkan kalimat pembuka/penutup yang ramah
+   - JANGAN ubah angka atau perhitungan apapun
+
+CONTOH BENAR - SATU PRODUK:
+User: 'Pesan 2 Es Buah'
+AI: [panggil add_to_cart(products=[{product_id:2, quantity:2}])]
+AI Response: 'Baik! ✅ Berhasil menambahkan ke keranjang!
+
+📦 Es Buah Selasih x2
+
+Ketik \"lihat keranjang\" untuk melihat ringkasan pesanan.'
+
+CONTOH BENAR - MULTIPLE PRODUK:
+User: 'Pesan es campur 1 dan es buah selasih 3'
+AI: [panggil add_to_cart(products=[{product_id:1, quantity:1}, {product_id:2, quantity:3}])]
+AI Response: 'Baik! ✅ Berhasil menambahkan ke keranjang!
+
+📦 Es Campur x1
+📦 Es Buah Selasih x3
+
+Ketik \"lihat keranjang\" untuk melihat ringkasan pesanan.'
+
+CONTOH SALAH:
+User: 'Pesan es campur 1 dan es buah 3'
+AI: [panggil add_to_cart(products=[{product_id:1, quantity:1}])] ❌ SALAH! Harus include semua produk!
+AI: 'Saya tambahkan 2 Es Buah seharga Rp 40.000' ❌ SALAH! Jangan hitung sendiri!";
         }
 
         return $prompt;

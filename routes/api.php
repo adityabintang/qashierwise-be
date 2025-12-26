@@ -6,6 +6,9 @@ use App\Http\Controllers\Api\BalanceController;
 use App\Http\Controllers\Api\BroadcastAuthController;
 use App\Http\Controllers\Api\EmbeddedSignupController;
 use App\Http\Controllers\Api\MidtransWebhookController;
+use App\Http\Controllers\Api\DokuWebhookController;
+use App\Http\Controllers\Api\XenditWebhookController;
+use App\Http\Controllers\Api\DuitkuWebhookController;
 use App\Http\Controllers\Api\PolarWebhookController;
 use App\Http\Controllers\Api\Pos\CategoryController;
 use App\Http\Controllers\Api\Pos\OrderController;
@@ -16,13 +19,14 @@ use App\Http\Controllers\Api\Pos\ReportController;
 use App\Http\Controllers\Api\Pos\StoreController;
 use App\Http\Controllers\Api\Pos\TableController;
 use App\Http\Controllers\Api\Pos\TransactionController;
+use App\Http\Controllers\Api\ProviderCredentialController;
+use App\Http\Controllers\Api\ProviderValidationController;
 use App\Http\Controllers\Api\QrisController;
 use App\Http\Controllers\Api\SubMerchantController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\WhatsAppController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
-use App\Http\Controllers\Api\WithdrawalController;
-use App\Http\Controllers\Api\Admin\AdminWithdrawalController;
+use App\Http\Controllers\Api\MigrationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -47,8 +51,11 @@ Route::post('/whatsapp/webhook', [WhatsAppWebhookController::class, 'handle']);
 // Polar.sh Webhook (must be public for Polar to access)
 Route::post('/webhooks/polar', [PolarWebhookController::class, 'handle']);
 
-// Midtrans Webhook (must be public for Midtrans to access)
+// Payment Provider Webhooks (must be public for providers to access)
 Route::post('/webhooks/midtrans', [MidtransWebhookController::class, 'handleNotification']);
+Route::post('/webhooks/doku', [DokuWebhookController::class, 'handleNotification']);
+Route::post('/webhooks/xendit', [XenditWebhookController::class, 'handleNotification']);
+Route::post('/webhooks/duitku', [DuitkuWebhookController::class, 'handleNotification']);
 
 // Broadcast authentication - Custom controller for Sanctum token auth
 Route::post('/broadcasting/auth', [BroadcastAuthController::class, 'authenticate'])
@@ -140,6 +147,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/', [AiAgentController::class, 'store']);
         Route::put('/toggle-active', [AiAgentController::class, 'toggleActive']);
         Route::put('/toggle-order', [AiAgentController::class, 'toggleOrder']);
+        Route::put('/toggle-qris', [AiAgentController::class, 'toggleQris']);
         Route::post('/test', [AiAgentController::class, 'test']);
         Route::delete('/conversations/{contactId}', [AiAgentController::class, 'clearConversation']);
     });
@@ -201,12 +209,33 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/status', [SubMerchantController::class, 'status']);
         Route::post('/register', [SubMerchantController::class, 'register']);
         Route::get('/profile', [SubMerchantController::class, 'profile']);
-        Route::put('/bank-account', [SubMerchantController::class, 'updateBankAccount']);
         Route::post('/deactivate', [SubMerchantController::class, 'deactivate']);
         Route::post('/activate', [SubMerchantController::class, 'activate']);
 
+        // Migration to BYOK
+        Route::prefix('migration')->group(function () {
+            Route::get('/status', [MigrationController::class, 'checkMigrationStatus']);
+            Route::post('/migrate', [MigrationController::class, 'migrate']);
+            Route::post('/skip', [MigrationController::class, 'skipMigration']);
+        });
+
+        // Payment Provider Credential Management
+        Route::prefix('providers')->middleware('sanitize.provider.errors')->group(function () {
+            Route::get('/', [ProviderCredentialController::class, 'index']);
+            Route::post('/', [ProviderCredentialController::class, 'store']);
+            Route::put('/{id}', [ProviderCredentialController::class, 'update']);
+            Route::delete('/{id}', [ProviderCredentialController::class, 'destroy']);
+            Route::post('/set-active', [ProviderCredentialController::class, 'setActive']);
+            
+            // Provider Validation
+            Route::post('/{id}/validate', [ProviderValidationController::class, 'validate']);
+            Route::post('/{id}/revalidate', [ProviderValidationController::class, 'revalidate']);
+            Route::get('/{id}/status', [ProviderValidationController::class, 'status']);
+            Route::get('/status-all', [ProviderValidationController::class, 'statusAll']);
+        });
+
         // QRIS generation and management
-        Route::prefix('qris')->group(function () {
+        Route::prefix('qris')->middleware('sanitize.provider.errors')->group(function () {
             Route::post('/generate', [QrisController::class, 'generate'])->middleware('qris.rate_limit');
             Route::get('/history', [QrisController::class, 'history']);
             Route::get('/pending', [QrisController::class, 'pending']);
@@ -225,32 +254,6 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/earnings', [BalanceController::class, 'earnings']);
             Route::get('/daily-earnings', [BalanceController::class, 'dailyEarnings']);
             Route::post('/calculate-fee', [BalanceController::class, 'calculateFee']);
-        });
-
-        // Withdrawal management
-        Route::prefix('withdrawals')->group(function () {
-            Route::post('/', [WithdrawalController::class, 'store'])->middleware('withdrawal.auth');
-            Route::get('/history', [WithdrawalController::class, 'history']);
-            Route::get('/stats', [WithdrawalController::class, 'stats']);
-            Route::post('/validate', [WithdrawalController::class, 'validate']);
-            Route::post('/confirm-password', [WithdrawalController::class, 'confirmPassword']);
-            Route::get('/password-status', [WithdrawalController::class, 'checkPasswordConfirmation']);
-            Route::get('/{id}', [WithdrawalController::class, 'show']);
-            Route::post('/{id}/cancel', [WithdrawalController::class, 'cancel'])->middleware('withdrawal.auth');
-        });
-    });
-
-    // Admin routes for withdrawal management
-    Route::prefix('admin')->middleware('admin.session')->group(function () {
-        Route::prefix('withdrawals')->group(function () {
-            Route::get('/', [AdminWithdrawalController::class, 'index']);
-            Route::get('/pending', [AdminWithdrawalController::class, 'pending']);
-            Route::get('/stats', [AdminWithdrawalController::class, 'stats']);
-            Route::get('/{id}', [AdminWithdrawalController::class, 'show']);
-            Route::get('/{id}/audit-trail', [AdminWithdrawalController::class, 'auditTrail']);
-            Route::post('/{id}/approve', [AdminWithdrawalController::class, 'approve']);
-            Route::post('/{id}/reject', [AdminWithdrawalController::class, 'reject']);
-            Route::post('/{id}/mark-processed', [AdminWithdrawalController::class, 'markProcessed']);
         });
     });
 });

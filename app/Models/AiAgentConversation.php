@@ -17,6 +17,8 @@ class AiAgentConversation extends Model
         'whatsapp_contact_id',
         'messages',
         'order_context',
+        'current_order_id',
+        'current_qris_transaction_id',
         'expires_at',
     ];
 
@@ -53,13 +55,13 @@ class AiAgentConversation extends Model
     /**
      * Add a message to the conversation with sliding window (max 10 messages).
      */
-    public function addMessage(string $role, string $content): void
+    public function addMessage(string $type, string $content): void
     {
         $messages = $this->messages ?? [];
 
-        // Add new message
+        // Add new message with type (human/ai) instead of role
         $messages[] = [
-            'role' => $role,
+            'type' => $type, // 'human' or 'ai'
             'content' => $content,
             'timestamp' => now()->toIso8601String(),
         ];
@@ -149,6 +151,66 @@ class AiAgentConversation extends Model
         unset($orderContext['cart']);
 
         $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    /**
+     * Get the current order associated with this conversation.
+     */
+    public function currentOrder(): BelongsTo
+    {
+        return $this->belongsTo(Order::class, 'current_order_id');
+    }
+
+    /**
+     * Get the current QRIS transaction associated with this conversation.
+     */
+    public function currentQrisTransaction(): BelongsTo
+    {
+        return $this->belongsTo(QrisTransaction::class, 'current_qris_transaction_id');
+    }
+
+    /**
+     * Set the current order for this conversation.
+     */
+    public function setCurrentOrder(int $orderId): void
+    {
+        $this->current_order_id = $orderId;
+        $this->save();
+    }
+
+    /**
+     * Get the current order model.
+     */
+    public function getCurrentOrder(): ?Order
+    {
+        return $this->currentOrder;
+    }
+
+    /**
+     * Set the current QRIS transaction for this conversation.
+     */
+    public function setCurrentQrisTransaction(int $transactionId): void
+    {
+        $this->current_qris_transaction_id = $transactionId;
+        $this->save();
+    }
+
+    /**
+     * Get the current QRIS transaction model.
+     */
+    public function getCurrentQrisTransaction(): ?QrisTransaction
+    {
+        return $this->currentQrisTransaction;
+    }
+
+    /**
+     * Clear payment context (order and QRIS transaction).
+     */
+    public function clearPaymentContext(): void
+    {
+        $this->current_order_id = null;
+        $this->current_qris_transaction_id = null;
         $this->save();
     }
 }

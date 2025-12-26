@@ -137,6 +137,10 @@
             <i class="fas fa-qrcode w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>Dashboard</span>
         </a>
+        <a href="/dashboard/sub-merchant/provider-settings" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'sub-merchant-provider-settings' ? 'active' : '' }}">
+            <i class="fas fa-cogs w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Provider Settings</span>
+        </a>
         <a href="/dashboard/sub-merchant/qris" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'sub-merchant-qris' ? 'active' : '' }}">
             <i class="fas fa-plus-circle w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>Generate QRIS</span>
@@ -144,21 +148,6 @@
         <a href="/dashboard/sub-merchant/balance" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'sub-merchant-balance' ? 'active' : '' }}">
             <i class="fas fa-chart-pie w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>Balance</span>
-        </a>
-        <a href="/dashboard/sub-merchant/withdrawals" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'sub-merchant-withdrawals' ? 'active' : '' }}">
-            <i class="fas fa-money-bill-transfer w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Withdrawals</span>
-        </a>
-
-        <!-- Admin Section -->
-        <div x-show="sidebarOpen || isMobile" x-transition class="pt-4">
-            <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
-                Admin
-            </div>
-        </div>
-        <a href="/dashboard/admin/withdrawals" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'admin-withdrawals' ? 'active' : '' }}">
-            <i class="fas fa-wallet w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Withdrawals</span>
         </a>
     </nav>
 

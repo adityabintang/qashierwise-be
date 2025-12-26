@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -70,5 +71,37 @@ class User extends Authenticatable
     public function isSubMerchant(): bool
     {
         return $this->subMerchant !== null;
+    }
+
+    /**
+     * Get the encryption key associated with the user.
+     */
+    public function encryptionKey(): HasOne
+    {
+        return $this->hasOne(UserEncryptionKey::class);
+    }
+
+    /**
+     * Get the payment provider credentials for the user.
+     */
+    public function paymentProviderCredentials(): HasMany
+    {
+        return $this->hasMany(PaymentProviderCredential::class);
+    }
+
+    /**
+     * Get the active payment provider credential for the user.
+     */
+    public function activeProviderCredential(): HasOne
+    {
+        return $this->hasOne(PaymentProviderCredential::class)->where('is_active', true);
+    }
+
+    /**
+     * Get the credential access logs for the user.
+     */
+    public function credentialAccessLogs(): HasMany
+    {
+        return $this->hasMany(CredentialAccessLog::class);
     }
 }
