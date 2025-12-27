@@ -426,25 +426,8 @@ class AiAgentController extends Controller
             [
                 'type' => 'function',
                 'function' => [
-                    'name' => 'search_products',
-                    'description' => 'Cari produk berdasarkan nama atau SKU. Gunakan ini ketika user bertanya tentang menu, produk, atau daftar item.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'query' => [
-                                'type' => 'string',
-                                'description' => 'Kata kunci pencarian. Jika user minta semua menu/produk, gunakan string kosong atau kata umum seperti "menu"',
-                            ],
-                        ],
-                        'required' => ['query'],
-                    ],
-                ],
-            ],
-            [
-                'type' => 'function',
-                'function' => [
                     'name' => 'get_all_products',
-                    'description' => 'Dapatkan semua produk/menu yang tersedia. Gunakan ini ketika user minta daftar menu lengkap atau semua produk.',
+                    'description' => 'Dapatkan semua produk/menu yang tersedia. Gunakan ketika user bertanya menu atau daftar produk.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [],
@@ -455,38 +438,31 @@ class AiAgentController extends Controller
             [
                 'type' => 'function',
                 'function' => [
-                    'name' => 'get_product_details',
-                    'description' => 'Dapatkan detail lengkap dari satu produk berdasarkan ID produk.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'product_id' => [
-                                'type' => 'integer',
-                                'description' => 'ID produk yang ingin dilihat detailnya',
-                            ],
-                        ],
-                        'required' => ['product_id'],
-                    ],
-                ],
-            ],
-            [
-                'type' => 'function',
-                'function' => [
                     'name' => 'add_to_cart',
-                    'description' => 'Tambahkan produk ke keranjang belanja. Gunakan setelah user memilih produk yang ingin dipesan.',
+                    'description' => 'GUNAKAN INI ketika user ingin MEMESAN/BELI produk. Tambahkan produk ke keranjang berdasarkan NAMA produk. Untuk multiple produk, masukkan semua dalam satu array.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
-                            'product_id' => [
-                                'type' => 'integer',
-                                'description' => 'ID produk yang akan ditambahkan',
-                            ],
-                            'quantity' => [
-                                'type' => 'integer',
-                                'description' => 'Jumlah produk yang dipesan',
+                            'items' => [
+                                'type' => 'array',
+                                'description' => 'Array produk yang dipesan. Setiap item berisi nama produk dan jumlah.',
+                                'items' => [
+                                    'type' => 'object',
+                                    'properties' => [
+                                        'product_name' => [
+                                            'type' => 'string',
+                                            'description' => 'Nama produk (contoh: "dimsum", "teh jumbo")',
+                                        ],
+                                        'quantity' => [
+                                            'type' => 'integer',
+                                            'description' => 'Jumlah yang dipesan',
+                                        ],
+                                    ],
+                                    'required' => ['product_name', 'quantity'],
+                                ],
                             ],
                         ],
-                        'required' => ['product_id', 'quantity'],
+                        'required' => ['items'],
                     ],
                 ],
             ],
@@ -499,6 +475,35 @@ class AiAgentController extends Controller
                         'type' => 'object',
                         'properties' => [],
                         'required' => [],
+                    ],
+                ],
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'clear_cart',
+                    'description' => 'Kosongkan/batalkan semua item di keranjang. Gunakan ketika user ingin cancel, batalkan pesanan, atau mulai dari awal.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [],
+                        'required' => [],
+                    ],
+                ],
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'remove_from_cart',
+                    'description' => 'Hapus satu produk dari keranjang berdasarkan nama.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'product_name' => [
+                                'type' => 'string',
+                                'description' => 'Nama produk yang ingin dihapus dari keranjang',
+                            ],
+                        ],
+                        'required' => ['product_name'],
                     ],
                 ],
             ],
@@ -566,9 +571,29 @@ class AiAgentController extends Controller
         foreach ($toolCalls as $toolCall) {
             $functionName = $toolCall['function']['name'] ?? null;
             $arguments = json_decode($toolCall['function']['arguments'] ?? '{}', true);
+            
+            // Ensure arguments is always an array
+            if (!is_array($arguments)) {
+                $arguments = [];
+            }
+
+            Log::info('Executing test tool call', [
+                'function' => $functionName,
+                'arguments' => $arguments,
+            ]);
 
             $result = $this->executeTestToolCall($functionName, $arguments, $userId, $conversation, $aiAgent);
-            $results[] = $result;
+            
+            // For search calls, don't show raw results to user - just log them
+            if (in_array($functionName, ['search_products', 'search_multiple_products'])) {
+                Log::info('Search result (internal)', ['result' => $result]);
+                // Don't add to results - search is internal only
+                continue;
+            }
+            
+            if (!empty($result)) {
+                $results[] = $result;
+            }
         }
 
         return implode("\n\n", array_filter($results));
@@ -593,6 +618,12 @@ class AiAgentController extends Controller
                     }
                     return $this->searchProducts($userId, $arguments['query']);
 
+                case 'search_multiple_products':
+                    if (!isset($arguments['queries']) || !is_array($arguments['queries'])) {
+                        return 'Maaf, parameter pencarian tidak lengkap. Mohon berikan array kata kunci.';
+                    }
+                    return $this->searchMultipleProducts($userId, $arguments['queries']);
+
                 case 'get_all_products':
                     return $this->getAllProducts($userId);
 
@@ -606,27 +637,52 @@ class AiAgentController extends Controller
                     return $this->getProductDetails($userId, (int) $arguments['product_id']);
 
                 case 'add_to_cart':
-                    if (!isset($arguments['product_id'])) {
-                        return 'Maaf, parameter tidak lengkap. Mohon berikan ID produk.';
+                    // Support items array with product_name (new format)
+                    if (isset($arguments['items']) && is_array($arguments['items'])) {
+                        return $this->addItemsByName($conversation, $userId, $arguments['items']);
                     }
-                    if (!isset($arguments['quantity'])) {
-                        return 'Maaf, parameter tidak lengkap. Mohon berikan jumlah pesanan.';
+                    // Support products array with product_id (legacy)
+                    elseif (isset($arguments['products']) && is_array($arguments['products'])) {
+                        return $this->addMultipleToCart($conversation, $userId, $arguments['products']);
+                    } 
+                    // Support single product_name
+                    elseif (isset($arguments['product_name'])) {
+                        if (!isset($arguments['quantity'])) {
+                            return 'Maaf, parameter tidak lengkap. Mohon berikan jumlah pesanan.';
+                        }
+                        return $this->addToCartByName(
+                            $conversation,
+                            $userId,
+                            $arguments['product_name'],
+                            (int) $arguments['quantity']
+                        );
+                    } 
+                    // Support single product_id (legacy)
+                    elseif (isset($arguments['product_id'])) {
+                        if (!isset($arguments['quantity'])) {
+                            return 'Maaf, parameter tidak lengkap. Mohon berikan jumlah pesanan.';
+                        }
+                        return $this->addToCart(
+                            $conversation,
+                            $userId,
+                            (int) $arguments['product_id'],
+                            (int) $arguments['quantity']
+                        );
+                    } else {
+                        return 'Maaf, parameter tidak lengkap. Mohon berikan items atau nama produk.';
                     }
-                    if (!is_numeric($arguments['product_id'])) {
-                        return 'Maaf, ID produk harus berupa angka.';
-                    }
-                    if (!is_numeric($arguments['quantity'])) {
-                        return 'Maaf, jumlah pesanan harus berupa angka.';
-                    }
-                    return $this->addToCart(
-                        $conversation,
-                        $userId,
-                        (int) $arguments['product_id'],
-                        (int) $arguments['quantity']
-                    );
 
                 case 'get_cart_summary':
                     return $this->getCartSummary($conversation);
+
+                case 'clear_cart':
+                    return $this->clearCart($conversation);
+
+                case 'remove_from_cart':
+                    if (!isset($arguments['product_name'])) {
+                        return 'Maaf, mohon sebutkan nama produk yang ingin dihapus.';
+                    }
+                    return $this->removeFromCart($conversation, $arguments['product_name']);
 
                 case 'confirm_order':
                     return $this->confirmOrder($conversation, $aiAgent, $userId);
@@ -795,10 +851,22 @@ class AiAgentController extends Controller
             return $this->getAllProducts($userId);
         }
 
+        // Clean and normalize query for case-insensitive search
+        $cleanQuery = trim(strtolower($query));
+        $keywords = explode(' ', $cleanQuery);
+
         $products = $productsQuery
-            ->where(function ($q) use ($query) {
-                $q->where('name', 'like', "%{$query}%")
-                    ->orWhere('sku', 'like', "%{$query}%");
+            ->where(function ($q) use ($cleanQuery, $keywords) {
+                // Case-insensitive search using LOWER()
+                $q->whereRaw('LOWER(name) LIKE ?', ["%{$cleanQuery}%"])
+                    ->orWhereRaw('LOWER(sku) LIKE ?', ["%{$cleanQuery}%"]);
+                
+                // Also match if ANY keyword is present (more flexible)
+                foreach ($keywords as $keyword) {
+                    if (strlen($keyword) >= 2) {
+                        $q->orWhereRaw('LOWER(name) LIKE ?', ["%{$keyword}%"]);
+                    }
+                }
             })
             ->limit(10)
             ->get(['id', 'name', 'price', 'stock_quantity', 'description']);
@@ -809,13 +877,84 @@ class AiAgentController extends Controller
 
         $response = "Berikut produk yang saya temukan:\n\n";
         foreach ($products as $product) {
-            $response .= "🔹 {$product->name}\n";
+            $response .= "🔹 {$product->name} [ID:{$product->id}]\n";
             $response .= '   Harga: Rp '.number_format($product->price, 0, ',', '.')."\n";
             if ($product->stock_quantity !== null) {
                 $response .= "   Stok: {$product->stock_quantity}\n";
             }
             $response .= "\n";
         }
+
+        return $response;
+    }
+
+    /**
+     * Search multiple products by multiple queries at once.
+     */
+    protected function searchMultipleProducts(int $userId, array $queries): string
+    {
+        if (empty($queries)) {
+            return 'Mohon berikan kata kunci pencarian produk.';
+        }
+
+        $allResults = [];
+        $notFound = [];
+
+        foreach ($queries as $query) {
+            if (empty(trim($query))) {
+                continue;
+            }
+
+            $cleanQuery = trim(strtolower($query));
+            $keywords = explode(' ', $cleanQuery);
+
+            $products = \App\Models\Product::where('user_id', $userId)
+                ->where('is_active', true)
+                ->where(function ($q) use ($cleanQuery, $keywords) {
+                    $q->whereRaw('LOWER(name) LIKE ?', ["%{$cleanQuery}%"])
+                        ->orWhereRaw('LOWER(sku) LIKE ?', ["%{$cleanQuery}%"]);
+                    
+                    foreach ($keywords as $keyword) {
+                        if (strlen($keyword) >= 2) {
+                            $q->orWhereRaw('LOWER(name) LIKE ?', ["%{$keyword}%"]);
+                        }
+                    }
+                })
+                ->limit(5)
+                ->get(['id', 'name', 'price', 'stock_quantity']);
+
+            if ($products->isEmpty()) {
+                $notFound[] = $query;
+            } else {
+                foreach ($products as $product) {
+                    if (!isset($allResults[$product->id])) {
+                        $allResults[$product->id] = [
+                            'id' => $product->id,
+                            'name' => $product->name,
+                            'price' => $product->price,
+                            'stock' => $product->stock_quantity,
+                        ];
+                    }
+                }
+            }
+        }
+
+        if (empty($allResults) && !empty($notFound)) {
+            return "Maaf, tidak ada produk yang ditemukan untuk: " . implode(', ', $notFound);
+        }
+
+        $response = "Berikut produk yang saya temukan:\n\n";
+        foreach ($allResults as $product) {
+            $response .= "🔹 {$product['name']} [ID:{$product['id']}]\n";
+            $response .= '   Harga: Rp '.number_format($product['price'], 0, ',', '.')."\n";
+            $response .= "   Stok: {$product['stock']}\n\n";
+        }
+
+        if (!empty($notFound)) {
+            $response .= "⚠️ Tidak ditemukan: " . implode(', ', $notFound) . "\n\n";
+        }
+
+        $response .= "**INSTRUKSI**: Gunakan ID di atas untuk add_to_cart.";
 
         return $response;
     }
@@ -964,6 +1103,284 @@ class AiAgentController extends Controller
     }
 
     /**
+     * Add multiple products to cart at once.
+     */
+    protected function addMultipleToCart(
+        AiAgentConversation $conversation,
+        int $userId,
+        array $products
+    ): string {
+        if (empty($products)) {
+            return 'Maaf, tidak ada produk yang ditambahkan.';
+        }
+
+        $cart = $conversation->getCart();
+        $addedProducts = [];
+        $errors = [];
+
+        foreach ($products as $item) {
+            $productId = $item['product_id'] ?? null;
+            $quantity = $item['quantity'] ?? 1;
+
+            if (!$productId || !is_numeric($productId)) {
+                continue;
+            }
+
+            $productId = (int) $productId;
+            $quantity = (int) $quantity;
+
+            if ($productId <= 0 || $quantity <= 0) {
+                continue;
+            }
+
+            $product = \App\Models\Product::where('id', $productId)
+                ->where('user_id', $userId)
+                ->where('is_active', true)
+                ->first(['id', 'name', 'price', 'stock_quantity']);
+
+            if (!$product) {
+                $errors[] = "Produk ID {$productId} tidak ditemukan";
+                continue;
+            }
+
+            if ($product->stock_quantity !== null && $product->stock_quantity < $quantity) {
+                $errors[] = "{$product->name}: stok tidak mencukupi";
+                continue;
+            }
+
+            // Add to cart
+            $found = false;
+            foreach ($cart as &$cartItem) {
+                if ($cartItem['product_id'] == $productId) {
+                    $cartItem['quantity'] += $quantity;
+                    $found = true;
+                    break;
+                }
+            }
+
+            if (!$found) {
+                $cart[] = [
+                    'product_id' => $product->id,
+                    'product_name' => $product->name,
+                    'price' => (float) $product->price,
+                    'quantity' => $quantity,
+                ];
+            }
+
+            $addedProducts[] = "{$product->name} x{$quantity}";
+        }
+
+        if (!empty($addedProducts)) {
+            $conversation->updateCart($cart);
+        }
+
+        if (empty($addedProducts) && !empty($errors)) {
+            return "❌ Gagal menambahkan produk:\n" . implode("\n", $errors);
+        }
+
+        $response = "✅ Berhasil menambahkan ke keranjang!\n\n";
+        foreach ($addedProducts as $p) {
+            $response .= "📦 {$p}\n";
+        }
+
+        if (!empty($errors)) {
+            $response .= "\n⚠️ " . implode(", ", $errors);
+        }
+
+        $response .= "\nKetik 'lihat keranjang' untuk melihat ringkasan pesanan.";
+
+        return $response;
+    }
+
+    /**
+     * Add items to cart by product name (search and add in one step).
+     */
+    protected function addItemsByName(
+        AiAgentConversation $conversation,
+        int $userId,
+        array $items
+    ): string {
+        if (empty($items)) {
+            return 'Maaf, tidak ada produk yang ditambahkan.';
+        }
+
+        $cart = $conversation->getCart();
+        $addedProducts = [];
+        $errors = [];
+        $totalAdded = 0;
+
+        foreach ($items as $item) {
+            $productName = $item['product_name'] ?? null;
+            $quantity = $item['quantity'] ?? 1;
+
+            if (empty($productName)) {
+                continue;
+            }
+
+            $quantity = (int) $quantity;
+            if ($quantity <= 0) {
+                $quantity = 1;
+            }
+
+            // Search product by name (case-insensitive)
+            $cleanName = trim(strtolower($productName));
+            
+            $product = \App\Models\Product::where('user_id', $userId)
+                ->where('is_active', true)
+                ->where(function ($q) use ($cleanName) {
+                    $q->whereRaw('LOWER(name) LIKE ?', ["%{$cleanName}%"]);
+                })
+                ->first(['id', 'name', 'price', 'stock_quantity']);
+
+            if (!$product) {
+                $errors[] = "'{$productName}' tidak ditemukan";
+                continue;
+            }
+
+            if ($product->stock_quantity !== null && $product->stock_quantity < $quantity) {
+                $errors[] = "{$product->name}: stok tidak mencukupi";
+                continue;
+            }
+
+            // Add to cart
+            $found = false;
+            foreach ($cart as &$cartItem) {
+                if ($cartItem['product_id'] == $product->id) {
+                    $cartItem['quantity'] += $quantity;
+                    $found = true;
+                    break;
+                }
+            }
+
+            if (!$found) {
+                $cart[] = [
+                    'product_id' => $product->id,
+                    'product_name' => $product->name,
+                    'price' => (float) $product->price,
+                    'quantity' => $quantity,
+                ];
+            }
+
+            $subtotal = $product->price * $quantity;
+            $totalAdded += $subtotal;
+            $addedProducts[] = [
+                'name' => $product->name,
+                'quantity' => $quantity,
+                'price' => $product->price,
+                'subtotal' => $subtotal,
+            ];
+        }
+
+        if (!empty($addedProducts)) {
+            $conversation->updateCart($cart);
+        }
+
+        if (empty($addedProducts) && !empty($errors)) {
+            return "❌ Gagal menambahkan produk:\n" . implode("\n", $errors);
+        }
+
+        $response = "✅ Berhasil menambahkan ke keranjang!\n\n";
+        foreach ($addedProducts as $p) {
+            $formattedPrice = 'Rp ' . number_format($p['price'], 0, ',', '.');
+            $formattedSubtotal = 'Rp ' . number_format($p['subtotal'], 0, ',', '.');
+            $response .= "📦 {$p['name']} x{$p['quantity']}\n";
+            $response .= "   {$formattedPrice} × {$p['quantity']} = {$formattedSubtotal}\n";
+        }
+
+        if (!empty($errors)) {
+            $response .= "\n⚠️ " . implode(", ", $errors);
+        }
+
+        // Show total added
+        $response .= "\n─────────────────\n";
+        $response .= "💰 Subtotal: Rp " . number_format($totalAdded, 0, ',', '.') . "\n\n";
+        $response .= "Ketik 'lihat keranjang' untuk melihat ringkasan pesanan atau 'konfirmasi' untuk checkout.";
+
+        return $response;
+    }
+
+    /**
+     * Add product to cart by name (search and add).
+     */
+    protected function addToCartByName(
+        AiAgentConversation $conversation,
+        int $userId,
+        string $productName,
+        int $quantity
+    ): string {
+        if (empty(trim($productName))) {
+            return 'Maaf, nama produk tidak boleh kosong.';
+        }
+
+        if ($quantity <= 0) {
+            return 'Maaf, jumlah pesanan harus lebih dari 0.';
+        }
+
+        // Search product by name (case-insensitive)
+        $cleanName = trim(strtolower($productName));
+        
+        $product = \App\Models\Product::where('user_id', $userId)
+            ->where('is_active', true)
+            ->where(function ($q) use ($cleanName) {
+                $q->whereRaw('LOWER(name) LIKE ?', ["%{$cleanName}%"]);
+            })
+            ->first(['id', 'name', 'price', 'stock_quantity']);
+
+        if (!$product) {
+            return "Maaf, produk '{$productName}' tidak ditemukan. Ketik 'menu' untuk melihat daftar produk.";
+        }
+
+        // Check stock availability
+        if ($product->stock_quantity !== null && $product->stock_quantity < $quantity) {
+            return "Maaf, stok {$product->name} tidak mencukupi. Stok tersedia: {$product->stock_quantity}";
+        }
+
+        // Get current cart
+        $cart = $conversation->getCart();
+
+        // Check if product already in cart
+        $existingIndex = null;
+        foreach ($cart as $index => $item) {
+            if ($item['product_id'] === $product->id) {
+                $existingIndex = $index;
+                break;
+            }
+        }
+
+        if ($existingIndex !== null) {
+            // Update existing item
+            $newQuantity = $cart[$existingIndex]['quantity'] + $quantity;
+            
+            // Check stock for new quantity
+            if ($product->stock_quantity !== null && $product->stock_quantity < $newQuantity) {
+                return "Maaf, stok tidak mencukupi. Stok tersedia: {$product->stock_quantity}";
+            }
+            
+            $cart[$existingIndex]['quantity'] = $newQuantity;
+        } else {
+            // Add new item
+            $cart[] = [
+                'product_id' => $product->id,
+                'product_name' => $product->name,
+                'price' => (float) $product->price,
+                'quantity' => $quantity,
+            ];
+        }
+
+        // Update cart in conversation
+        $conversation->updateCart($cart);
+
+        $formattedPrice = 'Rp '.number_format($product->price, 0, ',', '.');
+        $subtotal = $product->price * $quantity;
+        $formattedSubtotal = 'Rp '.number_format($subtotal, 0, ',', '.');
+
+        return "✅ Berhasil menambahkan ke keranjang!\n\n" .
+               "📦 {$product->name}\n" .
+               "💰 {$formattedPrice} x {$quantity} = {$formattedSubtotal}\n\n" .
+               "Ketik 'lihat keranjang' untuk melihat ringkasan pesanan.";
+    }
+
+    /**
      * Get cart summary.
      */
     protected function getCartSummary(AiAgentConversation $conversation): string
@@ -994,8 +1411,68 @@ class AiAgentController extends Controller
         $response .= "━━━━━━━━━━━━━━━━━━━━\n";
         $response .= 'Subtotal: Rp ' . number_format($subtotal, 0, ',', '.') . "\n";
         $response .= 'Pajak (11%): Rp ' . number_format($taxAmount, 0, ',', '.') . "\n";
-        $response .= 'Total: Rp ' . number_format($total, 0, ',', '.') . "\n\n";
-        $response .= "Ketik 'konfirmasi pesanan' untuk melanjutkan.";
+        $response .= '💰 Total: Rp ' . number_format($total, 0, ',', '.') . "\n\n";
+        $response .= "📝 Anda masih bisa:\n";
+        $response .= "• Tambah pesanan lagi\n";
+        $response .= "• Ketik 'hapus [nama produk]' untuk menghapus item\n";
+        $response .= "• Ketik 'batalkan pesanan' untuk mengosongkan keranjang\n";
+        $response .= "• Ketik 'konfirmasi' untuk checkout";
+
+        return $response;
+    }
+
+    /**
+     * Clear all items from cart.
+     */
+    protected function clearCart(AiAgentConversation $conversation): string
+    {
+        $cart = $conversation->getCart();
+
+        if (empty($cart)) {
+            return '🛒 Keranjang sudah kosong.';
+        }
+
+        $conversation->updateCart([]);
+
+        return "🗑️ Keranjang berhasil dikosongkan.\n\nSilakan mulai pesan lagi jika berubah pikiran! 😊";
+    }
+
+    /**
+     * Remove a product from cart by name.
+     */
+    protected function removeFromCart(AiAgentConversation $conversation, string $productName): string
+    {
+        $cart = $conversation->getCart();
+
+        if (empty($cart)) {
+            return '🛒 Keranjang sudah kosong.';
+        }
+
+        $cleanName = trim(strtolower($productName));
+        $removedItem = null;
+        $newCart = [];
+
+        foreach ($cart as $item) {
+            if (stripos($item['product_name'], $cleanName) !== false) {
+                $removedItem = $item;
+            } else {
+                $newCart[] = $item;
+            }
+        }
+
+        if (!$removedItem) {
+            return "❌ Produk '{$productName}' tidak ditemukan di keranjang.";
+        }
+
+        $conversation->updateCart($newCart);
+
+        $response = "✅ {$removedItem['product_name']} berhasil dihapus dari keranjang.\n\n";
+        
+        if (empty($newCart)) {
+            $response .= "🛒 Keranjang sekarang kosong.";
+        } else {
+            $response .= "Ketik 'lihat keranjang' untuk melihat sisa pesanan.";
+        }
 
         return $response;
     }
@@ -1160,7 +1637,9 @@ class AiAgentController extends Controller
                 return "✅ Pesanan Berhasil Dibuat!\n\n" .
                        "📋 No. Pesanan: {$order->order_number}\n" .
                        "💰 Total: {$formattedTotal}\n\n" .
-                       "Pesanan Anda sedang diproses. Terima kasih! 🙏";
+                       "Pesanan Anda sedang diproses.\n" .
+                       "Silakan tunjukkan pesan ini ke kasir untuk melakukan pembayaran.\n\n" .
+                       "Terima kasih! 🙏";
             });
 
         } catch (\InvalidArgumentException $e) {
@@ -1219,6 +1698,58 @@ class AiAgentController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to clear conversation',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Clear test conversation history.
+     */
+    public function clearTestConversation(Request $request): JsonResponse
+    {
+        try {
+            $userId = auth()->id();
+
+            $whatsappAccount = WhatsAppAccount::where('user_id', $userId)->first();
+
+            if (! $whatsappAccount) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'WhatsApp account not connected',
+                ], 404);
+            }
+
+            $aiAgent = AiAgent::where('whatsapp_account_id', $whatsappAccount->id)->first();
+
+            if (! $aiAgent) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'AI Agent not configured',
+                ], 404);
+            }
+
+            // Find test contact for this user
+            $testContact = WhatsAppContact::where('user_id', $userId)
+                ->where('wa_id', 'test_user_'.$userId)
+                ->first();
+
+            if ($testContact) {
+                // Delete conversation for test contact
+                AiAgentConversation::where('ai_agent_id', $aiAgent->id)
+                    ->where('whatsapp_contact_id', $testContact->id)
+                    ->delete();
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Test conversation history cleared',
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to clear test conversation',
                 'error' => $e->getMessage(),
             ], 500);
         }

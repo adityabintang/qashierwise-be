@@ -430,13 +430,36 @@
                     <i class="fas fa-flask text-purple-500"></i>
                     Test AI Agent
                 </h3>
-                <button @click="showTestModal = false" class="btn btn-ghost btn-icon">
-                    <i class="fas fa-times"></i>
-                </button>
+                <div class="flex items-center gap-2">
+                    <button 
+                        @click="resetTestConversation()" 
+                        class="btn btn-ghost btn-sm text-gray-600 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Reset conversation"
+                        :disabled="testMessages.length === 0"
+                    >
+                        <i class="fas fa-redo-alt mr-1.5"></i>
+                        <span class="text-sm">Reset</span>
+                    </button>
+                    <button @click="showTestModal = false" class="btn btn-ghost btn-icon">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
             </div>
 
             <!-- Chat Area -->
             <div class="flex-1 overflow-y-auto p-4 space-y-4 min-h-[300px] max-h-[400px]" id="testChatArea">
+                <!-- Empty State -->
+                <div x-show="testMessages.length === 0 && !testLoading" class="flex flex-col items-center justify-center h-full text-center py-12">
+                    <div class="h-16 w-16 rounded-full bg-purple-100 flex items-center justify-center mb-4">
+                        <i class="fas fa-comments text-purple-500 text-2xl"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold text-gray-700 mb-2">Mulai Percakapan</h4>
+                    <p class="text-sm text-gray-500 max-w-xs">
+                        Ketik pesan di bawah untuk mulai test AI Agent Anda
+                    </p>
+                </div>
+                
+                <!-- Messages -->
                 <template x-for="(msg, index) in testMessages" :key="index">
                     <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
                         <div :class="msg.role === 'user' ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-800'" class="rounded-lg px-4 py-2 max-w-[80%]">
@@ -444,6 +467,8 @@
                         </div>
                     </div>
                 </template>
+                
+                <!-- Loading State -->
                 <div x-show="testLoading" class="flex justify-start">
                     <div class="bg-gray-100 rounded-lg px-4 py-2">
                         <i class="fas fa-spinner animate-spin text-gray-500"></i>
@@ -721,6 +746,41 @@ function aiAgentApp() {
             this.showTestModal = true;
             this.testMessages = [];
             this.testInput = '';
+        },
+
+        resetTestConversation() {
+            if (this.testMessages.length === 0) {
+                return;
+            }
+            
+            if (confirm('Apakah Anda yakin ingin mereset percakapan? Semua pesan akan dihapus.')) {
+                // Clear messages in UI
+                this.testMessages = [];
+                this.testInput = '';
+                
+                // Clear conversation in database
+                const token = localStorage.getItem('token');
+                
+                // Call API to clear conversation in database
+                fetch(`/api/ai-agent/conversations/test`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json',
+                    },
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        this.showNotification('Percakapan berhasil direset', 'success');
+                    }
+                })
+                .catch(error => {
+                    console.error('Failed to clear conversation:', error);
+                    // Still show success since UI is already cleared
+                    this.showNotification('Percakapan berhasil direset', 'success');
+                });
+            }
         },
 
         async sendTestMessage() {

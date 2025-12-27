@@ -274,16 +274,37 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'search_products',
-                    'description' => 'Cari produk berdasarkan nama atau SKU',
+                    'description' => 'Cari SATU produk berdasarkan nama atau SKU. Untuk mencari MULTIPLE produk sekaligus (contoh: "dimsum dan teh"), gunakan search_multiple_products.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
                             'query' => [
                                 'type' => 'string',
-                                'description' => 'Kata kunci pencarian (nama produk atau SKU)',
+                                'description' => 'Kata kunci pencarian PENDEK untuk SATU produk (contoh: "dimsum", "teh", "nasi").',
                             ],
                         ],
                         'required' => ['query'],
+                    ],
+                ],
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'search_multiple_products',
+                    'description' => 'WAJIB DIGUNAKAN saat user memesan LEBIH DARI SATU produk sekaligus (contoh: "pesan dimsum dan teh jumbo", "mau nasi goreng sama es teh"). Cari beberapa produk sekaligus dalam satu panggilan. Hasil akan menampilkan semua produk yang ditemukan beserta ID-nya untuk digunakan di add_to_cart.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'queries' => [
+                                'type' => 'array',
+                                'description' => 'Array kata kunci pencarian. Setiap kata kunci untuk satu produk. Contoh: ["dimsum", "teh"] untuk mencari dimsum dan teh.',
+                                'items' => [
+                                    'type' => 'string',
+                                    'description' => 'Kata kunci PENDEK untuk satu produk',
+                                ],
+                            ],
+                        ],
+                        'required' => ['queries'],
                     ],
                 ],
             ],
@@ -308,19 +329,19 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'add_to_cart',
-                    'description' => 'Tambahkan satu atau lebih produk ke keranjang belanja. Untuk multiple produk, gunakan array products.',
+                    'description' => 'Tambahkan satu atau lebih produk ke keranjang belanja. PENTING: User akan menyebutkan NAMA produk, kamu harus cari ID produk dari daftar produk atau hasil search_products terlebih dahulu. Untuk multiple produk, gunakan array products dan masukkan SEMUA produk dalam SATU pemanggilan function.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
                             'products' => [
                                 'type' => 'array',
-                                'description' => 'Array of products to add. Each product must have product_id and quantity.',
+                                'description' => 'Array of products to add. Each product must have product_id (yang sudah kamu cari dari nama produk) and quantity.',
                                 'items' => [
                                     'type' => 'object',
                                     'properties' => [
                                         'product_id' => [
                                             'type' => 'integer',
-                                            'description' => 'ID produk',
+                                            'description' => 'ID produk yang sudah kamu cari dari nama produk yang disebutkan user',
                                         ],
                                         'quantity' => [
                                             'type' => 'integer',
@@ -441,12 +462,20 @@ class AiAgentService
             }, $toolCalls),
         ]);
 
-        $results = [];
-        $addToCartResults = [];
+        $toolResults = [];
+        $hasSearchCall = false;
+        $hasFinalAction = false; // add_to_cart, confirm_order, get_cart_summary, etc.
 
         foreach ($toolCalls as $toolCall) {
             $functionName = $toolCall['function']['name'] ?? null;
             $arguments = json_decode($toolCall['function']['arguments'] ?? '{}', true);
+            
+            // Ensure arguments is always an array
+            if (!is_array($arguments)) {
+                $arguments = [];
+            }
+            
+            $toolCallId = $toolCall['id'] ?? uniqid();
 
             Log::info('Executing tool call', [
                 'function' => $functionName,
@@ -455,37 +484,166 @@ class AiAgentService
 
             $result = $this->executeToolCall($functionName, $arguments, $account->user_id, $conversation);
             
-            // Track add_to_cart calls separately
-            if ($functionName === 'add_to_cart' && !empty($result)) {
-                $addToCartResults[] = $result;
-            } else {
-                $results[] = $result;
+            // Track what type of calls we have
+            if (in_array($functionName, ['search_products', 'search_multiple_products'])) {
+                $hasSearchCall = true;
+            }
+            if (in_array($functionName, ['add_to_cart', 'confirm_order', 'get_cart_summary', 'generate_qris', 'check_payment_status'])) {
+                $hasFinalAction = true;
+            }
+
+            $toolResults[] = [
+                'tool_call_id' => $toolCallId,
+                'function_name' => $functionName,
+                'result' => $result,
+            ];
+        }
+
+        // If we only have search calls (no final action), we need to call LLM again
+        // to let it process the search results and call add_to_cart
+        if ($hasSearchCall && !$hasFinalAction) {
+            Log::info('Search completed, calling LLM again to process results and add to cart');
+            
+            // Build messages with tool results for LLM to continue
+            $messages = $conversation->messages ?? [];
+            
+            // Add assistant message with tool calls
+            $messages[] = [
+                'role' => 'assistant',
+                'content' => null,
+                'tool_calls' => $toolCalls,
+            ];
+            
+            // Add tool results
+            foreach ($toolResults as $tr) {
+                $messages[] = [
+                    'role' => 'tool',
+                    'tool_call_id' => $tr['tool_call_id'],
+                    'content' => $tr['result'],
+                ];
+            }
+
+            // Call LLM again to continue processing
+            $systemPrompt = $aiAgent->buildSystemPrompt($account->user_id);
+            $tools = $this->getToolDefinitionsForAgent($aiAgent);
+            
+            try {
+                $response = $this->callLLMWithToolResults($systemPrompt, $messages, $tools);
+                
+                // If LLM returns more tool calls, handle them
+                if (isset($response['tool_calls'])) {
+                    $this->handleToolCalls(
+                        $response['tool_calls'],
+                        $conversation,
+                        $account,
+                        $contact,
+                        $aiAgent
+                    );
+                    return;
+                }
+                
+                // Otherwise send the response
+                $assistantMessage = $response['content'] ?? '';
+                if ($assistantMessage) {
+                    $conversation->addMessage('ai', $assistantMessage);
+                    $this->sendReply($account, $contact->wa_id, $assistantMessage);
+                }
+                return;
+            } catch (\Exception $e) {
+                Log::error('Error in follow-up LLM call', ['error' => $e->getMessage()]);
+                // Fall through to send search results if follow-up fails
             }
         }
 
-        // Handle add_to_cart results
-        if (count($addToCartResults) > 1) {
-            // Multiple products added - create summary
-            $summaryMessage = "✅ Berhasil menambahkan ke keranjang!\n\n";
-            foreach ($addToCartResults as $cartResult) {
-                // Extract product info from each result
-                if (preg_match('/✅\s+(.+?)\s+x(\d+)\s+berhasil/', $cartResult, $matches)) {
-                    $summaryMessage .= "📦 {$matches[1]} x{$matches[2]}\n";
-                }
+        // For final actions or if follow-up failed, send results to user
+        $userFacingResults = [];
+        foreach ($toolResults as $tr) {
+            // Don't show raw search results to user - they're internal
+            if (!in_array($tr['function_name'], ['search_products', 'search_multiple_products'])) {
+                $userFacingResults[] = $tr['result'];
             }
-            $summaryMessage .= "\nKetik 'lihat keranjang' untuk melihat ringkasan pesanan.";
-            $results[] = $summaryMessage;
-        } elseif (count($addToCartResults) === 1) {
-            // Single product - use original detailed message
-            $results[] = $addToCartResults[0];
         }
 
         // Send combined result to user
-        $responseMessage = implode("\n\n", array_filter($results));
+        $responseMessage = implode("\n\n", array_filter($userFacingResults));
         if ($responseMessage) {
             $conversation->addMessage('ai', $responseMessage);
             $this->sendReply($account, $contact->wa_id, $responseMessage);
         }
+    }
+
+    /**
+     * Call LLM with tool results to continue the conversation.
+     */
+    protected function callLLMWithToolResults(string $systemPrompt, array $messages, ?array $tools = null): array
+    {
+        $config = config('services.byteplus_ark');
+        $url = $config['base_url'].'/chat/completions';
+
+        // Build messages array with proper format
+        $llmMessages = [
+            ['role' => 'system', 'content' => $systemPrompt],
+        ];
+
+        foreach ($messages as $msg) {
+            if (isset($msg['role']) && $msg['role'] === 'tool') {
+                // Tool result message
+                $llmMessages[] = [
+                    'role' => 'tool',
+                    'tool_call_id' => $msg['tool_call_id'],
+                    'content' => $msg['content'],
+                ];
+            } elseif (isset($msg['tool_calls'])) {
+                // Assistant message with tool calls
+                $llmMessages[] = [
+                    'role' => 'assistant',
+                    'content' => $msg['content'],
+                    'tool_calls' => $msg['tool_calls'],
+                ];
+            } else {
+                // Regular message
+                $role = match($msg['type'] ?? $msg['role'] ?? 'user') {
+                    'human' => 'user',
+                    'ai' => 'assistant',
+                    default => $msg['type'] ?? $msg['role'] ?? 'user'
+                };
+                
+                $llmMessages[] = [
+                    'role' => $role,
+                    'content' => $msg['content'],
+                ];
+            }
+        }
+
+        $payload = [
+            'model' => $config['model'],
+            'messages' => $llmMessages,
+            'temperature' => 0.7,
+            'max_tokens' => 500,
+        ];
+
+        if ($tools) {
+            $payload['tools'] = $tools;
+            $payload['tool_choice' ] = 'auto';
+        }
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer '.$config['api_key'],
+            'Content-Type' => 'application/json',
+        ])->timeout(30)->post($url, $payload);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            $choice = $data['choices'][0] ?? null;
+            
+            if ($choice && isset($choice['message']['tool_calls'])) {
+                return ['tool_calls' => $choice['message']['tool_calls']];
+            }
+            
+            return ['content' => $choice['message']['content'] ?? ''];
+        }
+
+        throw new \Exception('LLM API call failed: ' . $response->body());
     }
 
     /**
@@ -505,6 +663,12 @@ class AiAgentService
                         return 'Maaf, parameter pencarian tidak lengkap. Mohon berikan kata kunci pencarian.';
                     }
                     return $this->searchProducts($userId, $arguments['query']);
+
+                case 'search_multiple_products':
+                    if (!isset($arguments['queries']) || !is_array($arguments['queries'])) {
+                        return 'Maaf, parameter pencarian tidak lengkap. Mohon berikan array kata kunci pencarian.';
+                    }
+                    return $this->searchMultipleProducts($userId, $arguments['queries']);
 
                 case 'get_product_details':
                     if (!isset($arguments['product_id'])) {
@@ -587,11 +751,25 @@ class AiAgentService
             return 'Mohon berikan kata kunci pencarian produk.';
         }
 
+        // Clean and normalize query for better matching (lowercase for case-insensitive search)
+        $cleanQuery = trim(strtolower($query));
+        
+        // Split query into words for flexible matching
+        $keywords = explode(' ', $cleanQuery);
+
         $products = Product::where('user_id', $userId)
             ->where('is_active', true)
-            ->where(function ($q) use ($query) {
-                $q->where('name', 'like', "%{$query}%")
-                    ->orWhere('sku', 'like', "%{$query}%");
+            ->where(function ($q) use ($cleanQuery, $keywords) {
+                // Case-insensitive search using LOWER()
+                $q->whereRaw('LOWER(name) LIKE ?', ["%{$cleanQuery}%"])
+                    ->orWhereRaw('LOWER(sku) LIKE ?', ["%{$cleanQuery}%"]);
+                
+                // Also match if ANY keyword is present (more flexible)
+                foreach ($keywords as $keyword) {
+                    if (strlen($keyword) >= 2) { // Use keywords with 2+ chars
+                        $q->orWhereRaw('LOWER(name) LIKE ?', ["%{$keyword}%"]);
+                    }
+                }
             })
             ->limit(10)
             ->get(['id', 'name', 'price', 'stock_quantity', 'description']);
@@ -600,9 +778,10 @@ class AiAgentService
             return "Maaf, tidak ada produk yang ditemukan dengan kata kunci '{$query}'.";
         }
 
+        // Build response for AI (with IDs in brackets for internal use)
         $response = "Berikut produk yang saya temukan:\n\n";
         foreach ($products as $product) {
-            $response .= "🔹 {$product->name} (ID: {$product->id})\n";
+            $response .= "🔹 {$product->name} [ID:{$product->id}]\n";
             $response .= '   Harga: Rp '.number_format($product->price, 0, ',', '.')."\n";
             $response .= "   Stok: {$product->stock_quantity}\n";
             if ($product->description) {
@@ -610,6 +789,83 @@ class AiAgentService
             }
             $response .= "\n";
         }
+        
+        $response .= "\n**INSTRUKSI UNTUK AI**: ID dalam [ID:X] adalah untuk internal AI saja. Saat menampilkan ke user, HAPUS bagian [ID:X]. User hanya perlu tahu nama, harga, dan stok produk.";
+
+        return $response;
+    }
+
+    /**
+     * Search multiple products by multiple queries at once.
+     * This is useful when user orders multiple products in one message.
+     */
+    protected function searchMultipleProducts(int $userId, array $queries): string
+    {
+        if (empty($queries)) {
+            return 'Mohon berikan kata kunci pencarian produk.';
+        }
+
+        $allResults = [];
+        $notFound = [];
+
+        foreach ($queries as $query) {
+            if (empty(trim($query))) {
+                continue;
+            }
+
+            $cleanQuery = trim(strtolower($query));
+            $keywords = explode(' ', $cleanQuery);
+
+            $products = Product::where('user_id', $userId)
+                ->where('is_active', true)
+                ->where(function ($q) use ($cleanQuery, $keywords) {
+                    $q->whereRaw('LOWER(name) LIKE ?', ["%{$cleanQuery}%"])
+                        ->orWhereRaw('LOWER(sku) LIKE ?', ["%{$cleanQuery}%"]);
+                    
+                    foreach ($keywords as $keyword) {
+                        if (strlen($keyword) >= 2) {
+                            $q->orWhereRaw('LOWER(name) LIKE ?', ["%{$keyword}%"]);
+                        }
+                    }
+                })
+                ->limit(5)
+                ->get(['id', 'name', 'price', 'stock_quantity']);
+
+            if ($products->isEmpty()) {
+                $notFound[] = $query;
+            } else {
+                foreach ($products as $product) {
+                    // Avoid duplicates
+                    if (!isset($allResults[$product->id])) {
+                        $allResults[$product->id] = [
+                            'id' => $product->id,
+                            'name' => $product->name,
+                            'price' => $product->price,
+                            'stock' => $product->stock_quantity,
+                            'query' => $query,
+                        ];
+                    }
+                }
+            }
+        }
+
+        if (empty($allResults) && !empty($notFound)) {
+            return "Maaf, tidak ada produk yang ditemukan untuk: " . implode(', ', $notFound);
+        }
+
+        // Build response
+        $response = "Berikut produk yang saya temukan:\n\n";
+        foreach ($allResults as $product) {
+            $response .= "🔹 {$product['name']} [ID:{$product['id']}]\n";
+            $response .= '   Harga: Rp '.number_format($product['price'], 0, ',', '.')."\n";
+            $response .= "   Stok: {$product['stock']}\n\n";
+        }
+
+        if (!empty($notFound)) {
+            $response .= "⚠️ Tidak ditemukan: " . implode(', ', $notFound) . "\n\n";
+        }
+
+        $response .= "**INSTRUKSI UNTUK AI**: Gunakan ID di atas untuk add_to_cart. Contoh: add_to_cart(products=[{product_id:1, quantity:2}, {product_id:2, quantity:1}])";
 
         return $response;
     }
@@ -1166,10 +1422,12 @@ class AiAgentService
             }
 
             // Send confirmation without QRIS (fallback or QRIS not enabled)
-            $response = "✅ Pesanan berhasil dibuat!\n\n";
-            $response .= "Nomor Pesanan: {$order->order_number}\n";
-            $response .= 'Total: Rp '.number_format($order->total, 0, ',', '.')."\n\n";
-            $response .= 'Terima kasih atas pesanan Anda! 🙏';
+            $response = "✅ Pesanan Berhasil Dibuat!\n\n";
+            $response .= "📋 No. Pesanan: {$order->order_number}\n";
+            $response .= "💰 Total: Rp ".number_format($order->total, 0, ',', '.')."\n\n";
+            $response .= "Pesanan Anda sedang diproses.\n";
+            $response .= "Silakan tunjukkan pesan ini ke kasir untuk melakukan pembayaran.\n\n";
+            $response .= "Terima kasih! 🙏";
 
             $this->sendReply($account, $contact->wa_id, $response);
 

@@ -149,6 +149,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/toggle-order', [AiAgentController::class, 'toggleOrder']);
         Route::put('/toggle-qris', [AiAgentController::class, 'toggleQris']);
         Route::post('/test', [AiAgentController::class, 'test']);
+        Route::delete('/conversations/test', [AiAgentController::class, 'clearTestConversation']);
         Route::delete('/conversations/{contactId}', [AiAgentController::class, 'clearConversation']);
     });
 

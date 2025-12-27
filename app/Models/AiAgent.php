@@ -217,15 +217,20 @@ JANGAN PERNAH:
                 ->get(['id', 'name', 'price', 'stock_quantity', 'description']);
 
             if ($products->isNotEmpty()) {
-                $prompt .= "\n\n## Produk Tersedia (Top 20):\n";
+                $prompt .= "\n\n## Produk Tersedia (Top 20) - UNTUK REFERENSI AI:\n";
                 foreach ($products as $product) {
-                    $prompt .= "- {$product->name} (ID: {$product->id}) - Rp ".number_format($product->price, 0, ',', '.')." - Stok: {$product->stock_quantity}";
+                    $prompt .= "- {$product->name} [ID:{$product->id}] - Rp ".number_format($product->price, 0, ',', '.')." - Stok: {$product->stock_quantity}";
                     if ($product->description) {
                         $prompt .= " - {$product->description}";
                     }
                     $prompt .= "\n";
                 }
-                $prompt .= "\nUntuk produk lainnya, gunakan function 'search_products' untuk mencari.";
+                $prompt .= "\n**PENTING UNTUK AI**: 
+- ID produk dalam [ID:X] adalah untuk internal AI saja
+- Saat user bertanya 'menunya apa?', tampilkan TANPA [ID:X]
+- Format ke user: '1. Dimsum Keju - Rp 40.000 - Stok: 10'
+- Saat user memesan, WAJIB panggil search_products dulu untuk mendapatkan ID terbaru
+- Untuk produk lainnya, gunakan function 'search_products' untuk mencari";
             }
 
             // Add ordering instructions
@@ -236,51 +241,108 @@ JANGAN PERNAH:
    - JANGAN tambahkan atau kurangi angka sendiri
    - JANGAN hitung pajak atau total sendiri
 
-2. **Saat menambahkan produk ke keranjang:**
+2. **JANGAN PERNAH tampilkan ID produk ke user**
+   - ID produk hanya untuk internal AI
+   - User TIDAK PERLU tahu ID produk
+   - User hanya perlu menyebutkan NAMA produk
+
+3. **WORKFLOW PEMESANAN - WAJIB IKUTI:**
+   
+   **Langkah 1: User bertanya menu**
+   - User: 'menunya apa aja?'
+   - AI: Tampilkan daftar produk dari konteks (TANPA ID)
+   - Format: '1. Dimsum Keju - Rp 40.000'
+   
+   **Langkah 2: User memesan produk**
+   - JIKA user memesan SATU produk: gunakan search_products('nama_produk')
+   - JIKA user memesan LEBIH DARI SATU produk: WAJIB gunakan search_multiple_products(['produk1', 'produk2'])
+   - Contoh: 'pesan dimsum dan teh' → search_multiple_products(['dimsum', 'teh'])
+   - TIPS: Gunakan kata kunci PENDEK (contoh: 'dimsum', 'teh', 'nasi')
+   
+   **Langkah 3: Tambahkan ke keranjang**
+   - Setelah dapat ID dari search
+   - Panggil add_to_cart dengan ID tersebut
+   - Untuk multiple produk: add_to_cart(products=[{product_id:X, quantity:Y}, ...])
+   - Tampilkan hasil dari function
+
+4. **PENTING: SELALU SEARCH DULU SEBELUM ADD TO CART**
+   - Meskipun produk sudah ditampilkan sebelumnya
+   - Untuk SATU produk: search_products('nama')
+   - Untuk MULTIPLE produk: search_multiple_products(['nama1', 'nama2'])
+   - Baru kemudian panggil add_to_cart dengan ID tersebut
+   - EKSTRAK ID dari hasil search yang berbentuk [ID:X]
+   - Contoh: \"Dimsum Keju [ID:123]\" gunakan product_id: 123
+
+5. **Saat menambahkan produk ke keranjang:**
    - Gunakan function 'add_to_cart' dengan parameter 'products' (array)
    - **PENTING: Untuk MULTIPLE produk, masukkan SEMUA produk dalam SATU array**
    - Format: products: [{product_id: X, quantity: Y}, {product_id: Z, quantity: W}]
    - Tampilkan PERSIS hasil yang dikembalikan function
    - JANGAN ubah atau hitung ulang harga
 
-3. **Saat menampilkan keranjang:**
+6. **Saat menampilkan keranjang:**
    - Gunakan function 'get_cart_summary'
    - Tampilkan PERSIS hasil yang dikembalikan function
    - JANGAN hitung ulang subtotal, pajak, atau total
 
-4. **Saat konfirmasi pesanan:**
+7. **Saat konfirmasi pesanan:**
    - Gunakan function 'confirm_order'
    - Tampilkan PERSIS hasil yang dikembalikan function
    - Function akan otomatis generate QRIS jika enabled
 
-5. **Format response:**
+8. **Format response:**
    - Salin PERSIS output dari function
    - Boleh tambahkan kalimat pembuka/penutup yang ramah
    - JANGAN ubah angka atau perhitungan apapun
 
-CONTOH BENAR - SATU PRODUK:
-User: 'Pesan 2 Es Buah'
-AI: [panggil add_to_cart(products=[{product_id:2, quantity:2}])]
-AI Response: 'Baik! ✅ Berhasil menambahkan ke keranjang!
+CONTOH BENAR - User memesan MULTIPLE produk:
+User: 'pesan dimsum keju 2 dan teh jumbo 1'
 
-📦 Es Buah Selasih x2
+Step 1: Search SEMUA produk sekaligus
+AI: [panggil search_multiple_products(['dimsum', 'teh'])]
+Hasil: 
+- Dimsum Keju [ID:1] - Harga: Rp 40.000 - Stok: 10
+- Teh Jumbo [ID:2] - Harga: Rp 5.000 - Stok: 20
 
-Ketik \"lihat keranjang\" untuk melihat ringkasan pesanan.'
+Step 2: Add semua produk ke cart dalam SATU panggilan
+AI: [panggil add_to_cart(products=[{product_id:1, quantity:2}, {product_id:2, quantity:1}])]
 
-CONTOH BENAR - MULTIPLE PRODUK:
-User: 'Pesan es campur 1 dan es buah selasih 3'
-AI: [panggil add_to_cart(products=[{product_id:1, quantity:1}, {product_id:2, quantity:3}])]
-AI Response: 'Baik! ✅ Berhasil menambahkan ke keranjang!
+Step 3: Tampilkan hasil ke user (TANPA ID)
+AI Response: 'Baik! Berhasil menambahkan ke keranjang!
 
-📦 Es Campur x1
-📦 Es Buah Selasih x3
+Dimsum Keju x2
+Teh Jumbo x1
 
-Ketik \"lihat keranjang\" untuk melihat ringkasan pesanan.'
+Ketik lihat keranjang untuk melihat ringkasan pesanan.'
 
-CONTOH SALAH:
-User: 'Pesan es campur 1 dan es buah 3'
-AI: [panggil add_to_cart(products=[{product_id:1, quantity:1}])] ❌ SALAH! Harus include semua produk!
-AI: 'Saya tambahkan 2 Es Buah seharga Rp 40.000' ❌ SALAH! Jangan hitung sendiri!";
+CONTOH BENAR - User memesan SATU produk:
+User: 'pesan dimsum 2'
+
+Step 1: [panggil search_products('dimsum')]
+Step 2: [dapat hasil dengan ID:1]
+Step 3: [panggil add_to_cart(products=[{product_id:1, quantity:2}])]
+
+CONTOH SALAH 1:
+User: 'pesan dimsum keju 2'
+AI: [langsung panggil add_to_cart tanpa search] ❌ SALAH! Harus search dulu!
+
+CONTOH SALAH 2:
+User: 'pesan dimsum dan teh'
+AI: [panggil search_products('dimsum')] ❌ SALAH! Untuk multiple produk, gunakan search_multiple_products(['dimsum', 'teh'])
+
+CONTOH SALAH 3:
+User: 'pesan dimsum 2'
+AI: [panggil search_products('dimsum keju')] ❌ SALAH! Gunakan kata kunci PENDEK: 'dimsum'
+
+**TIPS PENTING UNTUK SEARCH:**
+- Untuk SATU produk: search_products('kata_kunci')
+- Untuk MULTIPLE produk: search_multiple_products(['kata1', 'kata2', ...])
+- Gunakan kata kunci PENDEK dan UMUM (contoh: 'dimsum', 'teh', 'nasi', 'ayam')
+- Sistem akan mencocokkan dengan semua produk yang mengandung kata tersebut
+- Jika user bilang 'dimsum', sistem akan menemukan 'Dimsum Keju', 'Dimsum Ayam', dll
+- Jika user bilang 'teh', sistem akan menemukan 'Teh Jumbo', 'Teh Manis', dll
+- Jika hasil search lebih dari 1 untuk satu kata kunci, tanyakan ke user produk mana yang dimaksud
+- EKSTRAK ID dari hasil search yang berbentuk [ID:X] dan gunakan untuk add_to_cart";
         }
 
         return $prompt;
