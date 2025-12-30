@@ -1,13 +1,13 @@
 @extends('layouts.app')
 
-@section('title', 'Dashboard - QashierWise')
+@section('title', __('dashboard.dashboard_title'))
 
 @section('content')
 <div x-data="dashboardApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
     @include('components.dashboard-sidebar', ['activePage' => 'dashboard'])
 
     <div class="flex-1 flex flex-col min-h-screen" :class="{ 'lg:ml-0': true }">
-        @include('components.dashboard-header', ['title' => 'Dashboard', 'description' => 'Welcome back! Here\'s your WhatsApp Business overview.'])
+        @include('components.dashboard-header', ['title' => __('dashboard.menu_dashboard'), 'description' => __('dashboard.welcome_back')])
 
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto space-y-6">

@@ -213,4 +213,70 @@ class AiAgentConversation extends Model
         $this->current_qris_transaction_id = null;
         $this->save();
     }
+
+    /**
+     * Get conversation summary from order_context.
+     */
+    public function getSummary(): ?array
+    {
+        return $this->order_context['summary'] ?? null;
+    }
+
+    /**
+     * Set conversation summary in order_context.
+     */
+    public function setSummary(array $summary): void
+    {
+        $orderContext = $this->order_context ?? [];
+        $orderContext['summary'] = $summary;
+        $orderContext['summarized_at'] = now()->toIso8601String();
+
+        $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    /**
+     * Check if conversation has summary.
+     */
+    public function hasSummary(): bool
+    {
+        return isset($this->order_context['summary']);
+    }
+
+    /**
+     * Clear summary from order_context.
+     */
+    public function clearSummary(): void
+    {
+        $orderContext = $this->order_context ?? [];
+        unset($orderContext['summary']);
+        unset($orderContext['summarized_at']);
+        unset($orderContext['last_intent']);
+
+        $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    /**
+     * Get message count.
+     */
+    public function getMessageCount(): int
+    {
+        return count($this->messages ?? []);
+    }
+
+    /**
+     * Get recent messages (last N messages).
+     */
+    public function getRecentMessages(int $count = 3): array
+    {
+        $messages = $this->messages ?? [];
+        
+        if (empty($messages)) {
+            return [];
+        }
+
+        // Return last N messages
+        return array_slice($messages, -$count);
+    }
 }

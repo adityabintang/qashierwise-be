@@ -23,10 +23,41 @@
         window.addEventListener('whatsapp-message-received', (event) => {
             console.log('📩 Dashboard - New message notification:', event.detail);
             this.notifications.unshift({
+                id: Date.now(),
+                title: 'New WhatsApp Message',
                 message: `New message from ${event.detail.contact?.name || 'Unknown'}`,
-                time: new Date().toLocaleTimeString()
+                time: new Date(),
+                icon: 'fa-whatsapp',
+                color: 'blue'
             });
         });
+    },
+
+    clearNotifications() {
+        this.notifications = [];
+    },
+
+    removeNotification(id) {
+        this.notifications = this.notifications.filter(n => n.id !== id);
+    },
+
+    formatNotificationTime(time) {
+        if (!time) return '';
+        const date = new Date(time);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        
+        const diffHours = Math.floor(diffMins / 60);
+        if (diffHours < 24) return `${diffHours}h ago`;
+        
+        const diffDays = Math.floor(diffHours / 24);
+        if (diffDays < 7) return `${diffDays}d ago`;
+        
+        return date.toLocaleDateString();
     },
 
     logout() {

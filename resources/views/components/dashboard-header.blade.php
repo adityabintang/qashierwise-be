@@ -25,26 +25,29 @@
 
         <!-- Actions -->
         <div class="flex items-center gap-2">
+            <!-- Language Switcher -->
+            <x-language-switcher />
+            
             <!-- Notifications -->
-            <div x-data="{ open: false }" class="relative">
+            <div x-data="{ notificationOpen: false }" class="relative">
                 <button 
-                    @click="open = !open" 
+                    @click="notificationOpen = !notificationOpen" 
                     class="btn btn-ghost btn-icon relative touch-target"
                 >
                     <i class="fas fa-bell text-lg"></i>
                     <span 
-                        x-show="notifications.length > 0" 
+                        x-show="notifications && notifications.length > 0" 
                         x-transition
                         class="notification-badge"
-                        x-text="notifications.length > 9 ? '9+' : notifications.length"
+                        x-text="notifications && notifications.length > 9 ? '9+' : notifications.length"
                     ></span>
                 </button>
 
                 <!-- Notifications Dropdown -->
                 <div 
-                    x-show="open" 
+                    x-show="notificationOpen" 
                     x-cloak
-                    @click.away="open = false" 
+                    @click.away="notificationOpen = false" 
                     x-transition:enter="transition ease-out duration-200"
                     x-transition:enter-start="opacity-0 translate-y-1"
                     x-transition:enter-end="opacity-100 translate-y-0"
@@ -55,30 +58,30 @@
                 >
                     <!-- Header -->
                     <div class="flex items-center justify-between px-4 py-3 border-b border-[hsl(var(--border))]">
-                        <h3 class="font-semibold text-sm">Notifications</h3>
+                        <h3 class="font-semibold text-sm">{{ __('dashboard.notifications') }}</h3>
                         <button 
-                            x-show="notifications.length > 0" 
-                            @click="clearNotifications()" 
+                            x-show="notifications && notifications.length > 0" 
+                            @click="clearNotifications && clearNotifications()" 
                             class="text-xs text-[hsl(var(--destructive))] hover:underline"
                         >
-                            Clear all
+                            {{ __('dashboard.clear_all') }}
                         </button>
                     </div>
 
                     <!-- Notifications List -->
                     <div class="max-h-72 overflow-y-auto scroll-area">
                         <!-- Empty State -->
-                        <template x-if="notifications.length === 0">
+                        <template x-if="!notifications || notifications.length === 0">
                             <div class="empty-state py-8">
                                 <div class="empty-state-icon">
                                     <i class="fas fa-bell-slash"></i>
                                 </div>
-                                <p class="text-sm text-[hsl(var(--muted-foreground))]">No notifications</p>
+                                <p class="text-sm text-[hsl(var(--muted-foreground))]">{{ __('dashboard.no_notifications') }}</p>
                             </div>
                         </template>
 
                         <!-- Notification Items -->
-                        <template x-for="notif in notifications" :key="notif.id">
+                        <template x-for="notif in (notifications || [])" :key="notif.id">
                             <div class="flex items-start gap-3 px-4 py-3 hover:bg-[hsl(var(--accent))] transition-colors group border-b border-[hsl(var(--border))] last:border-0">
                                 <div 
                                     class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
@@ -93,12 +96,12 @@
                                     <i class="fas text-sm" :class="notif.icon || 'fa-bell'"></i>
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <p class="text-sm font-medium" x-text="notif.title || 'Notification'"></p>
+                                    <p class="text-sm font-medium" x-text="notif.title || '{{ __("dashboard.notification") }}'"></p>
                                     <p class="text-xs text-[hsl(var(--muted-foreground))] truncate" x-text="notif.message"></p>
-                                    <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1" x-text="formatNotificationTime(notif.time)"></p>
+                                    <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1" x-text="formatNotificationTime && formatNotificationTime(notif.time)"></p>
                                 </div>
                                 <button 
-                                    @click.stop="removeNotification(notif.id)" 
+                                    @click.stop="removeNotification && removeNotification(notif.id)" 
                                     class="opacity-0 group-hover:opacity-100 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))] transition-opacity"
                                 >
                                     <i class="fas fa-times text-xs"></i>

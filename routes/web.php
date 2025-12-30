@@ -2,6 +2,21 @@
 
 use Illuminate\Support\Facades\Route;
 
+// Language switching route
+Route::get('/language/{locale}', function ($locale) {
+    if (!in_array($locale, config('app.supported_locales'))) {
+        abort(400);
+    }
+
+    session(['locale' => $locale]);
+
+    if (auth()->check()) {
+        auth()->user()->update(['language_preference' => $locale]);
+    }
+
+    return redirect()->back();
+})->name('language.switch');
+
 // Landing page
 Route::get('/', function () {
     return view('welcome');

@@ -34,7 +34,8 @@ class QrisService
     public function __construct(
         private ProviderCredentialService $credentialService,
         private EncryptionService $encryptionService,
-        private ProviderFactory $providerFactory
+        private ProviderFactory $providerFactory,
+        private ?CredentialAuditService $credentialAuditService = null
     ) {
         $this->serverKey = config('services.midtrans.server_key') ?? '';
         $this->clientKey = config('services.midtrans.client_key') ?? '';
@@ -122,6 +123,15 @@ class QrisService
                     $activeCredential->credentials_encrypted
                 );
 
+                // Log credential access for audit
+                if ($this->credentialAuditService !== null) {
+                    $this->credentialAuditService->logDecryption(
+                        $user,
+                        $activeCredential,
+                        true
+                    );
+                }
+
                 // Get provider implementation
                 $provider = $this->providerFactory->make($activeCredential->provider);
 
@@ -160,6 +170,18 @@ class QrisService
                     'provider' => $activeCredential->provider,
                     'error' => $e->getMessage(),
                 ]);
+                
+                // Log failed credential access
+                if ($this->credentialAuditService !== null) {
+                    $this->credentialAuditService->logAccess(
+                        $user,
+                        $activeCredential,
+                        \App\Models\CredentialAccessLog::ACTION_READ,
+                        false,
+                        "Unsupported provider: {$activeCredential->provider}"
+                    );
+                }
+                
                 throw new RuntimeException("Provider {$activeCredential->provider} is not supported");
                 
             } catch (\Exception $e) {
@@ -167,7 +189,18 @@ class QrisService
                     'order_id' => $orderId,
                     'provider' => $activeCredential->provider,
                     'error' => $e->getMessage(),
+                    'error_class' => get_class($e),
                 ]);
+                
+                // Log failed credential access
+                if ($this->credentialAuditService !== null) {
+                    $this->credentialAuditService->logDecryption(
+                        $user,
+                        $activeCredential,
+                        false,
+                        $e->getMessage()
+                    );
+                }
                 
                 // If provider fails, we still have the transaction record
                 // Generate a fallback QR code URL
@@ -499,5 +532,238 @@ class QrisService
         }
 
         return $result;
+    }
+
+    /**
+     * Get the active provider credential for a user.
+     *
+     * @param User $user The user to get the active provider for
+     * @return \App\Models\PaymentProviderCredential|null The active provider credential or null
+     */
+    public function getActiveProviderCredential(User $user): ?\App\Models\PaymentProviderCredential
+    {
+        return $this->credentialService->getActiveProvider($user);
+    }
+
+    /**
+     * Handle webhook notification from payment provider.
+     * Verifies webhook signature and updates transaction status.
+     *
+     * @param string $provider The provider name (xendit, midtrans, etc.)
+     * @param array $payload The webhook payload data
+     * @param string $signature The webhook signature from headers
+     * @return void
+     * @throws \App\Exceptions\InvalidWebhookException If webhook signature is invalid
+     * @throws \App\Exceptions\NoActiveProviderException If provider credentials not found
+     * @throws RuntimeException If webhook processing fails
+     */
+    public function handleWebhook(string $provider, array $payload, string $signature): void
+    {
+        Log::info('Processing webhook', [
+            'provider' => $provider,
+            'payload_keys' => array_keys($payload),
+        ]);
+
+        // Find credential for this provider (any user with this provider configured)
+        // For webhooks, we need to find the credential based on the transaction data
+        $credential = \App\Models\PaymentProviderCredential::where('provider', $provider)
+            ->where('is_active', true)
+            ->first();
+
+        if (!$credential) {
+            Log::error('No active credential found for webhook provider', [
+                'provider' => $provider,
+            ]);
+            throw new \App\Exceptions\NoActiveProviderException(
+                "No active credentials found for provider: {$provider}"
+            );
+        }
+
+        try {
+            // Get provider instance
+            $providerInstance = $this->providerFactory->make($provider);
+
+            // Decrypt credentials for verification
+            $decryptedCredentials = $this->encryptionService->decryptCredentials(
+                $credential->user,
+                $credential->credentials_encrypted
+            );
+
+            // Log credential access for webhook verification
+            if ($this->credentialAuditService !== null) {
+                $this->credentialAuditService->logDecryption(
+                    $credential->user,
+                    $credential,
+                    true
+                );
+            }
+
+            // Verify webhook signature
+            if (!$providerInstance->verifyWebhook($payload, $signature, $decryptedCredentials)) {
+                Log::warning('Invalid webhook signature', [
+                    'provider' => $provider,
+                    'signature' => $signature,
+                ]);
+                throw new \App\Exceptions\InvalidWebhookException('Invalid webhook signature');
+            }
+
+            Log::info('Webhook signature verified', [
+                'provider' => $provider,
+            ]);
+
+            // Parse webhook payload into standard format
+            $webhookTransaction = $providerInstance->parseWebhookPayload($payload);
+
+            Log::info('Webhook payload parsed', [
+                'provider' => $provider,
+                'external_id' => $webhookTransaction->externalId,
+                'status' => $webhookTransaction->status,
+            ]);
+
+            // Update transaction status
+            $this->updateTransactionStatus($webhookTransaction);
+
+        } catch (\App\Exceptions\InvalidWebhookException $e) {
+            throw $e;
+        } catch (UnsupportedProviderException $e) {
+            Log::error('Unsupported provider in webhook', [
+                'provider' => $provider,
+                'error' => $e->getMessage(),
+            ]);
+            throw new RuntimeException("Provider {$provider} is not supported");
+        } catch (\Exception $e) {
+            Log::error('Webhook processing failed', [
+                'provider' => $provider,
+                'error' => $e->getMessage(),
+                'error_class' => get_class($e),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            // Log failed credential access if applicable
+            if ($this->credentialAuditService !== null && isset($credential)) {
+                $this->credentialAuditService->logDecryption(
+                    $credential->user,
+                    $credential,
+                    false,
+                    "Webhook processing failed: {$e->getMessage()}"
+                );
+            }
+            
+            throw new RuntimeException("Failed to process webhook: {$e->getMessage()}");
+        }
+    }
+
+    /**
+     * Update transaction status from webhook data.
+     * Processes the standardized webhook transaction data and updates the database.
+     *
+     * @param \App\DTOs\WebhookTransaction $webhookTransaction The parsed webhook transaction data
+     * @return void
+     * @throws RuntimeException If transaction update fails
+     */
+    public function updateTransactionStatus(\App\DTOs\WebhookTransaction $webhookTransaction): void
+    {
+        Log::info('Updating transaction status from webhook', [
+            'external_id' => $webhookTransaction->externalId,
+            'status' => $webhookTransaction->status,
+            'provider' => $webhookTransaction->provider,
+        ]);
+
+        // Find transaction by order_id (external_id)
+        $transaction = QrisTransaction::where('order_id', $webhookTransaction->externalId)
+            ->where('provider', $webhookTransaction->provider)
+            ->first();
+
+        if (!$transaction) {
+            Log::warning('Transaction not found for webhook', [
+                'external_id' => $webhookTransaction->externalId,
+                'provider' => $webhookTransaction->provider,
+            ]);
+            throw new RuntimeException(
+                "Transaction not found: {$webhookTransaction->externalId}"
+            );
+        }
+
+        // Don't update if transaction is already in a final state
+        if (in_array($transaction->status, [
+            QrisTransaction::STATUS_SETTLEMENT,
+            QrisTransaction::STATUS_CANCEL,
+        ])) {
+            Log::info('Transaction already in final state, skipping update', [
+                'order_id' => $transaction->order_id,
+                'current_status' => $transaction->status,
+                'webhook_status' => $webhookTransaction->status,
+            ]);
+            return;
+        }
+
+        try {
+            DB::transaction(function () use ($transaction, $webhookTransaction) {
+                // Map webhook status to transaction status
+                $newStatus = $this->mapWebhookStatusToTransactionStatus($webhookTransaction->status);
+
+                // Prepare update data
+                $updateData = [
+                    'status' => $newStatus,
+                ];
+
+                // Add reference_id if provided
+                if ($webhookTransaction->referenceId !== null) {
+                    $updateData['reference_id'] = $webhookTransaction->referenceId;
+                }
+
+                // Add paid_at timestamp if payment was successful
+                if ($newStatus === QrisTransaction::STATUS_SETTLEMENT && $webhookTransaction->paidAt !== null) {
+                    $updateData['paid_at'] = $webhookTransaction->paidAt;
+                } elseif ($newStatus === QrisTransaction::STATUS_SETTLEMENT && $webhookTransaction->paidAt === null) {
+                    $updateData['paid_at'] = now();
+                }
+
+                // Update transaction
+                $transaction->update($updateData);
+
+                Log::info('Transaction status updated', [
+                    'order_id' => $transaction->order_id,
+                    'old_status' => $transaction->getOriginal('status'),
+                    'new_status' => $newStatus,
+                    'provider' => $webhookTransaction->provider,
+                ]);
+
+                // Log to financial audit trail if payment was successful
+                // Note: Audit logging is skipped in webhook context as balance updates
+                // are handled by ProcessQrisPayment job which has access to balance info
+                if ($newStatus === QrisTransaction::STATUS_SETTLEMENT && 
+                    $this->auditService !== null && 
+                    $transaction->subMerchant !== null) {
+                    // Skip audit logging here - it's handled by ProcessQrisPayment job
+                    Log::info('Transaction settlement logged, audit will be handled by ProcessQrisPayment job', [
+                        'order_id' => $transaction->order_id,
+                    ]);
+                }
+            });
+        } catch (\Exception $e) {
+            Log::error('Failed to update transaction status', [
+                'order_id' => $transaction->order_id,
+                'error' => $e->getMessage(),
+            ]);
+            throw new RuntimeException("Failed to update transaction: {$e->getMessage()}");
+        }
+    }
+
+    /**
+     * Map webhook status to QrisTransaction status constants.
+     *
+     * @param string $webhookStatus The status from webhook (success, pending, failed, expired)
+     * @return string The mapped transaction status constant
+     */
+    private function mapWebhookStatusToTransactionStatus(string $webhookStatus): string
+    {
+        return match (strtolower($webhookStatus)) {
+            'success', 'paid', 'settlement' => QrisTransaction::STATUS_SETTLEMENT,
+            'pending', 'active' => QrisTransaction::STATUS_PENDING,
+            'failed', 'deny', 'cancel' => QrisTransaction::STATUS_CANCEL,
+            'expired', 'expire' => QrisTransaction::STATUS_EXPIRE,
+            default => QrisTransaction::STATUS_PENDING,
+        };
     }
 }

@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Contacts - QashierWise')
+@section('title', __('dashboard.contacts_title'))
 
 @section('content')
 <div x-data="contactsApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
@@ -10,7 +10,7 @@
     <!-- Main Content -->
     <div class="flex-1 flex flex-col min-h-screen">
         <!-- Header -->
-        @include('components.dashboard-header', ['title' => 'Contacts', 'description' => 'Manage your WhatsApp contacts'])
+        @include('components.dashboard-header', ['title' => __('whatsapp.contacts_title'), 'description' => __('whatsapp.contacts_subtitle')])
 
         <!-- Page Content -->
         <main class="flex-1 p-4 md:p-6">
@@ -24,15 +24,15 @@
                                 type="text"
                                 x-model="searchQuery"
                                 @input="filterContacts"
-                                placeholder="Search contacts..."
+                                placeholder="{{ __('whatsapp.search_contacts') }}"
                                 class="input pl-10 w-full"
                             >
                         </div>
                         <select x-model="sortBy" @change="sortContacts" class="input w-full sm:w-48">
-                            <option value="name_asc">Name (A-Z)</option>
-                            <option value="name_desc">Name (Z-A)</option>
-                            <option value="recent">Recently Added</option>
-                            <option value="oldest">Oldest First</option>
+                            <option value="name_asc">{{ __('whatsapp.name_asc') }}</option>
+                            <option value="name_desc">{{ __('whatsapp.name_desc') }}</option>
+                            <option value="recent">{{ __('whatsapp.recently_added') }}</option>
+                            <option value="oldest">{{ __('whatsapp.oldest_first') }}</option>
                         </select>
                     </div>
                 </div>
@@ -129,8 +129,8 @@
                         <div class="empty-state-icon">
                             <i class="fas fa-address-book text-2xl"></i>
                         </div>
-                        <h3 class="font-semibold mt-4">No contacts found</h3>
-                        <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">Contacts will appear here when you receive or send messages.</p>
+                        <h3 class="font-semibold mt-4">{{ __('whatsapp.no_contacts_found') }}</h3>
+                        <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">{{ __('whatsapp.contacts_will_appear') }}</p>
                     </div>
                 </div>
 
@@ -162,7 +162,7 @@
                     >
                         <!-- Header -->
                         <div class="flex items-center justify-between p-6 border-b border-[hsl(var(--border))]">
-                            <h3 class="text-lg font-semibold">Contact Details</h3>
+                            <h3 class="text-lg font-semibold">{{ __('whatsapp.contact_details') }}</h3>
                             <button @click="closeModal" class="btn btn-ghost btn-icon">
                                 <i class="fas fa-times"></i>
                             </button>
@@ -192,24 +192,24 @@
                             <!-- Details -->
                             <div class="space-y-4">
                                 <div>
-                                    <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Name</label>
+                                    <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">{{ __('whatsapp.name') }}</label>
                                     <p class="text-lg font-semibold mt-1" x-text="selectedContact?.name || 'Unknown'">-</p>
                                 </div>
                                 <div>
-                                    <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Phone Number</label>
+                                    <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">{{ __('whatsapp.phone_number') }}</label>
                                     <p class="text-lg font-semibold mt-1" x-text="selectedContact?.phone_number">-</p>
                                 </div>
                                 <div x-show="selectedContact?.profile_name">
-                                    <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">WhatsApp Profile</label>
+                                    <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">{{ __('whatsapp.profile_name') }}</label>
                                     <p class="mt-1" x-text="selectedContact?.profile_name">-</p>
                                 </div>
                                 <div class="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Messages</label>
+                                        <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">{{ __('whatsapp.messages_count') }}</label>
                                         <p class="text-lg font-semibold mt-1" x-text="selectedContact?.messages_count || 0">0</p>
                                     </div>
                                     <div>
-                                        <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Last Activity</label>
+                                        <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">{{ __('whatsapp.last_activity') }}</label>
                                         <p class="mt-1" x-text="formatDate(selectedContact?.last_message_at || selectedContact?.created_at)">-</p>
                                     </div>
                                 </div>
@@ -220,13 +220,13 @@
                         <div class="flex gap-3 p-4 md:p-6 border-t border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)]">
                             <button @click="closeModal" class="btn btn-outline btn-md flex-1">
                                 <i class="fas fa-times md:hidden"></i>
-                                <span class="hidden md:inline">Close</span>
-                                <span class="md:hidden">Close</span>
+                                <span class="hidden md:inline">{{ __('whatsapp.close') }}</span>
+                                <span class="md:hidden">{{ __('whatsapp.close') }}</span>
                             </button>
                             <button @click="sendMessage(selectedContact)" class="btn btn-primary btn-md flex-1">
                                 <i class="fas fa-paper-plane"></i>
-                                <span class="hidden md:inline">Send Message</span>
-                                <span class="md:hidden">Message</span>
+                                <span class="hidden md:inline">{{ __('whatsapp.send_message') }}</span>
+                                <span class="md:hidden">{{ __('whatsapp.message') }}</span>
                             </button>
                         </div>
                     </div>

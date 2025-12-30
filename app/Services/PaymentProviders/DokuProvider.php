@@ -7,6 +7,7 @@ use App\DTOs\QrisRequest;
 use App\DTOs\QrisResponse;
 use App\DTOs\TransactionStatus;
 use App\DTOs\ValidationResult;
+use App\DTOs\WebhookTransaction;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -245,5 +246,54 @@ class DokuProvider implements PaymentProviderInterface
             'cancelled', 'cancel', '02' => TransactionStatus::STATUS_CANCEL,
             default => TransactionStatus::STATUS_FAILED,
         };
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function verifyWebhook(array $payload, string $signature, array $credentials): bool
+    {
+        try {
+            // Doku uses HMAC-SHA256 for webhook verification
+            $secretKey = $credentials['secret_key'] ?? '';
+            
+            // Construct the signature string (adjust based on Doku's documentation)
+            $signatureString = json_encode($payload);
+            $computedSignature = hash_hmac('sha256', $signatureString, $secretKey);
+            
+            return hash_equals($computedSignature, $signature);
+        } catch (\Exception $e) {
+            Log::error('Doku webhook verification error', [
+                'error' => $e->getMessage(),
+            ]);
+            
+            return false;
+        }
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function parseWebhookPayload(array $payload): WebhookTransaction
+    {
+        $status = $this->mapDokuStatus($payload['transactionStatusCode'] ?? $payload['latestTransactionStatus'] ?? 'pending');
+        
+        $paidAt = null;
+        if ($status === TransactionStatus::STATUS_SETTLEMENT && isset($payload['transactionDate'])) {
+            $paidAt = $payload['transactionDate'];
+        }
+
+        return new WebhookTransaction(
+            externalId: $payload['originalPartnerReferenceNo'] ?? $payload['partnerReferenceNo'] ?? '',
+            status: $status,
+            amount: isset($payload['amount']['value']) ? (float) $payload['amount']['value'] : 0.0,
+            paidAt: $paidAt,
+            provider: 'doku',
+            referenceId: $payload['referenceNo'] ?? null,
+            metadata: [
+                'response_code' => $payload['responseCode'] ?? null,
+                'original_status' => $payload['transactionStatusCode'] ?? null,
+            ]
+        );
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -23,11 +24,7 @@ class AuthController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error',
-                'errors' => $validator->errors()
-            ], 422);
+            return ApiResponse::validationError($validator->errors());
         }
 
         $user = User::create([
@@ -41,16 +38,12 @@ class AuthController extends Controller
         $expiresAt = now()->addMinutes($expirationMinutes);
         $token = $user->createToken('auth_token', ['*'], $expiresAt)->plainTextToken;
 
-        return response()->json([
-            'success' => true,
-            'message' => 'User registered successfully',
-            'data' => [
-                'user' => $user,
-                'access_token' => $token,
-                'token_type' => 'Bearer',
-                'expires_at' => $expiresAt->toIso8601String(),
-            ]
-        ], 201);
+        return ApiResponse::success([
+            'user' => $user,
+            'access_token' => $token,
+            'token_type' => 'Bearer',
+            'expires_at' => $expiresAt->toIso8601String(),
+        ], 'messages.success.created', 201);
     }
 
     /**
@@ -64,18 +57,11 @@ class AuthController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error',
-                'errors' => $validator->errors()
-            ], 422);
+            return ApiResponse::validationError($validator->errors());
         }
 
         if (!Auth::attempt($request->only('email', 'password'))) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid login credentials'
-            ], 401);
+            return ApiResponse::unauthorized('messages.error.invalid_credentials');
         }
 
         $user = User::where('email', $request->email)->firstOrFail();
@@ -85,16 +71,12 @@ class AuthController extends Controller
         $expiresAt = now()->addMinutes($expirationMinutes);
         $token = $user->createToken('auth_token', ['*'], $expiresAt)->plainTextToken;
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Login successful',
-            'data' => [
-                'user' => $user,
-                'access_token' => $token,
-                'token_type' => 'Bearer',
-                'expires_at' => $expiresAt->toIso8601String(),
-            ]
-        ], 200);
+        return ApiResponse::success([
+            'user' => $user,
+            'access_token' => $token,
+            'token_type' => 'Bearer',
+            'expires_at' => $expiresAt->toIso8601String(),
+        ], 'auth.login_success');
     }
 
     /**
@@ -105,10 +87,7 @@ class AuthController extends Controller
         $user = $request->user();
         
         if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User not authenticated'
-            ], 401);
+            return ApiResponse::unauthorized('messages.error.unauthorized');
         }
 
         $token = $user->currentAccessToken();
@@ -117,10 +96,7 @@ class AuthController extends Controller
             $token->delete();
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Logged out successfully'
-        ], 200);
+        return ApiResponse::success(null, 'auth.logout_success');
     }
 
     /**
@@ -128,11 +104,8 @@ class AuthController extends Controller
      */
     public function me(Request $request)
     {
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'user' => $request->user()
-            ]
-        ], 200);
+        return ApiResponse::success([
+            'user' => $request->user()
+        ]);
     }
 }

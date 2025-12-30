@@ -416,22 +416,25 @@
 
                 <!-- Desktop Menu -->
                 <div class="hidden md:flex items-center space-x-8">
-                    <a href="#features" class="text-gray-600 hover:text-primary transition">Cara Kerja</a>
-                    <a href="#fitur" class="text-gray-600 hover:text-primary transition">Fitur</a>
-                    <a href="#pricing" class="text-gray-600 hover:text-primary transition">Harga</a>
-                    <a href="#about" class="text-gray-600 hover:text-primary transition">Tentang Kami</a>
-                    <a href="#faq" class="text-gray-600 hover:text-primary transition">FAQ</a>
+                    <a href="#features" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.how_it_works') }}</a>
+                    <a href="#fitur" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.features') }}</a>
+                    <a href="#pricing" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.pricing') }}</a>
+                    <a href="#about" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.about') }}</a>
+                    <a href="#faq" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.faq') }}</a>
                 </div>
 
                 <!-- CTA Buttons (Desktop) -->
                 <div class="hidden md:flex items-center space-x-4">
+                    <!-- Language Switcher -->
+                    <x-language-switcher />
+                    
                     @if (Route::has('login'))
                         @auth
-                            <a href="{{ url('/dashboard') }}" class="text-gray-600 hover:text-primary font-medium transition">Dashboard</a>
+                            <a href="{{ url('/dashboard') }}" class="text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.dashboard') }}</a>
                         @else
-                            <a href="/login" class="text-gray-600 hover:text-primary font-medium transition">Lihat Demo</a>
+                            <a href="/login" class="text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.view_demo') }}</a>
                             <a href="/login" class="bg-primary text-white px-5 py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-all">
-                                Coba Gratis 14 Hari
+                                {{ __('landing.nav.try_free') }}
                             </a>
                         @endauth
                     @endif
@@ -463,21 +466,26 @@
             class="md:hidden bg-white border-t border-gray-100 shadow-lg"
         >
             <div class="px-4 py-4 space-y-3">
-                <a href="#features" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">Cara Kerja</a>
-                <a href="#fitur" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">Fitur</a>
-                <a href="#pricing" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">Harga</a>
-                <a href="#about" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">Tentang Kami</a>
-                <a href="#faq" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">FAQ</a>
+                <a href="#features" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.how_it_works') }}</a>
+                <a href="#fitur" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.features') }}</a>
+                <a href="#pricing" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.pricing') }}</a>
+                <a href="#about" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.about') }}</a>
+                <a href="#faq" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.faq') }}</a>
 
                 <!-- Mobile CTA Buttons -->
                 <div class="pt-4 border-t border-gray-100 space-y-3">
+                    <!-- Language Switcher for Mobile -->
+                    <div class="flex justify-center">
+                        <x-language-switcher />
+                    </div>
+                    
                     @if (Route::has('login'))
                         @auth
-                            <a href="{{ url('/dashboard') }}" class="block py-3 px-4 text-center text-gray-600 hover:text-primary font-medium transition">Dashboard</a>
+                            <a href="{{ url('/dashboard') }}" class="block py-3 px-4 text-center text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.dashboard') }}</a>
                         @else
-                            <a href="/login" class="block py-3 px-4 text-center text-gray-600 hover:text-primary font-medium transition">Lihat Demo</a>
+                            <a href="/login" class="block py-3 px-4 text-center text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.view_demo') }}</a>
                             <a href="/login" class="block py-3 px-4 text-center bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-all">
-                                Coba Gratis 14 Hari
+                                {{ __('landing.nav.try_free') }}
                             </a>
                         @endauth
                     @endif
@@ -512,46 +520,46 @@
                 <div class="text-center lg:text-left order-1">
                     <div class="inline-flex items-center px-3 md:px-4 py-2 bg-purple-100 rounded-full text-primary text-xs md:text-sm font-medium mb-4 md:mb-6">
                         <i class="fas fa-sparkles mr-2"></i>
-                        Didukung AI + Terintegrasi QRIS
+                        {{ __('landing.hero.badge') }}
                     </div>
 
-                    <p class="text-gray-500 mb-3 md:mb-4 text-sm md:text-base">Chatbot untuk WhatsApp + Sistem QRIS</p>
+                    <p class="text-gray-500 mb-3 md:mb-4 text-sm md:text-base">{{ __('landing.hero.subtitle') }}</p>
 
                     <!-- Responsive heading: smaller on mobile -->
                     <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-4 md:mb-6">
-                        Respon lebih cepat, jual lebih <span class="gradient-text">banyak</span>
+                        {{ __('landing.hero.title') }} <span class="gradient-text">{{ __('landing.hero.title_highlight') }}</span>
                     </h1>
 
                     <p class="text-base md:text-lg text-gray-600 mb-6 md:mb-8 leading-relaxed">
-                        QashierWise menghadirkan Chatbot WhatsApp yang restoran-first dengan satu layar admin: Inbox, Pesanan, Reservasi, Menu, dan CRM.
+                        {{ __('landing.hero.description') }}
                     </p>
 
                     <div class="flex flex-col sm:flex-row gap-3 md:gap-4 mb-6 md:mb-8 justify-center lg:justify-start">
                         <a href="/login" class="inline-flex items-center justify-center px-6 md:px-8 py-3 md:py-4 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all text-sm md:text-base">
-                            <span>Coba Gratis 14 Hari</span>
+                            <span>{{ __('landing.hero.cta_primary') }}</span>
                         </a>
                         <a href="#demo" class="inline-flex items-center justify-center px-6 md:px-8 py-3 md:py-4 bg-white text-primary rounded-xl font-semibold border-2 border-primary/30 hover:border-primary transition-all text-sm md:text-base">
                             <i class="fas fa-play-circle mr-2"></i>
-                            <span>Lihat Demo</span>
+                            <span>{{ __('landing.hero.cta_secondary') }}</span>
                         </a>
                     </div>
 
                     <div class="flex flex-col gap-2 text-xs md:text-sm text-gray-500 items-center lg:items-start">
                         <div class="flex items-center">
                             <i class="fas fa-check text-green-600 mr-2"></i>
-                            <span>Reservasi & Order via WhatsApp tanpa ribet</span>
+                            <span>{{ __('landing.hero.benefits.reservations_orders') }}</span>
                         </div>
                         <div class="flex items-center">
                             <i class="fas fa-check text-green-600 mr-2"></i>
-                            <span>Kelola pesanan + laporan dengan mudah</span>
+                            <span>{{ __('landing.hero.benefits.manage_orders') }}</span>
                         </div>
                         <div class="flex items-center">
                             <i class="fas fa-check text-green-600 mr-2"></i>
-                            <span>Tanpa perubahan workflow (bayar di tempat)</span>
+                            <span>{{ __('landing.hero.benefits.no_workflow_change') }}</span>
                         </div>
                         <div class="flex items-center">
                             <i class="fas fa-check text-green-600 mr-2"></i>
-                            <span>Laporan Order & penjualan otomatis</span>
+                            <span>{{ __('landing.hero.benefits.auto_reports') }}</span>
                         </div>
                     </div>
                 </div>
@@ -578,8 +586,8 @@
                                 <i class="fab fa-whatsapp text-green-600 text-lg md:text-xl"></i>
                             </div>
                             <div>
-                                <p class="text-xs md:text-sm font-semibold text-gray-900">Pesan Masuk</p>
-                                <p class="text-xs text-gray-500">+128 hari ini</p>
+                                <p class="text-xs md:text-sm font-semibold text-gray-900">{{ __('landing.hero.floating_messages') }}</p>
+                                <p class="text-xs text-gray-500">{{ __('landing.hero.floating_messages_count') }}</p>
                             </div>
                         </div>
                     </div>
@@ -589,8 +597,8 @@
                                 <i class="fas fa-chart-line text-primary text-lg md:text-xl"></i>
                             </div>
                             <div>
-                                <p class="text-xs md:text-sm font-semibold text-gray-900">Penjualan</p>
-                                <p class="text-xs text-green-600">↑ 24% bulan ini</p>
+                                <p class="text-xs md:text-sm font-semibold text-gray-900">{{ __('landing.hero.floating_sales') }}</p>
+                                <p class="text-xs text-green-600">{{ __('landing.hero.floating_sales_trend') }}</p>
                             </div>
                         </div>
                     </div>
@@ -603,8 +611,8 @@
     <section id="features" class="py-12 md:py-20 bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-10 md:mb-16">
-                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 md:mb-4">Cara kerja otomatis dengan AI + QRIS</h2>
-                <p class="text-sm md:text-base text-gray-600 max-w-2xl mx-auto">Semuanya untuk bisnis restoran: cepat, ringkas, dan akurat.</p>
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 md:mb-4">{{ __('landing.how_it_works.title') }}</h2>
+                <p class="text-sm md:text-base text-gray-600 max-w-2xl mx-auto">{{ __('landing.how_it_works.subtitle') }}</p>
             </div>
 
             <!-- Responsive: 1 col mobile, 2 cols tablet, 4 cols desktop -->
@@ -614,8 +622,8 @@
                     <div class="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-green-500/30">
                         <i class="fab fa-whatsapp text-white text-2xl"></i>
                     </div>
-                    <h3 class="font-semibold text-gray-900 mb-2">Terima chat di WhatsApp</h3>
-                    <p class="text-sm text-gray-500">Balas manual atau otomatis, sesuaikan auto-reply, jam operasional, dan menu.</p>
+                    <h3 class="font-semibold text-gray-900 mb-2">{{ __('landing.how_it_works.steps.0.title') }}</h3>
+                    <p class="text-sm text-gray-500">{{ __('landing.how_it_works.steps.0.description') }}</p>
                 </div>
 
                 <!-- Step 2 -->
@@ -623,8 +631,8 @@
                     <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-primary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-500/30">
                         <i class="fas fa-robot text-white text-2xl"></i>
                     </div>
-                    <h3 class="font-semibold text-gray-900 mb-2">AI merespons otomatis</h3>
-                    <p class="text-sm text-gray-500">Terkirim konfirmasi & menu, dan pelanggan terkelola dengan baik.</p>
+                    <h3 class="font-semibold text-gray-900 mb-2">{{ __('landing.how_it_works.steps.1.title') }}</h3>
+                    <p class="text-sm text-gray-500">{{ __('landing.how_it_works.steps.1.description') }}</p>
                 </div>
 
                 <!-- Step 3 -->
@@ -632,8 +640,8 @@
                     <div class="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/30">
                         <i class="fas fa-qrcode text-white text-2xl"></i>
                     </div>
-                    <h3 class="font-semibold text-gray-900 mb-2">Bayar dengan QRIS</h3>
-                    <p class="text-sm text-gray-500">Kirim link QRIS statis. Semua disimpan, status berubah otomatis.</p>
+                    <h3 class="font-semibold text-gray-900 mb-2">{{ __('landing.how_it_works.steps.2.title') }}</h3>
+                    <p class="text-sm text-gray-500">{{ __('landing.how_it_works.steps.2.description') }}</p>
                 </div>
 
                 <!-- Step 4 -->
@@ -641,8 +649,8 @@
                     <div class="w-16 h-16 bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-orange-500/30">
                         <i class="fas fa-user-tie text-white text-2xl"></i>
                     </div>
-                    <h3 class="font-semibold text-gray-900 mb-2">Karyawan pantau di Console</h3>
-                    <p class="text-sm text-gray-500">Lihat inbox pesan pesanan, dan kelola semuanya dalam satu layar.</p>
+                    <h3 class="font-semibold text-gray-900 mb-2">{{ __('landing.how_it_works.steps.3.title') }}</h3>
+                    <p class="text-sm text-gray-500">{{ __('landing.how_it_works.steps.3.description') }}</p>
                 </div>
             </div>
         </div>
@@ -652,8 +660,8 @@
     <section id="fitur" class="py-12 md:py-20 bg-gray-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-10 md:mb-16">
-                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 md:mb-4">Fitur utama yang restoran butuhkan</h2>
-                <p class="text-sm md:text-base text-gray-600 max-w-2xl mx-auto">Semua alat & aplikasi dibuat untuk memaksimalkan pemasukan restoran</p>
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 md:mb-4">{{ __('landing.features.title') }}</h2>
+                <p class="text-sm md:text-base text-gray-600 max-w-2xl mx-auto">{{ __('landing.features.subtitle') }}</p>
             </div>
 
             <!-- Responsive: 1 col mobile, 2 cols tablet, 3 cols desktop -->
@@ -663,8 +671,8 @@
                     <div class="w-10 h-10 md:w-12 md:h-12 bg-green-100 rounded-xl flex items-center justify-center mb-3 md:mb-4">
                         <i class="fab fa-whatsapp text-green-600 text-lg md:text-xl"></i>
                     </div>
-                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">AI Chatbot WhatsApp</h3>
-                    <p class="text-sm md:text-base text-gray-600">Balas cerdas dengan model AI, terima order, Talk to Staff, handover ke live agent langsung.</p>
+                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">{{ __('landing.features.list.0.title') }}</h3>
+                    <p class="text-sm md:text-base text-gray-600">{{ __('landing.features.list.0.description') }}</p>
                 </div>
 
                 <!-- Feature 2 -->
@@ -672,8 +680,8 @@
                     <div class="w-10 h-10 md:w-12 md:h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-3 md:mb-4">
                         <i class="fas fa-desktop text-primary text-lg md:text-xl"></i>
                     </div>
-                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">Console Satu Layar</h3>
-                    <p class="text-sm md:text-base text-gray-600">Inbox pesan, pesanan, kelola reservasi, dan semuanya dalam satu dashboard.</p>
+                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">{{ __('landing.features.list.1.title') }}</h3>
+                    <p class="text-sm md:text-base text-gray-600">{{ __('landing.features.list.1.description') }}</p>
                 </div>
 
                 <!-- Feature 3 -->
@@ -681,8 +689,8 @@
                     <div class="w-10 h-10 md:w-12 md:h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-3 md:mb-4">
                         <i class="fas fa-motorcycle text-blue-600 text-lg md:text-xl"></i>
                     </div>
-                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">Order Delivery & Pickup</h3>
-                    <p class="text-sm md:text-base text-gray-600">Penjadwalan, order & delivery bisa terhubung, pembayaran QRIS terintegrasi.</p>
+                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">{{ __('landing.features.list.2.title') }}</h3>
+                    <p class="text-sm md:text-base text-gray-600">{{ __('landing.features.list.2.description') }}</p>
                 </div>
 
                 <!-- Feature 4 -->
@@ -690,8 +698,8 @@
                     <div class="w-10 h-10 md:w-12 md:h-12 bg-amber-100 rounded-xl flex items-center justify-center mb-3 md:mb-4">
                         <i class="fas fa-calendar-check text-amber-600 text-lg md:text-xl"></i>
                     </div>
-                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">Reservasi Pintar</h3>
-                    <p class="text-sm md:text-base text-gray-600">Slot ketersediaan, jam buka, kapasitas, dan notifikasi staff. Pengingat T-24h & T+7hr.</p>
+                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">{{ __('landing.features.list.3.title') }}</h3>
+                    <p class="text-sm md:text-base text-gray-600">{{ __('landing.features.list.3.description') }}</p>
                 </div>
 
                 <!-- Feature 5 -->
@@ -699,8 +707,8 @@
                     <div class="w-10 h-10 md:w-12 md:h-12 bg-emerald-100 rounded-xl flex items-center justify-center mb-3 md:mb-4">
                         <i class="fas fa-qrcode text-emerald-600 text-lg md:text-xl"></i>
                     </div>
-                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">Pembayaran QRIS</h3>
-                    <p class="text-sm md:text-base text-gray-600">Kirim invoice QRIS atau berikan QR statis via chat, semua tercatat otomatis.</p>
+                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">{{ __('landing.features.list.4.title') }}</h3>
+                    <p class="text-sm md:text-base text-gray-600">{{ __('landing.features.list.4.description') }}</p>
                 </div>
 
                 <!-- Feature 6 -->
@@ -708,8 +716,8 @@
                     <div class="w-10 h-10 md:w-12 md:h-12 bg-rose-100 rounded-xl flex items-center justify-center mb-3 md:mb-4">
                         <i class="fas fa-chart-pie text-rose-600 text-lg md:text-xl"></i>
                     </div>
-                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">Laporan & CRM</h3>
-                    <p class="text-sm md:text-base text-gray-600">CRM, repeat rate, tag pelanggan, dan export CSV (Pro).</p>
+                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">{{ __('landing.features.list.5.title') }}</h3>
+                    <p class="text-sm md:text-base text-gray-600">{{ __('landing.features.list.5.description') }}</p>
                 </div>
             </div>
         </div>
@@ -719,8 +727,8 @@
     <section class="py-20 bg-gradient-to-b from-primary to-purple-800 overflow-hidden">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
-                <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Satu dashboard untuk semua</h2>
-                <p class="text-purple-200 max-w-2xl mx-auto">Kelola chat, pesanan, reservasi, dan laporan dalam satu tampilan yang simpel</p>
+                <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">{{ __('landing.app_preview.title') }}</h2>
+                <p class="text-purple-200 max-w-2xl mx-auto">{{ __('landing.app_preview.subtitle') }}</p>
             </div>
 
             <!-- App Preview Image Placeholder -->
@@ -824,8 +832,8 @@
     <section id="pricing" class="py-12 md:py-20 bg-gray-50" x-data="pricingSection()">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-10 md:mb-16">
-                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 md:mb-4">Harga sederhana, tumbuh bersama Anda</h2>
-                <p class="text-sm md:text-base text-gray-600">Mulai gratis - upgrade kapan saja.</p>
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 md:mb-4">{{ __('landing.pricing.title') }}</h2>
+                <p class="text-sm md:text-base text-gray-600">{{ __('landing.pricing.subtitle') }}</p>
             </div>
 
             <!-- Error Message -->
@@ -1073,22 +1081,22 @@
     <section id="about" class="py-20 bg-white">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
-                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Tentang Kami</h2>
-                <p class="text-gray-600">Kenali lebih dekat QashierWise dan tim di belaknya</p>
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">{{ __('landing.about.title') }}</h2>
+                <p class="text-gray-600">{{ __('landing.about.subtitle') }}</p>
             </div>
 
             <div class="prose prose-lg max-w-none text-gray-600 mb-12">
-                <h3 class="text-xl font-semibold text-gray-900">Apa itu QashierWise?</h3>
+                <h3 class="text-xl font-semibold text-gray-900">{{ __('landing.about.what_is_title') }}</h3>
                 <p>
-                    QashierWise adalah solusi modern yang menghadirkan AI Chatbot WhatsApp dengan sistem POS (Point of Sale) untuk restoran dan manajemen untuk proses reservasi dan pemesanan melalui WhatsApp. Serta menyajikan operasional bisnis dengan integrasi QRIS.
+                    {{ __('landing.about.what_is_description_1') }}
                 </p>
                 <p>
-                    Dengan QashierWise restoran dapat mengelola operasional lewat API, mengubah pesan secara otomatis, memiliki pembayaran QRIS, dan meningkatkan bisnis yang kompetitif - semua dalam satu platform yang mudah digunakan.
+                    {{ __('landing.about.what_is_description_2') }}
                 </p>
             </div>
 
             <div class="bg-gray-50 rounded-2xl p-8">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Pengelola</h3>
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ __('landing.about.founder_title') }}</h3>
                 <div class="flex items-center space-x-4">
                     <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-primary rounded-full flex items-center justify-center text-white text-2xl font-bold">
                         AB
@@ -1113,52 +1121,52 @@
     <section id="faq" class="py-20 bg-gray-50">
         <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
-                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Pertanyaan yang sering diajukan</h2>
-                <p class="text-gray-600">Semua dalam Bahasa Indonesia.</p>
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">{{ __('landing.faq.title') }}</h2>
+                <p class="text-gray-600">{{ __('landing.faq.subtitle') }}</p>
             </div>
 
             <div class="space-y-4" x-data="{ open: null }">
                 <!-- FAQ Item 1 -->
                 <div class="bg-white rounded-xl border border-gray-200">
                     <button @click="open = open === 1 ? null : 1" class="w-full px-6 py-4 text-left flex items-center justify-between">
-                        <span class="font-medium text-gray-900">Apa itu QashierWise?</span>
+                        <span class="font-medium text-gray-900">{{ __('landing.faq.items.0.question') }}</span>
                         <i class="fas fa-chevron-down text-gray-500 transform transition-transform" :class="{ 'rotate-180': open === 1 }"></i>
                     </button>
                     <div x-show="open === 1" x-transition class="px-6 pb-4 text-gray-600">
-                        QashierWise adalah platform AI Chatbot WhatsApp yang dirancang khusus untuk restoran, membantu mengelola reservasi, pesanan, dan pembayaran QRIS dalam satu dashboard.
+                        {{ __('landing.faq.items.0.answer') }}
                     </div>
                 </div>
 
                 <!-- FAQ Item 2 -->
                 <div class="bg-white rounded-xl border border-gray-200">
                     <button @click="open = open === 2 ? null : 2" class="w-full px-6 py-4 text-left flex items-center justify-between">
-                        <span class="font-medium text-gray-900">Apakah perlu aplikasi terpisah untuk pelanggan?</span>
+                        <span class="font-medium text-gray-900">{{ __('landing.faq.items.1.question') }}</span>
                         <i class="fas fa-chevron-down text-gray-500 transform transition-transform" :class="{ 'rotate-180': open === 2 }"></i>
                     </button>
                     <div x-show="open === 2" x-transition class="px-6 pb-4 text-gray-600">
-                        Tidak! Pelanggan cukup menggunakan WhatsApp yang sudah mereka miliki. Tidak perlu download aplikasi tambahan.
+                        {{ __('landing.faq.items.1.answer') }}
                     </div>
                 </div>
 
                 <!-- FAQ Item 3 -->
                 <div class="bg-white rounded-xl border border-gray-200">
                     <button @click="open = open === 3 ? null : 3" class="w-full px-6 py-4 text-left flex items-center justify-between">
-                        <span class="font-medium text-gray-900">Bagaimana pembayaran dilakukan?</span>
+                        <span class="font-medium text-gray-900">{{ __('landing.faq.items.2.question') }}</span>
                         <i class="fas fa-chevron-down text-gray-500 transform transition-transform" :class="{ 'rotate-180': open === 3 }"></i>
                     </button>
                     <div x-show="open === 3" x-transition class="px-6 pb-4 text-gray-600">
-                        Pembayaran bisa dilakukan melalui QRIS yang terintegrasi dengan Midtrans, Xendit, atau penyedia QRIS lainnya. Pelanggan juga bisa bayar di tempat.
+                        {{ __('landing.faq.items.2.answer') }}
                     </div>
                 </div>
 
                 <!-- FAQ Item 4 -->
                 <div class="bg-white rounded-xl border border-gray-200">
                     <button @click="open = open === 4 ? null : 4" class="w-full px-6 py-4 text-left flex items-center justify-between">
-                        <span class="font-medium text-gray-900">Apakah bisa multi-outlet dan multi nomor?</span>
+                        <span class="font-medium text-gray-900">{{ __('landing.faq.items.3.question') }}</span>
                         <i class="fas fa-chevron-down text-gray-500 transform transition-transform" :class="{ 'rotate-180': open === 4 }"></i>
                     </button>
                     <div x-show="open === 4" x-transition class="px-6 pb-4 text-gray-600">
-                        Ya! Paket Standard mendukung hingga 2 outlet, dan paket Pro mendukung unlimited outlet dengan fitur multi-branding.
+                        {{ __('landing.faq.items.3.answer') }}
                     </div>
                 </div>
             </div>
@@ -1178,46 +1186,46 @@
                         <span class="text-xl font-bold text-primary">QashierWise</span>
                     </div>
                     <p class="text-sm text-gray-600 mb-4">
-                        Coba gratis 14 hari, QashierWise membantu restoran menerima reservasi & order via WhatsApp dengan cepat.
+                        {{ __('landing.footer.company_description') }}
                     </p>
                     <div class="text-sm text-gray-600">
-                        <p class="font-semibold text-gray-900 mb-1">Alamat</p>
-                        <p>Jl. Widosari No. 55, Tegalrejo Raya<br>Salatiga, Jawa Tengah, Indonesia<br>50733</p>
+                        <p class="font-semibold text-gray-900 mb-1">{{ __('landing.footer.address_title') }}</p>
+                        <p>{!! __('landing.footer.address') !!}</p>
                     </div>
                 </div>
 
                 <!-- Navigation -->
                 <div>
-                    <h3 class="text-gray-900 font-semibold mb-4 text-base">Navigasi</h3>
+                    <h3 class="text-gray-900 font-semibold mb-4 text-base">{{ __('landing.footer.navigation_title') }}</h3>
                     <ul class="space-y-2 text-sm">
-                        <li><a href="#fitur" class="text-gray-600 hover:text-primary transition">Fitur</a></li>
-                        <li><a href="#pricing" class="text-gray-600 hover:text-primary transition">Harga</a></li>
-                        <li><a href="#about" class="text-gray-600 hover:text-primary transition">Tentang Kami</a></li>
-                        <li><a href="#faq" class="text-gray-600 hover:text-primary transition">FAQ</a></li>
+                        <li><a href="#fitur" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.features') }}</a></li>
+                        <li><a href="#pricing" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.pricing') }}</a></li>
+                        <li><a href="#about" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.about') }}</a></li>
+                        <li><a href="#faq" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.faq') }}</a></li>
                     </ul>
                 </div>
 
                 <!-- Legal -->
                 <div>
-                    <h3 class="text-gray-900 font-semibold mb-4 text-base">Legal</h3>
+                    <h3 class="text-gray-900 font-semibold mb-4 text-base">{{ __('landing.footer.legal_title') }}</h3>
                     <ul class="space-y-2 text-sm">
-                        <li><a href="/privacy-policy" class="text-gray-600 hover:text-primary transition">Kebijakan Privasi</a></li>
-                        <li><a href="/terms-of-service" class="text-gray-600 hover:text-primary transition">Ketentuan Layanan</a></li>
+                        <li><a href="/privacy-policy" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.privacy_policy') }}</a></li>
+                        <li><a href="/terms-of-service" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.terms_of_service') }}</a></li>
                     </ul>
                 </div>
 
                 <!-- Product -->
                 <div>
-                    <h3 class="text-gray-900 font-semibold mb-4 text-base">Produk</h3>
+                    <h3 class="text-gray-900 font-semibold mb-4 text-base">{{ __('landing.footer.product_title') }}</h3>
                     <ul class="space-y-2 text-sm">
-                        <li><a href="#" class="text-gray-600 hover:text-primary transition">QashierWise Console</a></li>
-                        <li><a href="#" class="text-gray-600 hover:text-primary transition">Chatbot WhatsApp</a></li>
+                        <li><a href="#" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.console') }}</a></li>
+                        <li><a href="#" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.chatbot') }}</a></li>
                     </ul>
                 </div>
             </div>
 
             <div class="border-t border-gray-200 pt-8 text-center text-sm text-gray-600">
-                <p>&copy; 2025 QashierWise by Aditya Bintang Fadila. All Rights Reserved.</p>
+                <p>{!! __('landing.footer.copyright') !!}</p>
             </div>
         </div>
     </footer>

@@ -6,6 +6,7 @@ use App\DTOs\QrisRequest;
 use App\DTOs\QrisResponse;
 use App\DTOs\TransactionStatus;
 use App\DTOs\ValidationResult;
+use App\DTOs\WebhookTransaction;
 
 /**
  * Interface for payment provider implementations.
@@ -40,6 +41,24 @@ interface PaymentProviderInterface
      * @return TransactionStatus Current status of the transaction
      */
     public function checkTransactionStatus(array $credentials, string $transactionId): TransactionStatus;
+
+    /**
+     * Verify webhook signature from provider.
+     *
+     * @param array $payload Webhook payload data
+     * @param string $signature Signature from webhook headers
+     * @param array $credentials Provider-specific credentials for verification
+     * @return bool True if signature is valid, false otherwise
+     */
+    public function verifyWebhook(array $payload, string $signature, array $credentials): bool;
+
+    /**
+     * Parse webhook payload into standard format.
+     *
+     * @param array $payload Raw webhook payload from provider
+     * @return WebhookTransaction Standardized transaction data
+     */
+    public function parseWebhookPayload(array $payload): WebhookTransaction;
 
     /**
      * Get the name of the provider.

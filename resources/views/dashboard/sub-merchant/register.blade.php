@@ -1,13 +1,13 @@
 @extends('layouts.app')
 
-@section('title', 'Register as Sub-Merchant - QashierWise')
+@section('title', __('submerchant.register_title'))
 
 @section('content')
 <div x-data="subMerchantRegister()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
     @include('components.dashboard-sidebar', ['activePage' => 'sub-merchant'])
 
     <div class="flex-1 flex flex-col min-h-screen">
-        @include('components.dashboard-header', ['title' => 'Register as Sub-Merchant', 'description' => 'Start accepting QRIS payments from your customers'])
+        @include('components.dashboard-header', ['title' => __('submerchant.register_as_submerchant'), 'description' => __('submerchant.start_accepting_qris')])
 
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-2xl mx-auto">

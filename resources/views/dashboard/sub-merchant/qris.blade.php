@@ -1,13 +1,13 @@
 @extends('layouts.app')
 
-@section('title', 'Generate QRIS - QashierWise')
+@section('title', __('submerchant.qris_title'))
 
 @section('content')
 <div x-data="qrisApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
     @include('components.dashboard-sidebar', ['activePage' => 'sub-merchant-qris'])
 
     <div class="flex-1 flex flex-col min-h-screen">
-        @include('components.dashboard-header', ['title' => 'Generate QRIS', 'description' => 'Create dynamic QR codes for payments'])
+        @include('components.dashboard-header', ['title' => __('submerchant.generate_qris'), 'description' => __('submerchant.qris_generation')])
 
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto space-y-6">

@@ -22,14 +22,22 @@ class AiAgentService
 
     protected QrisService $qrisService;
 
+    protected ConversationSummarizer $conversationSummarizer;
+
+    protected IntentTracker $intentTracker;
+
     public function __construct(
         WhatsAppAccountService $whatsappAccountService,
         OrderService $orderService,
-        QrisService $qrisService
+        QrisService $qrisService,
+        ConversationSummarizer $conversationSummarizer,
+        IntentTracker $intentTracker
     ) {
         $this->whatsappAccountService = $whatsappAccountService;
         $this->orderService = $orderService;
         $this->qrisService = $qrisService;
+        $this->conversationSummarizer = $conversationSummarizer;
+        $this->intentTracker = $intentTracker;
     }
 
     /**
@@ -73,11 +81,98 @@ class AiAgentService
             // Add user message to conversation
             $conversation->addMessage('human', $messageText);
 
+            // Check if summarization is needed
+            $shouldSummarize = $this->conversationSummarizer->shouldSummarize($conversation);
+            
+            // DISABLED: Intent change detection (too slow - adds extra LLM call)
+            // Intent changes will be detected naturally during regular summarization
+            // if (!$shouldSummarize && $conversation->hasSummary()) {
+            //     try {
+            //         $currentSummary = $conversation->getSummary();
+            //         $currentIntent = $currentSummary['intent'] ?? null;
+            //         
+            //         if ($currentIntent) {
+            //             // Get the last few messages to detect intent change
+            //             $recentMessages = $conversation->getRecentMessages(3);
+            //             
+            //             // Generate a quick summary to check intent
+            //             $quickSummary = $this->conversationSummarizer->generateSummary($recentMessages);
+            //             
+            //             if ($quickSummary && isset($quickSummary['intent'])) {
+            //                 $newIntent = $quickSummary['intent'];
+            //                 
+            //                 // Check if intent has changed
+            //                 if ($this->intentTracker->hasIntentChanged($conversation, $newIntent)) {
+            //                     Log::info('Intent change detected, triggering summarization', [
+            //                         'conversation_id' => $conversation->id,
+            //                         'old_intent' => $currentIntent,
+            //                         'new_intent' => $newIntent,
+            //                     ]);
+            //                     
+            //                     $shouldSummarize = true;
+            //                 }
+            //             }
+            //         }
+            //     } catch (\Exception $e) {
+            //         Log::warning('Intent change detection failed', [
+            //             'conversation_id' => $conversation->id,
+            //             'error' => $e->getMessage(),
+            //         ]);
+            //         // Continue without intent-based summarization
+            //     }
+            // }
+            
+            if ($shouldSummarize) {
+                try {
+                    Log::info('Triggering conversation summarization', [
+                        'conversation_id' => $conversation->id,
+                        'message_count' => count($conversation->messages ?? []),
+                    ]);
+
+                    // Generate summary
+                    $summary = $this->conversationSummarizer->generateSummary($conversation->messages ?? []);
+                    
+                    if ($summary) {
+                        // Store summary
+                        $this->conversationSummarizer->storeSummary($conversation, $summary);
+                        
+                        // Update intent tracker
+                        if (isset($summary['intent'])) {
+                            $this->intentTracker->updateIntent($conversation, $summary['intent']);
+                        }
+                        
+                        Log::info('Summary generated and stored successfully', [
+                            'conversation_id' => $conversation->id,
+                            'intent' => $summary['intent'] ?? 'unknown',
+                        ]);
+                    } else {
+                        Log::warning('Summary generation returned null, continuing without summary', [
+                            'conversation_id' => $conversation->id,
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Summarization failed, continuing with full message history', [
+                        'conversation_id' => $conversation->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                    // Continue without summary - system will use full message history
+                }
+            }
+
             // Build system prompt
             $systemPrompt = $aiAgent->buildSystemPrompt($account->user_id);
 
-            // Get conversation messages
-            $messages = $conversation->messages ?? [];
+            // Get conversation context (summary + recent messages OR full messages)
+            $messages = $this->conversationSummarizer->getContextForLLM($conversation);
+            
+            // Log context usage for monitoring
+            $hasSummary = $conversation->hasSummary();
+            Log::info('Using conversation context for LLM', [
+                'conversation_id' => $conversation->id,
+                'using_summary' => $hasSummary,
+                'context_message_count' => count($messages),
+                'total_message_count' => count($conversation->messages ?? []),
+            ]);
 
             // Call LLM with tools
             $tools = $this->getToolDefinitionsForAgent($aiAgent);
@@ -501,7 +596,36 @@ class AiAgentService
 
         // If we only have search calls (no final action), we need to call LLM again
         // to let it process the search results and call add_to_cart
+        // BUT: Only do this ONCE to prevent infinite loops
         if ($hasSearchCall && !$hasFinalAction) {
+            // Check if we've already done a follow-up call in this conversation turn
+            $lastMessages = array_slice($conversation->messages ?? [], -5);
+            $recentSearchCount = 0;
+            foreach ($lastMessages as $msg) {
+                if (isset($msg['type']) && $msg['type'] === 'ai' && 
+                    (stripos($msg['content'] ?? '', 'HASIL PENCARIAN') !== false || 
+                     stripos($msg['content'] ?? '', 'produk yang saya temukan') !== false)) {
+                    $recentSearchCount++;
+                }
+            }
+            
+            // If we've already shown search results recently, don't loop - just show to user
+            if ($recentSearchCount >= 2) {
+                Log::warning('Preventing search loop - already searched multiple times recently', [
+                    'conversation_id' => $conversation->id,
+                    'recent_search_count' => $recentSearchCount,
+                ]);
+                
+                // Send a helpful message to user
+                $responseMessage = "Maaf, saya mengalami kesulitan memproses pesanan Anda. Silakan coba lagi dengan format:\n\n";
+                $responseMessage .= "Contoh: 'pesan dimsum 2 porsi'\n";
+                $responseMessage .= "Atau: 'pesan dimsum 1 dan teh jumbo 2'";
+                
+                $conversation->addMessage('ai', $responseMessage);
+                $this->sendReply($account, $contact->wa_id, $responseMessage);
+                return;
+            }
+            
             Log::info('Search completed, calling LLM again to process results and add to cart');
             
             // Build messages with tool results for LLM to continue
@@ -779,18 +903,12 @@ class AiAgentService
         }
 
         // Build response for AI (with IDs in brackets for internal use)
-        $response = "Berikut produk yang saya temukan:\n\n";
+        $response = "HASIL PENCARIAN PRODUK:\n\n";
         foreach ($products as $product) {
-            $response .= "🔹 {$product->name} [ID:{$product->id}]\n";
-            $response .= '   Harga: Rp '.number_format($product->price, 0, ',', '.')."\n";
-            $response .= "   Stok: {$product->stock_quantity}\n";
-            if ($product->description) {
-                $response .= "   {$product->description}\n";
-            }
-            $response .= "\n";
+            $response .= "- {$product->name} [ID:{$product->id}] - Rp ".number_format($product->price, 0, ',', '.')." - Stok: {$product->stock_quantity}\n";
         }
         
-        $response .= "\n**INSTRUKSI UNTUK AI**: ID dalam [ID:X] adalah untuk internal AI saja. Saat menampilkan ke user, HAPUS bagian [ID:X]. User hanya perlu tahu nama, harga, dan stok produk.";
+        $response .= "\n**INSTRUKSI WAJIB**: Sekarang LANGSUNG panggil add_to_cart dengan ID di atas. JANGAN search lagi! JANGAN tampilkan daftar produk ke user lagi!";
 
         return $response;
     }
@@ -854,18 +972,16 @@ class AiAgentService
         }
 
         // Build response
-        $response = "Berikut produk yang saya temukan:\n\n";
+        $response = "HASIL PENCARIAN PRODUK:\n\n";
         foreach ($allResults as $product) {
-            $response .= "🔹 {$product['name']} [ID:{$product['id']}]\n";
-            $response .= '   Harga: Rp '.number_format($product['price'], 0, ',', '.')."\n";
-            $response .= "   Stok: {$product['stock']}\n\n";
+            $response .= "- {$product['name']} [ID:{$product['id']}] - Rp ".number_format($product['price'], 0, ',', '.')." - Stok: {$product['stock']}\n";
         }
 
         if (!empty($notFound)) {
-            $response .= "⚠️ Tidak ditemukan: " . implode(', ', $notFound) . "\n\n";
+            $response .= "\n⚠️ Tidak ditemukan: " . implode(', ', $notFound) . "\n";
         }
 
-        $response .= "**INSTRUKSI UNTUK AI**: Gunakan ID di atas untuk add_to_cart. Contoh: add_to_cart(products=[{product_id:1, quantity:2}, {product_id:2, quantity:1}])";
+        $response .= "\n**INSTRUKSI WAJIB**: Sekarang LANGSUNG panggil add_to_cart dengan SEMUA ID di atas dalam SATU array. JANGAN search lagi! JANGAN tampilkan daftar produk ke user lagi!";
 
         return $response;
     }

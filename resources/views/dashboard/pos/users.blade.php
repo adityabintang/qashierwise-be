@@ -1,13 +1,13 @@
 @extends('layouts.app')
 
-@section('title', 'POS Users - QashierWise')
+@section('title', __('pos.users.title') . ' - QashierWise')
 
 @section('content')
 <div x-data="posUsersApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
     @include('components.dashboard-sidebar', ['activePage' => 'pos-users'])
 
     <div class="flex-1 flex flex-col min-h-screen">
-        @include('components.dashboard-header', ['title' => 'POS Users', 'description' => 'Manage staff users and roles'])
+        @include('components.dashboard-header', ['title' => __('pos.users.title'), 'description' => __('pos.users.description')])
 
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto space-y-6">

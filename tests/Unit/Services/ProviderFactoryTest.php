@@ -133,7 +133,7 @@ class ProviderFactoryTest extends TestCase
         
         $this->assertCount(2, $fields);
         $this->assertContains('api_key', $fields);
-        $this->assertContains('callback_token', $fields);
+        $this->assertContains('webhook_token', $fields);
     }
 
     public function test_midtrans_provider_has_correct_required_fields(): void

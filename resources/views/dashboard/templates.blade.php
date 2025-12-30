@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Templates - QashierWise')
+@section('title', __('dashboard.templates_title'))
 
 @section('content')
 <!-- Toast Notification Container -->
@@ -46,7 +46,7 @@
     <!-- Main Content -->
     <div class="flex-1 flex flex-col min-h-screen">
         <!-- Header -->
-        @include('components.dashboard-header', ['title' => 'Templates', 'description' => 'Manage your WhatsApp message templates'])
+        @include('components.dashboard-header', ['title' => __('whatsapp.templates_title'), 'description' => __('whatsapp.templates_subtitle')])
 
         <!-- Page Content -->
         <main class="flex-1 p-4 md:p-6">

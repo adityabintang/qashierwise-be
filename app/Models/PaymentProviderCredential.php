@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Crypt;
 
 class PaymentProviderCredential extends Model
 {
@@ -65,6 +67,103 @@ class PaymentProviderCredential extends Model
     public function accessLogs(): HasMany
     {
         return $this->hasMany(CredentialAccessLog::class, 'credential_id');
+    }
+
+    /**
+     * Get the decrypted API key.
+     * This accessor extracts the api_key from the encrypted credentials JSON.
+     *
+     * @return string|null
+     */
+    public function getApiKeyAttribute(): ?string
+    {
+        if (empty($this->credentials_encrypted)) {
+            return null;
+        }
+
+        try {
+            $credentials = json_decode(Crypt::decryptString($this->credentials_encrypted), true);
+            return $credentials['api_key'] ?? null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Get the decrypted secret key.
+     * This accessor extracts the secret_key from the encrypted credentials JSON.
+     *
+     * @return string|null
+     */
+    public function getSecretKeyAttribute(): ?string
+    {
+        if (empty($this->credentials_encrypted)) {
+            return null;
+        }
+
+        try {
+            $credentials = json_decode(Crypt::decryptString($this->credentials_encrypted), true);
+            return $credentials['secret_key'] ?? null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Set the API key by encrypting it into the credentials JSON.
+     * This mutator updates the api_key in the encrypted credentials.
+     *
+     * @param string $value
+     * @return void
+     */
+    public function setApiKeyAttribute(string $value): void
+    {
+        $credentials = $this->getDecryptedCredentials();
+        $credentials['api_key'] = $value;
+        $this->attributes['credentials_encrypted'] = Crypt::encryptString(json_encode($credentials));
+    }
+
+    /**
+     * Set the secret key by encrypting it into the credentials JSON.
+     * This mutator updates the secret_key in the encrypted credentials.
+     *
+     * @param string $value
+     * @return void
+     */
+    public function setSecretKeyAttribute(string $value): void
+    {
+        $credentials = $this->getDecryptedCredentials();
+        $credentials['secret_key'] = $value;
+        $this->attributes['credentials_encrypted'] = Crypt::encryptString(json_encode($credentials));
+    }
+
+    /**
+     * Get all decrypted credentials as an array.
+     *
+     * @return array
+     */
+    private function getDecryptedCredentials(): array
+    {
+        if (empty($this->attributes['credentials_encrypted'])) {
+            return [];
+        }
+
+        try {
+            return json_decode(Crypt::decryptString($this->attributes['credentials_encrypted']), true) ?? [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Scope a query to only include active credentials.
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_active', true);
     }
 
     /**

@@ -53,10 +53,12 @@ class QrisTransaction extends Model
         'status',
         'provider',
         'provider_transaction_id',
+        'reference_id',
         'midtrans_transaction_id',
         'qr_code_url',
         'expires_at',
         'settled_at',
+        'paid_at',
     ];
 
     /**
@@ -72,6 +74,7 @@ class QrisTransaction extends Model
             'net_amount' => 'decimal:2',
             'expires_at' => 'datetime',
             'settled_at' => 'datetime',
+            'paid_at' => 'datetime',
         ];
     }
 

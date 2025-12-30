@@ -30,12 +30,14 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
 
-        // Apply PostgreSQL RLS context to authenticated routes
-        $middleware->appendToGroup('api', [
+        // Apply localization middleware to all routes
+        $middleware->appendToGroup('web', [
+            \App\Http\Middleware\LocalizationMiddleware::class,
             \App\Http\Middleware\SetPostgresUserContext::class,
         ]);
         
-        $middleware->appendToGroup('web', [
+        $middleware->appendToGroup('api', [
+            \App\Http\Middleware\LocalizationMiddleware::class,
             \App\Http\Middleware\SetPostgresUserContext::class,
         ]);
 
@@ -48,6 +50,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Register custom middleware aliases
         $middleware->alias([
+            'localization' => \App\Http\Middleware\LocalizationMiddleware::class,
             'check.web.auth' => \App\Http\Middleware\CheckWebAuth::class,
             'whatsapp.connected' => \App\Http\Middleware\EnsureWhatsAppConnected::class,
             'qris.rate_limit' => \App\Http\Middleware\QrisRateLimiter::class,

@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'WhatsApp Account - QashierWise')
+@section('title', __('dashboard.whatsapp_account_title'))
 
 @section('content')
 <div x-data="whatsAppAccountApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
@@ -10,7 +10,7 @@
     <!-- Main Content -->
     <div class="flex-1 flex flex-col min-h-screen">
         <!-- Header -->
-        @include('components.dashboard-header', ['title' => 'WhatsApp Account', 'description' => 'Connect and manage your WhatsApp Business account'])
+        @include('components.dashboard-header', ['title' => __('whatsapp.account_title'), 'description' => __('whatsapp.account_subtitle')])
 
         <!-- Page Content -->
         <main class="flex-1 p-4 md:p-6">

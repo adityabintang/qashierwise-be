@@ -1,13 +1,13 @@
 @extends('layouts.app')
 
-@section('title', 'Sub-Merchant Dashboard - QashierWise')
+@section('title', __('submerchant.dashboard_title'))
 
 @section('content')
 <div x-data="subMerchantDashboard()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
     @include('components.dashboard-sidebar', ['activePage' => 'sub-merchant'])
 
     <div class="flex-1 flex flex-col min-h-screen">
-        @include('components.dashboard-header', ['title' => 'Sub-Merchant', 'description' => 'Manage your QRIS payments and earnings'])
+        @include('components.dashboard-header', ['title' => __('submerchant.dashboard'), 'description' => __('submerchant.welcome')])
 
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto space-y-6">
@@ -37,30 +37,30 @@
                             <div class="h-20 w-20 rounded-full bg-[hsl(var(--primary)/0.1)] flex items-center justify-center mx-auto mb-6">
                                 <i class="fas fa-qrcode text-4xl text-[hsl(var(--primary))]"></i>
                             </div>
-                            <h2 class="text-2xl font-bold mb-2">Become a Sub-Merchant</h2>
+                            <h2 class="text-2xl font-bold mb-2">{{ __('submerchant.register_as_submerchant') }}</h2>
                             <p class="text-[hsl(var(--muted-foreground))] mb-6 max-w-md mx-auto">
-                                Start accepting QRIS payments from your customers. Generate dynamic QR codes and manage your earnings easily.
+                                {{ __('submerchant.start_accepting_qris') }}
                             </p>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto mb-8">
                                 <div class="p-4 rounded-lg bg-[hsl(var(--muted)/0.5)]">
                                     <i class="fas fa-qrcode text-2xl text-[hsl(var(--primary))] mb-2"></i>
-                                    <h3 class="font-semibold">Generate QRIS</h3>
-                                    <p class="text-sm text-[hsl(var(--muted-foreground))]">Create dynamic QR codes for payments</p>
+                                    <h3 class="font-semibold">{{ __('submerchant.generate_qris') }}</h3>
+                                    <p class="text-sm text-[hsl(var(--muted-foreground))]">{{ __('submerchant.step_generate') }}</p>
                                 </div>
                                 <div class="p-4 rounded-lg bg-[hsl(var(--muted)/0.5)]">
                                     <i class="fas fa-wallet text-2xl text-emerald-500 mb-2"></i>
-                                    <h3 class="font-semibold">Track Earnings</h3>
-                                    <p class="text-sm text-[hsl(var(--muted-foreground))]">Monitor your balance in real-time</p>
+                                    <h3 class="font-semibold">{{ __('submerchant.balance') }}</h3>
+                                    <p class="text-sm text-[hsl(var(--muted-foreground))]">{{ __('submerchant.balance_overview') }}</p>
                                 </div>
                                 <div class="p-4 rounded-lg bg-[hsl(var(--muted)/0.5)]">
                                     <i class="fas fa-cogs text-2xl text-purple-500 mb-2"></i>
-                                    <h3 class="font-semibold">Provider Settings</h3>
-                                    <p class="text-sm text-[hsl(var(--muted-foreground))]">Configure your payment providers</p>
+                                    <h3 class="font-semibold">{{ __('submerchant.provider_settings') }}</h3>
+                                    <p class="text-sm text-[hsl(var(--muted-foreground))]">{{ __('submerchant.manage_providers') }}</p>
                                 </div>
                             </div>
                             <a href="/dashboard/sub-merchant/register" class="btn btn-primary btn-lg">
                                 <i class="fas fa-user-plus mr-2"></i>
-                                Register as Sub-Merchant
+                                {{ __('submerchant.register_now') }}
                             </a>
                         </div>
                     </div>
@@ -74,7 +74,7 @@
                             <div class="card p-5 hover:shadow-md transition-shadow">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Available Balance</p>
+                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('submerchant.available_balance') }}</p>
                                         <p class="text-2xl font-bold mt-1" x-text="formatCurrency(balance.available)">Rp 0</p>
                                     </div>
                                     <div class="h-12 w-12 rounded-xl bg-emerald-50 flex items-center justify-center">
@@ -82,27 +82,27 @@
                                     </div>
                                 </div>
                                 <a href="/dashboard/sub-merchant/balance" class="text-sm text-[hsl(var(--primary))] hover:underline mt-3 inline-block">
-                                    View details →
+                                    {{ __('submerchant.view_details') }} →
                                 </a>
                             </div>
 
                             <div class="card p-5 hover:shadow-md transition-shadow">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Pending Balance</p>
+                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('submerchant.pending_balance') }}</p>
                                         <p class="text-2xl font-bold mt-1" x-text="formatCurrency(balance.pending)">Rp 0</p>
                                     </div>
                                     <div class="h-12 w-12 rounded-xl bg-amber-50 flex items-center justify-center">
                                         <i class="fas fa-clock text-xl text-amber-500"></i>
                                     </div>
                                 </div>
-                                <p class="text-sm text-[hsl(var(--muted-foreground))] mt-3">Being processed</p>
+                                <p class="text-sm text-[hsl(var(--muted-foreground))] mt-3">{{ __('submerchant.processing') }}</p>
                             </div>
 
                             <div class="card p-5 hover:shadow-md transition-shadow">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Total Earned</p>
+                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('submerchant.total_earnings') }}</p>
                                         <p class="text-2xl font-bold mt-1" x-text="formatCurrency(balance.total_earned)">Rp 0</p>
                                     </div>
                                     <div class="h-12 w-12 rounded-xl bg-blue-50 flex items-center justify-center">
@@ -110,14 +110,14 @@
                                     </div>
                                 </div>
                                 <a href="/dashboard/sub-merchant/balance" class="text-sm text-[hsl(var(--primary))] hover:underline mt-3 inline-block">
-                                    View details →
+                                    {{ __('submerchant.view_details') }} →
                                 </a>
                             </div>
 
                             <div class="card p-5 hover:shadow-md transition-shadow">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Total Transactions</p>
+                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('submerchant.transactions') }}</p>
                                         <p class="text-2xl font-bold mt-1" x-text="balance.total_transactions || 0">0</p>
                                     </div>
                                     <div class="h-12 w-12 rounded-xl bg-purple-50 flex items-center justify-center">
@@ -125,7 +125,7 @@
                                     </div>
                                 </div>
                                 <a href="/dashboard/sub-merchant/balance" class="text-sm text-[hsl(var(--primary))] hover:underline mt-3 inline-block">
-                                    View transactions →
+                                    {{ __('submerchant.transaction_history') }} →
                                 </a>
                             </div>
                         </div>
@@ -135,8 +135,8 @@
                             <!-- Quick Actions -->
                             <div class="lg:col-span-2 card">
                                 <div class="card-header">
-                                    <h2 class="card-title">Quick Actions</h2>
-                                    <p class="card-description">Common tasks for your sub-merchant account</p>
+                                    <h2 class="card-title">{{ __('submerchant.quick_actions') }}</h2>
+                                    <p class="card-description">{{ __('submerchant.overview') }}</p>
                                 </div>
                                 <div class="card-content">
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -145,8 +145,8 @@
                                                 <i class="fas fa-cogs text-xl text-white"></i>
                                             </div>
                                             <div>
-                                                <h3 class="font-semibold">Provider Settings</h3>
-                                                <p class="text-sm text-[hsl(var(--muted-foreground))]">Configure payment providers</p>
+                                                <h3 class="font-semibold">{{ __('submerchant.provider_settings') }}</h3>
+                                                <p class="text-sm text-[hsl(var(--muted-foreground))]">{{ __('submerchant.manage_providers') }}</p>
                                             </div>
                                         </a>
 
@@ -155,8 +155,8 @@
                                                 <i class="fas fa-qrcode text-xl text-white"></i>
                                             </div>
                                             <div>
-                                                <h3 class="font-semibold">Generate QRIS</h3>
-                                                <p class="text-sm text-[hsl(var(--muted-foreground))]">Create new payment QR code</p>
+                                                <h3 class="font-semibold">{{ __('submerchant.generate_qris') }}</h3>
+                                                <p class="text-sm text-[hsl(var(--muted-foreground))]">{{ __('submerchant.new_qris') }}</p>
                                             </div>
                                         </a>
 
@@ -165,8 +165,8 @@
                                                 <i class="fas fa-chart-pie text-xl text-white"></i>
                                             </div>
                                             <div>
-                                                <h3 class="font-semibold">View Balance</h3>
-                                                <p class="text-sm text-[hsl(var(--muted-foreground))]">Check earnings & transactions</p>
+                                                <h3 class="font-semibold">{{ __('submerchant.balance') }}</h3>
+                                                <p class="text-sm text-[hsl(var(--muted-foreground))]">{{ __('submerchant.balance_overview') }}</p>
                                             </div>
                                         </a>
 
@@ -235,7 +235,8 @@ function subMerchantDashboard() {
         },
 
         formatCurrency(amount) {
-            return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount || 0);
+            const locale = document.documentElement.lang || 'en';
+            return new Intl.NumberFormat(locale === 'id' ? 'id-ID' : 'en-US', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount || 0);
         },
 
         logout() { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/login'; }

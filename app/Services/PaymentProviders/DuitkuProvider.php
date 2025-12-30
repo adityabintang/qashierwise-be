@@ -7,6 +7,7 @@ use App\DTOs\QrisRequest;
 use App\DTOs\QrisResponse;
 use App\DTOs\TransactionStatus;
 use App\DTOs\ValidationResult;
+use App\DTOs\WebhookTransaction;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -273,5 +274,58 @@ class DuitkuProvider implements PaymentProviderInterface
             '03' => TransactionStatus::STATUS_CANCEL,
             default => TransactionStatus::STATUS_FAILED,
         };
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function verifyWebhook(array $payload, string $signature, array $credentials): bool
+    {
+        try {
+            // Duitku uses MD5 signature for webhook verification
+            $merchantCode = $credentials['merchant_code'] ?? '';
+            $apiKey = $credentials['api_key'] ?? '';
+            
+            // Construct signature string based on Duitku's documentation
+            // Format: merchantCode + amount + merchantOrderId + apiKey
+            $amount = $payload['amount'] ?? '';
+            $merchantOrderId = $payload['merchantOrderId'] ?? '';
+            
+            $computedSignature = md5($merchantCode . $amount . $merchantOrderId . $apiKey);
+            
+            return hash_equals($computedSignature, $signature);
+        } catch (\Exception $e) {
+            Log::error('Duitku webhook verification error', [
+                'error' => $e->getMessage(),
+            ]);
+            
+            return false;
+        }
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function parseWebhookPayload(array $payload): WebhookTransaction
+    {
+        $status = $this->mapDuitkuStatus($payload['resultCode'] ?? $payload['statusCode'] ?? '01');
+        
+        $paidAt = null;
+        if ($status === TransactionStatus::STATUS_SETTLEMENT && isset($payload['settlementDate'])) {
+            $paidAt = $payload['settlementDate'];
+        }
+
+        return new WebhookTransaction(
+            externalId: $payload['merchantOrderId'] ?? '',
+            status: $status,
+            amount: isset($payload['amount']) ? (float) $payload['amount'] : 0.0,
+            paidAt: $paidAt,
+            provider: 'duitku',
+            referenceId: $payload['reference'] ?? null,
+            metadata: [
+                'result_code' => $payload['resultCode'] ?? null,
+                'status_message' => $payload['statusMessage'] ?? null,
+            ]
+        );
     }
 }

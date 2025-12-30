@@ -114,7 +114,13 @@ class EmbeddedSignupController extends Controller
     {
         // Check if Embedded Signup is enabled
         if (! $this->embeddedSignupService->isEnabled()) {
-            throw new EmbeddedSignupDisabledException;
+            // Return a more graceful response instead of throwing exception
+            return response()->json([
+                'success' => false,
+                'error_code' => 'EMBEDDED_SIGNUP_DISABLED',
+                'message' => 'Embedded Signup feature is not configured. Please add WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID to your .env file.',
+                'data' => null,
+            ], 200); // Return 200 instead of 503 so frontend can handle it gracefully
         }
 
         return response()->json([

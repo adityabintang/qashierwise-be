@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Messages - QashierWise')
+@section('title', __('dashboard.messages_title'))
 @section('content')
 <div x-data="messagesApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
     <!-- Sidebar -->
@@ -7,7 +7,7 @@
     <!-- Main Content -->
     <div class="flex-1 flex flex-col min-h-screen">
         <!-- Header -->
-        @include('components.dashboard-header', ['title' => 'Messages', 'description' => 'Chat with your WhatsApp contacts'])
+        @include('components.dashboard-header', ['title' => __('whatsapp.messages_title'), 'description' => __('whatsapp.messages_subtitle')])
         <!-- Page Content -->
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto h-[calc(100vh-10rem)]" x-data="messagesManager()">
@@ -26,7 +26,7 @@
                                     type="text"
                                     x-model="contactSearch"
                                     @input="filterContactList"
-                                    placeholder="Search contacts..."
+                                    placeholder="{{ __('whatsapp.search_contacts') }}"
                                     class="input pl-10 w-full h-9 text-sm"
                                 >
                             </div>

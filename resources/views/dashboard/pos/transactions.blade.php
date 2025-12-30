@@ -1,13 +1,13 @@
 @extends('layouts.app')
 
-@section('title', 'Transactions - QashierWise POS')
+@section('title', __('dashboard.menu_transactions') . ' - QashierWise POS')
 
 @section('content')
 <div x-data="transactionsApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
     @include('components.dashboard-sidebar', ['activePage' => 'pos-transactions'])
 
     <div class="flex-1 flex flex-col min-h-screen">
-        @include('components.dashboard-header', ['title' => 'Transactions', 'description' => 'View transaction history'])
+        @include('components.dashboard-header', ['title' => __('dashboard.menu_transactions'), 'description' => __('submerchant.transaction_history')])
 
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto space-y-6">

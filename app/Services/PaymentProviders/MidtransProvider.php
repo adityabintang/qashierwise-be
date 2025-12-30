@@ -7,6 +7,7 @@ use App\DTOs\QrisRequest;
 use App\DTOs\QrisResponse;
 use App\DTOs\TransactionStatus;
 use App\DTOs\ValidationResult;
+use App\DTOs\WebhookTransaction;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -257,5 +258,60 @@ class MidtransProvider implements PaymentProviderInterface
             'cancel', 'deny' => TransactionStatus::STATUS_CANCEL,
             default => TransactionStatus::STATUS_FAILED,
         };
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function verifyWebhook(array $payload, string $signature, array $credentials): bool
+    {
+        try {
+            // Midtrans uses SHA512 hash for signature verification
+            $serverKey = $credentials['server_key'] ?? '';
+            
+            // Construct signature string: order_id + status_code + gross_amount + server_key
+            $orderId = $payload['order_id'] ?? '';
+            $statusCode = $payload['status_code'] ?? '';
+            $grossAmount = $payload['gross_amount'] ?? '';
+            
+            $signatureString = $orderId . $statusCode . $grossAmount . $serverKey;
+            $computedSignature = hash('sha512', $signatureString);
+            
+            return hash_equals($computedSignature, $signature);
+        } catch (\Exception $e) {
+            Log::error('Midtrans webhook verification error', [
+                'error' => $e->getMessage(),
+            ]);
+            
+            return false;
+        }
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function parseWebhookPayload(array $payload): WebhookTransaction
+    {
+        $status = $this->mapMidtransStatus($payload['transaction_status'] ?? 'pending');
+        
+        $paidAt = null;
+        if ($status === TransactionStatus::STATUS_SETTLEMENT && isset($payload['settlement_time'])) {
+            $paidAt = $payload['settlement_time'];
+        }
+
+        return new WebhookTransaction(
+            externalId: $payload['order_id'] ?? '',
+            status: $status,
+            amount: isset($payload['gross_amount']) ? (float) $payload['gross_amount'] : 0.0,
+            paidAt: $paidAt,
+            provider: 'midtrans',
+            referenceId: $payload['transaction_id'] ?? null,
+            metadata: [
+                'payment_type' => $payload['payment_type'] ?? null,
+                'transaction_status' => $payload['transaction_status'] ?? null,
+                'status_code' => $payload['status_code'] ?? null,
+                'acquirer' => $payload['acquirer'] ?? null,
+            ]
+        );
     }
 }

@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Business Profile - QashierWise')
+@section('title', __('dashboard.profile_title'))
 
 @section('content')
 <div x-data="profileApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
@@ -10,7 +10,7 @@
     <!-- Main Content -->
     <div class="flex-1 flex flex-col min-h-screen">
         <!-- Header -->
-        @include('components.dashboard-header', ['title' => 'Business Profile', 'description' => 'Manage your WhatsApp Business profile'])
+        @include('components.dashboard-header', ['title' => __('whatsapp.business_profile'), 'description' => __('dashboard.menu_business_profile')])
 
         <!-- Page Content -->
         <main class="flex-1 p-4 md:p-6">

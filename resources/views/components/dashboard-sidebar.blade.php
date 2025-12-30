@@ -36,118 +36,118 @@
     <nav class="flex-1 py-4 px-2 space-y-1 overflow-y-auto scroll-area">
         <a href="/dashboard" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'dashboard' ? 'active' : '' }}">
             <i class="fas fa-home w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Dashboard</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_dashboard') }}</span>
         </a>
         <a href="/dashboard/contacts" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'contacts' ? 'active' : '' }}">
             <i class="fas fa-address-book w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Contacts</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_contacts') }}</span>
         </a>
         <a href="/dashboard/messages" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'messages' ? 'active' : '' }}">
             <i class="fas fa-comments w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Messages</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_messages') }}</span>
         </a>
         <a href="/dashboard/templates" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'templates' ? 'active' : '' }}">
             <i class="fas fa-file-alt w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Templates</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_templates') }}</span>
         </a>
         <a href="/dashboard/profile" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'profile' ? 'active' : '' }}">
             <i class="fas fa-building w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Business Profile</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_business_profile') }}</span>
         </a>
         <a href="/dashboard/whatsapp-account" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'whatsapp-account' ? 'active' : '' }}">
             <i class="fab fa-whatsapp w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>WhatsApp Account</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_whatsapp_account') }}</span>
         </a>
         <a href="/dashboard/ai-agent" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'ai-agent' ? 'active' : '' }}">
             <i class="fas fa-robot w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>AI Agent</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_ai_agent') }}</span>
         </a>
 
         <!-- POS Section - Orders & Payment -->
         <div x-show="sidebarOpen || isMobile" x-transition class="pt-4">
             <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
-                Point of Sale
+                {{ __('dashboard.section_point_of_sale') }}
             </div>
         </div>
         <a href="/dashboard/pos/orders" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-orders' ? 'active' : '' }}">
             <i class="fas fa-shopping-cart w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Orders</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_orders') }}</span>
         </a>
         <a href="/dashboard/pos/payment" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-payment' ? 'active' : '' }}">
             <i class="fas fa-credit-card w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Payment</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_payment') }}</span>
         </a>
 
         <!-- POS Inventory Section -->
         <div x-show="sidebarOpen || isMobile" x-transition class="pt-4">
             <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
-                Inventory
+                {{ __('dashboard.section_inventory') }}
             </div>
         </div>
         <a href="/dashboard/pos/products" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-products' ? 'active' : '' }}">
             <i class="fas fa-box w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Products</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_products') }}</span>
         </a>
         <a href="/dashboard/pos/categories" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-categories' ? 'active' : '' }}">
             <i class="fas fa-tags w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Categories</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_categories') }}</span>
         </a>
 
         <!-- POS Operations Section -->
         <div x-show="sidebarOpen || isMobile" x-transition class="pt-4">
             <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
-                Operations
+                {{ __('dashboard.section_operations') }}
             </div>
         </div>
         <a href="/dashboard/pos/stores" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-stores' ? 'active' : '' }}">
             <i class="fas fa-store w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Stores</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_stores') }}</span>
         </a>
         <a href="/dashboard/pos/tables" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-tables' ? 'active' : '' }}">
             <i class="fas fa-chair w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Tables</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_tables') }}</span>
         </a>
         <a href="/dashboard/pos/users" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-users' ? 'active' : '' }}">
             <i class="fas fa-users w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Users</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_users') }}</span>
         </a>
 
         <!-- POS Analytics Section -->
         <div x-show="sidebarOpen || isMobile" x-transition class="pt-4">
             <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
-                Analytics
+                {{ __('dashboard.section_analytics') }}
             </div>
         </div>
         <a href="/dashboard/pos/reports" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-reports' ? 'active' : '' }}">
             <i class="fas fa-chart-bar w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Reports</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_reports') }}</span>
         </a>
         <a href="/dashboard/pos/transactions" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-transactions' ? 'active' : '' }}">
             <i class="fas fa-receipt w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Transactions</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_transactions') }}</span>
         </a>
 
         <!-- Sub-Merchant Section -->
         <div x-show="sidebarOpen || isMobile" x-transition class="pt-4">
             <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
-                Sub-Merchant
+                {{ __('dashboard.section_sub_merchant') }}
             </div>
         </div>
         <a href="/dashboard/sub-merchant" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'sub-merchant' ? 'active' : '' }}">
             <i class="fas fa-qrcode w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Dashboard</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_sub_merchant_dashboard') }}</span>
         </a>
         <a href="/dashboard/sub-merchant/provider-settings" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'sub-merchant-provider-settings' ? 'active' : '' }}">
             <i class="fas fa-cogs w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Provider Settings</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_provider_settings') }}</span>
         </a>
         <a href="/dashboard/sub-merchant/qris" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'sub-merchant-qris' ? 'active' : '' }}">
             <i class="fas fa-plus-circle w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Generate QRIS</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_generate_qris') }}</span>
         </a>
         <a href="/dashboard/sub-merchant/balance" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'sub-merchant-balance' ? 'active' : '' }}">
             <i class="fas fa-chart-pie w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Balance</span>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_balance') }}</span>
         </a>
     </nav>
 
@@ -174,10 +174,10 @@
                 @click="logout()"
                 class="btn btn-ghost btn-sm text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.1)]"
                 :class="(sidebarOpen || isMobile) ? '' : 'btn-icon'"
-                :title="!(sidebarOpen || isMobile) ? 'Logout' : ''"
+                :title="!(sidebarOpen || isMobile) ? '{{ __('dashboard.logout') }}' : ''"
             >
                 <i class="fas fa-sign-out-alt"></i>
-                <span x-show="sidebarOpen || isMobile">Logout</span>
+                <span x-show="sidebarOpen || isMobile">{{ __('dashboard.logout') }}</span>
             </button>
             <button
                 @click="sidebarOpen = !sidebarOpen"

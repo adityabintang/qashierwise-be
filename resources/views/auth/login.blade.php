@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Masuk - QashierWise')
+@section('title', __('auth.login') . ' - QashierWise')
 
 @section('content')
 <div class="min-h-screen flex flex-col items-center justify-center py-8 md:py-12 px-4" x-data="authForm()">
@@ -14,10 +14,10 @@
     <div class="w-full max-w-md mb-4 md:mb-6 px-0">
         <div class="flex bg-[hsl(var(--muted))] rounded-lg p-1">
             <a href="/register" class="flex-1 py-2.5 md:py-2.5 text-center text-sm font-medium text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition rounded-md touch-target">
-                Daftar
+                {{ __('auth.register') }}
             </a>
             <button class="flex-1 py-2.5 md:py-2.5 text-center text-sm font-medium bg-white text-[hsl(var(--foreground))] shadow-sm rounded-md touch-target">
-                Masuk
+                {{ __('auth.login') }}
             </button>
         </div>
     </div>
@@ -25,8 +25,8 @@
     <!-- Login Card - Full width minus padding on mobile -->
     <div class="card w-full max-w-md p-5 md:p-8">
         <div class="mb-5 md:mb-6">
-            <h2 class="text-xl md:text-2xl font-bold">Selamat Datang Kembali</h2>
-            <p class="text-xs md:text-sm text-[hsl(var(--primary))] mt-1">Masuk ke akun QashierWise Anda</p>
+            <h2 class="text-xl md:text-2xl font-bold">{{ __('auth.welcome_back') }}</h2>
+            <p class="text-xs md:text-sm text-[hsl(var(--primary))] mt-1">{{ __('auth.login_subtitle') }}</p>
         </div>
 
         <!-- Error Alert -->
@@ -41,14 +41,14 @@
 
         <form @submit.prevent="login" class="space-y-4 md:space-y-5">
             <div>
-                <label for="email" class="text-sm font-medium mb-1.5 block">Email</label>
-                <input x-model="formData.email" id="email" type="email" required class="input w-full touch-target-input" placeholder="nama@email.com">
+                <label for="email" class="text-sm font-medium mb-1.5 block">{{ __('auth.email') }}</label>
+                <input x-model="formData.email" id="email" type="email" required class="input w-full touch-target-input" placeholder="{{ __('auth.email_placeholder') }}">
             </div>
 
             <div>
-                <label for="password" class="text-sm font-medium mb-1.5 block">Password</label>
+                <label for="password" class="text-sm font-medium mb-1.5 block">{{ __('auth.password') }}</label>
                 <div class="relative">
-                    <input x-model="formData.password" id="password" :type="showPassword ? 'text' : 'password'" required class="input w-full pr-12 touch-target-input" placeholder="Masukkan password">
+                    <input x-model="formData.password" id="password" :type="showPassword ? 'text' : 'password'" required class="input w-full pr-12 touch-target-input" placeholder="{{ __('auth.password_placeholder') }}">
                     <button type="button" @click="showPassword = !showPassword" class="absolute inset-y-0 right-0 pr-4 flex items-center text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] touch-target">
                         <i :class="showPassword ? 'fa-eye-slash' : 'fa-eye'" class="fas"></i>
                     </button>
@@ -56,9 +56,9 @@
             </div>
 
             <button type="submit" :disabled="loading" class="btn btn-primary w-full h-11 md:h-12 touch-target">
-                <span x-show="!loading">Masuk</span>
+                <span x-show="!loading">{{ __('auth.sign_in') }}</span>
                 <span x-show="loading" class="flex items-center justify-center">
-                    <i class="fas fa-spinner animate-spin mr-2"></i> Memproses...
+                    <i class="fas fa-spinner animate-spin mr-2"></i> {{ __('auth.processing') }}
                 </span>
             </button>
         </form>
@@ -67,7 +67,7 @@
     <!-- Back to Home -->
     <a href="/" class="mt-5 md:mt-6 text-sm text-[hsl(var(--primary))] hover:underline flex items-center gap-2 touch-target">
         <i class="fas fa-arrow-left"></i>
-        Kembali ke beranda
+        {{ __('auth.back_to_home') }}
     </a>
 </div>
 
@@ -111,15 +111,15 @@ function authForm() {
                 if (data.success) {
                     localStorage.setItem('token', data.data.access_token);
                     if (data.data.user) localStorage.setItem('user', JSON.stringify(data.data.user));
-                    this.success = 'Login berhasil! Mengalihkan...';
+                    this.success = '{{ __("auth.login_success") }}';
                     
                     const redirectUrl = this.getRedirectUrl();
                     setTimeout(() => window.location.href = redirectUrl, 1000);
                 } else {
-                    this.error = data.message || 'Login gagal. Periksa kredensial Anda.';
+                    this.error = data.message || '{{ __("auth.login_failed") }}';
                 }
             } catch (e) {
-                this.error = 'Terjadi kesalahan jaringan. Silakan coba lagi.';
+                this.error = '{{ __("auth.network_error") }}';
             } finally {
                 this.loading = false;
             }

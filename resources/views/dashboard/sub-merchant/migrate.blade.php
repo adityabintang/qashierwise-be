@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Migrate to BYOK')
+@section('title', __('submerchant.migrate_title'))
 
 @section('content')
 <div class="container mx-auto px-4 py-8">

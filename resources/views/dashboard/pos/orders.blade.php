@@ -1,13 +1,13 @@
 @extends('layouts.app')
 
-@section('title', 'Orders - QashierWise POS')
+@section('title', __('pos.orders.title') . ' - QashierWise POS')
 
 @section('content')
 <div x-data="ordersApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
     @include('components.dashboard-sidebar', ['activePage' => 'pos-orders'])
 
     <div class="flex-1 flex flex-col min-h-screen">
-        @include('components.dashboard-header', ['title' => 'Orders', 'description' => 'Manage sales orders'])
+        @include('components.dashboard-header', ['title' => __('pos.orders.title'), 'description' => __('pos.orders.description')])
 
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto space-y-6">

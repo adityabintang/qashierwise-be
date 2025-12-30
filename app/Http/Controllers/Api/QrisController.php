@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use App\Models\QrisTransaction;
 use App\Services\QrisService;
@@ -51,27 +52,14 @@ class QrisController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'VALIDATION_ERROR',
-                    'message' => 'Invalid request data',
-                ],
-                'errors' => $validator->errors(),
-            ], 422);
+            return ApiResponse::validationError($validator->errors());
         }
 
         $user = $request->user();
         $subMerchant = $this->subMerchantService->findByUserId($user->id);
 
         if ($subMerchant === null) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'NOT_SUB_MERCHANT',
-                    'message' => 'User is not registered as a sub-merchant',
-                ],
-            ], 403);
+            return ApiResponse::forbidden('messages.error.forbidden');
         }
 
         try {
@@ -93,21 +81,11 @@ class QrisController extends Controller
                 'provider' => $transaction->provider,
             ]);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'QRIS generated successfully',
-                'data' => [
-                    'transaction' => $this->formatTransactionResponse($transaction),
-                ],
-            ], 201);
+            return ApiResponse::success([
+                'transaction' => $this->formatTransactionResponse($transaction),
+            ], 'payments.qris_generated', 201);
         } catch (InvalidArgumentException $e) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'GENERATION_FAILED',
-                    'message' => $e->getMessage(),
-                ],
-            ], 422);
+            return ApiResponse::error('messages.error.invalid_data', 422);
         } catch (RuntimeException $e) {
             Log::error('QRIS generation failed', [
                 'user_id' => $user->id,
@@ -116,37 +94,16 @@ class QrisController extends Controller
 
             // Check if error is about no active provider (Requirement 4.5)
             if (str_contains($e->getMessage(), 'No active payment provider')) {
-                return response()->json([
-                    'success' => false,
-                    'error' => [
-                        'code' => 'NO_ACTIVE_PROVIDER',
-                        'message' => $e->getMessage(),
-                        'action_required' => 'Please configure and activate a payment provider in settings.',
-                    ],
-                ], 428); // 428 Precondition Required
+                return ApiResponse::error('payments.no_active_provider', 428);
             }
 
             // Check if error is about invalid provider configuration
             if (str_contains($e->getMessage(), 'not properly configured')) {
-                return response()->json([
-                    'success' => false,
-                    'error' => [
-                        'code' => 'PROVIDER_INVALID',
-                        'message' => $e->getMessage(),
-                        'action_required' => 'Please validate your provider credentials in settings.',
-                    ],
-                ], 428);
+                return ApiResponse::error('payments.provider_invalid', 428);
             }
 
             // Generic provider error (Requirement 7.5)
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'PROVIDER_ERROR',
-                    'message' => 'Failed to generate QRIS code. Please try again.',
-                    'details' => $e->getMessage(),
-                ],
-            ], 500);
+            return ApiResponse::serverError('messages.error.server');
         }
     }
 
@@ -163,32 +120,17 @@ class QrisController extends Controller
         $subMerchant = $this->subMerchantService->findByUserId($user->id);
 
         if ($subMerchant === null) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'NOT_SUB_MERCHANT',
-                    'message' => 'User is not registered as a sub-merchant',
-                ],
-            ], 403);
+            return ApiResponse::forbidden('messages.error.forbidden');
         }
 
         $transaction = $this->qrisService->findByOrderId($orderId);
 
         if ($transaction === null || $transaction->sub_merchant_id !== $subMerchant->id) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'TRANSACTION_NOT_FOUND',
-                    'message' => 'QRIS transaction not found',
-                ],
-            ], 404);
+            return ApiResponse::notFound('messages.error.not_found');
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'transaction' => $this->formatTransactionResponse($transaction),
-            ],
+        return ApiResponse::success([
+            'transaction' => $this->formatTransactionResponse($transaction),
         ]);
     }
 

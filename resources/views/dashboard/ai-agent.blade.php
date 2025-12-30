@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'AI Agent - QashierWise')
+@section('title', __('dashboard.ai_agent_title'))
 
 @section('content')
 <div x-data="aiAgentApp()" x-init="init()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
@@ -10,7 +10,7 @@
     <!-- Main Content -->
     <div class="flex-1 flex flex-col min-h-screen">
         <!-- Header -->
-        @include('components.dashboard-header', ['title' => 'AI Agent', 'description' => 'Configure your WhatsApp AI Assistant'])
+        @include('components.dashboard-header', ['title' => __('dashboard.menu_ai_agent'), 'description' => __('ai_agent.configure_assistant')])
 
         <!-- Page Content -->
         <main class="flex-1 p-4 md:p-6">

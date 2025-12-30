@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="{{ app()->getLocale() }}" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -63,6 +63,9 @@
 
     <!-- Echo Setup Script - Deferred -->
     <script defer src="{{ asset('js/echo-setup.js') }}"></script>
+
+    <!-- Dashboard Base - Shared functionality for dashboard pages -->
+    <script defer src="{{ asset('js/dashboard-base.js') }}"></script>
 
     <style>
         [x-cloak] { display: none !important; }
