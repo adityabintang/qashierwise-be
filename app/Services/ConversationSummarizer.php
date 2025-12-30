@@ -143,7 +143,7 @@ class ConversationSummarizer
             $summary = $this->parseJsonResponse($response);
 
             if (!$summary) {
-                Log::warning('Failed to parse JSON response from LLM', ['response' => $response]);
+                Log::warning('Failed to parse JSON response from LLM', ['response' => substr($response, 0, 200)]);
                 
                 // Retry with stricter prompt
                 Log::info('Retrying summarization with stricter prompt');
@@ -154,14 +154,12 @@ class ConversationSummarizer
                     $summary = $this->parseJsonResponse($retryResponse);
                 }
 
+                // If still no summary after retry, parseJsonResponse will create fallback
                 if (!$summary) {
-                    Log::error('Summary generation failed', [
-                        'reason' => 'json_parse_failed_after_retry',
-                        'retry_response' => $retryResponse,
+                    Log::warning('Summary generation used fallback after retry failed', [
                         'message_count' => count($messages),
                         'duration_ms' => round((microtime(true) - $startTime) * 1000, 2),
                     ]);
-                    return null;
                 }
             }
 
@@ -400,7 +398,140 @@ PROMPT;
             Log::warning('Direct JSON decode failed', ['error' => $e->getMessage()]);
         }
 
-        return null;
+        // FALLBACK: If JSON parsing fails, create summary from plain text response
+        Log::info('JSON parsing failed, using plain text fallback', [
+            'response_preview' => substr($response, 0, 100)
+        ]);
+        
+        return $this->createSummaryFromPlainText($response);
+    }
+
+    /**
+     * Create summary structure from plain text response.
+     * This is a fallback when LLM doesn't return JSON.
+     *
+     * @param string $text The plain text response from LLM
+     * @return array Summary array with basic structure
+     */
+    protected function createSummaryFromPlainText(string $text): array
+    {
+        $text = trim($text);
+        
+        // Limit summary length
+        $maxLength = 500;
+        if (mb_strlen($text) > $maxLength) {
+            $text = mb_substr($text, 0, $maxLength) . '...';
+        }
+
+        // Try to detect intent from text content
+        $intent = $this->detectIntentFromText($text);
+
+        // Try to extract key information
+        $keyData = $this->extractKeyDataFromText($text);
+
+        Log::info('Created summary from plain text', [
+            'detected_intent' => $intent,
+            'summary_length' => mb_strlen($text),
+            'has_key_data' => !empty(array_filter($keyData))
+        ]);
+
+        return [
+            'summary' => $text,
+            'intent' => $intent,
+            'key_data' => $keyData,
+            'missing_information' => [],
+            'source' => 'plain_text_fallback',
+        ];
+    }
+
+    /**
+     * Detect intent from plain text content.
+     *
+     * @param string $text The text to analyze
+     * @return string Detected intent
+     */
+    protected function detectIntentFromText(string $text): string
+    {
+        $text = mb_strtolower($text);
+
+        // Keywords for different intents
+        $intentKeywords = [
+            'order_food' => ['pesan', 'order', 'beli', 'mau', 'keranjang', 'checkout', 'konfirmasi'],
+            'browse_menu' => ['menu', 'daftar', 'produk', 'tersedia', 'ada apa', 'lihat'],
+            'payment' => ['bayar', 'pembayaran', 'qris', 'transfer', 'lunas', 'total'],
+            'reservation' => ['reservasi', 'booking', 'pesan tempat', 'meja', 'tanggal'],
+            'general_question' => ['tanya', 'info', 'jam', 'buka', 'tutup', 'lokasi', 'alamat'],
+        ];
+
+        // Count keyword matches for each intent
+        $scores = [];
+        foreach ($intentKeywords as $intent => $keywords) {
+            $score = 0;
+            foreach ($keywords as $keyword) {
+                if (mb_strpos($text, $keyword) !== false) {
+                    $score++;
+                }
+            }
+            $scores[$intent] = $score;
+        }
+
+        // Get intent with highest score
+        arsort($scores);
+        $topIntent = array_key_first($scores);
+        
+        // Return top intent if it has at least one match, otherwise unknown
+        return $scores[$topIntent] > 0 ? $topIntent : 'unknown';
+    }
+
+    /**
+     * Extract key data from plain text.
+     *
+     * @param string $text The text to analyze
+     * @return array Key data array
+     */
+    protected function extractKeyDataFromText(string $text): array
+    {
+        $keyData = [
+            'products' => [],
+            'reservation_date' => null,
+            'reservation_time' => null,
+            'people_count' => null,
+            'order_items' => [],
+            'total_estimate' => null,
+        ];
+
+        // Try to extract numbers (could be quantities, prices, etc.)
+        if (preg_match_all('/\d+/', $text, $matches)) {
+            $numbers = $matches[0];
+            
+            // Look for price patterns (Rp followed by number)
+            if (preg_match('/Rp\s*[\d.,]+/', $text, $priceMatch)) {
+                $price = preg_replace('/[^\d]/', '', $priceMatch[0]);
+                if ($price) {
+                    $keyData['total_estimate'] = (float) $price;
+                }
+            }
+            
+            // Look for quantity patterns (number followed by "porsi", "pcs", etc.)
+            if (preg_match('/(\d+)\s*(porsi|pcs|buah|item)/i', $text, $qtyMatch)) {
+                $keyData['people_count'] = (int) $qtyMatch[1];
+            }
+        }
+
+        // Try to extract product names (common food items)
+        $commonProducts = [
+            'nasi goreng', 'mie goreng', 'ayam goreng', 'dimsum', 'teh', 'kopi',
+            'sate', 'bakso', 'soto', 'gado-gado', 'rendang', 'seafood'
+        ];
+        
+        $textLower = mb_strtolower($text);
+        foreach ($commonProducts as $product) {
+            if (mb_strpos($textLower, $product) !== false) {
+                $keyData['products'][] = $product;
+            }
+        }
+
+        return $keyData;
     }
 
     /**

@@ -76,6 +76,21 @@ class SummaryValidator
             $this->errors[] = 'Field "missing_information" must be an array';
         }
 
+        // If this is a plain text fallback, be more lenient with validation
+        if (isset($summary['source']) && $summary['source'] === 'plain_text_fallback') {
+            // For fallback summaries, only require summary and intent fields to be valid
+            // Other fields can be empty/default values
+            $criticalErrors = array_filter($this->errors, function($error) {
+                return str_contains($error, 'summary') || str_contains($error, 'intent');
+            });
+            
+            if (empty($criticalErrors)) {
+                // Clear non-critical errors for fallback summaries
+                $this->errors = [];
+                return true;
+            }
+        }
+
         return empty($this->errors);
     }
 

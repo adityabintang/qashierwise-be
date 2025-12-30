@@ -192,7 +192,21 @@ class AiAgentService
             }
 
             // Send AI response
-            $assistantMessage = $response['content'] ?? 'Maaf, saya tidak mengerti. Bisa diulang?';
+            $assistantMessage = $response['content'] ?? '';
+            
+            // If content is empty, generate contextual fallback
+            if (empty(trim($assistantMessage))) {
+                Log::warning('LLM returned empty content in main response', [
+                    'conversation_id' => $conversation->id,
+                    'account_id' => $account->id,
+                    'raw_content' => $assistantMessage,
+                    'last_user_message' => $messageText,
+                ]);
+                
+                // Generate contextual fallback based on conversation
+                $assistantMessage = $this->generateSimpleFallback($conversation);
+            }
+            
             $conversation->addMessage('ai', $assistantMessage);
             $this->sendReply($account, $contact->wa_id, $assistantMessage);
 
@@ -331,8 +345,19 @@ class AiAgentService
                         ];
                     }
 
+                    // Get content from LLM response
+                    $content = $choice['message']['content'] ?? '';
+                    
+                    // Log if content is empty
+                    if (empty(trim($content))) {
+                        Log::warning('LLM returned empty content', [
+                            'choice' => $choice,
+                            'full_response' => $data,
+                        ]);
+                    }
+
                     return [
-                        'content' => $choice['message']['content'] ?? '',
+                        'content' => $content,
                     ];
                 }
 
@@ -668,10 +693,22 @@ class AiAgentService
                 
                 // Otherwise send the response
                 $assistantMessage = $response['content'] ?? '';
-                if ($assistantMessage) {
-                    $conversation->addMessage('ai', $assistantMessage);
-                    $this->sendReply($account, $contact->wa_id, $assistantMessage);
+                
+                // Check if content is empty or only whitespace
+                if (empty(trim($assistantMessage))) {
+                    // LLM returned empty content after processing search results
+                    Log::warning('LLM returned empty content after search', [
+                        'conversation_id' => $conversation->id,
+                        'tool_results' => array_map(fn($tr) => $tr['function_name'], $toolResults),
+                        'raw_content' => $assistantMessage,
+                    ]);
+                    
+                    // Generate contextual fallback based on search results
+                    $assistantMessage = $this->generateContextualFallback($toolResults, $conversation);
                 }
+                
+                $conversation->addMessage('ai', $assistantMessage);
+                $this->sendReply($account, $contact->wa_id, $assistantMessage);
                 return;
             } catch (\Exception $e) {
                 Log::error('Error in follow-up LLM call', ['error' => $e->getMessage()]);
@@ -690,10 +727,21 @@ class AiAgentService
 
         // Send combined result to user
         $responseMessage = implode("\n\n", array_filter($userFacingResults));
-        if ($responseMessage) {
-            $conversation->addMessage('ai', $responseMessage);
-            $this->sendReply($account, $contact->wa_id, $responseMessage);
+        
+        // Check if response is empty or only whitespace
+        if (empty(trim($responseMessage))) {
+            // No user-facing results to send (e.g., only search was performed)
+            Log::warning('No user-facing results from tool calls', [
+                'conversation_id' => $conversation->id,
+                'tool_calls' => array_map(fn($tr) => $tr['function_name'], $toolResults),
+            ]);
+            
+            // Generate contextual fallback based on tool results
+            $responseMessage = $this->generateContextualFallback($toolResults, $conversation);
         }
+        
+        $conversation->addMessage('ai', $responseMessage);
+        $this->sendReply($account, $contact->wa_id, $responseMessage);
     }
 
     /**
@@ -768,6 +816,218 @@ class AiAgentService
         }
 
         throw new \Exception('LLM API call failed: ' . $response->body());
+    }
+
+    /**
+     * Generate contextual fallback message based on tool results and conversation context.
+     */
+    protected function generateContextualFallback(array $toolResults, AiAgentConversation $conversation): string
+    {
+        // Analyze tool results to understand what was attempted
+        $toolNames = array_map(fn($tr) => $tr['function_name'], $toolResults);
+        $hasSearch = !empty(array_intersect($toolNames, ['search_products', 'search_multiple_products']));
+        
+        // Get last user message for context
+        $messages = $conversation->messages ?? [];
+        $lastUserMessage = '';
+        for ($i = count($messages) - 1; $i >= 0; $i--) {
+            if (isset($messages[$i]['type']) && $messages[$i]['type'] === 'human') {
+                $lastUserMessage = strtolower($messages[$i]['content'] ?? '');
+                break;
+            }
+        }
+        
+        // Parse search results to extract product information
+        $foundProducts = [];
+        foreach ($toolResults as $tr) {
+            if (in_array($tr['function_name'], ['search_products', 'search_multiple_products'])) {
+                $result = $tr['result'];
+                // Extract product names from result string
+                if (preg_match_all('/\d+\.\s*([^\n]+?)\s*-\s*Rp/', $result, $matches)) {
+                    $foundProducts = array_merge($foundProducts, $matches[1]);
+                }
+            }
+        }
+        
+        // Generate contextual response based on user intent and search results
+        if ($hasSearch && !empty($foundProducts)) {
+            // User was searching/ordering and we found products
+            $productList = implode(', ', array_slice($foundProducts, 0, 3));
+            
+            if (stripos($lastUserMessage, 'pesan') !== false || 
+                stripos($lastUserMessage, 'beli') !== false || 
+                stripos($lastUserMessage, 'order') !== false) {
+                // User wants to order
+                return "Saya menemukan produk yang Anda cari: {$productList}. " .
+                       "Berapa jumlah yang ingin Anda pesan? Contoh: 'pesan {$foundProducts[0]} 2 porsi'";
+            } elseif (stripos($lastUserMessage, 'menu') !== false || 
+                      stripos($lastUserMessage, 'ada apa') !== false || 
+                      stripos($lastUserMessage, 'daftar') !== false) {
+                // User wants to browse menu
+                return "Kami punya: {$productList}" . (count($foundProducts) > 3 ? ' dan lainnya' : '') . ". " .
+                       "Mau pesan yang mana?";
+            } else {
+                // General search
+                return "Saya menemukan: {$productList}. Ada yang ingin Anda pesan?";
+            }
+        } elseif ($hasSearch && empty($foundProducts)) {
+            // Search was performed but no products found
+            if (stripos($lastUserMessage, 'pesan') !== false || 
+                stripos($lastUserMessage, 'beli') !== false) {
+                return "Maaf, produk yang Anda cari tidak tersedia. Ketik 'menu' untuk melihat daftar produk kami.";
+            } else {
+                return "Maaf, tidak ada produk yang sesuai dengan pencarian Anda. Bisa coba kata kunci lain atau ketik 'menu' untuk lihat semua produk.";
+            }
+        }
+        
+        // Check cart context
+        $cart = $conversation->getCart();
+        if (!empty($cart)) {
+            if (stripos($lastUserMessage, 'keranjang') !== false || 
+                stripos($lastUserMessage, 'cart') !== false || 
+                stripos($lastUserMessage, 'pesanan') !== false) {
+                return "Anda punya " . count($cart) . " item di keranjang. Ketik 'lihat keranjang' untuk detail atau 'konfirmasi' untuk checkout.";
+            }
+        }
+        
+        // Check if user is asking about payment
+        if (stripos($lastUserMessage, 'bayar') !== false || 
+            stripos($lastUserMessage, 'qris') !== false || 
+            stripos($lastUserMessage, 'payment') !== false) {
+            $currentOrder = $conversation->getCurrentOrder();
+            if ($currentOrder) {
+                return "Pesanan Anda sudah dibuat. Silakan lakukan pembayaran untuk melanjutkan.";
+            } else {
+                return "Belum ada pesanan yang perlu dibayar. Silakan buat pesanan terlebih dahulu.";
+            }
+        }
+        
+        // Check if user is asking general questions
+        if (stripos($lastUserMessage, 'jam') !== false || 
+            stripos($lastUserMessage, 'buka') !== false || 
+            stripos($lastUserMessage, 'tutup') !== false) {
+            return "Untuk informasi jam operasional, silakan hubungi kami langsung. Ada yang bisa saya bantu untuk pemesanan?";
+        }
+        
+        if (stripos($lastUserMessage, 'lokasi') !== false || 
+            stripos($lastUserMessage, 'alamat') !== false || 
+            stripos($lastUserMessage, 'dimana') !== false) {
+            return "Untuk informasi lokasi, silakan hubungi kami langsung. Mau pesan sesuatu?";
+        }
+        
+        // Generic fallback based on conversation state
+        if (!empty($cart)) {
+            return "Anda punya pesanan di keranjang. Mau tambah item lagi atau langsung checkout?";
+        }
+        
+        // Default fallback - encourage user to be more specific
+        return "Maaf, saya kurang mengerti maksud Anda. Bisa dijelaskan lebih detail? " .
+               "Contoh: 'lihat menu', 'pesan nasi goreng 2', atau 'lihat keranjang'.";
+    }
+
+    /**
+     * Generate simple contextual fallback for main response (without tool results).
+     */
+    protected function generateSimpleFallback(AiAgentConversation $conversation): string
+    {
+        // Get last user message for context
+        $messages = $conversation->messages ?? [];
+        $lastUserMessage = '';
+        for ($i = count($messages) - 1; $i >= 0; $i--) {
+            if (isset($messages[$i]['type']) && $messages[$i]['type'] === 'human') {
+                $lastUserMessage = strtolower($messages[$i]['content'] ?? '');
+                break;
+            }
+        }
+        
+        // Check conversation state
+        $cart = $conversation->getCart();
+        $currentOrder = $conversation->getCurrentOrder();
+        
+        // Greeting detection
+        if (preg_match('/^(halo|hai|hi|hello|hey|assalamualaikum|selamat)/i', $lastUserMessage)) {
+            return "Halo! Ada yang bisa saya bantu? Ketik 'menu' untuk lihat produk kami.";
+        }
+        
+        // Menu/product inquiry
+        if (stripos($lastUserMessage, 'menu') !== false || 
+            stripos($lastUserMessage, 'produk') !== false || 
+            stripos($lastUserMessage, 'ada apa') !== false ||
+            stripos($lastUserMessage, 'jual apa') !== false) {
+            return "Untuk melihat menu lengkap, ketik 'lihat menu' atau 'daftar produk'. Atau sebutkan produk yang Anda cari.";
+        }
+        
+        // Order intent
+        if (stripos($lastUserMessage, 'pesan') !== false || 
+            stripos($lastUserMessage, 'beli') !== false || 
+            stripos($lastUserMessage, 'order') !== false ||
+            stripos($lastUserMessage, 'mau') !== false) {
+            if (!empty($cart)) {
+                return "Anda sudah punya " . count($cart) . " item di keranjang. Mau tambah lagi atau langsung checkout? Ketik 'lihat keranjang' untuk detail.";
+            } else {
+                return "Silakan sebutkan produk yang ingin Anda pesan. Contoh: 'pesan nasi goreng 2 porsi' atau ketik 'menu' untuk lihat daftar produk.";
+            }
+        }
+        
+        // Cart inquiry
+        if (stripos($lastUserMessage, 'keranjang') !== false || 
+            stripos($lastUserMessage, 'cart') !== false || 
+            stripos($lastUserMessage, 'pesanan') !== false) {
+            if (!empty($cart)) {
+                return "Ketik 'lihat keranjang' untuk melihat detail pesanan Anda.";
+            } else {
+                return "Keranjang Anda masih kosong. Silakan pesan produk terlebih dahulu. Ketik 'menu' untuk lihat produk.";
+            }
+        }
+        
+        // Payment inquiry
+        if (stripos($lastUserMessage, 'bayar') !== false || 
+            stripos($lastUserMessage, 'qris') !== false || 
+            stripos($lastUserMessage, 'payment') !== false ||
+            stripos($lastUserMessage, 'transfer') !== false) {
+            if ($currentOrder) {
+                return "Untuk melakukan pembayaran, silakan konfirmasi pesanan Anda terlebih dahulu.";
+            } else {
+                return "Belum ada pesanan yang perlu dibayar. Silakan buat pesanan terlebih dahulu.";
+            }
+        }
+        
+        // Help/info inquiry
+        if (stripos($lastUserMessage, 'bantuan') !== false || 
+            stripos($lastUserMessage, 'help') !== false || 
+            stripos($lastUserMessage, 'cara') !== false) {
+            return "Saya bisa bantu Anda:\n" .
+                   "• Lihat menu: ketik 'menu' atau 'daftar produk'\n" .
+                   "• Pesan: ketik 'pesan [nama produk] [jumlah]'\n" .
+                   "• Lihat keranjang: ketik 'lihat keranjang'\n" .
+                   "• Checkout: ketik 'konfirmasi pesanan'\n\n" .
+                   "Ada yang bisa saya bantu?";
+        }
+        
+        // Thank you
+        if (preg_match('/(terima kasih|thanks|thank you|makasih)/i', $lastUserMessage)) {
+            return "Sama-sama! Ada lagi yang bisa saya bantu?";
+        }
+        
+        // Cancel/stop
+        if (preg_match('/(batal|cancel|stop|tidak jadi)/i', $lastUserMessage)) {
+            if (!empty($cart)) {
+                return "Mau batalkan pesanan? Ketik 'hapus keranjang' untuk mengosongkan keranjang.";
+            } else {
+                return "Baik, tidak jadi. Ada yang bisa saya bantu lagi?";
+            }
+        }
+        
+        // Default - based on conversation state
+        if (!empty($cart)) {
+            return "Anda punya " . count($cart) . " item di keranjang. Ketik 'lihat keranjang' untuk detail atau 'konfirmasi' untuk checkout. Atau mau pesan yang lain?";
+        }
+        
+        // Ultimate fallback
+        return "Maaf, saya kurang mengerti. Bisa dijelaskan lebih detail atau coba:\n" .
+               "• Ketik 'menu' untuk lihat produk\n" .
+               "• Ketik 'pesan [produk] [jumlah]' untuk memesan\n" .
+               "• Ketik 'bantuan' untuk info lebih lanjut";
     }
 
     /**
