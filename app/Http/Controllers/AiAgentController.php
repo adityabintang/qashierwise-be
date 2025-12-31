@@ -394,13 +394,22 @@ class AiAgentController extends Controller
             // Refresh to get latest messages from database
             $conversation->refresh();
 
+            // Convert messages format from type to role for test compatibility
+            $conversationHistory = array_map(function($msg) {
+                return [
+                    'role' => $msg['type'] === 'human' ? 'user' : 'assistant',
+                    'content' => $msg['content'],
+                    'timestamp' => $msg['timestamp'] ?? null,
+                ];
+            }, $conversation->messages ?? []);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Test message processed',
                 'data' => [
                     'user_message' => $request->message,
                     'ai_response' => $responseContent,
-                    'conversation_history' => $conversation->messages,
+                    'conversation_history' => $conversationHistory,
                 ],
             ], 200);
 
@@ -427,7 +436,7 @@ class AiAgentController extends Controller
                 'type' => 'function',
                 'function' => [
                     'name' => 'get_all_products',
-                    'description' => 'Dapatkan semua produk/menu yang tersedia. Gunakan ketika user bertanya menu atau daftar produk.',
+                    'description' => 'Dapatkan semua produk/menu yang tersedia. HANYA gunakan ketika user bertanya "menunya apa?", "ada apa aja?", "daftar menu", atau pertanyaan serupa tentang DAFTAR menu. JANGAN gunakan saat user ingin MEMESAN produk.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [],
@@ -439,19 +448,19 @@ class AiAgentController extends Controller
                 'type' => 'function',
                 'function' => [
                     'name' => 'add_to_cart',
-                    'description' => 'GUNAKAN INI ketika user ingin MEMESAN/BELI produk. Tambahkan produk ke keranjang berdasarkan NAMA produk. Untuk multiple produk, masukkan semua dalam satu array.',
+                    'description' => 'GUNAKAN INI ketika user ingin MEMESAN/BELI/PESAN produk (contoh: "pesan nasi goreng 2", "beli dimsum 1", "mau teh jumbo 3"). Tambahkan produk ke keranjang berdasarkan NAMA produk yang disebutkan user. PENTING: HANYA gunakan nama produk yang BENAR-BENAR disebutkan user atau yang ada di daftar menu. JANGAN tambahkan produk yang tidak disebutkan user. Untuk multiple produk, masukkan semua dalam satu array.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
                             'items' => [
                                 'type' => 'array',
-                                'description' => 'Array produk yang dipesan. Setiap item berisi nama produk dan jumlah.',
+                                'description' => 'Array produk yang dipesan. Setiap item berisi nama produk PERSIS seperti yang disebutkan user dan jumlah.',
                                 'items' => [
                                     'type' => 'object',
                                     'properties' => [
                                         'product_name' => [
                                             'type' => 'string',
-                                            'description' => 'Nama produk (contoh: "dimsum", "teh jumbo")',
+                                            'description' => 'Nama produk PERSIS seperti yang disebutkan user (contoh: "nasi goreng", "dimsum", "teh jumbo"). Gunakan huruf kecil.',
                                         ],
                                         'quantity' => [
                                             'type' => 'integer',

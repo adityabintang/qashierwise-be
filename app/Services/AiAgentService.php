@@ -393,8 +393,20 @@ class AiAgentService
             [
                 'type' => 'function',
                 'function' => [
+                    'name' => 'get_all_products',
+                    'description' => 'GUNAKAN INI saat user bertanya "menunya apa?", "ada apa aja?", "daftar menu", dll. Dapatkan SEMUA produk yang tersedia. HANYA tampilkan produk yang dikembalikan function ini, JANGAN tambahkan produk lain.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [],
+                        'required' => [],
+                    ],
+                ],
+            ],
+            [
+                'type' => 'function',
+                'function' => [
                     'name' => 'search_products',
-                    'description' => 'Cari SATU produk berdasarkan nama atau SKU. Untuk mencari MULTIPLE produk sekaligus (contoh: "dimsum dan teh"), gunakan search_multiple_products.',
+                    'description' => 'Cari SATU produk berdasarkan nama atau SKU. Untuk mencari MULTIPLE produk sekaligus (contoh: "dimsum dan teh"), gunakan search_multiple_products. PENTING: Jika hasil kosong, JANGAN sebutkan produk tersebut ke user.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
@@ -411,7 +423,7 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'search_multiple_products',
-                    'description' => 'WAJIB DIGUNAKAN saat user memesan LEBIH DARI SATU produk sekaligus (contoh: "pesan dimsum dan teh jumbo", "mau nasi goreng sama es teh"). Cari beberapa produk sekaligus dalam satu panggilan. Hasil akan menampilkan semua produk yang ditemukan beserta ID-nya untuk digunakan di add_to_cart.',
+                    'description' => 'WAJIB DIGUNAKAN saat user memesan LEBIH DARI SATU produk sekaligus (contoh: "pesan dimsum dan teh jumbo", "mau nasi goreng sama es teh"). Cari beberapa produk sekaligus dalam satu panggilan. PENTING: Jika ada produk yang tidak ditemukan, JANGAN sebutkan produk tersebut ke user. HANYA proses produk yang ditemukan.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
@@ -449,13 +461,13 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'add_to_cart',
-                    'description' => 'Tambahkan satu atau lebih produk ke keranjang belanja. PENTING: User akan menyebutkan NAMA produk, kamu harus cari ID produk dari daftar produk atau hasil search_products terlebih dahulu. Untuk multiple produk, gunakan array products dan masukkan SEMUA produk dalam SATU pemanggilan function.',
+                    'description' => 'Tambahkan satu atau lebih produk ke keranjang belanja. PENTING: User akan menyebutkan NAMA produk, kamu harus cari ID produk dari daftar produk atau hasil search_products terlebih dahulu. Untuk multiple produk, gunakan array products dan masukkan SEMUA produk dalam SATU pemanggilan function. HANYA tambahkan produk yang BENAR-BENAR DITEMUKAN di hasil search.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
                             'products' => [
                                 'type' => 'array',
-                                'description' => 'Array of products to add. Each product must have product_id (yang sudah kamu cari dari nama produk) and quantity.',
+                                'description' => 'Array of products to add. Each product must have product_id (yang sudah kamu cari dari nama produk) and quantity. HANYA masukkan produk yang ID-nya sudah kamu dapatkan dari search.',
                                 'items' => [
                                     'type' => 'object',
                                     'properties' => [
@@ -1042,6 +1054,9 @@ class AiAgentService
         try {
             // Validate parameters based on function requirements
             switch ($functionName) {
+                case 'get_all_products':
+                    return $this->getAllProducts($userId);
+
                 case 'search_products':
                     if (!isset($arguments['query'])) {
                         return 'Maaf, parameter pencarian tidak lengkap. Mohon berikan kata kunci pencarian.';
@@ -1159,7 +1174,15 @@ class AiAgentService
             ->get(['id', 'name', 'price', 'stock_quantity', 'description']);
 
         if ($products->isEmpty()) {
-            return "Maaf, tidak ada produk yang ditemukan dengan kata kunci '{$query}'.";
+            // CRITICAL: Return clear message that product was NOT FOUND
+            return "PRODUK TIDAK DITEMUKAN!\n\n" .
+                   "Pencarian untuk '{$query}' tidak menemukan hasil.\n\n" .
+                   "**INSTRUKSI WAJIB UNTUK AI**:\n" .
+                   "- JANGAN sebutkan produk ini ke user\n" .
+                   "- JANGAN buat-buat atau asumsikan produk ada\n" .
+                   "- Katakan ke user: \"Mohon maaf, untuk menu '{$query}' tidak tersedia di restoran kami. Ketik 'menu' untuk melihat daftar produk yang tersedia.\"\n" .
+                   "- JANGAN coba search lagi dengan kata kunci berbeda\n" .
+                   "- JANGAN rekomendasikan produk yang tidak ada di database";
         }
 
         // Build response for AI (with IDs in brackets for internal use)
@@ -1227,21 +1250,79 @@ class AiAgentService
             }
         }
 
+        // CRITICAL: Handle case when NO products found at all
         if (empty($allResults) && !empty($notFound)) {
-            return "Maaf, tidak ada produk yang ditemukan untuk: " . implode(', ', $notFound);
+            return "PRODUK TIDAK DITEMUKAN!\n\n" .
+                   "Pencarian untuk: " . implode(', ', $notFound) . " tidak menemukan hasil.\n\n" .
+                   "**INSTRUKSI WAJIB UNTUK AI**:\n" .
+                   "- JANGAN sebutkan produk-produk ini ke user\n" .
+                   "- JANGAN buat-buat atau asumsikan produk ada\n" .
+                   "- Katakan ke user: \"Mohon maaf, menu yang Anda cari tidak tersedia di restoran kami. Ketik 'menu' untuk melihat daftar produk yang tersedia.\"\n" .
+                   "- JANGAN coba search lagi dengan kata kunci berbeda\n" .
+                   "- JANGAN rekomendasikan produk yang tidak ada di database";
         }
 
         // Build response
         $response = "HASIL PENCARIAN PRODUK:\n\n";
-        foreach ($allResults as $product) {
-            $response .= "- {$product['name']} [ID:{$product['id']}] - Rp ".number_format($product['price'], 0, ',', '.')." - Stok: {$product['stock']}\n";
+        
+        if (!empty($allResults)) {
+            $response .= "✅ PRODUK DITEMUKAN:\n";
+            foreach ($allResults as $product) {
+                $response .= "- {$product['name']} [ID:{$product['id']}] - Rp ".number_format($product['price'], 0, ',', '.')." - Stok: {$product['stock']}\n";
+            }
         }
 
         if (!empty($notFound)) {
-            $response .= "\n⚠️ Tidak ditemukan: " . implode(', ', $notFound) . "\n";
+            $response .= "\n❌ PRODUK TIDAK DITEMUKAN:\n";
+            $response .= "- " . implode("\n- ", $notFound) . "\n";
+            $response .= "\n**INSTRUKSI UNTUK AI**: Untuk produk yang tidak ditemukan, katakan ke user: \"Mohon maaf, untuk menu [nama] tidak tersedia di restoran kami.\"\n";
         }
 
-        $response .= "\n**INSTRUKSI WAJIB**: Sekarang LANGSUNG panggil add_to_cart dengan SEMUA ID di atas dalam SATU array. JANGAN search lagi! JANGAN tampilkan daftar produk ke user lagi!";
+        if (!empty($allResults)) {
+            $response .= "\n**INSTRUKSI WAJIB**: Sekarang LANGSUNG panggil add_to_cart dengan SEMUA ID yang DITEMUKAN di atas dalam SATU array. JANGAN tambahkan produk yang tidak ditemukan! JANGAN search lagi!";
+        }
+
+        return $response;
+    }
+
+    /**
+     * Get all active products.
+     */
+    protected function getAllProducts(int $userId): string
+    {
+        $products = Product::where('user_id', $userId)
+            ->where('is_active', true)
+            ->orderBy('name', 'asc')
+            ->get(['id', 'name', 'price', 'stock_quantity', 'description']);
+
+        if ($products->isEmpty()) {
+            return "TIDAK ADA PRODUK!\n\n" .
+                   "Saat ini belum ada produk yang tersedia.\n\n" .
+                   "**INSTRUKSI WAJIB UNTUK AI**:\n" .
+                   "- Katakan ke user: \"Mohon maaf, saat ini belum ada menu yang tersedia.\"\n" .
+                   "- JANGAN sebutkan produk apapun\n" .
+                   "- JANGAN buat-buat atau asumsikan ada produk";
+        }
+
+        // Build response with IDs for AI internal use
+        $response = "DAFTAR SEMUA PRODUK TERSEDIA:\n\n";
+        $response .= "**INSTRUKSI UNTUK AI**: Ini adalah SEMUA produk yang tersedia. JANGAN sebutkan produk lain selain yang ada di daftar ini!\n\n";
+        
+        foreach ($products as $index => $product) {
+            $response .= ($index + 1).". {$product->name} [ID:{$product->id}]\n";
+            $response .= '   💰 Rp '.number_format($product->price, 0, ',', '.')."\n";
+            $response .= "   📦 Stok: {$product->stock_quantity}\n";
+            if ($product->description) {
+                $response .= "   📝 {$product->description}\n";
+            }
+            $response .= "\n";
+        }
+
+        $response .= "\n**INSTRUKSI TAMPILAN KE USER**:\n";
+        $response .= "- Tampilkan daftar di atas ke user TANPA [ID:X]\n";
+        $response .= "- Format: '1. Dimsum Keju - Rp 40.000 - Stok: 10'\n";
+        $response .= "- JANGAN tambahkan produk yang tidak ada di daftar ini\n";
+        $response .= "- Jika user pesan, gunakan ID dari daftar ini untuk add_to_cart";
 
         return $response;
     }
