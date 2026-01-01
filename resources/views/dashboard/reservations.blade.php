@@ -15,20 +15,20 @@
                 <!-- Tabs Navigation -->
                 <div class="card">
                     <div class="flex border-b border-[hsl(var(--border))] overflow-x-auto">
-                        <button 
-                            @click="activeTab = 'reservations'" 
+                        <button
+                            @click="activeTab = 'reservations'"
                             :class="activeTab === 'reservations' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'"
                             class="px-6 py-3 font-medium transition-colors hover:text-primary whitespace-nowrap">
                             <i class="fas fa-calendar-check mr-2"></i>Reservations
                         </button>
-                        <button 
-                            @click="activeTab = 'flows'" 
+                        <button
+                            @click="activeTab = 'flows'"
                             :class="activeTab === 'flows' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'"
                             class="px-6 py-3 font-medium transition-colors hover:text-primary whitespace-nowrap">
                             <i class="fab fa-whatsapp mr-2"></i>WhatsApp Flows
                         </button>
-                        <button 
-                            @click="activeTab = 'flow-config'; loadFlowConfig()" 
+                        <button
+                            @click="activeTab = 'flow-config'; loadFlowConfig()"
                             :class="activeTab === 'flow-config' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'"
                             class="px-6 py-3 font-medium transition-colors hover:text-primary whitespace-nowrap">
                             <i class="fas fa-cog mr-2"></i>Flow Configuration
@@ -131,7 +131,7 @@
                                     <i class="fas fa-external-link-alt ml-auto text-muted-foreground"></i>
                                 </a>
                             </div>
-                            
+
                             <!-- Step by Step Guide -->
                             <h4 class="font-semibold mb-4">🚀 4 Langkah Mudah</h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -168,7 +168,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Tips Box -->
                             <div class="mt-6 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/30">
                                 <h4 class="font-semibold flex items-center gap-2 text-amber-700 dark:text-amber-400">
@@ -248,7 +248,7 @@
                             </div>
                             <h3 class="text-xl font-bold mb-2">Belum Ada Flow</h3>
                             <p class="text-muted-foreground max-w-md mx-auto mb-6">Buat flow pertama Anda untuk mulai menerima reservasi via WhatsApp. Pelanggan dapat mengisi form langsung dari chat!</p>
-                            
+
                             <!-- Quick Start Options -->
                             <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
                                 <button @click="showTemplateModal = true" class="btn btn-secondary btn-lg">
@@ -271,25 +271,25 @@
                                         <div>
                                             <h3 class="font-semibold" x-text="flow.name"></h3>
                                             <p class="text-sm text-muted-foreground">
-                                                <span x-text="flow.status"></span> • 
+                                                <span x-text="flow.status"></span> •
                                                 Created <span x-text="formatDate(flow.created_at)"></span>
                                             </p>
                                         </div>
                                     </div>
                                     <div class="flex items-center gap-2">
-                                        <button 
+                                        <button
                                             x-show="flow.status !== 'PUBLISHED'"
-                                            @click="publishFlow(flow.id)" 
+                                            @click="publishFlow(flow.id)"
                                             class="btn btn-sm btn-primary">
                                             <i class="fas fa-rocket mr-2"></i>Publish
                                         </button>
-                                        <button 
-                                            @click="openSendFlowModal(flow)" 
+                                        <button
+                                            @click="openSendFlowModal(flow)"
                                             class="btn btn-sm btn-secondary">
                                             <i class="fas fa-paper-plane mr-2"></i>Send
                                         </button>
-                                        <button 
-                                            @click="deleteFlow(flow.id)" 
+                                        <button
+                                            @click="deleteFlow(flow.id)"
                                             class="btn btn-sm btn-danger">
                                             <i class="fas fa-trash"></i>
                                         </button>
@@ -397,7 +397,7 @@
                                         <template x-for="(day, index) in ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']" :key="index">
                                             <button type="button"
                                                 @click="toggleOperatingDay(index + 1)"
-                                                class="flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all hover:shadow-sm" 
+                                                class="flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all hover:shadow-sm"
                                                 :class="flowConfig.operating_days?.includes(index + 1) ? 'bg-green-500 text-white border-green-500 font-semibold shadow-md' : 'border-[hsl(var(--border))] hover:border-green-300 hover:bg-green-50 dark:hover:bg-green-900/20'">
                                                 <i class="fas fa-check text-xs" x-show="flowConfig.operating_days?.includes(index + 1)"></i>
                                                 <span x-text="day" class="text-sm font-medium"></span>
@@ -631,7 +631,7 @@
                                 </div>
                                 <div class="mt-4">
                                     <label class="block text-sm font-medium mb-2">Teks Body</label>
-                                    <textarea x-model="flowConfig.body_text" class="input w-full" rows="3" maxlength="1024" 
+                                    <textarea x-model="flowConfig.body_text" class="input w-full" rows="3" maxlength="1024"
                                         placeholder="Silakan isi form di bawah ini untuk membuat reservasi."></textarea>
                                 </div>
                                 <div class="mt-4">
@@ -678,10 +678,10 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium mb-2">Nomor WhatsApp Pelanggan</label>
-                        <input 
-                            x-model="sendConfigFlowPhone" 
-                            type="tel" 
-                            class="input w-full" 
+                        <input
+                            x-model="sendConfigFlowPhone"
+                            type="tel"
+                            class="input w-full"
                             placeholder="+62812xxxxxxxx">
                         <p class="text-xs text-muted-foreground mt-1">Sertakan kode negara (contoh: +62 untuk Indonesia)</p>
                     </div>
@@ -708,18 +708,18 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium mb-2">Nama Flow</label>
-                        <input 
-                            x-model="newFlow.name" 
-                            type="text" 
-                            class="input w-full" 
+                        <input
+                            x-model="newFlow.name"
+                            type="text"
+                            class="input w-full"
                             placeholder="contoh: Flow Reservasi Restoran">
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-2">Kategori (pisahkan dengan koma)</label>
-                        <input 
-                            x-model="newFlow.categories" 
-                            type="text" 
-                            class="input w-full" 
+                        <input
+                            x-model="newFlow.categories"
+                            type="text"
+                            class="input w-full"
                             placeholder="APPOINTMENT_BOOKING, MAKE_A_RESERVATION">
                     </div>
                 </div>
@@ -745,19 +745,19 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium mb-2">Nomor WhatsApp Pelanggan</label>
-                        <input 
-                            x-model="sendFlowData.phone" 
-                            type="tel" 
-                            class="input w-full" 
+                        <input
+                            x-model="sendFlowData.phone"
+                            type="tel"
+                            class="input w-full"
                             placeholder="+62812xxxxxxxx">
                         <p class="text-xs text-muted-foreground mt-1">Sertakan kode negara (contoh: +62 untuk Indonesia)</p>
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-2">Pesan (Opsional)</label>
-                        <textarea 
-                            x-model="sendFlowData.message" 
-                            class="input w-full" 
-                            rows="3" 
+                        <textarea
+                            x-model="sendFlowData.message"
+                            class="input w-full"
+                            rows="3"
                             placeholder="Halo! Silakan isi form ini untuk membuat reservasi."></textarea>
                     </div>
                 </div>
@@ -791,12 +791,12 @@
                         </button>
                     </div>
                 </div>
-                
+
                 <!-- Template Grid -->
                 <div class="p-6 overflow-y-auto max-h-[60vh]">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <template x-for="template in flowTemplates" :key="template.id">
-                            <div @click="selectedTemplate = template.id" 
+                            <div @click="selectedTemplate = template.id"
                                 class="p-5 rounded-xl border-2 cursor-pointer transition-all hover:shadow-lg"
                                 :class="selectedTemplate === template.id ? 'border-primary bg-primary/5 shadow-md' : 'border-[hsl(var(--border))] hover:border-primary/50'">
                                 <div class="flex items-start gap-4">
@@ -809,8 +809,8 @@
                                         }">
                                         <i :class="'fas ' + template.icon"
                                             :style="{
-                                                color: template.color === 'orange' ? '#ea580c' : 
-                                                       template.color === 'pink' ? '#db2777' : 
+                                                color: template.color === 'orange' ? '#ea580c' :
+                                                       template.color === 'pink' ? '#db2777' :
                                                        template.color === 'amber' ? '#d97706' : '#9333ea'
                                             }"></i>
                                     </div>
@@ -831,7 +831,7 @@
                         </template>
                     </div>
                 </div>
-                
+
                 <!-- Modal Footer -->
                 <div class="p-6 border-t border-[hsl(var(--border))] bg-muted/30 flex items-center justify-between">
                     <p class="text-sm text-muted-foreground">
@@ -862,16 +862,16 @@ function reservationsApp() {
         isMobile: window.innerWidth < 768,
         user: null,
         notifications: [],
-        
+
         // Reservations-specific properties
         API_BASE_URL: window.location.origin + '/api',
         loading: false,
         reservations: [],
         stats: { today: 0, upcoming: 0, pending: 0, total_this_month: 0 },
-        
+
         // Tabs
         activeTab: 'reservations',
-        
+
         // Flow Management
         flows: [],
         flowsLoading: false,
@@ -900,7 +900,7 @@ function reservationsApp() {
         availableProducts: [],
         showSendConfigFlowModal: false,
         sendConfigFlowPhone: '',
-        
+
         // Help & Templates
         showFlowHelp: false,
         showTemplateModal: false,
@@ -1053,12 +1053,12 @@ function reservationsApp() {
                 this.sidebarOpen = true;
                 localStorage.setItem('sidebarOpen', 'true');
             }
-            
+
             // Watch sidebar state changes (only save on desktop)
             this.$watch('sidebarOpen', v => {
                 if (!this.isMobile) localStorage.setItem('sidebarOpen', JSON.stringify(v));
             });
-            
+
             // Handle resize events with debounce
             let resizeTimeout;
             window.addEventListener('resize', () => {
@@ -1066,7 +1066,7 @@ function reservationsApp() {
                 resizeTimeout = setTimeout(() => {
                     const wasMobile = this.isMobile;
                     this.isMobile = window.innerWidth < 768;
-                    
+
                     if (wasMobile && !this.isMobile) {
                         let savedState = localStorage.getItem('sidebarOpen');
                         this.sidebarOpen = savedState !== null ? JSON.parse(savedState) : true;
@@ -1075,7 +1075,7 @@ function reservationsApp() {
                     }
                 }, 150);
             });
-            
+
             // Load user info
             let storedUser = localStorage.getItem('user');
             if (storedUser) {
@@ -1087,7 +1087,7 @@ function reservationsApp() {
             } else {
                 this.user = { name: 'User', email: 'user@example.com' };
             }
-            
+
             // Load saved notifications
             let savedNotifs = localStorage.getItem('notifications');
             if (savedNotifs) {
@@ -1097,13 +1097,13 @@ function reservationsApp() {
                     this.notifications = [];
                 }
             }
-            
+
             // Fetch reservations data
             await Promise.all([
                 this.fetchStatistics(),
                 this.fetchReservations(),
             ]);
-            
+
             // Watch for tab changes
             this.$watch('activeTab', (tab) => {
                 if (tab === 'flows' && this.flows.length === 0) {
@@ -1191,7 +1191,7 @@ function reservationsApp() {
                     })
                 });
                 const data = await response.json();
-                
+
                 if (data.success) {
                     this.addNotification({
                         type: 'success',
@@ -1229,7 +1229,7 @@ function reservationsApp() {
                     body: JSON.stringify({ flow_id: flowId })
                 });
                 const data = await response.json();
-                
+
                 if (data.success) {
                     this.addNotification({
                         type: 'success',
@@ -1272,7 +1272,7 @@ function reservationsApp() {
                     body: JSON.stringify(this.sendFlowData)
                 });
                 const data = await response.json();
-                
+
                 if (data.success) {
                     this.addNotification({
                         type: 'success',
@@ -1313,7 +1313,7 @@ function reservationsApp() {
                     body: JSON.stringify({ flow_id: flowId })
                 });
                 const data = await response.json();
-                
+
                 if (data.success) {
                     this.addNotification({
                         type: 'success',
@@ -1335,10 +1335,10 @@ function reservationsApp() {
 
         formatDate(dateString) {
             const date = new Date(dateString);
-            return date.toLocaleDateString('en-US', { 
-                month: 'short', 
-                day: 'numeric', 
-                year: 'numeric' 
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
             });
         },
 
@@ -1368,34 +1368,34 @@ function reservationsApp() {
         // Flow Configuration Methods
         async loadFlowConfig() {
             if (this.flowConfigLoading) return;
-            
+
             this.flowConfigLoading = true;
             const token = localStorage.getItem('token');
-            
+
             // Check if token exists
             if (!token) {
                 console.warn('No auth token found, redirecting to login');
                 window.location.href = '/login';
                 return;
             }
-            
+
             try {
                 // Fetch flow config, tables, and products in parallel
                 const [configResponse, tablesResponse, productsResponse] = await Promise.all([
                     fetch(`${this.API_BASE_URL}/reservations/flow-config`, {
-                        headers: { 
+                        headers: {
                             'Authorization': `Bearer ${token}`,
                             'Accept': 'application/json'
                         }
                     }),
                     fetch(`${this.API_BASE_URL}/pos/tables`, {
-                        headers: { 
+                        headers: {
                             'Authorization': `Bearer ${token}`,
                             'Accept': 'application/json'
                         }
                     }),
                     fetch(`${this.API_BASE_URL}/pos/products?per_page=100&active_only=true`, {
-                        headers: { 
+                        headers: {
                             'Authorization': `Bearer ${token}`,
                             'Accept': 'application/json'
                         }
@@ -1435,10 +1435,10 @@ function reservationsApp() {
                 } catch (e) {
                     console.error('Error parsing products response:', e);
                 }
-                
+
                 if (configData.success) {
                     this.flowConfig = configData.data.config || {};
-                    
+
                     // Initialize arrays if null
                     if (!this.flowConfig.operating_days) {
                         this.flowConfig.operating_days = [1, 2, 3, 4, 5, 6, 7];
@@ -1476,14 +1476,14 @@ function reservationsApp() {
                     time: new Date().toISOString()
                 });
             }
-            
+
             this.flowConfigLoading = false;
         },
 
         async saveFlowConfig() {
             this.savingConfig = true;
             const token = localStorage.getItem('token');
-            
+
             try {
                 const response = await fetch(`${this.API_BASE_URL}/reservations/flow-config`, {
                     method: 'POST',
@@ -1494,7 +1494,7 @@ function reservationsApp() {
                     },
                     body: JSON.stringify(this.flowConfig)
                 });
-                
+
                 const text = await response.text();
                 let data;
                 try {
@@ -1505,7 +1505,7 @@ function reservationsApp() {
                     this.savingConfig = false;
                     return;
                 }
-                
+
                 if (data.success) {
                     this.flowConfig = data.data.config || this.flowConfig;
                     this.addNotification({
@@ -1523,16 +1523,16 @@ function reservationsApp() {
                 console.error('Error saving flow config:', error);
                 alert('Failed to save configuration');
             }
-            
+
             this.savingConfig = false;
         },
 
         async publishFlowConfig() {
             if (!confirm('Publish this flow? It will be available for customers.')) return;
-            
+
             this.publishingConfig = true;
             const token = localStorage.getItem('token');
-            
+
             try {
                 const response = await fetch(`${this.API_BASE_URL}/reservations/flow-config/publish`, {
                     method: 'POST',
@@ -1542,7 +1542,7 @@ function reservationsApp() {
                         'Accept': 'application/json'
                     }
                 });
-                
+
                 const text = await response.text();
                 let data;
                 try {
@@ -1553,7 +1553,7 @@ function reservationsApp() {
                     this.publishingConfig = false;
                     return;
                 }
-                
+
                 if (data.success) {
                     this.flowConfig = data.data || this.flowConfig;
                     this.addNotification({
@@ -1571,7 +1571,7 @@ function reservationsApp() {
                 console.error('Error publishing flow config:', error);
                 alert('Failed to publish flow');
             }
-            
+
             this.publishingConfig = false;
         },
 
@@ -1592,7 +1592,7 @@ function reservationsApp() {
                     body: JSON.stringify({ phone: this.sendConfigFlowPhone })
                 });
                 const data = await response.json();
-                
+
                 if (data.success) {
                     this.addNotification({
                         type: 'success',
@@ -1617,7 +1617,7 @@ function reservationsApp() {
             if (!this.flowConfig.operating_days) {
                 this.flowConfig.operating_days = [];
             }
-            
+
             const index = this.flowConfig.operating_days.indexOf(day);
             if (index > -1) {
                 this.flowConfig.operating_days.splice(index, 1);
@@ -1631,7 +1631,7 @@ function reservationsApp() {
             if (!this.flowConfig.available_table_ids) {
                 this.flowConfig.available_table_ids = [];
             }
-            
+
             const index = this.flowConfig.available_table_ids.indexOf(tableId);
             if (index > -1) {
                 this.flowConfig.available_table_ids.splice(index, 1);
@@ -1644,7 +1644,7 @@ function reservationsApp() {
             if (!this.flowConfig.available_product_ids) {
                 this.flowConfig.available_product_ids = [];
             }
-            
+
             const index = this.flowConfig.available_product_ids.indexOf(productId);
             if (index > -1) {
                 this.flowConfig.available_product_ids.splice(index, 1);
@@ -1664,20 +1664,20 @@ function reservationsApp() {
         // Template Methods
         applyTemplate() {
             if (!this.selectedTemplate) return;
-            
+
             const template = this.flowTemplates.find(t => t.id === this.selectedTemplate);
             if (!template) return;
-            
+
             // Apply template config to flowConfig
             Object.keys(template.config).forEach(key => {
                 this.flowConfig[key] = template.config[key];
             });
-            
+
             // Close modal and switch to config tab
             this.showTemplateModal = false;
             this.selectedTemplate = null;
             this.activeTab = 'flow-config';
-            
+
             // Show success notification
             this.addNotification({
                 type: 'success',
@@ -1687,7 +1687,7 @@ function reservationsApp() {
                 message: `Template "${template.name}" berhasil diterapkan. Silakan sesuaikan konfigurasi.`,
                 time: new Date().toISOString()
             });
-            
+
             // Save the config
             this.saveFlowConfig();
         },
@@ -1697,18 +1697,18 @@ function reservationsApp() {
             // Remove existing tooltip
             const existingTooltip = document.querySelector('.flow-tooltip');
             if (existingTooltip) existingTooltip.remove();
-            
+
             // Create tooltip element
             const tooltip = document.createElement('div');
             tooltip.className = 'flow-tooltip fixed z-[100] px-3 py-2 text-sm bg-foreground text-background rounded-lg shadow-lg max-w-xs';
             tooltip.textContent = text;
             document.body.appendChild(tooltip);
-            
+
             // Position tooltip
             const rect = event.target.getBoundingClientRect();
             tooltip.style.left = `${rect.left + rect.width / 2 - tooltip.offsetWidth / 2}px`;
             tooltip.style.top = `${rect.top - tooltip.offsetHeight - 8}px`;
-            
+
             // Auto-hide after 3 seconds
             setTimeout(() => tooltip.remove(), 3000);
         },

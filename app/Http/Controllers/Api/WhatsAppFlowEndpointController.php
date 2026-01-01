@@ -325,6 +325,7 @@ class WhatsAppFlowEndpointController extends Controller
         // Generate available dates and time slots based on config
         $dates = $config ? $config->getAvailableDates() : $this->getAvailableDates(30);
         $times = $config ? $config->getTimeSlots() : $this->getAllTimeSlots();
+        $guestOptions = $config ? $config->getGuestCountOptions() : $this->getDefaultGuestOptions();
 
         return [
             'screen' => 'APPOINTMENT',
@@ -332,8 +333,21 @@ class WhatsAppFlowEndpointController extends Controller
                 'dates' => $dates,
                 'times' => $times,
                 'is_time_enabled' => false, // Disabled until date is selected
+                'guest_options' => $guestOptions,
             ],
         ];
+    }
+
+    /**
+     * Get default guest options
+     */
+    private function getDefaultGuestOptions(): array
+    {
+        $options = [];
+        for ($i = 1; $i <= 10; $i++) {
+            $options[] = ['id' => (string) $i, 'title' => "{$i} orang"];
+        }
+        return $options;
     }
 
     /**
@@ -374,12 +388,14 @@ class WhatsAppFlowEndpointController extends Controller
 
         // Get available time slots for the selected date based on config
         $times = $this->getAvailableTimeSlotsWithConfig($selectedDate, $userId, $config);
+        $guestOptions = $config ? $config->getGuestCountOptions() : $this->getDefaultGuestOptions();
 
         return [
             'screen' => 'APPOINTMENT',
             'data' => [
                 'times' => $times,
                 'is_time_enabled' => true,
+                'guest_options' => $guestOptions,
             ],
         ];
     }
@@ -639,7 +655,7 @@ class WhatsAppFlowEndpointController extends Controller
 
     /**
      * Handle ping action (health check).
-     * 
+     *
      * @see https://developers.facebook.com/docs/whatsapp/flows/guides/implementingyourflowendpoint#health_check_request
      */
     private function handlePing(): array

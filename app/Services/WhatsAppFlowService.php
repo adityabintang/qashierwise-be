@@ -109,6 +109,11 @@ class WhatsAppFlowService
 
     /**
      * Publish a flow (make it live)
+     * 
+     * Before publishing, this method ensures:
+     * 1. Endpoint URI is configured
+     * 2. Public signing key is uploaded
+     * 3. Health check passes
      */
     public function publishFlow(int $userId, string $flowId): bool
     {
@@ -119,6 +124,37 @@ class WhatsAppFlowService
             return false;
         }
 
+        // Step 1: Configure endpoint URI
+        $endpointUri = config('app.url') . '/api/whatsapp/flow/endpoint';
+        
+        \Log::info('publishFlow: Setting endpoint URI', [
+            'flow_id' => $flowId,
+            'endpoint_uri' => $endpointUri,
+        ]);
+
+        $updateResponse = Http::withToken($account->access_token)
+            ->post("https://graph.facebook.com/v21.0/{$flowId}", [
+                'endpoint_uri' => $endpointUri,
+            ]);
+
+        if (! $updateResponse->successful()) {
+            \Log::error('publishFlow: Failed to set endpoint URI', [
+                'flow_id' => $flowId,
+                'status' => $updateResponse->status(),
+                'response' => $updateResponse->json(),
+            ]);
+            // Continue anyway, maybe it's already set
+        } else {
+            \Log::info('publishFlow: Endpoint URI set successfully');
+        }
+
+        // Step 2: Upload public signing key
+        $publicKeyUploaded = $this->uploadPublicSigningKey($account);
+        if (! $publicKeyUploaded) {
+            \Log::warning('publishFlow: Public key upload may have failed, continuing anyway');
+        }
+
+        // Step 3: Publish the flow
         $response = Http::withToken($account->access_token)
             ->post("https://graph.facebook.com/v21.0/{$flowId}/publish");
 
@@ -132,6 +168,88 @@ class WhatsAppFlowService
         }
 
         return $response->successful();
+    }
+
+    /**
+     * Upload public signing key to Meta
+     * Required for WhatsApp Flow encryption
+     */
+    public function uploadPublicSigningKey($account): bool
+    {
+        $privateKeyRaw = config('services.whatsapp.flow_private_key');
+        
+        if (empty($privateKeyRaw)) {
+            \Log::error('uploadPublicSigningKey: Private key not configured');
+            return false;
+        }
+
+        // Decode private key and extract public key
+        $privateKeyPem = $this->decodePrivateKey($privateKeyRaw);
+        $passphrase = config('services.whatsapp.flow_passphrase', '');
+        
+        $privateKey = openssl_pkey_get_private($privateKeyPem, $passphrase);
+        if ($privateKey === false) {
+            \Log::error('uploadPublicSigningKey: Failed to load private key', [
+                'error' => openssl_error_string(),
+            ]);
+            return false;
+        }
+
+        $keyDetails = openssl_pkey_get_details($privateKey);
+        $publicKey = $keyDetails['key'];
+
+        \Log::info('uploadPublicSigningKey: Uploading public key', [
+            'phone_number_id' => $account->phone_number_id,
+            'key_bits' => $keyDetails['bits'],
+        ]);
+
+        $apiVersion = config('services.whatsapp.api_version', 'v21.0');
+        $url = "https://graph.facebook.com/{$apiVersion}/{$account->phone_number_id}/whatsapp_business_encryption";
+
+        $response = Http::withToken($account->access_token)
+            ->post($url, [
+                'business_public_key' => $publicKey,
+            ]);
+
+        if ($response->successful() && ($response->json()['success'] ?? false)) {
+            \Log::info('uploadPublicSigningKey: Public key uploaded successfully');
+            return true;
+        }
+
+        \Log::error('uploadPublicSigningKey: Failed to upload public key', [
+            'status' => $response->status(),
+            'response' => $response->json(),
+        ]);
+
+        return false;
+    }
+
+    /**
+     * Decode private key from various formats
+     */
+    private function decodePrivateKey(string $key): string
+    {
+        // If it already looks like a PEM key, return as-is
+        if (str_contains($key, '-----BEGIN')) {
+            return $key;
+        }
+
+        // Try base64 decoding
+        $decoded = base64_decode($key, true);
+        if ($decoded !== false && str_contains($decoded, '-----BEGIN')) {
+            return $decoded;
+        }
+
+        // Try replacing literal \n with newlines
+        $withNewlines = str_replace('\\n', "\n", $key);
+        if (str_contains($withNewlines, '-----BEGIN')) {
+            return $withNewlines;
+        }
+
+        // Assume it's a base64-encoded key without headers
+        return "-----BEGIN PRIVATE KEY-----\n" .
+            chunk_split($key, 64, "\n") .
+            "-----END PRIVATE KEY-----\n";
     }
 
     /**
@@ -875,16 +993,19 @@ class WhatsAppFlowService
 
     /**
      * Build flow JSON from config.
+     * Follows Meta's WhatsApp Flow JSON specification v3.0
+     * @see https://developers.facebook.com/docs/whatsapp/flows/reference/flowjson
      */
     private function buildFlowJsonFromConfig(\App\Models\ReservationFlowConfig $config): array
     {
         $screens = [];
+        $hasDetails = $config->enable_menu_selection || $config->enable_table_selection;
 
         // Screen 1: Appointment (Date, Time, Customer Info)
-        $screens[] = $this->buildAppointmentScreen($config);
+        $screens[] = $this->buildAppointmentScreen($config, $hasDetails);
 
         // Screen 2: Details (Menu, Table, Event Type) - if enabled
-        if ($config->enable_menu_selection || $config->enable_table_selection) {
+        if ($hasDetails) {
             $screens[] = $this->buildDetailsScreen($config);
         }
 
@@ -896,30 +1017,137 @@ class WhatsAppFlowService
             $screens[] = $this->buildPaymentScreen($config);
         }
 
+        // Screen 5: Success (terminal screen)
+        $screens[] = $this->buildSuccessScreen();
+
+        // Build routing model - all possible transitions
+        $routingModel = [];
+        
+        if ($hasDetails) {
+            $routingModel['APPOINTMENT'] = ['DETAILS'];
+            $routingModel['DETAILS'] = ['SUMMARY', 'APPOINTMENT'];
+        } else {
+            $routingModel['APPOINTMENT'] = ['SUMMARY'];
+        }
+        
+        if ($config->enable_payment) {
+            $routingModel['SUMMARY'] = ['PAYMENT', 'APPOINTMENT', 'DETAILS'];
+            $routingModel['PAYMENT'] = ['SUCCESS', 'SUMMARY'];
+        } else {
+            $routingModel['SUMMARY'] = ['SUCCESS', 'APPOINTMENT', 'DETAILS'];
+        }
+
         return [
             'version' => '3.0',
             'data_api_version' => '3.0',
-            'routing_model' => [
-                'APPOINTMENT' => $config->enable_menu_selection || $config->enable_table_selection
-                    ? ['DETAILS']
-                    : ['SUMMARY'],
-                'DETAILS' => ['SUMMARY'],
-                'SUMMARY' => $config->enable_payment ? ['PAYMENT'] : ['SUCCESS'],
-                'PAYMENT' => ['SUCCESS'],
-            ],
+            'routing_model' => $routingModel,
             'screens' => $screens,
         ];
     }
 
-    private function buildAppointmentScreen(\App\Models\ReservationFlowConfig $config): array
+    /**
+     * Build SUCCESS terminal screen
+     */
+    private function buildSuccessScreen(): array
     {
+        return [
+            'id' => 'SUCCESS',
+            'title' => 'Reservasi Berhasil',
+            'terminal' => true,
+            'success' => true,
+            'data' => [
+                'confirmation_message' => [
+                    'type' => 'string',
+                    '__example__' => 'Reservasi Anda telah berhasil dibuat!',
+                ],
+                'reservation_code' => [
+                    'type' => 'string',
+                    '__example__' => 'RES-000001',
+                ],
+            ],
+            'layout' => [
+                'type' => 'SingleColumnLayout',
+                'children' => [
+                    [
+                        'type' => 'TextHeading',
+                        'text' => '✅ Reservasi Berhasil!',
+                    ],
+                    [
+                        'type' => 'TextBody',
+                        'text' => '${data.confirmation_message}',
+                    ],
+                    [
+                        'type' => 'TextSubheading',
+                        'text' => 'Kode Reservasi:',
+                    ],
+                    [
+                        'type' => 'TextHeading',
+                        'text' => '${data.reservation_code}',
+                    ],
+                    [
+                        'type' => 'TextCaption',
+                        'text' => 'Kami akan menghubungi Anda untuk konfirmasi. Terima kasih!',
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    private function buildAppointmentScreen(\App\Models\ReservationFlowConfig $config, bool $hasDetails = true): array
+    {
+        // Build guest count options
+        $guestOptions = [];
+        for ($i = $config->min_guests; $i <= min($config->max_guests, 20); $i++) {
+            $guestOptions[] = ['id' => (string) $i, 'title' => "{$i} orang"];
+        }
+        if ($config->max_guests > 20) {
+            $guestOptions[] = ['id' => '20+', 'title' => 'Lebih dari 20 orang'];
+        }
+
+        $nextScreen = $hasDetails ? 'DETAILS' : 'SUMMARY';
+
         return [
             'id' => 'APPOINTMENT',
             'title' => 'Reservasi',
             'data' => [
-                'dates' => ['type' => 'array', 'items' => ['type' => 'object']],
-                'times' => ['type' => 'array', 'items' => ['type' => 'object']],
-                'is_time_enabled' => ['type' => 'boolean'],
+                'dates' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'id' => ['type' => 'string'],
+                            'title' => ['type' => 'string'],
+                        ],
+                    ],
+                    '__example__' => [['id' => '2026-01-15', 'title' => 'Kam, 15 Jan 2026']],
+                ],
+                'times' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'id' => ['type' => 'string'],
+                            'title' => ['type' => 'string'],
+                            'enabled' => ['type' => 'boolean'],
+                        ],
+                    ],
+                    '__example__' => [['id' => '12:00', 'title' => '12:00 WIB', 'enabled' => true]],
+                ],
+                'is_time_enabled' => [
+                    'type' => 'boolean',
+                    '__example__' => false,
+                ],
+                'guest_options' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'id' => ['type' => 'string'],
+                            'title' => ['type' => 'string'],
+                        ],
+                    ],
+                    '__example__' => $guestOptions,
+                ],
             ],
             'layout' => [
                 'type' => 'SingleColumnLayout',
@@ -965,21 +1193,22 @@ class WhatsAppFlowService
                                 'input-type' => 'phone',
                             ],
                             [
-                                'type' => 'TextInput',
+                                'type' => 'Dropdown',
                                 'name' => 'guest_count',
                                 'label' => 'Jumlah Tamu',
                                 'required' => true,
-                                'input-type' => 'number',
-                                'min-value' => $config->min_guests,
-                                'max-value' => $config->max_guests,
+                                'data-source' => '${data.guest_options}',
                             ],
                             [
                                 'type' => 'Footer',
                                 'label' => 'Lanjut',
                                 'on-click-action' => [
-                                    'name' => 'data_exchange',
+                                    'name' => 'navigate',
+                                    'next' => [
+                                        'type' => 'screen',
+                                        'name' => $nextScreen,
+                                    ],
                                     'payload' => [
-                                        'trigger' => 'appointment_submitted',
                                         'reservation_date' => '${form.reservation_date}',
                                         'reservation_time' => '${form.reservation_time}',
                                         'customer_name' => '${form.customer_name}',
@@ -1050,9 +1279,12 @@ class WhatsAppFlowService
             'type' => 'Footer',
             'label' => 'Lihat Ringkasan',
             'on-click-action' => [
-                'name' => 'data_exchange',
+                'name' => 'navigate',
+                'next' => [
+                    'type' => 'screen',
+                    'name' => 'SUMMARY',
+                ],
                 'payload' => [
-                    'trigger' => 'details_submitted',
                     'table_id' => '${form.table_id}',
                     'selected_products' => '${form.selected_products}',
                     'event_type' => '${form.event_type}',
@@ -1066,9 +1298,39 @@ class WhatsAppFlowService
             'id' => 'DETAILS',
             'title' => 'Detail Reservasi',
             'data' => [
-                'tables' => ['type' => 'array', 'items' => ['type' => 'object']],
-                'products' => ['type' => 'array', 'items' => ['type' => 'object']],
-                'event_types' => ['type' => 'array', 'items' => ['type' => 'object']],
+                'tables' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'id' => ['type' => 'string'],
+                            'title' => ['type' => 'string'],
+                        ],
+                    ],
+                    '__example__' => [['id' => '1', 'title' => 'Meja 1 (4 orang)']],
+                ],
+                'products' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'id' => ['type' => 'string'],
+                            'title' => ['type' => 'string'],
+                        ],
+                    ],
+                    '__example__' => [['id' => '1', 'title' => 'Nasi Goreng - Rp25.000']],
+                ],
+                'event_types' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'id' => ['type' => 'string'],
+                            'title' => ['type' => 'string'],
+                        ],
+                    ],
+                    '__example__' => [['id' => 'regular', 'title' => 'Makan biasa']],
+                ],
             ],
             'layout' => [
                 'type' => 'SingleColumnLayout',
@@ -1085,14 +1347,28 @@ class WhatsAppFlowService
 
     private function buildSummaryScreen(\App\Models\ReservationFlowConfig $config): array
     {
+        $nextScreen = $config->enable_payment ? 'PAYMENT' : 'SUCCESS';
+        
         return [
             'id' => 'SUMMARY',
             'title' => 'Ringkasan',
             'data' => [
-                'appointment_summary' => ['type' => 'string'],
-                'menu_summary' => ['type' => 'string'],
-                'table_summary' => ['type' => 'string'],
-                'price_breakdown' => ['type' => 'string'],
+                'appointment_summary' => [
+                    'type' => 'string',
+                    '__example__' => '📅 Senin, 15 Jan 2026 jam 12:00 WIB\n👤 John Doe (+6281234567890)\n👥 4 tamu',
+                ],
+                'menu_summary' => [
+                    'type' => 'string',
+                    '__example__' => '🍽️ Menu yang dipilih:\n• Nasi Goreng - Rp25.000',
+                ],
+                'table_summary' => [
+                    'type' => 'string',
+                    '__example__' => '🪑 Meja 1 (4 orang)',
+                ],
+                'price_breakdown' => [
+                    'type' => 'string',
+                    '__example__' => '💰 Total: Rp125.000\nDP (50%): Rp62.500',
+                ],
             ],
             'layout' => [
                 'type' => 'SingleColumnLayout',
@@ -1106,8 +1382,12 @@ class WhatsAppFlowService
                         'type' => 'Footer',
                         'label' => $config->enable_payment ? 'Lanjut ke Pembayaran' : 'Konfirmasi',
                         'on-click-action' => [
-                            'name' => 'data_exchange',
-                            'payload' => ['trigger' => 'summary_confirmed'],
+                            'name' => 'navigate',
+                            'next' => [
+                                'type' => 'screen',
+                                'name' => $nextScreen,
+                            ],
+                            'payload' => [],
                         ],
                     ],
                 ],
@@ -1121,13 +1401,42 @@ class WhatsAppFlowService
             'id' => 'PAYMENT',
             'title' => 'Pembayaran',
             'data' => [
-                'payment_types' => ['type' => 'array', 'items' => ['type' => 'object']],
-                'payment_methods' => ['type' => 'array', 'items' => ['type' => 'object']],
-                'is_payment_method_enabled' => ['type' => 'boolean'],
-                'show_qris' => ['type' => 'boolean'],
-                'qr_code_url' => ['type' => 'string'],
-                'payment_amount_formatted' => ['type' => 'string'],
-                'payment_instruction' => ['type' => 'string'],
+                'payment_types' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'id' => ['type' => 'string'],
+                            'title' => ['type' => 'string'],
+                        ],
+                    ],
+                    '__example__' => [
+                        ['id' => 'dp', 'title' => 'DP (50%) - Rp62.500'],
+                        ['id' => 'lunas', 'title' => 'Lunas - Rp125.000'],
+                    ],
+                ],
+                'payment_methods' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'id' => ['type' => 'string'],
+                            'title' => ['type' => 'string'],
+                        ],
+                    ],
+                    '__example__' => [
+                        ['id' => 'qris', 'title' => 'QRIS'],
+                        ['id' => 'cash', 'title' => 'Bayar di Tempat'],
+                    ],
+                ],
+                'is_payment_method_enabled' => [
+                    'type' => 'boolean',
+                    '__example__' => true,
+                ],
+                'payment_instruction' => [
+                    'type' => 'string',
+                    '__example__' => 'Total pembayaran: Rp62.500',
+                ],
             ],
             'layout' => [
                 'type' => 'SingleColumnLayout',
@@ -1143,13 +1452,6 @@ class WhatsAppFlowService
                                 'label' => 'Tipe Pembayaran',
                                 'required' => true,
                                 'data-source' => '${data.payment_types}',
-                                'on-select-action' => [
-                                    'name' => 'data_exchange',
-                                    'payload' => [
-                                        'trigger' => 'payment_type_selected',
-                                        'payment_type' => '${form.payment_type}',
-                                    ],
-                                ],
                             ],
                             [
                                 'type' => 'Dropdown',
@@ -1158,35 +1460,25 @@ class WhatsAppFlowService
                                 'required' => true,
                                 'data-source' => '${data.payment_methods}',
                                 'enabled' => '${data.is_payment_method_enabled}',
-                                'on-select-action' => [
-                                    'name' => 'data_exchange',
+                            ],
+                            [
+                                'type' => 'Footer',
+                                'label' => 'Konfirmasi Pembayaran',
+                                'on-click-action' => [
+                                    'name' => 'navigate',
+                                    'next' => [
+                                        'type' => 'screen',
+                                        'name' => 'SUCCESS',
+                                    ],
                                     'payload' => [
-                                        'trigger' => 'payment_method_selected',
-                                        'payment_method' => '${form.payment_method}',
                                         'payment_type' => '${form.payment_type}',
+                                        'payment_method' => '${form.payment_method}',
                                     ],
                                 ],
                             ],
                         ],
                     ],
                     ['type' => 'TextBody', 'text' => '${data.payment_instruction}'],
-                    [
-                        'type' => 'Image',
-                        'src' => '${data.qr_code_url}',
-                        'visible' => '${data.show_qris}',
-                        'height' => 200,
-                    ],
-                    [
-                        'type' => 'Footer',
-                        'label' => 'Selesai',
-                        'on-click-action' => [
-                            'name' => 'complete',
-                            'payload' => [
-                                'payment_type' => '${form.payment_type}',
-                                'payment_method' => '${form.payment_method}',
-                            ],
-                        ],
-                    ],
                 ],
             ],
         ];

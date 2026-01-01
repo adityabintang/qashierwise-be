@@ -154,6 +154,15 @@ class ReservationFlowConfigController extends Controller
         $config = ReservationFlowConfig::getOrCreateForUser(Auth::id());
 
         try {
+            // Check if private key is configured
+            $privateKey = config('services.whatsapp.flow_private_key');
+            if (empty($privateKey)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Private key untuk WhatsApp Flow belum dikonfigurasi. Silakan set WHATSAPP_FLOW_PRIVATE_KEY di .env',
+                ], 422);
+            }
+
             // Create flow if not exists
             if (!$config->hasFlow()) {
                 $result = $this->flowService->createReservationFlowWithConfig(Auth::id(), $config);
@@ -163,7 +172,7 @@ class ReservationFlowConfigController extends Controller
                 ]);
             }
 
-            // Publish the flow
+            // Publish the flow (this will auto-configure endpoint URI and upload public key)
             $published = $this->flowService->publishFlow(Auth::id(), $config->flow_id);
 
             if ($published) {
@@ -178,10 +187,16 @@ class ReservationFlowConfigController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal mempublish flow',
+                'message' => 'Gagal mempublish flow. Pastikan endpoint URI dapat diakses dan public key sudah ter-upload. Cek log untuk detail.',
             ], 500);
 
         } catch (\Exception $e) {
+            \Log::error('Flow publish error', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),

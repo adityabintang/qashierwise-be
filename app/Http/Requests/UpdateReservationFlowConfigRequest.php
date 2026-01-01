@@ -11,6 +11,37 @@ class UpdateReservationFlowConfigRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $data = [];
+
+        // Convert time format H:i:s to H:i if needed
+        if ($this->has('opening_time') && $this->opening_time) {
+            $data['opening_time'] = substr($this->opening_time, 0, 5);
+        }
+
+        if ($this->has('closing_time') && $this->closing_time) {
+            $data['closing_time'] = substr($this->closing_time, 0, 5);
+        }
+
+        // Ensure blocked_times is an array
+        if ($this->has('blocked_times')) {
+            $blockedTimes = $this->blocked_times;
+            if (is_string($blockedTimes)) {
+                $blockedTimes = $blockedTimes ? explode(',', $blockedTimes) : [];
+            }
+            if (!is_array($blockedTimes)) {
+                $blockedTimes = [];
+            }
+            // Trim each time to H:i format
+            $data['blocked_times'] = array_map(fn($t) => substr(trim($t), 0, 5), $blockedTimes);
+        }
+
+        if (!empty($data)) {
+            $this->merge($data);
+        }
+    }
+
     public function rules(): array
     {
         return [
@@ -18,10 +49,10 @@ class UpdateReservationFlowConfigRequest extends FormRequest
             'flow_name' => 'sometimes|string|max:255',
 
             // Time Configuration
-            'opening_time' => 'sometimes|date_format:H:i',
-            'closing_time' => 'sometimes|date_format:H:i|after:opening_time',
+            'opening_time' => 'sometimes|nullable|date_format:H:i',
+            'closing_time' => 'sometimes|nullable|date_format:H:i|after:opening_time',
             'time_interval' => 'sometimes|integer|in:30,60,90,120',
-            'blocked_times' => 'sometimes|array',
+            'blocked_times' => 'sometimes|nullable|array',
             'blocked_times.*' => 'date_format:H:i',
             'operating_days' => 'sometimes|array',
             'operating_days.*' => 'integer|between:1,7',
