@@ -34,9 +34,19 @@ class WhatsAppFlowEndpointController extends Controller
     public function handleRequest(Request $request): JsonResponse
     {
         try {
+            // Log raw incoming request
+            Log::channel('whatsapp')->info('WhatsApp Flow Request Received', [
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'has_encrypted_aes_key' => $request->has('encrypted_aes_key'),
+                'has_encrypted_flow_data' => $request->has('encrypted_flow_data'),
+                'has_initial_vector' => $request->has('initial_vector'),
+                'timestamp' => now()->toDateTimeString(),
+            ]);
+
             // Check if encryption is configured
             if (! $this->encryptionService->isConfigured()) {
-                Log::warning('WhatsApp Flow endpoint called but not configured');
+                Log::channel('whatsapp')->error('WhatsApp Flow endpoint called but encryption not configured');
 
                 return response()->json(['error' => 'Endpoint not configured'], 500);
             }
@@ -47,10 +57,18 @@ class WhatsAppFlowEndpointController extends Controller
             $initialVector = $request->input('initial_vector');
 
             if (! $encryptedAesKey || ! $encryptedFlowData || ! $initialVector) {
+                Log::channel('whatsapp')->error('WhatsApp Flow missing required encryption parameters', [
+                    'has_aes_key' => ! empty($encryptedAesKey),
+                    'has_flow_data' => ! empty($encryptedFlowData),
+                    'has_iv' => ! empty($initialVector),
+                ]);
+
                 return response()->json(['error' => 'Missing encryption parameters'], 400);
             }
 
             // Decrypt the request
+            Log::channel('whatsapp')->debug('Attempting to decrypt WhatsApp Flow request');
+
             $decrypted = $this->encryptionService->decryptRequest(
                 $encryptedAesKey,
                 $encryptedFlowData,
@@ -61,13 +79,18 @@ class WhatsAppFlowEndpointController extends Controller
             $aesKey = $decrypted['aes_key'];
             $iv = $decrypted['iv'];
 
-            Log::info('WhatsApp Flow request received', [
+            Log::channel('whatsapp')->info('WhatsApp Flow request decrypted successfully', [
                 'action' => $flowData['action'] ?? 'unknown',
                 'screen' => $flowData['screen'] ?? 'unknown',
+                'flow_token' => substr($flowData['flow_token'] ?? '', 0, 20).'...', // Only log first 20 chars for security
+                'data_keys' => array_keys($flowData['data'] ?? []),
             ]);
 
             // Route to appropriate handler based on action
-            $response = match ($flowData['action'] ?? '') {
+            $action = $flowData['action'] ?? 'unknown';
+            Log::channel('whatsapp')->debug("Routing to handler for action: {$action}");
+
+            $response = match ($action) {
                 'INIT' => $this->handleInit($flowData),
                 'data_exchange' => $this->handleDataExchange($flowData),
                 'BACK' => $this->handleBack($flowData),
@@ -75,21 +98,41 @@ class WhatsAppFlowEndpointController extends Controller
                 default => $this->handleUnknownAction($flowData),
             };
 
+            Log::channel('whatsapp')->info('WhatsApp Flow response prepared', [
+                'action' => $action,
+                'response_screen' => $response['screen'] ?? 'none',
+                'response_data_keys' => array_keys($response['data'] ?? []),
+            ]);
+
             // Encrypt and return response
+            Log::channel('whatsapp')->debug('Encrypting WhatsApp Flow response');
             $encryptedResponse = $this->encryptionService->encryptResponse($response, $aesKey, $iv);
+
+            Log::channel('whatsapp')->info('WhatsApp Flow request completed successfully', [
+                'action' => $action,
+                'encrypted_response_length' => strlen($encryptedResponse),
+            ]);
 
             return response()->json([
                 'encrypted_response' => $encryptedResponse,
             ]);
 
         } catch (\Exception $e) {
-            Log::error('WhatsApp Flow endpoint error', [
+            Log::channel('whatsapp')->error('WhatsApp Flow endpoint error', [
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString(),
+                'request_data' => [
+                    'has_encrypted_data' => ! empty($encryptedFlowData ?? null),
+                    'has_aes_key' => ! empty($encryptedAesKey ?? null),
+                    'has_iv' => ! empty($initialVector ?? null),
+                ],
             ]);
 
             return response()->json([
                 'error' => 'Internal server error',
+                'message' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
     }
@@ -128,6 +171,13 @@ class WhatsAppFlowEndpointController extends Controller
         $data = $flowData['data'] ?? [];
         $flowToken = $flowData['flow_token'] ?? '';
         $userId = $this->extractUserIdFromFlowToken($flowToken);
+
+        Log::channel('whatsapp')->info('WhatsApp Flow data_exchange triggered', [
+            'trigger' => $trigger,
+            'user_id' => $userId,
+            'data_keys' => array_keys($data),
+            'screen' => $flowData['screen'] ?? 'unknown',
+        ]);
 
         return match ($trigger) {
             'date_selected' => $this->handleDateSelected($data, $userId),
@@ -289,19 +339,38 @@ class WhatsAppFlowEndpointController extends Controller
 
         if ($paymentMethod === 'qris' && $userId) {
             try {
+                Log::channel('whatsapp')->info('Generating QRIS for WhatsApp Flow reservation', [
+                    'user_id' => $userId,
+                    'amount' => $paymentAmount,
+                    'payment_type' => $paymentType,
+                    'customer_name' => $data['customer_name'] ?? 'unknown',
+                ]);
+
                 // Generate QRIS
                 $qrisData = $this->generateQrisForReservation($userId, $paymentAmount, $data);
                 $showQris = true;
                 $qrCodeUrl = $qrisData['qr_code_url'] ?? '';
                 $instruction = "Scan QRIS di bawah untuk membayar {$this->formatCurrency($paymentAmount)}";
+
+                Log::channel('whatsapp')->info('QRIS generated successfully for WhatsApp Flow', [
+                    'user_id' => $userId,
+                    'order_id' => $qrisData['order_id'] ?? 'unknown',
+                    'has_qr_url' => ! empty($qrCodeUrl),
+                ]);
             } catch (\Exception $e) {
-                Log::error('Failed to generate QRIS for flow', [
+                Log::channel('whatsapp')->error('Failed to generate QRIS for WhatsApp Flow', [
                     'error' => $e->getMessage(),
                     'user_id' => $userId,
+                    'amount' => $paymentAmount,
+                    'trace' => $e->getTraceAsString(),
                 ]);
                 $instruction = 'Gagal generate QRIS. Silakan pilih metode pembayaran lain.';
             }
         } elseif ($paymentMethod === 'cash') {
+            Log::channel('whatsapp')->info('Cash payment selected for WhatsApp Flow reservation', [
+                'user_id' => $userId,
+                'amount' => $paymentAmount,
+            ]);
             $instruction = "Pembayaran {$this->formatCurrency($paymentAmount)} akan dilakukan di tempat saat datang.";
         }
 
