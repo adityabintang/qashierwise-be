@@ -319,11 +319,12 @@ class WhatsAppFlowEndpointController extends Controller
         $flowToken = $flowData['flow_token'] ?? '';
         $userId = $this->extractUserIdFromFlowToken($flowToken);
 
-        // Generate available dates (next 30 days, starting from tomorrow)
-        $dates = $this->getAvailableDates(30);
+        // Get flow config for user
+        $config = $this->getFlowConfig($userId);
 
-        // Generate initial time slots (all available until date is selected)
-        $times = $this->getAllTimeSlots();
+        // Generate available dates and time slots based on config
+        $dates = $config ? $config->getAvailableDates() : $this->getAvailableDates(30);
+        $times = $config ? $config->getTimeSlots() : $this->getAllTimeSlots();
 
         return [
             'screen' => 'APPOINTMENT',
@@ -369,9 +370,10 @@ class WhatsAppFlowEndpointController extends Controller
     private function handleDateSelected(array $data, ?int $userId): array
     {
         $selectedDate = $data['reservation_date'] ?? '';
+        $config = $this->getFlowConfig($userId);
 
-        // Get available time slots for the selected date
-        $times = $this->getAvailableTimeSlots($selectedDate, $userId);
+        // Get available time slots for the selected date based on config
+        $times = $this->getAvailableTimeSlotsWithConfig($selectedDate, $userId, $config);
 
         return [
             'screen' => 'APPOINTMENT',
@@ -637,13 +639,14 @@ class WhatsAppFlowEndpointController extends Controller
 
     /**
      * Handle ping action (health check).
+     * 
+     * @see https://developers.facebook.com/docs/whatsapp/flows/guides/implementingyourflowendpoint#health_check_request
      */
     private function handlePing(): array
     {
         return [
             'data' => [
                 'status' => 'active',
-                'version' => '7.3',
             ],
         ];
     }
@@ -995,5 +998,165 @@ class WhatsAppFlowEndpointController extends Controller
             'order_id' => $transaction->order_id,
             'transaction_id' => $transaction->id,
         ];
+    }
+
+    // ==================== Config-based Helper Methods ====================
+
+    /**
+     * Get flow config for user.
+     */
+    private function getFlowConfig(?int $userId): ?\App\Models\ReservationFlowConfig
+    {
+        if (!$userId) {
+            return null;
+        }
+
+        return \App\Models\ReservationFlowConfig::where('user_id', $userId)->first();
+    }
+
+    /**
+     * Get available time slots with config.
+     */
+    private function getAvailableTimeSlotsWithConfig(string $date, ?int $userId, ?\App\Models\ReservationFlowConfig $config): array
+    {
+        // Get base time slots from config or default
+        $allSlots = $config ? $config->getTimeSlots() : $this->getAllTimeSlots();
+
+        if (!$userId || !$date) {
+            return $allSlots;
+        }
+
+        // Get booked times for this date
+        $bookedTimes = Reservation::where('user_id', $userId)
+            ->whereDate('reservation_date', $date)
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->pluck('reservation_time')
+            ->map(fn ($time) => Carbon::parse($time)->format('H:i'))
+            ->toArray();
+
+        // Mark booked slots as disabled
+        return array_map(function ($slot) use ($bookedTimes) {
+            if (in_array($slot['id'], $bookedTimes)) {
+                $slot['enabled'] = false;
+                $slot['title'] .= ' (Terisi)';
+            }
+
+            return $slot;
+        }, $allSlots);
+    }
+
+    /**
+     * Get tables for dropdown based on config.
+     */
+    private function getTablesForDropdownWithConfig(?int $userId, ?\App\Models\ReservationFlowConfig $config): array
+    {
+        if (!$userId) {
+            return [];
+        }
+
+        $query = Table::where('user_id', $userId)
+            ->where('status', Table::STATUS_AVAILABLE)
+            ->orderBy('number');
+
+        // Filter by config if available_table_ids is set
+        if ($config && !empty($config->available_table_ids)) {
+            $query->whereIn('id', $config->available_table_ids);
+        }
+
+        return $query->get()->map(fn ($table) => [
+            'id' => (string) $table->id,
+            'title' => "Meja {$table->number} ({$table->capacity} orang)",
+        ])->toArray();
+    }
+
+    /**
+     * Get products for checkbox based on config.
+     */
+    private function getProductsForCheckboxWithConfig(?int $userId, ?\App\Models\ReservationFlowConfig $config): array
+    {
+        if (!$userId) {
+            return [];
+        }
+
+        $query = Product::where('user_id', $userId)
+            ->where('is_active', true)
+            ->orderBy('name');
+
+        // Filter by config if available_product_ids is set
+        if ($config && !empty($config->available_product_ids)) {
+            $query->whereIn('id', $config->available_product_ids);
+        }
+
+        return $query->get()->map(fn ($product) => [
+            'id' => (string) $product->id,
+            'title' => "{$product->name} - {$this->formatCurrency($product->price)}",
+        ])->toArray();
+    }
+
+    /**
+     * Get payment types based on config.
+     */
+    private function getPaymentTypesWithConfig(float $grandTotal, float $dpAmount, ?\App\Models\ReservationFlowConfig $config): array
+    {
+        if (!$config) {
+            return $this->getPaymentTypes($grandTotal, $dpAmount);
+        }
+
+        $types = [];
+
+        if ($config->allow_dp_payment) {
+            $types[] = [
+                'id' => 'dp',
+                'title' => "DP ({$config->dp_percentage}%) - {$this->formatCurrency($dpAmount)}",
+            ];
+        }
+
+        if ($config->allow_full_payment) {
+            $types[] = [
+                'id' => 'lunas',
+                'title' => "Lunas - {$this->formatCurrency($grandTotal)}",
+            ];
+        }
+
+        return $types;
+    }
+
+    /**
+     * Get payment methods based on config.
+     */
+    private function getPaymentMethodsWithConfig(?\App\Models\ReservationFlowConfig $config): array
+    {
+        if (!$config) {
+            return $this->getPaymentMethods();
+        }
+
+        $methods = [];
+
+        if ($config->enable_qris) {
+            $methods[] = ['id' => 'qris', 'title' => 'QRIS'];
+        }
+
+        if ($config->enable_cash) {
+            $methods[] = ['id' => 'cash', 'title' => 'Bayar di Tempat (Cash)'];
+        }
+
+        return $methods;
+    }
+
+    /**
+     * Get table fee from config.
+     */
+    private function getTableFeeFromConfig(?\App\Models\ReservationFlowConfig $config): float
+    {
+        return $config ? (float) $config->table_fee : (float) config('services.whatsapp.flow_table_fee', 100000);
+    }
+
+    /**
+     * Calculate DP amount based on config.
+     */
+    private function calculateDpAmountFromConfig(float $grandTotal, ?\App\Models\ReservationFlowConfig $config): float
+    {
+        $percentage = $config ? $config->dp_percentage : 50;
+        return ceil($grandTotal * ($percentage / 100));
     }
 }

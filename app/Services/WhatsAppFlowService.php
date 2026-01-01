@@ -115,11 +115,21 @@ class WhatsAppFlowService
         $account = $this->accountService->getActiveAccount($userId);
 
         if (! $account) {
+            \Log::warning('publishFlow: No active account found', ['user_id' => $userId]);
             return false;
         }
 
         $response = Http::withToken($account->access_token)
             ->post("https://graph.facebook.com/v21.0/{$flowId}/publish");
+
+        if (! $response->successful()) {
+            \Log::error('publishFlow failed', [
+                'user_id' => $userId,
+                'flow_id' => $flowId,
+                'status' => $response->status(),
+                'response' => $response->json(),
+            ]);
+        }
 
         return $response->successful();
     }
@@ -740,5 +750,453 @@ class WhatsAppFlowService
     public function getTableFee(): float
     {
         return (float) config('services.whatsapp.flow_table_fee', 100000);
+    }
+
+    // ==================== Config-based Flow Methods ====================
+
+    /**
+     * Create a reservation flow with config.
+     */
+    public function createReservationFlowWithConfig(int $userId, \App\Models\ReservationFlowConfig $config): array
+    {
+        $account = $this->accountService->getActiveAccount($userId);
+
+        if (!$account) {
+            throw new \Exception('No active WhatsApp account found');
+        }
+
+        $wabaId = $account->waba_id ?? $account->business_account_id;
+        $flowJson = $this->buildFlowJsonFromConfig($config);
+        $endpointUri = config('app.url') . '/api/whatsapp/flow/endpoint';
+
+        $response = Http::withToken($account->access_token)
+            ->post("https://graph.facebook.com/v21.0/{$wabaId}/flows", [
+                'name' => $config->flow_name . '_' . Str::random(6),
+                'categories' => ['APPOINTMENT_BOOKING'],
+                'endpoint_uri' => $endpointUri,
+                'data_api_version' => '3.0',
+            ]);
+
+        if ($response->failed()) {
+            Log::error('Failed to create WhatsApp Flow with config', [
+                'response' => $response->json(),
+                'user_id' => $userId,
+            ]);
+
+            throw new \Exception('Failed to create flow: ' . ($response->json()['error']['message'] ?? 'Unknown error'));
+        }
+
+        $result = $response->json();
+        $flowId = $result['id'] ?? null;
+
+        // Update flow JSON
+        if ($flowId) {
+            $updateResponse = Http::withToken($account->access_token)
+                ->post("https://graph.facebook.com/v21.0/{$flowId}/assets", [
+                    'name' => 'flow.json',
+                    'asset_type' => 'FLOW_JSON',
+                    'file' => json_encode($flowJson),
+                ]);
+
+            if ($updateResponse->failed()) {
+                Log::warning('Failed to update flow JSON', [
+                    'flow_id' => $flowId,
+                    'response' => $updateResponse->json(),
+                ]);
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Send a reservation flow with config.
+     */
+    public function sendReservationFlowWithConfig(
+        int $userId,
+        string $phoneNumber,
+        \App\Models\ReservationFlowConfig $config
+    ): array {
+        $account = $this->accountService->getActiveAccount($userId);
+
+        if (!$account) {
+            throw new \Exception('No active WhatsApp account found');
+        }
+
+        $flowToken = $userId . '_' . Str::uuid()->toString();
+
+        $response = Http::withToken($account->access_token)
+            ->post("https://graph.facebook.com/v21.0/{$account->phone_number_id}/messages", [
+                'messaging_product' => 'whatsapp',
+                'recipient_type' => 'individual',
+                'to' => $this->formatPhoneNumber($phoneNumber),
+                'type' => 'interactive',
+                'interactive' => [
+                    'type' => 'flow',
+                    'header' => [
+                        'type' => 'text',
+                        'text' => $config->header_text,
+                    ],
+                    'body' => [
+                        'text' => $config->body_text ?? 'Silakan isi form di bawah ini untuk membuat reservasi.',
+                    ],
+                    'footer' => [
+                        'text' => $config->footer_text,
+                    ],
+                    'action' => [
+                        'name' => 'flow',
+                        'parameters' => [
+                            'flow_message_version' => '3',
+                            'flow_token' => $flowToken,
+                            'flow_id' => $config->flow_id,
+                            'flow_cta' => $config->cta_text,
+                            'flow_action' => 'data_exchange',
+                        ],
+                    ],
+                ],
+            ]);
+
+        if ($response->failed()) {
+            Log::error('Failed to send reservation flow with config', [
+                'response' => $response->json(),
+                'user_id' => $userId,
+                'phone' => $phoneNumber,
+            ]);
+
+            throw new \Exception('Failed to send flow: ' . ($response->json()['error']['message'] ?? 'Unknown error'));
+        }
+
+        return [
+            'success' => true,
+            'flow_token' => $flowToken,
+            'message_id' => $response->json()['messages'][0]['id'] ?? null,
+        ];
+    }
+
+    /**
+     * Build flow JSON from config.
+     */
+    private function buildFlowJsonFromConfig(\App\Models\ReservationFlowConfig $config): array
+    {
+        $screens = [];
+
+        // Screen 1: Appointment (Date, Time, Customer Info)
+        $screens[] = $this->buildAppointmentScreen($config);
+
+        // Screen 2: Details (Menu, Table, Event Type) - if enabled
+        if ($config->enable_menu_selection || $config->enable_table_selection) {
+            $screens[] = $this->buildDetailsScreen($config);
+        }
+
+        // Screen 3: Summary
+        $screens[] = $this->buildSummaryScreen($config);
+
+        // Screen 4: Payment - if enabled
+        if ($config->enable_payment) {
+            $screens[] = $this->buildPaymentScreen($config);
+        }
+
+        return [
+            'version' => '3.0',
+            'data_api_version' => '3.0',
+            'routing_model' => [
+                'APPOINTMENT' => $config->enable_menu_selection || $config->enable_table_selection
+                    ? ['DETAILS']
+                    : ['SUMMARY'],
+                'DETAILS' => ['SUMMARY'],
+                'SUMMARY' => $config->enable_payment ? ['PAYMENT'] : ['SUCCESS'],
+                'PAYMENT' => ['SUCCESS'],
+            ],
+            'screens' => $screens,
+        ];
+    }
+
+    private function buildAppointmentScreen(\App\Models\ReservationFlowConfig $config): array
+    {
+        return [
+            'id' => 'APPOINTMENT',
+            'title' => 'Reservasi',
+            'data' => [
+                'dates' => ['type' => 'array', 'items' => ['type' => 'object']],
+                'times' => ['type' => 'array', 'items' => ['type' => 'object']],
+                'is_time_enabled' => ['type' => 'boolean'],
+            ],
+            'layout' => [
+                'type' => 'SingleColumnLayout',
+                'children' => [
+                    [
+                        'type' => 'Form',
+                        'name' => 'appointment_form',
+                        'children' => [
+                            [
+                                'type' => 'Dropdown',
+                                'name' => 'reservation_date',
+                                'label' => 'Tanggal Reservasi',
+                                'required' => true,
+                                'data-source' => '${data.dates}',
+                                'on-select-action' => [
+                                    'name' => 'data_exchange',
+                                    'payload' => [
+                                        'trigger' => 'date_selected',
+                                        'reservation_date' => '${form.reservation_date}',
+                                    ],
+                                ],
+                            ],
+                            [
+                                'type' => 'Dropdown',
+                                'name' => 'reservation_time',
+                                'label' => 'Jam Reservasi',
+                                'required' => true,
+                                'data-source' => '${data.times}',
+                                'enabled' => '${data.is_time_enabled}',
+                            ],
+                            [
+                                'type' => 'TextInput',
+                                'name' => 'customer_name',
+                                'label' => 'Nama Lengkap',
+                                'required' => true,
+                                'input-type' => 'text',
+                            ],
+                            [
+                                'type' => 'TextInput',
+                                'name' => 'phone',
+                                'label' => 'Nomor WhatsApp',
+                                'required' => true,
+                                'input-type' => 'phone',
+                            ],
+                            [
+                                'type' => 'TextInput',
+                                'name' => 'guest_count',
+                                'label' => 'Jumlah Tamu',
+                                'required' => true,
+                                'input-type' => 'number',
+                                'min-value' => $config->min_guests,
+                                'max-value' => $config->max_guests,
+                            ],
+                            [
+                                'type' => 'Footer',
+                                'label' => 'Lanjut',
+                                'on-click-action' => [
+                                    'name' => 'data_exchange',
+                                    'payload' => [
+                                        'trigger' => 'appointment_submitted',
+                                        'reservation_date' => '${form.reservation_date}',
+                                        'reservation_time' => '${form.reservation_time}',
+                                        'customer_name' => '${form.customer_name}',
+                                        'phone' => '${form.phone}',
+                                        'guest_count' => '${form.guest_count}',
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    private function buildDetailsScreen(\App\Models\ReservationFlowConfig $config): array
+    {
+        $formChildren = [];
+
+        if ($config->enable_table_selection) {
+            $formChildren[] = [
+                'type' => 'Dropdown',
+                'name' => 'table_id',
+                'label' => 'Pilih Meja',
+                'required' => false,
+                'data-source' => '${data.tables}',
+            ];
+        }
+
+        if ($config->enable_menu_selection) {
+            $formChildren[] = [
+                'type' => 'CheckboxGroup',
+                'name' => 'selected_products',
+                'label' => 'Pilih Menu (Opsional)',
+                'required' => $config->require_menu_selection,
+                'data-source' => '${data.products}',
+            ];
+        }
+
+        if ($config->require_event_type) {
+            $formChildren[] = [
+                'type' => 'Dropdown',
+                'name' => 'event_type',
+                'label' => 'Tipe Acara',
+                'required' => true,
+                'data-source' => '${data.event_types}',
+            ];
+        }
+
+        if ($config->require_email) {
+            $formChildren[] = [
+                'type' => 'TextInput',
+                'name' => 'email',
+                'label' => 'Email',
+                'required' => true,
+                'input-type' => 'email',
+            ];
+        }
+
+        $formChildren[] = [
+            'type' => 'TextArea',
+            'name' => 'special_notes',
+            'label' => 'Catatan Khusus (Opsional)',
+            'required' => false,
+        ];
+
+        $formChildren[] = [
+            'type' => 'Footer',
+            'label' => 'Lihat Ringkasan',
+            'on-click-action' => [
+                'name' => 'data_exchange',
+                'payload' => [
+                    'trigger' => 'details_submitted',
+                    'table_id' => '${form.table_id}',
+                    'selected_products' => '${form.selected_products}',
+                    'event_type' => '${form.event_type}',
+                    'email' => '${form.email}',
+                    'special_notes' => '${form.special_notes}',
+                ],
+            ],
+        ];
+
+        return [
+            'id' => 'DETAILS',
+            'title' => 'Detail Reservasi',
+            'data' => [
+                'tables' => ['type' => 'array', 'items' => ['type' => 'object']],
+                'products' => ['type' => 'array', 'items' => ['type' => 'object']],
+                'event_types' => ['type' => 'array', 'items' => ['type' => 'object']],
+            ],
+            'layout' => [
+                'type' => 'SingleColumnLayout',
+                'children' => [
+                    [
+                        'type' => 'Form',
+                        'name' => 'details_form',
+                        'children' => $formChildren,
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    private function buildSummaryScreen(\App\Models\ReservationFlowConfig $config): array
+    {
+        return [
+            'id' => 'SUMMARY',
+            'title' => 'Ringkasan',
+            'data' => [
+                'appointment_summary' => ['type' => 'string'],
+                'menu_summary' => ['type' => 'string'],
+                'table_summary' => ['type' => 'string'],
+                'price_breakdown' => ['type' => 'string'],
+            ],
+            'layout' => [
+                'type' => 'SingleColumnLayout',
+                'children' => [
+                    ['type' => 'TextHeading', 'text' => '📋 Ringkasan Reservasi'],
+                    ['type' => 'TextBody', 'text' => '${data.appointment_summary}'],
+                    ['type' => 'TextBody', 'text' => '${data.menu_summary}'],
+                    ['type' => 'TextBody', 'text' => '${data.table_summary}'],
+                    ['type' => 'TextBody', 'text' => '${data.price_breakdown}'],
+                    [
+                        'type' => 'Footer',
+                        'label' => $config->enable_payment ? 'Lanjut ke Pembayaran' : 'Konfirmasi',
+                        'on-click-action' => [
+                            'name' => 'data_exchange',
+                            'payload' => ['trigger' => 'summary_confirmed'],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    private function buildPaymentScreen(\App\Models\ReservationFlowConfig $config): array
+    {
+        return [
+            'id' => 'PAYMENT',
+            'title' => 'Pembayaran',
+            'data' => [
+                'payment_types' => ['type' => 'array', 'items' => ['type' => 'object']],
+                'payment_methods' => ['type' => 'array', 'items' => ['type' => 'object']],
+                'is_payment_method_enabled' => ['type' => 'boolean'],
+                'show_qris' => ['type' => 'boolean'],
+                'qr_code_url' => ['type' => 'string'],
+                'payment_amount_formatted' => ['type' => 'string'],
+                'payment_instruction' => ['type' => 'string'],
+            ],
+            'layout' => [
+                'type' => 'SingleColumnLayout',
+                'children' => [
+                    ['type' => 'TextHeading', 'text' => '💳 Pembayaran'],
+                    [
+                        'type' => 'Form',
+                        'name' => 'payment_form',
+                        'children' => [
+                            [
+                                'type' => 'Dropdown',
+                                'name' => 'payment_type',
+                                'label' => 'Tipe Pembayaran',
+                                'required' => true,
+                                'data-source' => '${data.payment_types}',
+                                'on-select-action' => [
+                                    'name' => 'data_exchange',
+                                    'payload' => [
+                                        'trigger' => 'payment_type_selected',
+                                        'payment_type' => '${form.payment_type}',
+                                    ],
+                                ],
+                            ],
+                            [
+                                'type' => 'Dropdown',
+                                'name' => 'payment_method',
+                                'label' => 'Metode Pembayaran',
+                                'required' => true,
+                                'data-source' => '${data.payment_methods}',
+                                'enabled' => '${data.is_payment_method_enabled}',
+                                'on-select-action' => [
+                                    'name' => 'data_exchange',
+                                    'payload' => [
+                                        'trigger' => 'payment_method_selected',
+                                        'payment_method' => '${form.payment_method}',
+                                        'payment_type' => '${form.payment_type}',
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                    ['type' => 'TextBody', 'text' => '${data.payment_instruction}'],
+                    [
+                        'type' => 'Image',
+                        'src' => '${data.qr_code_url}',
+                        'visible' => '${data.show_qris}',
+                        'height' => 200,
+                    ],
+                    [
+                        'type' => 'Footer',
+                        'label' => 'Selesai',
+                        'on-click-action' => [
+                            'name' => 'complete',
+                            'payload' => [
+                                'payment_type' => '${form.payment_type}',
+                                'payment_method' => '${form.payment_method}',
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * Get flow config for user.
+     */
+    public function getFlowConfig(int $userId): ?\App\Models\ReservationFlowConfig
+    {
+        return \App\Models\ReservationFlowConfig::where('user_id', $userId)->first();
     }
 }

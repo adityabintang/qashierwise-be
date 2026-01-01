@@ -166,10 +166,30 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Reservation routes
     Route::prefix('reservations')->group(function () {
-        // CRUD operations
+        // CRUD operations (non-parameterized first)
         Route::get('/', [ReservationController::class, 'index']);
         Route::post('/', [ReservationController::class, 'store']);
         Route::get('/statistics', [ReservationController::class, 'statistics']);
+
+        // WhatsApp Flow management (legacy)
+        Route::get('/flows/list', [ReservationController::class, 'listFlows']);
+        Route::post('/flows/create', [ReservationController::class, 'createFlow']);
+        Route::post('/flows/send', [ReservationController::class, 'sendFlow']);
+        Route::post('/flows/publish', [ReservationController::class, 'publishFlow']);
+        Route::delete('/flows/delete', [ReservationController::class, 'deleteFlow']);
+
+        // Flow Configuration (new dashboard feature) - MUST be before {reservation} wildcard
+        Route::prefix('flow-config')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Api\ReservationFlowConfigController::class, 'show']);
+            Route::post('/', [\App\Http\Controllers\Api\ReservationFlowConfigController::class, 'update']);
+            Route::get('/preview', [\App\Http\Controllers\Api\ReservationFlowConfigController::class, 'preview']);
+            Route::post('/publish', [\App\Http\Controllers\Api\ReservationFlowConfigController::class, 'publish']);
+            Route::post('/sync', [\App\Http\Controllers\Api\ReservationFlowConfigController::class, 'sync']);
+            Route::post('/send', [\App\Http\Controllers\Api\ReservationFlowConfigController::class, 'send']);
+            Route::delete('/', [\App\Http\Controllers\Api\ReservationFlowConfigController::class, 'destroy']);
+        });
+
+        // Parameterized routes MUST come last
         Route::get('/{reservation}', [ReservationController::class, 'show']);
         Route::put('/{reservation}', [ReservationController::class, 'update']);
         Route::delete('/{reservation}', [ReservationController::class, 'destroy']);
@@ -179,13 +199,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/{reservation}/cancel', [ReservationController::class, 'cancel']);
         Route::post('/{reservation}/complete', [ReservationController::class, 'complete']);
         Route::post('/{reservation}/no-show', [ReservationController::class, 'noShow']);
-
-        // WhatsApp Flow management
-        Route::get('/flows/list', [ReservationController::class, 'listFlows']);
-        Route::post('/flows/create', [ReservationController::class, 'createFlow']);
-        Route::post('/flows/send', [ReservationController::class, 'sendFlow']);
-        Route::post('/flows/publish', [ReservationController::class, 'publishFlow']);
-        Route::delete('/flows/delete', [ReservationController::class, 'deleteFlow']);
     });
 
     // POS (Point of Sale) API routes
