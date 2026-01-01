@@ -4,11 +4,11 @@ use App\Http\Controllers\AiAgentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BalanceController;
 use App\Http\Controllers\Api\BroadcastAuthController;
+use App\Http\Controllers\Api\DokuWebhookController;
+use App\Http\Controllers\Api\DuitkuWebhookController;
 use App\Http\Controllers\Api\EmbeddedSignupController;
 use App\Http\Controllers\Api\MidtransWebhookController;
-use App\Http\Controllers\Api\DokuWebhookController;
-use App\Http\Controllers\Api\XenditWebhookController;
-use App\Http\Controllers\Api\DuitkuWebhookController;
+use App\Http\Controllers\Api\MigrationController;
 use App\Http\Controllers\Api\PolarWebhookController;
 use App\Http\Controllers\Api\Pos\CategoryController;
 use App\Http\Controllers\Api\Pos\OrderController;
@@ -22,11 +22,13 @@ use App\Http\Controllers\Api\Pos\TransactionController;
 use App\Http\Controllers\Api\ProviderCredentialController;
 use App\Http\Controllers\Api\ProviderValidationController;
 use App\Http\Controllers\Api\QrisController;
+use App\Http\Controllers\Api\ReservationController;
 use App\Http\Controllers\Api\SubMerchantController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\WhatsAppController;
+use App\Http\Controllers\Api\WhatsAppFlowEndpointController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
-use App\Http\Controllers\Api\MigrationController;
+use App\Http\Controllers\Api\XenditWebhookController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -47,6 +49,10 @@ Route::post('/login', [AuthController::class, 'login']);
 // WhatsApp Webhook (must be public for WhatsApp to access)
 Route::get('/whatsapp/webhook', [WhatsAppWebhookController::class, 'verify']);
 Route::post('/whatsapp/webhook', [WhatsAppWebhookController::class, 'handle']);
+
+// WhatsApp Flow Data Endpoint (must be public for WhatsApp to access)
+// This endpoint receives encrypted requests from WhatsApp Flow and returns encrypted responses
+Route::post('/whatsapp/flow/endpoint', [WhatsAppFlowEndpointController::class, 'handleRequest']);
 
 // Polar.sh Webhook (must be public for Polar to access)
 Route::post('/webhooks/polar', [PolarWebhookController::class, 'handle']);
@@ -153,6 +159,30 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/conversations/{contactId}', [AiAgentController::class, 'clearConversation']);
     });
 
+    // Reservation routes
+    Route::prefix('reservations')->group(function () {
+        // CRUD operations
+        Route::get('/', [ReservationController::class, 'index']);
+        Route::post('/', [ReservationController::class, 'store']);
+        Route::get('/statistics', [ReservationController::class, 'statistics']);
+        Route::get('/{reservation}', [ReservationController::class, 'show']);
+        Route::put('/{reservation}', [ReservationController::class, 'update']);
+        Route::delete('/{reservation}', [ReservationController::class, 'destroy']);
+
+        // Status actions
+        Route::post('/{reservation}/confirm', [ReservationController::class, 'confirm']);
+        Route::post('/{reservation}/cancel', [ReservationController::class, 'cancel']);
+        Route::post('/{reservation}/complete', [ReservationController::class, 'complete']);
+        Route::post('/{reservation}/no-show', [ReservationController::class, 'noShow']);
+
+        // WhatsApp Flow management
+        Route::get('/flows/list', [ReservationController::class, 'listFlows']);
+        Route::post('/flows/create', [ReservationController::class, 'createFlow']);
+        Route::post('/flows/send', [ReservationController::class, 'sendFlow']);
+        Route::post('/flows/publish', [ReservationController::class, 'publishFlow']);
+        Route::delete('/flows/delete', [ReservationController::class, 'deleteFlow']);
+    });
+
     // POS (Point of Sale) API routes
     Route::prefix('pos')->group(function () {
         // Products
@@ -227,7 +257,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::put('/{id}', [ProviderCredentialController::class, 'update']);
             Route::delete('/{id}', [ProviderCredentialController::class, 'destroy']);
             Route::post('/set-active', [ProviderCredentialController::class, 'setActive']);
-            
+
             // Provider Validation
             Route::post('/{id}/validate', [ProviderValidationController::class, 'validate']);
             Route::post('/{id}/revalidate', [ProviderValidationController::class, 'revalidate']);

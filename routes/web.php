@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 
 // Language switching route
 Route::get('/language/{locale}', function ($locale) {
-    if (!in_array($locale, config('app.supported_locales'))) {
+    if (! in_array($locale, config('app.supported_locales'))) {
         abort(400);
     }
 
@@ -61,6 +61,10 @@ Route::middleware(['web', 'check.web.auth'])->group(function () {
     Route::get('/dashboard/templates', function () {
         return view('dashboard.templates');
     })->name('dashboard.templates');
+
+    Route::get('/dashboard/reservations', function () {
+        return view('dashboard.reservations');
+    })->name('dashboard.reservations');
 
     Route::get('/dashboard/profile', function () {
         return view('dashboard.profile');

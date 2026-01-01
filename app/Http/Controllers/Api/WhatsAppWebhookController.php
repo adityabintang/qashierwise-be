@@ -301,6 +301,14 @@ class WhatsAppWebhookController extends Controller
                     } elseif ($interactiveType === 'list_reply') {
                         $content = $message['interactive']['list_reply']['title'] ?? 'List item';
                         $metadata = $message['interactive']['list_reply'];
+                    } elseif ($interactiveType === 'nfm_reply') {
+                        // Handle WhatsApp Flow response
+                        $flowResponse = $message['interactive']['nfm_reply'] ?? [];
+                        $content = 'Flow response received';
+                        $metadata = $flowResponse;
+
+                        // Process the flow response for reservations
+                        $this->handleFlowResponse($flowResponse, $userId, $contact);
                     }
                 }
                 break;
@@ -758,5 +766,169 @@ class WhatsAppWebhookController extends Controller
         ];
 
         return $mimeToExt[$mimeType] ?? 'bin';
+    }
+
+    /**
+     * Handle WhatsApp Flow response (nfm_reply)
+     *
+     * @param  array  $flowResponse  The flow response data
+     * @param  int  $userId  User ID
+     * @param  WhatsAppContact  $contact  The WhatsApp contact
+     */
+    protected function handleFlowResponse(array $flowResponse, int $userId, WhatsAppContact $contact): void
+    {
+        try {
+            // Extract response data from the flow
+            $responseJson = $flowResponse['response_json'] ?? null;
+            $flowToken = $flowResponse['flow_token'] ?? null;
+            $flowId = $flowResponse['flow_id'] ?? null;
+
+            if (! $responseJson) {
+                Log::warning('Flow response without response_json', [
+                    'flow_response' => $flowResponse,
+                    'user_id' => $userId,
+                ]);
+
+                return;
+            }
+
+            // Parse the JSON response
+            $responseData = is_string($responseJson) ? json_decode($responseJson, true) : $responseJson;
+
+            if (! is_array($responseData)) {
+                Log::warning('Invalid flow response_json format', [
+                    'response_json' => $responseJson,
+                    'user_id' => $userId,
+                ]);
+
+                return;
+            }
+
+            Log::info('Processing flow response', [
+                'flow_token' => $flowToken,
+                'flow_id' => $flowId,
+                'response_data' => $responseData,
+                'user_id' => $userId,
+            ]);
+
+            // Check if this is a reservation flow response
+            if ($this->isReservationFlowResponse($responseData)) {
+                $this->processReservationFlowResponse(
+                    $userId,
+                    $flowToken,
+                    $flowId,
+                    $responseData,
+                    $contact
+                );
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Error processing flow response', [
+                'error' => $e->getMessage(),
+                'flow_response' => $flowResponse,
+                'user_id' => $userId,
+            ]);
+        }
+    }
+
+    /**
+     * Check if the flow response is a reservation flow
+     */
+    protected function isReservationFlowResponse(array $responseData): bool
+    {
+        // Check for reservation-specific fields
+        $reservationFields = ['customer_name', 'reservation_date', 'reservation_time', 'guest_count'];
+
+        foreach ($reservationFields as $field) {
+            if (isset($responseData[$field])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Process reservation flow response and create reservation
+     */
+    protected function processReservationFlowResponse(
+        int $userId,
+        ?string $flowToken,
+        ?string $flowId,
+        array $responseData,
+        WhatsAppContact $contact
+    ): void {
+        try {
+            $flowService = app(\App\Services\WhatsAppFlowService::class);
+
+            // Add flow_id to response data
+            $responseData['flow_id'] = $flowId;
+
+            // Process the flow response
+            $reservation = $flowService->processFlowResponse(
+                $userId,
+                $flowToken ?? '',
+                $responseData,
+                $contact
+            );
+
+            Log::info('Reservation created from flow response', [
+                'reservation_id' => $reservation->id,
+                'user_id' => $userId,
+                'contact_id' => $contact->id,
+            ]);
+
+            // Send confirmation message back to the customer
+            $this->sendReservationConfirmation($userId, $contact, $reservation);
+
+        } catch (\Exception $e) {
+            Log::error('Error creating reservation from flow', [
+                'error' => $e->getMessage(),
+                'response_data' => $responseData,
+                'user_id' => $userId,
+            ]);
+        }
+    }
+
+    /**
+     * Send reservation confirmation message to customer
+     */
+    protected function sendReservationConfirmation(int $userId, WhatsAppContact $contact, \App\Models\Reservation $reservation): void
+    {
+        try {
+            $whatsappClient = $this->whatsAppAccountService->getClientForUser($userId);
+
+            $confirmationMessage = sprintf(
+                "✅ *Reservasi Diterima!*\n\n".
+                "Kode: #RES%06d\n".
+                "Nama: %s\n".
+                "Tanggal: %s\n".
+                "Jam: %s\n".
+                "Jumlah Tamu: %d orang\n\n".
+                "Status: Menunggu konfirmasi\n\n".
+                'Kami akan menghubungi Anda untuk konfirmasi. Terima kasih! 🙏',
+                $reservation->id,
+                $reservation->customer_name,
+                $reservation->reservation_date->format('d M Y'),
+                $reservation->reservation_time->format('H:i'),
+                $reservation->guest_count
+            );
+
+            $whatsappClient->sendTextMessage(
+                $contact->wa_id,
+                $confirmationMessage
+            );
+
+            Log::info('Reservation confirmation sent', [
+                'reservation_id' => $reservation->id,
+                'contact_id' => $contact->id,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error sending reservation confirmation', [
+                'error' => $e->getMessage(),
+                'reservation_id' => $reservation->id,
+            ]);
+        }
     }
 }

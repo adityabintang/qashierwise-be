@@ -9,7 +9,9 @@ use Illuminate\Support\Facades\Log;
 class ConversationSummarizer
 {
     protected TokenEstimator $tokenEstimator;
+
     protected SummaryValidator $summaryValidator;
+
     protected IntentTracker $intentTracker;
 
     public function __construct(
@@ -25,23 +27,23 @@ class ConversationSummarizer
     /**
      * Check if conversation needs summarization.
      *
-     * @param AiAgentConversation $conversation The conversation to check
+     * @param  AiAgentConversation  $conversation  The conversation to check
      * @return bool True if summarization is needed
      */
     public function shouldSummarize(AiAgentConversation $conversation): bool
     {
         // Check if summarization is enabled
-        if (!config('conversation.summarization.enabled', true)) {
+        if (! config('conversation.summarization.enabled', true)) {
             return false;
         }
 
         $messages = $conversation->messages ?? [];
-        
+
         // Get thresholds from config
         $messageCountThreshold = config('conversation.summarization.message_count_threshold', 6);
         $tokenThreshold = config('conversation.summarization.token_threshold', 800);
         $minSubstantiveMessages = config('conversation.summarization.min_substantive_messages', 3);
-        
+
         // Must have at least the configured number of messages
         if (count($messages) < $messageCountThreshold) {
             return false;
@@ -52,7 +54,7 @@ class ConversationSummarizer
         if ($lastMessage && isset($lastMessage['content'])) {
             $content = trim(strtolower($lastMessage['content']));
             $shortConfirmations = ['ok', 'ya', 'iya', 'yes', 'oke'];
-            
+
             if (mb_strlen($content) <= 3 && in_array($content, $shortConfirmations, true)) {
                 return false;
             }
@@ -89,6 +91,7 @@ class ConversationSummarizer
                 'token_threshold' => $tokenThreshold,
                 'trigger_reason' => 'token_threshold_exceeded',
             ]);
+
             return true;
         }
 
@@ -100,21 +103,21 @@ class ConversationSummarizer
             'estimated_tokens' => $estimatedTokens,
             'trigger_reason' => 'message_count_threshold',
         ]);
-        
+
         return true;
     }
 
     /**
      * Generate summary from conversation messages.
      *
-     * @param array $messages Array of conversation messages
+     * @param  array  $messages  Array of conversation messages
      * @return array|null Summary array or null if generation fails
      */
     public function generateSummary(array $messages): ?array
     {
         $startTime = microtime(true);
         $originalTokens = $this->tokenEstimator->estimateConversationTokens($messages);
-        
+
         try {
             Log::info('Starting summary generation', [
                 'message_count' => count($messages),
@@ -127,35 +130,35 @@ class ConversationSummarizer
             // Call LLM with summarization prompt
             $response = $this->callLLMForSummarization($systemPrompt, $messages);
 
-            if (!$response) {
+            if (! $response) {
                 Log::warning('LLM returned empty response for summarization');
-                
+
                 Log::error('Summary generation failed', [
                     'reason' => 'empty_llm_response',
                     'message_count' => count($messages),
                     'duration_ms' => round((microtime(true) - $startTime) * 1000, 2),
                 ]);
-                
+
                 return null;
             }
 
             // Parse JSON response
             $summary = $this->parseJsonResponse($response);
 
-            if (!$summary) {
+            if (! $summary) {
                 Log::warning('Failed to parse JSON response from LLM', ['response' => substr($response, 0, 200)]);
-                
+
                 // Retry with stricter prompt
                 Log::info('Retrying summarization with stricter prompt');
                 $stricterPrompt = $this->buildStricterSummarizationPrompt();
                 $retryResponse = $this->callLLMForSummarization($stricterPrompt, $messages);
-                
+
                 if ($retryResponse) {
                     $summary = $this->parseJsonResponse($retryResponse);
                 }
 
                 // If still no summary after retry, parseJsonResponse will create fallback
-                if (!$summary) {
+                if (! $summary) {
                     Log::warning('Summary generation used fallback after retry failed', [
                         'message_count' => count($messages),
                         'duration_ms' => round((microtime(true) - $startTime) * 1000, 2),
@@ -164,7 +167,7 @@ class ConversationSummarizer
             }
 
             // Validate response using SummaryValidator
-            if (!$this->summaryValidator->validate($summary)) {
+            if (! $this->summaryValidator->validate($summary)) {
                 Log::error('Summary generation failed', [
                     'reason' => 'validation_failed',
                     'errors' => $this->summaryValidator->getErrors(),
@@ -172,6 +175,7 @@ class ConversationSummarizer
                     'message_count' => count($messages),
                     'duration_ms' => round((microtime(true) - $startTime) * 1000, 2),
                 ]);
+
                 return null;
             }
 
@@ -204,6 +208,7 @@ class ConversationSummarizer
                 'message_count' => count($messages),
                 'duration_ms' => round((microtime(true) - $startTime) * 1000, 2),
             ]);
+
             return null;
         }
     }
@@ -263,7 +268,7 @@ PROMPT;
         return <<<'PROMPT'
 Kamu adalah modul peringkas percakapan. Tugas kamu HANYA menghasilkan JSON yang valid.
 
-PENTING: 
+PENTING:
 - Output HARUS berupa JSON yang valid
 - JANGAN tambahkan teks apapun di luar JSON
 - JANGAN tambahkan penjelasan atau komentar
@@ -294,15 +299,15 @@ PROMPT;
     /**
      * Call LLM API for summarization.
      *
-     * @param string $systemPrompt The system prompt
-     * @param array $messages The conversation messages
+     * @param  string  $systemPrompt  The system prompt
+     * @param  array  $messages  The conversation messages
      * @return string|null The LLM response content or null if failed
      */
     protected function callLLMForSummarization(string $systemPrompt, array $messages): ?string
     {
         try {
             $config = config('services.byteplus_ark');
-            $url = $config['base_url'] . '/chat/completions';
+            $url = $config['base_url'].'/chat/completions';
 
             // Build messages array for LLM
             $llmMessages = [
@@ -310,7 +315,7 @@ PROMPT;
             ];
 
             foreach ($messages as $msg) {
-                $role = match($msg['type'] ?? 'user') {
+                $role = match ($msg['type'] ?? 'user') {
                     'human' => 'user',
                     'ai' => 'assistant',
                     default => 'user'
@@ -328,7 +333,7 @@ PROMPT;
 
             // Make API call
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $config['api_key'],
+                'Authorization' => 'Bearer '.$config['api_key'],
                 'Content-Type' => 'application/json',
             ])->timeout(30)->post($url, [
                 'model' => $config['model'],
@@ -357,6 +362,7 @@ PROMPT;
             Log::error('LLM API exception during summarization', [
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -364,7 +370,7 @@ PROMPT;
     /**
      * Parse JSON response from LLM.
      *
-     * @param string $response The LLM response
+     * @param  string  $response  The LLM response
      * @return array|null Parsed JSON array or null if invalid
      */
     protected function parseJsonResponse(string $response): ?array
@@ -375,10 +381,10 @@ PROMPT;
         // Look for JSON object in the response
         if (preg_match('/\{.*\}/s', $response, $matches)) {
             $jsonString = $matches[0];
-            
+
             try {
                 $decoded = json_decode($jsonString, true);
-                
+
                 if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                     return $decoded;
                 }
@@ -390,7 +396,7 @@ PROMPT;
         // Try direct decode as fallback
         try {
             $decoded = json_decode($response, true);
-            
+
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                 return $decoded;
             }
@@ -400,9 +406,9 @@ PROMPT;
 
         // FALLBACK: If JSON parsing fails, create summary from plain text response
         Log::info('JSON parsing failed, using plain text fallback', [
-            'response_preview' => substr($response, 0, 100)
+            'response_preview' => substr($response, 0, 100),
         ]);
-        
+
         return $this->createSummaryFromPlainText($response);
     }
 
@@ -410,17 +416,17 @@ PROMPT;
      * Create summary structure from plain text response.
      * This is a fallback when LLM doesn't return JSON.
      *
-     * @param string $text The plain text response from LLM
+     * @param  string  $text  The plain text response from LLM
      * @return array Summary array with basic structure
      */
     protected function createSummaryFromPlainText(string $text): array
     {
         $text = trim($text);
-        
+
         // Limit summary length
         $maxLength = 500;
         if (mb_strlen($text) > $maxLength) {
-            $text = mb_substr($text, 0, $maxLength) . '...';
+            $text = mb_substr($text, 0, $maxLength).'...';
         }
 
         // Try to detect intent from text content
@@ -432,7 +438,7 @@ PROMPT;
         Log::info('Created summary from plain text', [
             'detected_intent' => $intent,
             'summary_length' => mb_strlen($text),
-            'has_key_data' => !empty(array_filter($keyData))
+            'has_key_data' => ! empty(array_filter($keyData)),
         ]);
 
         return [
@@ -447,7 +453,7 @@ PROMPT;
     /**
      * Detect intent from plain text content.
      *
-     * @param string $text The text to analyze
+     * @param  string  $text  The text to analyze
      * @return string Detected intent
      */
     protected function detectIntentFromText(string $text): string
@@ -478,7 +484,7 @@ PROMPT;
         // Get intent with highest score
         arsort($scores);
         $topIntent = array_key_first($scores);
-        
+
         // Return top intent if it has at least one match, otherwise unknown
         return $scores[$topIntent] > 0 ? $topIntent : 'unknown';
     }
@@ -486,7 +492,7 @@ PROMPT;
     /**
      * Extract key data from plain text.
      *
-     * @param string $text The text to analyze
+     * @param  string  $text  The text to analyze
      * @return array Key data array
      */
     protected function extractKeyDataFromText(string $text): array
@@ -503,7 +509,7 @@ PROMPT;
         // Try to extract numbers (could be quantities, prices, etc.)
         if (preg_match_all('/\d+/', $text, $matches)) {
             $numbers = $matches[0];
-            
+
             // Look for price patterns (Rp followed by number)
             if (preg_match('/Rp\s*[\d.,]+/', $text, $priceMatch)) {
                 $price = preg_replace('/[^\d]/', '', $priceMatch[0]);
@@ -511,7 +517,7 @@ PROMPT;
                     $keyData['total_estimate'] = (float) $price;
                 }
             }
-            
+
             // Look for quantity patterns (number followed by "porsi", "pcs", etc.)
             if (preg_match('/(\d+)\s*(porsi|pcs|buah|item)/i', $text, $qtyMatch)) {
                 $keyData['people_count'] = (int) $qtyMatch[1];
@@ -521,9 +527,9 @@ PROMPT;
         // Try to extract product names (common food items)
         $commonProducts = [
             'nasi goreng', 'mie goreng', 'ayam goreng', 'dimsum', 'teh', 'kopi',
-            'sate', 'bakso', 'soto', 'gado-gado', 'rendang', 'seafood'
+            'sate', 'bakso', 'soto', 'gado-gado', 'rendang', 'seafood',
         ];
-        
+
         $textLower = mb_strtolower($text);
         foreach ($commonProducts as $product) {
             if (mb_strpos($textLower, $product) !== false) {
@@ -537,7 +543,7 @@ PROMPT;
     /**
      * Get context for LLM call (either summary or full messages).
      *
-     * @param AiAgentConversation $conversation The conversation
+     * @param  AiAgentConversation  $conversation  The conversation
      * @return array Context array with messages or summary
      */
     public function getContextForLLM(AiAgentConversation $conversation): array
@@ -546,15 +552,15 @@ PROMPT;
             // Check if conversation has summary
             if ($conversation->hasSummary()) {
                 $summary = $conversation->getSummary();
-                
+
                 if ($summary && is_array($summary)) {
                     // Get configured number of recent messages for immediate context
                     $recentMessagesCount = config('conversation.summarization.recent_messages_count', 3);
                     $recentMessages = $conversation->getRecentMessages($recentMessagesCount);
-                    
+
                     // Build context with summary + recent messages
                     $context = [];
-                    
+
                     // Add summary as a system-like message
                     $summaryText = $this->formatSummaryForContext($summary);
                     $context[] = [
@@ -562,25 +568,25 @@ PROMPT;
                         'content' => $summaryText,
                         'timestamp' => $summary['generated_at'] ?? now()->toIso8601String(),
                     ];
-                    
+
                     // Add recent messages
                     foreach ($recentMessages as $message) {
                         $context[] = $message;
                     }
-                    
+
                     return $context;
                 }
             }
-            
+
             // Fallback: return full message history if no summary or error
             return $conversation->messages ?? [];
-            
+
         } catch (\Exception $e) {
             Log::error('Error getting context for LLM', [
                 'conversation_id' => $conversation->id,
                 'error' => $e->getMessage(),
             ]);
-            
+
             // Fallback to full messages on error
             return $conversation->messages ?? [];
         }
@@ -588,74 +594,56 @@ PROMPT;
 
     /**
      * Format summary for use as context in LLM call.
+     * Ultra-compact format to minimize tokens.
      *
-     * @param array $summary The summary array
+     * @param  array  $summary  The summary array
      * @return string Formatted summary text
      */
     protected function formatSummaryForContext(array $summary): string
     {
-        $text = "=== Ringkasan Percakapan Sebelumnya ===\n\n";
-        
-        // Add summary
+        $parts = [];
+
+        // Add summary (compact)
         if (isset($summary['summary'])) {
-            $text .= "Ringkasan: {$summary['summary']}\n\n";
+            $parts[] = "PREV:{$summary['summary']}";
         }
-        
-        // Add intent
+
+        // Add intent (compact)
         if (isset($summary['intent'])) {
-            $text .= "Intent: {$summary['intent']}\n\n";
+            $parts[] = "INTENT:{$summary['intent']}";
         }
-        
-        // Add key data if present
+
+        // Add key data if present (ultra-compact)
         if (isset($summary['key_data']) && is_array($summary['key_data'])) {
             $keyData = $summary['key_data'];
-            
-            if (!empty($keyData['products'])) {
-                $text .= "Produk yang diminati: " . implode(', ', $keyData['products']) . "\n";
+
+            if (! empty($keyData['products'])) {
+                $parts[] = 'PRODUCTS:'.implode(',', $keyData['products']);
             }
-            
-            if (!empty($keyData['order_items'])) {
-                $text .= "Item pesanan:\n";
+
+            if (! empty($keyData['order_items'])) {
+                $items = [];
                 foreach ($keyData['order_items'] as $item) {
-                    $product = $item['product'] ?? 'Unknown';
-                    $quantity = $item['quantity'] ?? 1;
-                    $text .= "  - {$product} x{$quantity}\n";
+                    $product = $item['product'] ?? '?';
+                    $qty = $item['quantity'] ?? 1;
+                    $items[] = "{$product}x{$qty}";
                 }
+                $parts[] = 'CART:'.implode(',', $items);
             }
-            
-            if (isset($keyData['reservation_date'])) {
-                $text .= "Tanggal reservasi: {$keyData['reservation_date']}\n";
-            }
-            
-            if (isset($keyData['reservation_time'])) {
-                $text .= "Waktu reservasi: {$keyData['reservation_time']}\n";
-            }
-            
-            if (isset($keyData['people_count'])) {
-                $text .= "Jumlah orang: {$keyData['people_count']}\n";
-            }
-            
-            if (isset($keyData['total_estimate'])) {
-                $text .= "Estimasi total: Rp " . number_format($keyData['total_estimate'], 0, ',', '.') . "\n";
+
+            if (! empty($keyData['total'])) {
+                $parts[] = "TOTAL:{$keyData['total']}";
             }
         }
-        
-        // Add missing information if present
-        if (isset($summary['missing_information']) && is_array($summary['missing_information']) && !empty($summary['missing_information'])) {
-            $text .= "\nInformasi yang masih kurang: " . implode(', ', $summary['missing_information']) . "\n";
-        }
-        
-        $text .= "\n=== Lanjutan Percakapan ===\n";
-        
-        return $text;
+
+        return implode('|', $parts);
     }
 
     /**
      * Store summary in conversation.
      *
-     * @param AiAgentConversation $conversation The conversation
-     * @param array $summary The summary to store
-     * @return void
+     * @param  AiAgentConversation  $conversation  The conversation
+     * @param  array  $summary  The summary to store
      */
     public function storeSummary(AiAgentConversation $conversation, array $summary): void
     {
@@ -663,15 +651,15 @@ PROMPT;
             // Check for intent change before storing
             $previousIntent = $this->intentTracker->getCurrentIntent($conversation);
             $newIntent = $summary['intent'] ?? 'unknown';
-            
+
             // Use the model's setSummary method which handles storage
             $conversation->setSummary($summary);
-            
+
             // Update intent if present in summary
             if (isset($summary['intent'])) {
                 $this->intentTracker->updateIntent($conversation, $summary['intent']);
             }
-            
+
             // Log intent change if detected
             if ($previousIntent && $previousIntent !== $newIntent) {
                 Log::info('Intent change detected', [
@@ -681,20 +669,20 @@ PROMPT;
                     'summary_generated_at' => $summary['generated_at'] ?? null,
                 ]);
             }
-            
+
             Log::info('Summary stored successfully', [
                 'conversation_id' => $conversation->id,
                 'intent' => $newIntent,
                 'intent_changed' => $previousIntent && $previousIntent !== $newIntent,
             ]);
-            
+
         } catch (\Exception $e) {
             Log::error('Failed to store summary', [
                 'conversation_id' => $conversation->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            
+
             // Don't throw - let the system continue without summary
         }
     }
@@ -702,25 +690,24 @@ PROMPT;
     /**
      * Clear summary from conversation.
      *
-     * @param AiAgentConversation $conversation The conversation
-     * @return void
+     * @param  AiAgentConversation  $conversation  The conversation
      */
     public function clearSummary(AiAgentConversation $conversation): void
     {
         try {
             // Use the model's clearSummary method
             $conversation->clearSummary();
-            
+
             Log::info('Summary cleared successfully', [
                 'conversation_id' => $conversation->id,
             ]);
-            
+
         } catch (\Exception $e) {
             Log::error('Failed to clear summary', [
                 'conversation_id' => $conversation->id,
                 'error' => $e->getMessage(),
             ]);
-            
+
             // Don't throw - let the system continue
         }
     }

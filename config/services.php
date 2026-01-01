@@ -48,4 +48,16 @@ return [
         'merchant_id' => env('MIDTRANS_MERCHANT_ID'),
     ],
 
+    'whatsapp' => [
+        'api_version' => env('WHATSAPP_API_VERSION', 'v22.0'),
+        'app_id' => env('WHATSAPP_APP_ID'),
+        'app_secret' => env('WHATSAPP_APP_SECRET'),
+        'webhook_verify_token' => env('WHATSAPP_WEBHOOK_VERIFY_TOKEN'),
+        'embedded_signup_config_id' => env('WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID'),
+        // Flow endpoint configuration
+        'flow_private_key' => env('WHATSAPP_FLOW_PRIVATE_KEY'),
+        'flow_passphrase' => env('WHATSAPP_FLOW_PASSPHRASE'),
+        'flow_table_fee' => env('WHATSAPP_FLOW_TABLE_FEE', 100000),
+    ],
+
 ];

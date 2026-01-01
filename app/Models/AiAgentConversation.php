@@ -19,6 +19,8 @@ class AiAgentConversation extends Model
         'order_context',
         'current_order_id',
         'current_qris_transaction_id',
+        'cache_response_id',
+        'cache_expires_at',
         'expires_at',
     ];
 
@@ -33,6 +35,7 @@ class AiAgentConversation extends Model
             'messages' => 'array',
             'order_context' => 'array',
             'expires_at' => 'datetime',
+            'cache_expires_at' => 'datetime',
         ];
     }
 
@@ -74,7 +77,8 @@ class AiAgentConversation extends Model
         $this->messages = $messages;
 
         // Extend expiration by 24 hours from now
-        $this->expires_at = now()->addHours(24);
+        // $this->expires_at = now()->addHours(24);
+        $this->expires_at = now()->addHours(1);
 
         $this->save();
     }
@@ -271,12 +275,55 @@ class AiAgentConversation extends Model
     public function getRecentMessages(int $count = 3): array
     {
         $messages = $this->messages ?? [];
-        
+
         if (empty($messages)) {
             return [];
         }
 
         // Return last N messages
         return array_slice($messages, -$count);
+    }
+
+    /**
+     * Set cache response ID from BytePlus Responses API.
+     * Cache expires in 72 hours (max allowed by BytePlus).
+     */
+    public function setCacheResponseId(string $responseId): void
+    {
+        $this->cache_response_id = $responseId;
+        // BytePlus cache max retention is 72 hours
+        $this->cache_expires_at = now()->addHours(72);
+        $this->save();
+    }
+
+    /**
+     * Get cache response ID if still valid.
+     */
+    public function getCacheResponseId(): ?string
+    {
+        // Return null if cache is expired
+        if ($this->cache_expires_at && $this->cache_expires_at->isPast()) {
+            return null;
+        }
+
+        return $this->cache_response_id;
+    }
+
+    /**
+     * Check if cache is valid and available.
+     */
+    public function hasCacheResponseId(): bool
+    {
+        return $this->getCacheResponseId() !== null;
+    }
+
+    /**
+     * Clear cache response ID.
+     */
+    public function clearCacheResponseId(): void
+    {
+        $this->cache_response_id = null;
+        $this->cache_expires_at = null;
+        $this->save();
     }
 }

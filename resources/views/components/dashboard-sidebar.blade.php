@@ -50,6 +50,10 @@
             <i class="fas fa-file-alt w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_templates') }}</span>
         </a>
+        <a href="/dashboard/reservations" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'reservations' ? 'active' : '' }}">
+            <i class="fas fa-calendar-check w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Reservations</span>
+        </a>
         <a href="/dashboard/profile" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'profile' ? 'active' : '' }}">
             <i class="fas fa-building w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_business_profile') }}</span>

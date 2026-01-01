@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Helpers\ToonFormatter;
 use App\Models\AiAgent;
 use App\Models\AiAgentConversation;
 use App\Models\Order;
@@ -83,24 +84,24 @@ class AiAgentService
 
             // Check if summarization is needed
             $shouldSummarize = $this->conversationSummarizer->shouldSummarize($conversation);
-            
+
             // DISABLED: Intent change detection (too slow - adds extra LLM call)
             // Intent changes will be detected naturally during regular summarization
             // if (!$shouldSummarize && $conversation->hasSummary()) {
             //     try {
             //         $currentSummary = $conversation->getSummary();
             //         $currentIntent = $currentSummary['intent'] ?? null;
-            //         
+            //
             //         if ($currentIntent) {
             //             // Get the last few messages to detect intent change
             //             $recentMessages = $conversation->getRecentMessages(3);
-            //             
+            //
             //             // Generate a quick summary to check intent
             //             $quickSummary = $this->conversationSummarizer->generateSummary($recentMessages);
-            //             
+            //
             //             if ($quickSummary && isset($quickSummary['intent'])) {
             //                 $newIntent = $quickSummary['intent'];
-            //                 
+            //
             //                 // Check if intent has changed
             //                 if ($this->intentTracker->hasIntentChanged($conversation, $newIntent)) {
             //                     Log::info('Intent change detected, triggering summarization', [
@@ -108,7 +109,7 @@ class AiAgentService
             //                         'old_intent' => $currentIntent,
             //                         'new_intent' => $newIntent,
             //                     ]);
-            //                     
+            //
             //                     $shouldSummarize = true;
             //                 }
             //             }
@@ -121,7 +122,7 @@ class AiAgentService
             //         // Continue without intent-based summarization
             //     }
             // }
-            
+
             if ($shouldSummarize) {
                 try {
                     Log::info('Triggering conversation summarization', [
@@ -131,16 +132,16 @@ class AiAgentService
 
                     // Generate summary
                     $summary = $this->conversationSummarizer->generateSummary($conversation->messages ?? []);
-                    
+
                     if ($summary) {
                         // Store summary
                         $this->conversationSummarizer->storeSummary($conversation, $summary);
-                        
+
                         // Update intent tracker
                         if (isset($summary['intent'])) {
                             $this->intentTracker->updateIntent($conversation, $summary['intent']);
                         }
-                        
+
                         Log::info('Summary generated and stored successfully', [
                             'conversation_id' => $conversation->id,
                             'intent' => $summary['intent'] ?? 'unknown',
@@ -164,7 +165,7 @@ class AiAgentService
 
             // Get conversation context (summary + recent messages OR full messages)
             $messages = $this->conversationSummarizer->getContextForLLM($conversation);
-            
+
             // Log context usage for monitoring
             $hasSummary = $conversation->hasSummary();
             Log::info('Using conversation context for LLM', [
@@ -176,7 +177,7 @@ class AiAgentService
 
             // Call LLM with tools
             $tools = $this->getToolDefinitionsForAgent($aiAgent);
-            $response = $this->callLLM($systemPrompt, $messages, $tools);
+            $response = $this->callLLM($systemPrompt, $messages, $tools, $aiAgent);
 
             // Handle tool calls if present
             if (isset($response['tool_calls'])) {
@@ -193,7 +194,7 @@ class AiAgentService
 
             // Send AI response
             $assistantMessage = $response['content'] ?? '';
-            
+
             // If content is empty, generate contextual fallback
             if (empty(trim($assistantMessage))) {
                 Log::warning('LLM returned empty content in main response', [
@@ -202,11 +203,11 @@ class AiAgentService
                     'raw_content' => $assistantMessage,
                     'last_user_message' => $messageText,
                 ]);
-                
+
                 // Generate contextual fallback based on conversation
                 $assistantMessage = $this->generateSimpleFallback($conversation);
             }
-            
+
             $conversation->addMessage('ai', $assistantMessage);
             $this->sendReply($account, $contact->wa_id, $assistantMessage);
 
@@ -253,8 +254,13 @@ class AiAgentService
 
     /**
      * Call BytePlus ARK LLM API.
+     *
+     * @param  string  $systemPrompt  The system prompt to use
+     * @param  array  $messages  The conversation messages
+     * @param  array|null  $tools  The tool definitions for function calling
+     * @param  AiAgent|null  $aiAgent  The AI agent instance (for caching support)
      */
-    public function callLLM(string $systemPrompt, array $messages, ?array $tools = null): array
+    public function callLLM(string $systemPrompt, array $messages, ?array $tools = null, ?AiAgent $aiAgent = null): array
     {
         $config = config('services.byteplus_ark');
         $url = $config['base_url'].'/chat/completions';
@@ -266,12 +272,12 @@ class AiAgentService
 
         foreach ($messages as $msg) {
             // Map type (human/ai) to role (user/assistant) for LLM API
-            $role = match($msg['type'] ?? $msg['role'] ?? 'user') {
+            $role = match ($msg['type'] ?? $msg['role'] ?? 'user') {
                 'human' => 'user',
                 'ai' => 'assistant',
                 default => $msg['type'] ?? $msg['role'] ?? 'user'
             };
-            
+
             $llmMessages[] = [
                 'role' => $role,
                 'content' => $msg['content'],
@@ -291,10 +297,25 @@ class AiAgentService
             $payload['tool_choice'] = 'auto';
         }
 
+        // Add prompt caching metadata if enabled
+        if ($aiAgent && $aiAgent->enable_prompt_caching) {
+            Log::info('Prompt caching enabled for AI agent', [
+                'agent_id' => $aiAgent->id,
+                'agent_name' => $aiAgent->bot_name,
+            ]);
+
+            // BytePlus ARK may support caching through custom parameters
+            // Note: This depends on the provider's API capabilities
+            $payload['metadata'] = [
+                'prompt_caching_enabled' => true,
+            ];
+        }
+
         // Make API call with retry logic (3 attempts with exponential backoff)
         $attempts = 0;
         $maxAttempts = 3;
         $backoff = [10, 30, 60]; // seconds
+        $startTime = microtime(true); // Track response time
 
         while ($attempts < $maxAttempts) {
             try {
@@ -305,6 +326,7 @@ class AiAgentService
 
                 if ($response->successful()) {
                     $data = $response->json();
+                    $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
 
                     // Log the full response for debugging
                     Log::debug('LLM API Response', [
@@ -321,7 +343,7 @@ class AiAgentService
                     }
 
                     // Check if message exists
-                    if (!isset($choice['message'])) {
+                    if (! isset($choice['message'])) {
                         Log::error('Invalid LLM response format - no message', [
                             'choice' => $choice,
                         ]);
@@ -331,7 +353,7 @@ class AiAgentService
                     if (isset($choice['message']['tool_calls'])) {
                         Log::info('LLM returned tool calls', [
                             'tool_calls_count' => count($choice['message']['tool_calls']),
-                            'tool_calls' => array_map(function($tc) {
+                            'tool_calls' => array_map(function ($tc) {
                                 return [
                                     'id' => $tc['id'] ?? null,
                                     'function' => $tc['function']['name'] ?? 'unknown',
@@ -340,6 +362,26 @@ class AiAgentService
                             }, $choice['message']['tool_calls']),
                         ]);
 
+                        // Track analytics for tool call response
+                        if ($aiAgent) {
+                            $promptType = $aiAgent->enable_prompt_caching ? 'cached' :
+                                         ($aiAgent->use_optimized_prompt ? 'optimized' : 'full');
+                            $tokensUsed = $data['usage']['total_tokens'] ?? 0;
+                            $promptTokens = $data['usage']['prompt_tokens'] ?? null;
+                            $completionTokens = $data['usage']['completion_tokens'] ?? null;
+                            $cacheHit = $aiAgent->enable_prompt_caching;
+
+                            AiPromptAnalytics::trackTokenUsage(
+                                $aiAgent->id,
+                                $tokensUsed,
+                                $promptType,
+                                $cacheHit,
+                                $responseTimeMs,
+                                $promptTokens,
+                                $completionTokens
+                            );
+                        }
+
                         return [
                             'tool_calls' => $choice['message']['tool_calls'],
                         ];
@@ -347,13 +389,33 @@ class AiAgentService
 
                     // Get content from LLM response
                     $content = $choice['message']['content'] ?? '';
-                    
+
                     // Log if content is empty
                     if (empty(trim($content))) {
                         Log::warning('LLM returned empty content', [
                             'choice' => $choice,
                             'full_response' => $data,
                         ]);
+                    }
+
+                    // Track analytics for content response
+                    if ($aiAgent) {
+                        $promptType = $aiAgent->enable_prompt_caching ? 'cached' :
+                                     ($aiAgent->use_optimized_prompt ? 'optimized' : 'full');
+                        $tokensUsed = $data['usage']['total_tokens'] ?? 0;
+                        $promptTokens = $data['usage']['prompt_tokens'] ?? null;
+                        $completionTokens = $data['usage']['completion_tokens'] ?? null;
+                        $cacheHit = $aiAgent->enable_prompt_caching;
+
+                        AiPromptAnalytics::trackTokenUsage(
+                            $aiAgent->id,
+                            $tokensUsed,
+                            $promptType,
+                            $cacheHit,
+                            $responseTimeMs,
+                            $promptTokens,
+                            $completionTokens
+                        );
                     }
 
                     return [
@@ -394,7 +456,7 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'get_all_products',
-                    'description' => 'GUNAKAN INI saat user bertanya "menunya apa?", "ada apa aja?", "daftar menu", dll. Dapatkan SEMUA produk yang tersedia. HANYA tampilkan produk yang dikembalikan function ini, JANGAN tambahkan produk lain.',
+                    'description' => 'Get top 10 popular products. For specific items, use search_products.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [],
@@ -406,13 +468,13 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'search_products',
-                    'description' => 'Cari SATU produk berdasarkan nama atau SKU. Untuk mencari MULTIPLE produk sekaligus (contoh: "dimsum dan teh"), gunakan search_multiple_products. PENTING: Jika hasil kosong, JANGAN sebutkan produk tersebut ke user.',
+                    'description' => 'Search ONE product by name. For multiple products use search_multiple_products.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
                             'query' => [
                                 'type' => 'string',
-                                'description' => 'Kata kunci pencarian PENDEK untuk SATU produk (contoh: "dimsum", "teh", "nasi").',
+                                'description' => 'Short keyword for ONE product',
                             ],
                         ],
                         'required' => ['query'],
@@ -423,16 +485,15 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'search_multiple_products',
-                    'description' => 'WAJIB DIGUNAKAN saat user memesan LEBIH DARI SATU produk sekaligus (contoh: "pesan dimsum dan teh jumbo", "mau nasi goreng sama es teh"). Cari beberapa produk sekaligus dalam satu panggilan. PENTING: Jika ada produk yang tidak ditemukan, JANGAN sebutkan produk tersebut ke user. HANYA proses produk yang ditemukan.',
+                    'description' => 'Search multiple products at once. Required when user orders 2+ items.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
                             'queries' => [
                                 'type' => 'array',
-                                'description' => 'Array kata kunci pencarian. Setiap kata kunci untuk satu produk. Contoh: ["dimsum", "teh"] untuk mencari dimsum dan teh.',
+                                'description' => 'Array of keywords, one per product',
                                 'items' => [
                                     'type' => 'string',
-                                    'description' => 'Kata kunci PENDEK untuk satu produk',
                                 ],
                             ],
                         ],
@@ -444,13 +505,13 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'get_product_details',
-                    'description' => 'Dapatkan detail lengkap produk berdasarkan ID',
+                    'description' => 'Get product details by ID',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
                             'product_id' => [
                                 'type' => 'integer',
-                                'description' => 'ID produk',
+                                'description' => 'Product ID',
                             ],
                         ],
                         'required' => ['product_id'],
@@ -461,23 +522,21 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'add_to_cart',
-                    'description' => 'Tambahkan satu atau lebih produk ke keranjang belanja. PENTING: User akan menyebutkan NAMA produk, kamu harus cari ID produk dari daftar produk atau hasil search_products terlebih dahulu. Untuk multiple produk, gunakan array products dan masukkan SEMUA produk dalam SATU pemanggilan function. HANYA tambahkan produk yang BENAR-BENAR DITEMUKAN di hasil search.',
+                    'description' => 'Add products to cart. Get product_id from search first.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
                             'products' => [
                                 'type' => 'array',
-                                'description' => 'Array of products to add. Each product must have product_id (yang sudah kamu cari dari nama produk) and quantity. HANYA masukkan produk yang ID-nya sudah kamu dapatkan dari search.',
+                                'description' => 'Products with id and qty',
                                 'items' => [
                                     'type' => 'object',
                                     'properties' => [
                                         'product_id' => [
                                             'type' => 'integer',
-                                            'description' => 'ID produk yang sudah kamu cari dari nama produk yang disebutkan user',
                                         ],
                                         'quantity' => [
                                             'type' => 'integer',
-                                            'description' => 'Jumlah yang ingin dipesan',
                                         ],
                                     ],
                                     'required' => ['product_id', 'quantity'],
@@ -492,7 +551,7 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'get_cart_summary',
-                    'description' => 'Dapatkan ringkasan keranjang belanja saat ini',
+                    'description' => 'Get current cart summary',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [],
@@ -503,7 +562,7 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'confirm_order',
-                    'description' => 'Konfirmasi dan buat pesanan dari keranjang',
+                    'description' => 'Confirm and create order from cart',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [],
@@ -518,7 +577,7 @@ class AiAgentService
      */
     protected function getToolDefinitionsForAgent(AiAgent $aiAgent): ?array
     {
-        if (!$aiAgent->isOrderEnabled()) {
+        if (! $aiAgent->isOrderEnabled()) {
             return null;
         }
 
@@ -542,17 +601,17 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'generate_qris',
-                    'description' => 'Generate kode QRIS untuk pembayaran pesanan. Gunakan setelah pesanan dikonfirmasi.',
+                    'description' => 'Generate QRIS payment code after order confirmed',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
                             'amount' => [
                                 'type' => 'number',
-                                'description' => 'Jumlah pembayaran dalam Rupiah',
+                                'description' => 'Amount in Rupiah',
                             ],
                             'description' => [
                                 'type' => 'string',
-                                'description' => 'Deskripsi pembayaran (opsional)',
+                                'description' => 'Payment description (optional)',
                             ],
                         ],
                         'required' => ['amount'],
@@ -563,7 +622,7 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'check_payment_status',
-                    'description' => 'Cek status pembayaran QRIS terakhir',
+                    'description' => 'Check last QRIS payment status',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [],
@@ -586,7 +645,7 @@ class AiAgentService
         // Log how many tool calls received
         Log::info('Handling tool calls from LLM', [
             'tool_calls_count' => count($toolCalls),
-            'tool_calls' => array_map(function($tc) {
+            'tool_calls' => array_map(function ($tc) {
                 return [
                     'function' => $tc['function']['name'] ?? 'unknown',
                     'arguments' => $tc['function']['arguments'] ?? '{}',
@@ -601,12 +660,12 @@ class AiAgentService
         foreach ($toolCalls as $toolCall) {
             $functionName = $toolCall['function']['name'] ?? null;
             $arguments = json_decode($toolCall['function']['arguments'] ?? '{}', true);
-            
+
             // Ensure arguments is always an array
-            if (!is_array($arguments)) {
+            if (! is_array($arguments)) {
                 $arguments = [];
             }
-            
+
             $toolCallId = $toolCall['id'] ?? uniqid();
 
             Log::info('Executing tool call', [
@@ -614,8 +673,8 @@ class AiAgentService
                 'arguments' => $arguments,
             ]);
 
-            $result = $this->executeToolCall($functionName, $arguments, $account->user_id, $conversation);
-            
+            $result = $this->executeToolCall($functionName, $arguments, $account->user_id, $conversation, $aiAgent);
+
             // Track what type of calls we have
             if (in_array($functionName, ['search_products', 'search_multiple_products'])) {
                 $hasSearchCall = true;
@@ -634,47 +693,48 @@ class AiAgentService
         // If we only have search calls (no final action), we need to call LLM again
         // to let it process the search results and call add_to_cart
         // BUT: Only do this ONCE to prevent infinite loops
-        if ($hasSearchCall && !$hasFinalAction) {
+        if ($hasSearchCall && ! $hasFinalAction) {
             // Check if we've already done a follow-up call in this conversation turn
             $lastMessages = array_slice($conversation->messages ?? [], -5);
             $recentSearchCount = 0;
             foreach ($lastMessages as $msg) {
-                if (isset($msg['type']) && $msg['type'] === 'ai' && 
-                    (stripos($msg['content'] ?? '', 'HASIL PENCARIAN') !== false || 
+                if (isset($msg['type']) && $msg['type'] === 'ai' &&
+                    (stripos($msg['content'] ?? '', 'HASIL PENCARIAN') !== false ||
                      stripos($msg['content'] ?? '', 'produk yang saya temukan') !== false)) {
                     $recentSearchCount++;
                 }
             }
-            
+
             // If we've already shown search results recently, don't loop - just show to user
             if ($recentSearchCount >= 2) {
                 Log::warning('Preventing search loop - already searched multiple times recently', [
                     'conversation_id' => $conversation->id,
                     'recent_search_count' => $recentSearchCount,
                 ]);
-                
+
                 // Send a helpful message to user
                 $responseMessage = "Maaf, saya mengalami kesulitan memproses pesanan Anda. Silakan coba lagi dengan format:\n\n";
                 $responseMessage .= "Contoh: 'pesan dimsum 2 porsi'\n";
                 $responseMessage .= "Atau: 'pesan dimsum 1 dan teh jumbo 2'";
-                
+
                 $conversation->addMessage('ai', $responseMessage);
                 $this->sendReply($account, $contact->wa_id, $responseMessage);
+
                 return;
             }
-            
+
             Log::info('Search completed, calling LLM again to process results and add to cart');
-            
+
             // Build messages with tool results for LLM to continue
             $messages = $conversation->messages ?? [];
-            
+
             // Add assistant message with tool calls
             $messages[] = [
                 'role' => 'assistant',
                 'content' => null,
                 'tool_calls' => $toolCalls,
             ];
-            
+
             // Add tool results
             foreach ($toolResults as $tr) {
                 $messages[] = [
@@ -687,10 +747,10 @@ class AiAgentService
             // Call LLM again to continue processing
             $systemPrompt = $aiAgent->buildSystemPrompt($account->user_id);
             $tools = $this->getToolDefinitionsForAgent($aiAgent);
-            
+
             try {
                 $response = $this->callLLMWithToolResults($systemPrompt, $messages, $tools);
-                
+
                 // If LLM returns more tool calls, handle them
                 if (isset($response['tool_calls'])) {
                     $this->handleToolCalls(
@@ -700,27 +760,29 @@ class AiAgentService
                         $contact,
                         $aiAgent
                     );
+
                     return;
                 }
-                
+
                 // Otherwise send the response
                 $assistantMessage = $response['content'] ?? '';
-                
+
                 // Check if content is empty or only whitespace
                 if (empty(trim($assistantMessage))) {
                     // LLM returned empty content after processing search results
                     Log::warning('LLM returned empty content after search', [
                         'conversation_id' => $conversation->id,
-                        'tool_results' => array_map(fn($tr) => $tr['function_name'], $toolResults),
+                        'tool_results' => array_map(fn ($tr) => $tr['function_name'], $toolResults),
                         'raw_content' => $assistantMessage,
                     ]);
-                    
+
                     // Generate contextual fallback based on search results
                     $assistantMessage = $this->generateContextualFallback($toolResults, $conversation);
                 }
-                
+
                 $conversation->addMessage('ai', $assistantMessage);
                 $this->sendReply($account, $contact->wa_id, $assistantMessage);
+
                 return;
             } catch (\Exception $e) {
                 Log::error('Error in follow-up LLM call', ['error' => $e->getMessage()]);
@@ -732,26 +794,26 @@ class AiAgentService
         $userFacingResults = [];
         foreach ($toolResults as $tr) {
             // Don't show raw search results to user - they're internal
-            if (!in_array($tr['function_name'], ['search_products', 'search_multiple_products'])) {
+            if (! in_array($tr['function_name'], ['search_products', 'search_multiple_products'])) {
                 $userFacingResults[] = $tr['result'];
             }
         }
 
         // Send combined result to user
         $responseMessage = implode("\n\n", array_filter($userFacingResults));
-        
+
         // Check if response is empty or only whitespace
         if (empty(trim($responseMessage))) {
             // No user-facing results to send (e.g., only search was performed)
             Log::warning('No user-facing results from tool calls', [
                 'conversation_id' => $conversation->id,
-                'tool_calls' => array_map(fn($tr) => $tr['function_name'], $toolResults),
+                'tool_calls' => array_map(fn ($tr) => $tr['function_name'], $toolResults),
             ]);
-            
+
             // Generate contextual fallback based on tool results
             $responseMessage = $this->generateContextualFallback($toolResults, $conversation);
         }
-        
+
         $conversation->addMessage('ai', $responseMessage);
         $this->sendReply($account, $contact->wa_id, $responseMessage);
     }
@@ -786,12 +848,12 @@ class AiAgentService
                 ];
             } else {
                 // Regular message
-                $role = match($msg['type'] ?? $msg['role'] ?? 'user') {
+                $role = match ($msg['type'] ?? $msg['role'] ?? 'user') {
                     'human' => 'user',
                     'ai' => 'assistant',
                     default => $msg['type'] ?? $msg['role'] ?? 'user'
                 };
-                
+
                 $llmMessages[] = [
                     'role' => $role,
                     'content' => $msg['content'],
@@ -808,7 +870,7 @@ class AiAgentService
 
         if ($tools) {
             $payload['tools'] = $tools;
-            $payload['tool_choice' ] = 'auto';
+            $payload['tool_choice'] = 'auto';
         }
 
         $response = Http::withHeaders([
@@ -819,15 +881,15 @@ class AiAgentService
         if ($response->successful()) {
             $data = $response->json();
             $choice = $data['choices'][0] ?? null;
-            
+
             if ($choice && isset($choice['message']['tool_calls'])) {
                 return ['tool_calls' => $choice['message']['tool_calls']];
             }
-            
+
             return ['content' => $choice['message']['content'] ?? ''];
         }
 
-        throw new \Exception('LLM API call failed: ' . $response->body());
+        throw new \Exception('LLM API call failed: '.$response->body());
     }
 
     /**
@@ -836,9 +898,9 @@ class AiAgentService
     protected function generateContextualFallback(array $toolResults, AiAgentConversation $conversation): string
     {
         // Analyze tool results to understand what was attempted
-        $toolNames = array_map(fn($tr) => $tr['function_name'], $toolResults);
-        $hasSearch = !empty(array_intersect($toolNames, ['search_products', 'search_multiple_products']));
-        
+        $toolNames = array_map(fn ($tr) => $tr['function_name'], $toolResults);
+        $hasSearch = ! empty(array_intersect($toolNames, ['search_products', 'search_multiple_products']));
+
         // Get last user message for context
         $messages = $conversation->messages ?? [];
         $lastUserMessage = '';
@@ -848,7 +910,7 @@ class AiAgentService
                 break;
             }
         }
-        
+
         // Parse search results to extract product information
         $foundProducts = [];
         foreach ($toolResults as $tr) {
@@ -860,80 +922,80 @@ class AiAgentService
                 }
             }
         }
-        
+
         // Generate contextual response based on user intent and search results
-        if ($hasSearch && !empty($foundProducts)) {
+        if ($hasSearch && ! empty($foundProducts)) {
             // User was searching/ordering and we found products
             $productList = implode(', ', array_slice($foundProducts, 0, 3));
-            
-            if (stripos($lastUserMessage, 'pesan') !== false || 
-                stripos($lastUserMessage, 'beli') !== false || 
+
+            if (stripos($lastUserMessage, 'pesan') !== false ||
+                stripos($lastUserMessage, 'beli') !== false ||
                 stripos($lastUserMessage, 'order') !== false) {
                 // User wants to order
-                return "Saya menemukan produk yang Anda cari: {$productList}. " .
+                return "Saya menemukan produk yang Anda cari: {$productList}. ".
                        "Berapa jumlah yang ingin Anda pesan? Contoh: 'pesan {$foundProducts[0]} 2 porsi'";
-            } elseif (stripos($lastUserMessage, 'menu') !== false || 
-                      stripos($lastUserMessage, 'ada apa') !== false || 
+            } elseif (stripos($lastUserMessage, 'menu') !== false ||
+                      stripos($lastUserMessage, 'ada apa') !== false ||
                       stripos($lastUserMessage, 'daftar') !== false) {
                 // User wants to browse menu
-                return "Kami punya: {$productList}" . (count($foundProducts) > 3 ? ' dan lainnya' : '') . ". " .
-                       "Mau pesan yang mana?";
+                return "Kami punya: {$productList}".(count($foundProducts) > 3 ? ' dan lainnya' : '').'. '.
+                       'Mau pesan yang mana?';
             } else {
                 // General search
                 return "Saya menemukan: {$productList}. Ada yang ingin Anda pesan?";
             }
         } elseif ($hasSearch && empty($foundProducts)) {
             // Search was performed but no products found
-            if (stripos($lastUserMessage, 'pesan') !== false || 
+            if (stripos($lastUserMessage, 'pesan') !== false ||
                 stripos($lastUserMessage, 'beli') !== false) {
                 return "Maaf, produk yang Anda cari tidak tersedia. Ketik 'menu' untuk melihat daftar produk kami.";
             } else {
                 return "Maaf, tidak ada produk yang sesuai dengan pencarian Anda. Bisa coba kata kunci lain atau ketik 'menu' untuk lihat semua produk.";
             }
         }
-        
+
         // Check cart context
         $cart = $conversation->getCart();
-        if (!empty($cart)) {
-            if (stripos($lastUserMessage, 'keranjang') !== false || 
-                stripos($lastUserMessage, 'cart') !== false || 
+        if (! empty($cart)) {
+            if (stripos($lastUserMessage, 'keranjang') !== false ||
+                stripos($lastUserMessage, 'cart') !== false ||
                 stripos($lastUserMessage, 'pesanan') !== false) {
-                return "Anda punya " . count($cart) . " item di keranjang. Ketik 'lihat keranjang' untuk detail atau 'konfirmasi' untuk checkout.";
+                return 'Anda punya '.count($cart)." item di keranjang. Ketik 'lihat keranjang' untuk detail atau 'konfirmasi' untuk checkout.";
             }
         }
-        
+
         // Check if user is asking about payment
-        if (stripos($lastUserMessage, 'bayar') !== false || 
-            stripos($lastUserMessage, 'qris') !== false || 
+        if (stripos($lastUserMessage, 'bayar') !== false ||
+            stripos($lastUserMessage, 'qris') !== false ||
             stripos($lastUserMessage, 'payment') !== false) {
             $currentOrder = $conversation->getCurrentOrder();
             if ($currentOrder) {
-                return "Pesanan Anda sudah dibuat. Silakan lakukan pembayaran untuk melanjutkan.";
+                return 'Pesanan Anda sudah dibuat. Silakan lakukan pembayaran untuk melanjutkan.';
             } else {
-                return "Belum ada pesanan yang perlu dibayar. Silakan buat pesanan terlebih dahulu.";
+                return 'Belum ada pesanan yang perlu dibayar. Silakan buat pesanan terlebih dahulu.';
             }
         }
-        
+
         // Check if user is asking general questions
-        if (stripos($lastUserMessage, 'jam') !== false || 
-            stripos($lastUserMessage, 'buka') !== false || 
+        if (stripos($lastUserMessage, 'jam') !== false ||
+            stripos($lastUserMessage, 'buka') !== false ||
             stripos($lastUserMessage, 'tutup') !== false) {
-            return "Untuk informasi jam operasional, silakan hubungi kami langsung. Ada yang bisa saya bantu untuk pemesanan?";
+            return 'Untuk informasi jam operasional, silakan hubungi kami langsung. Ada yang bisa saya bantu untuk pemesanan?';
         }
-        
-        if (stripos($lastUserMessage, 'lokasi') !== false || 
-            stripos($lastUserMessage, 'alamat') !== false || 
+
+        if (stripos($lastUserMessage, 'lokasi') !== false ||
+            stripos($lastUserMessage, 'alamat') !== false ||
             stripos($lastUserMessage, 'dimana') !== false) {
-            return "Untuk informasi lokasi, silakan hubungi kami langsung. Mau pesan sesuatu?";
+            return 'Untuk informasi lokasi, silakan hubungi kami langsung. Mau pesan sesuatu?';
         }
-        
+
         // Generic fallback based on conversation state
-        if (!empty($cart)) {
-            return "Anda punya pesanan di keranjang. Mau tambah item lagi atau langsung checkout?";
+        if (! empty($cart)) {
+            return 'Anda punya pesanan di keranjang. Mau tambah item lagi atau langsung checkout?';
         }
-        
+
         // Default fallback - encourage user to be more specific
-        return "Maaf, saya kurang mengerti maksud Anda. Bisa dijelaskan lebih detail? " .
+        return 'Maaf, saya kurang mengerti maksud Anda. Bisa dijelaskan lebih detail? '.
                "Contoh: 'lihat menu', 'pesan nasi goreng 2', atau 'lihat keranjang'.";
     }
 
@@ -951,94 +1013,94 @@ class AiAgentService
                 break;
             }
         }
-        
+
         // Check conversation state
         $cart = $conversation->getCart();
         $currentOrder = $conversation->getCurrentOrder();
-        
+
         // Greeting detection
         if (preg_match('/^(halo|hai|hi|hello|hey|assalamualaikum|selamat)/i', $lastUserMessage)) {
             return "Halo! Ada yang bisa saya bantu? Ketik 'menu' untuk lihat produk kami.";
         }
-        
+
         // Menu/product inquiry
-        if (stripos($lastUserMessage, 'menu') !== false || 
-            stripos($lastUserMessage, 'produk') !== false || 
+        if (stripos($lastUserMessage, 'menu') !== false ||
+            stripos($lastUserMessage, 'produk') !== false ||
             stripos($lastUserMessage, 'ada apa') !== false ||
             stripos($lastUserMessage, 'jual apa') !== false) {
             return "Untuk melihat menu lengkap, ketik 'lihat menu' atau 'daftar produk'. Atau sebutkan produk yang Anda cari.";
         }
-        
+
         // Order intent
-        if (stripos($lastUserMessage, 'pesan') !== false || 
-            stripos($lastUserMessage, 'beli') !== false || 
+        if (stripos($lastUserMessage, 'pesan') !== false ||
+            stripos($lastUserMessage, 'beli') !== false ||
             stripos($lastUserMessage, 'order') !== false ||
             stripos($lastUserMessage, 'mau') !== false) {
-            if (!empty($cart)) {
-                return "Anda sudah punya " . count($cart) . " item di keranjang. Mau tambah lagi atau langsung checkout? Ketik 'lihat keranjang' untuk detail.";
+            if (! empty($cart)) {
+                return 'Anda sudah punya '.count($cart)." item di keranjang. Mau tambah lagi atau langsung checkout? Ketik 'lihat keranjang' untuk detail.";
             } else {
                 return "Silakan sebutkan produk yang ingin Anda pesan. Contoh: 'pesan nasi goreng 2 porsi' atau ketik 'menu' untuk lihat daftar produk.";
             }
         }
-        
+
         // Cart inquiry
-        if (stripos($lastUserMessage, 'keranjang') !== false || 
-            stripos($lastUserMessage, 'cart') !== false || 
+        if (stripos($lastUserMessage, 'keranjang') !== false ||
+            stripos($lastUserMessage, 'cart') !== false ||
             stripos($lastUserMessage, 'pesanan') !== false) {
-            if (!empty($cart)) {
+            if (! empty($cart)) {
                 return "Ketik 'lihat keranjang' untuk melihat detail pesanan Anda.";
             } else {
                 return "Keranjang Anda masih kosong. Silakan pesan produk terlebih dahulu. Ketik 'menu' untuk lihat produk.";
             }
         }
-        
+
         // Payment inquiry
-        if (stripos($lastUserMessage, 'bayar') !== false || 
-            stripos($lastUserMessage, 'qris') !== false || 
+        if (stripos($lastUserMessage, 'bayar') !== false ||
+            stripos($lastUserMessage, 'qris') !== false ||
             stripos($lastUserMessage, 'payment') !== false ||
             stripos($lastUserMessage, 'transfer') !== false) {
             if ($currentOrder) {
-                return "Untuk melakukan pembayaran, silakan konfirmasi pesanan Anda terlebih dahulu.";
+                return 'Untuk melakukan pembayaran, silakan konfirmasi pesanan Anda terlebih dahulu.';
             } else {
-                return "Belum ada pesanan yang perlu dibayar. Silakan buat pesanan terlebih dahulu.";
+                return 'Belum ada pesanan yang perlu dibayar. Silakan buat pesanan terlebih dahulu.';
             }
         }
-        
+
         // Help/info inquiry
-        if (stripos($lastUserMessage, 'bantuan') !== false || 
-            stripos($lastUserMessage, 'help') !== false || 
+        if (stripos($lastUserMessage, 'bantuan') !== false ||
+            stripos($lastUserMessage, 'help') !== false ||
             stripos($lastUserMessage, 'cara') !== false) {
-            return "Saya bisa bantu Anda:\n" .
-                   "• Lihat menu: ketik 'menu' atau 'daftar produk'\n" .
-                   "• Pesan: ketik 'pesan [nama produk] [jumlah]'\n" .
-                   "• Lihat keranjang: ketik 'lihat keranjang'\n" .
-                   "• Checkout: ketik 'konfirmasi pesanan'\n\n" .
-                   "Ada yang bisa saya bantu?";
+            return "Saya bisa bantu Anda:\n".
+                   "• Lihat menu: ketik 'menu' atau 'daftar produk'\n".
+                   "• Pesan: ketik 'pesan [nama produk] [jumlah]'\n".
+                   "• Lihat keranjang: ketik 'lihat keranjang'\n".
+                   "• Checkout: ketik 'konfirmasi pesanan'\n\n".
+                   'Ada yang bisa saya bantu?';
         }
-        
+
         // Thank you
         if (preg_match('/(terima kasih|thanks|thank you|makasih)/i', $lastUserMessage)) {
-            return "Sama-sama! Ada lagi yang bisa saya bantu?";
+            return 'Sama-sama! Ada lagi yang bisa saya bantu?';
         }
-        
+
         // Cancel/stop
         if (preg_match('/(batal|cancel|stop|tidak jadi)/i', $lastUserMessage)) {
-            if (!empty($cart)) {
+            if (! empty($cart)) {
                 return "Mau batalkan pesanan? Ketik 'hapus keranjang' untuk mengosongkan keranjang.";
             } else {
-                return "Baik, tidak jadi. Ada yang bisa saya bantu lagi?";
+                return 'Baik, tidak jadi. Ada yang bisa saya bantu lagi?';
             }
         }
-        
+
         // Default - based on conversation state
-        if (!empty($cart)) {
-            return "Anda punya " . count($cart) . " item di keranjang. Ketik 'lihat keranjang' untuk detail atau 'konfirmasi' untuk checkout. Atau mau pesan yang lain?";
+        if (! empty($cart)) {
+            return 'Anda punya '.count($cart)." item di keranjang. Ketik 'lihat keranjang' untuk detail atau 'konfirmasi' untuk checkout. Atau mau pesan yang lain?";
         }
-        
+
         // Ultimate fallback
-        return "Maaf, saya kurang mengerti. Bisa dijelaskan lebih detail atau coba:\n" .
-               "• Ketik 'menu' untuk lihat produk\n" .
-               "• Ketik 'pesan [produk] [jumlah]' untuk memesan\n" .
+        return "Maaf, saya kurang mengerti. Bisa dijelaskan lebih detail atau coba:\n".
+               "• Ketik 'menu' untuk lihat produk\n".
+               "• Ketik 'pesan [produk] [jumlah]' untuk memesan\n".
                "• Ketik 'bantuan' untuk info lebih lanjut";
     }
 
@@ -1049,33 +1111,40 @@ class AiAgentService
         string $functionName,
         array $arguments,
         int $userId,
-        AiAgentConversation $conversation
+        AiAgentConversation $conversation,
+        ?AiAgent $aiAgent = null
     ): string {
+        // Check if TOON format should be used for tool results
+        $useToon = $aiAgent?->use_toon_format ?? false;
+
         try {
             // Validate parameters based on function requirements
             switch ($functionName) {
                 case 'get_all_products':
-                    return $this->getAllProducts($userId);
+                    return $this->getAllProducts($userId, $useToon);
 
                 case 'search_products':
-                    if (!isset($arguments['query'])) {
+                    if (! isset($arguments['query'])) {
                         return 'Maaf, parameter pencarian tidak lengkap. Mohon berikan kata kunci pencarian.';
                     }
-                    return $this->searchProducts($userId, $arguments['query']);
+
+                    return $this->searchProducts($userId, $arguments['query'], $useToon);
 
                 case 'search_multiple_products':
-                    if (!isset($arguments['queries']) || !is_array($arguments['queries'])) {
+                    if (! isset($arguments['queries']) || ! is_array($arguments['queries'])) {
                         return 'Maaf, parameter pencarian tidak lengkap. Mohon berikan array kata kunci pencarian.';
                     }
-                    return $this->searchMultipleProducts($userId, $arguments['queries']);
+
+                    return $this->searchMultipleProducts($userId, $arguments['queries'], $useToon);
 
                 case 'get_product_details':
-                    if (!isset($arguments['product_id'])) {
+                    if (! isset($arguments['product_id'])) {
                         return 'Maaf, parameter tidak lengkap. Mohon berikan ID produk.';
                     }
-                    if (!is_numeric($arguments['product_id'])) {
+                    if (! is_numeric($arguments['product_id'])) {
                         return 'Maaf, ID produk harus berupa angka.';
                     }
+
                     return $this->getProductDetails($userId, (int) $arguments['product_id']);
 
                 case 'add_to_cart':
@@ -1085,12 +1154,13 @@ class AiAgentService
                         return $this->addMultipleToCart($conversation, $userId, $arguments['products']);
                     } elseif (isset($arguments['product_id']) && isset($arguments['quantity'])) {
                         // Single product (backward compatibility)
-                        if (!is_numeric($arguments['product_id'])) {
+                        if (! is_numeric($arguments['product_id'])) {
                             return 'Maaf, ID produk harus berupa angka.';
                         }
-                        if (!is_numeric($arguments['quantity'])) {
+                        if (! is_numeric($arguments['quantity'])) {
                             return 'Maaf, jumlah pesanan harus berupa angka.';
                         }
+
                         return $this->addToCart(
                             $conversation,
                             $userId,
@@ -1108,12 +1178,13 @@ class AiAgentService
                     return $this->prepareOrderConfirmation($conversation, $userId);
 
                 case 'generate_qris':
-                    if (!isset($arguments['amount'])) {
+                    if (! isset($arguments['amount'])) {
                         return 'Maaf, parameter tidak lengkap. Mohon berikan jumlah pembayaran.';
                     }
-                    if (!is_numeric($arguments['amount'])) {
+                    if (! is_numeric($arguments['amount'])) {
                         return 'Maaf, jumlah pembayaran harus berupa angka.';
                     }
+
                     return $this->generateQrisForOrder(
                         $conversation,
                         $userId,
@@ -1143,7 +1214,7 @@ class AiAgentService
     /**
      * Search products by query.
      */
-    protected function searchProducts(int $userId, string $query): string
+    protected function searchProducts(int $userId, string $query, bool $useToon = false): string
     {
         // Validate query parameter
         if (empty(trim($query))) {
@@ -1152,7 +1223,7 @@ class AiAgentService
 
         // Clean and normalize query for better matching (lowercase for case-insensitive search)
         $cleanQuery = trim(strtolower($query));
-        
+
         // Split query into words for flexible matching
         $keywords = explode(' ', $cleanQuery);
 
@@ -1162,7 +1233,7 @@ class AiAgentService
                 // Case-insensitive search using LOWER()
                 $q->whereRaw('LOWER(name) LIKE ?', ["%{$cleanQuery}%"])
                     ->orWhereRaw('LOWER(sku) LIKE ?', ["%{$cleanQuery}%"]);
-                
+
                 // Also match if ANY keyword is present (more flexible)
                 foreach ($keywords as $keyword) {
                     if (strlen($keyword) >= 2) { // Use keywords with 2+ chars
@@ -1175,22 +1246,27 @@ class AiAgentService
 
         if ($products->isEmpty()) {
             // CRITICAL: Return clear message that product was NOT FOUND
-            return "PRODUK TIDAK DITEMUKAN!\n\n" .
-                   "Pencarian untuk '{$query}' tidak menemukan hasil.\n\n" .
-                   "**INSTRUKSI WAJIB UNTUK AI**:\n" .
-                   "- JANGAN sebutkan produk ini ke user\n" .
-                   "- JANGAN buat-buat atau asumsikan produk ada\n" .
-                   "- Katakan ke user: \"Mohon maaf, untuk menu '{$query}' tidak tersedia di restoran kami. Ketik 'menu' untuk melihat daftar produk yang tersedia.\"\n" .
-                   "- JANGAN coba search lagi dengan kata kunci berbeda\n" .
-                   "- JANGAN rekomendasikan produk yang tidak ada di database";
+            return "NOT_FOUND\nquery:{$query}\naction:katakan tidak tersedia, jangan sebutkan produk ini";
         }
 
-        // Build response for AI (with IDs in brackets for internal use)
+        // Use TOON format if enabled (saves ~40% tokens)
+        if ($useToon) {
+            $productArray = $products->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'price' => $p->price,
+                'stock' => $p->stock_quantity,
+            ])->toArray();
+
+            return "FOUND\n".ToonFormatter::encodeProducts($productArray)."\naction:panggil add_to_cart dengan ID di atas";
+        }
+
+        // Legacy text format
         $response = "HASIL PENCARIAN PRODUK:\n\n";
         foreach ($products as $product) {
             $response .= "- {$product->name} [ID:{$product->id}] - Rp ".number_format($product->price, 0, ',', '.')." - Stok: {$product->stock_quantity}\n";
         }
-        
+
         $response .= "\n**INSTRUKSI WAJIB**: Sekarang LANGSUNG panggil add_to_cart dengan ID di atas. JANGAN search lagi! JANGAN tampilkan daftar produk ke user lagi!";
 
         return $response;
@@ -1200,7 +1276,7 @@ class AiAgentService
      * Search multiple products by multiple queries at once.
      * This is useful when user orders multiple products in one message.
      */
-    protected function searchMultipleProducts(int $userId, array $queries): string
+    protected function searchMultipleProducts(int $userId, array $queries, bool $useToon = false): string
     {
         if (empty($queries)) {
             return 'Mohon berikan kata kunci pencarian produk.';
@@ -1222,7 +1298,7 @@ class AiAgentService
                 ->where(function ($q) use ($cleanQuery, $keywords) {
                     $q->whereRaw('LOWER(name) LIKE ?', ["%{$cleanQuery}%"])
                         ->orWhereRaw('LOWER(sku) LIKE ?', ["%{$cleanQuery}%"]);
-                    
+
                     foreach ($keywords as $keyword) {
                         if (strlen($keyword) >= 2) {
                             $q->orWhereRaw('LOWER(name) LIKE ?', ["%{$keyword}%"]);
@@ -1237,13 +1313,12 @@ class AiAgentService
             } else {
                 foreach ($products as $product) {
                     // Avoid duplicates
-                    if (!isset($allResults[$product->id])) {
+                    if (! isset($allResults[$product->id])) {
                         $allResults[$product->id] = [
                             'id' => $product->id,
                             'name' => $product->name,
                             'price' => $product->price,
                             'stock' => $product->stock_quantity,
-                            'query' => $query,
                         ];
                     }
                 }
@@ -1251,34 +1326,41 @@ class AiAgentService
         }
 
         // CRITICAL: Handle case when NO products found at all
-        if (empty($allResults) && !empty($notFound)) {
-            return "PRODUK TIDAK DITEMUKAN!\n\n" .
-                   "Pencarian untuk: " . implode(', ', $notFound) . " tidak menemukan hasil.\n\n" .
-                   "**INSTRUKSI WAJIB UNTUK AI**:\n" .
-                   "- JANGAN sebutkan produk-produk ini ke user\n" .
-                   "- JANGAN buat-buat atau asumsikan produk ada\n" .
-                   "- Katakan ke user: \"Mohon maaf, menu yang Anda cari tidak tersedia di restoran kami. Ketik 'menu' untuk melihat daftar produk yang tersedia.\"\n" .
-                   "- JANGAN coba search lagi dengan kata kunci berbeda\n" .
-                   "- JANGAN rekomendasikan produk yang tidak ada di database";
+        if (empty($allResults) && ! empty($notFound)) {
+            return "NOT_FOUND\nqueries:".implode(',', $notFound)."\naction:katakan tidak tersedia";
         }
 
-        // Build response
+        // Use TOON format if enabled (saves ~40% tokens)
+        if ($useToon) {
+            $response = '';
+            if (! empty($allResults)) {
+                $response .= "FOUND\n".ToonFormatter::encodeProducts(array_values($allResults));
+            }
+            if (! empty($notFound)) {
+                $response .= "\nNOT_FOUND[".count($notFound).']: '.implode(',', $notFound);
+            }
+            $response .= "\naction:panggil add_to_cart dengan ID ditemukan, jangan sebutkan yang tidak ada";
+
+            return $response;
+        }
+
+        // Legacy text format
         $response = "HASIL PENCARIAN PRODUK:\n\n";
-        
-        if (!empty($allResults)) {
+
+        if (! empty($allResults)) {
             $response .= "✅ PRODUK DITEMUKAN:\n";
             foreach ($allResults as $product) {
                 $response .= "- {$product['name']} [ID:{$product['id']}] - Rp ".number_format($product['price'], 0, ',', '.')." - Stok: {$product['stock']}\n";
             }
         }
 
-        if (!empty($notFound)) {
+        if (! empty($notFound)) {
             $response .= "\n❌ PRODUK TIDAK DITEMUKAN:\n";
-            $response .= "- " . implode("\n- ", $notFound) . "\n";
+            $response .= '- '.implode("\n- ", $notFound)."\n";
             $response .= "\n**INSTRUKSI UNTUK AI**: Untuk produk yang tidak ditemukan, katakan ke user: \"Mohon maaf, untuk menu [nama] tidak tersedia di restoran kami.\"\n";
         }
 
-        if (!empty($allResults)) {
+        if (! empty($allResults)) {
             $response .= "\n**INSTRUKSI WAJIB**: Sekarang LANGSUNG panggil add_to_cart dengan SEMUA ID yang DITEMUKAN di atas dalam SATU array. JANGAN tambahkan produk yang tidak ditemukan! JANGAN search lagi!";
         }
 
@@ -1288,43 +1370,38 @@ class AiAgentService
     /**
      * Get all active products.
      */
-    protected function getAllProducts(int $userId): string
+    protected function getAllProducts(int $userId, bool $useToon = false): string
     {
         $products = Product::where('user_id', $userId)
             ->where('is_active', true)
             ->orderBy('name', 'asc')
-            ->get(['id', 'name', 'price', 'stock_quantity', 'description']);
+            ->limit(10)
+            ->get(['id', 'name', 'price', 'stock_quantity']);
 
         if ($products->isEmpty()) {
-            return "TIDAK ADA PRODUK!\n\n" .
-                   "Saat ini belum ada produk yang tersedia.\n\n" .
-                   "**INSTRUKSI WAJIB UNTUK AI**:\n" .
-                   "- Katakan ke user: \"Mohon maaf, saat ini belum ada menu yang tersedia.\"\n" .
-                   "- JANGAN sebutkan produk apapun\n" .
-                   "- JANGAN buat-buat atau asumsikan ada produk";
+            return "EMPTY\naction:katakan belum ada menu tersedia";
         }
 
-        // Build response with IDs for AI internal use
-        $response = "DAFTAR SEMUA PRODUK TERSEDIA:\n\n";
-        $response .= "**INSTRUKSI UNTUK AI**: Ini adalah SEMUA produk yang tersedia. JANGAN sebutkan produk lain selain yang ada di daftar ini!\n\n";
-        
-        foreach ($products as $index => $product) {
-            $response .= ($index + 1).". {$product->name} [ID:{$product->id}]\n";
-            $response .= '   💰 Rp '.number_format($product->price, 0, ',', '.')."\n";
-            $response .= "   📦 Stok: {$product->stock_quantity}\n";
-            if ($product->description) {
-                $response .= "   📝 {$product->description}\n";
-            }
-            $response .= "\n";
+        // Use TOON format if enabled (saves ~40% tokens)
+        if ($useToon) {
+            $productArray = $products->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'price' => $p->price,
+                'stock' => $p->stock_quantity,
+            ])->toArray();
+
+            return "MENU(10)\n".ToonFormatter::encodeProducts($productArray)."\nHide ID|Cari lain:search_products";
         }
 
-        $response .= "\n**INSTRUKSI TAMPILAN KE USER**:\n";
-        $response .= "- Tampilkan daftar di atas ke user TANPA [ID:X]\n";
-        $response .= "- Format: '1. Dimsum Keju - Rp 40.000 - Stok: 10'\n";
-        $response .= "- JANGAN tambahkan produk yang tidak ada di daftar ini\n";
-        $response .= "- Jika user pesan, gunakan ID dari daftar ini untuk add_to_cart";
+        // Compact format to reduce tokens
+        $lines = [];
+        foreach ($products as $product) {
+            $price = number_format($product->price, 0, ',', '.');
+            $lines[] = "[{$product->id}]{$product->name}|Rp{$price}|Stok:{$product->stock_quantity}";
+        }
 
-        return $response;
+        return "MENU(10):\n".implode("\n", $lines)."\n\nTampilkan TANPA ID|Cari lain:search_products|Pesan:add_to_cart(id)";
     }
 
     /**
@@ -1437,13 +1514,15 @@ class AiAgentService
             $quantity = $item['quantity'] ?? null;
 
             // Validate
-            if (!$productId || !$quantity) {
+            if (! $productId || ! $quantity) {
                 $errors[] = 'Produk dengan data tidak lengkap dilewati';
+
                 continue;
             }
 
-            if (!is_numeric($productId) || !is_numeric($quantity)) {
+            if (! is_numeric($productId) || ! is_numeric($quantity)) {
                 $errors[] = "Produk ID {$productId}: format tidak valid";
+
                 continue;
             }
 
@@ -1452,6 +1531,7 @@ class AiAgentService
 
             if ($productId <= 0 || $quantity <= 0) {
                 $errors[] = "Produk ID {$productId}: nilai tidak valid";
+
                 continue;
             }
 
@@ -1461,13 +1541,15 @@ class AiAgentService
                 ->where('is_active', true)
                 ->first();
 
-            if (!$product) {
+            if (! $product) {
                 $errors[] = "Produk ID {$productId} tidak ditemukan";
+
                 continue;
             }
 
             if ($product->stock_quantity < $quantity) {
                 $errors[] = "{$product->name}: stok tidak mencukupi (tersedia: {$product->stock_quantity})";
+
                 continue;
             }
 
@@ -1481,7 +1563,7 @@ class AiAgentService
                 }
             }
 
-            if (!$found) {
+            if (! $found) {
                 $cart[] = [
                     'product_id' => $productId,
                     'product_name' => $product->name,
@@ -1497,13 +1579,13 @@ class AiAgentService
         }
 
         // Save cart
-        if (!empty($addedProducts)) {
+        if (! empty($addedProducts)) {
             $conversation->updateCart($cart);
         }
 
         // Build response
-        if (empty($addedProducts) && !empty($errors)) {
-            return "❌ Gagal menambahkan produk:\n" . implode("\n", $errors);
+        if (empty($addedProducts) && ! empty($errors)) {
+            return "❌ Gagal menambahkan produk:\n".implode("\n", $errors);
         }
 
         $response = "✅ Berhasil menambahkan ke keranjang!\n\n";
@@ -1511,8 +1593,8 @@ class AiAgentService
             $response .= "📦 {$item['name']} x{$item['quantity']}\n";
         }
 
-        if (!empty($errors)) {
-            $response .= "\n⚠️ Beberapa produk tidak dapat ditambahkan:\n" . implode("\n", $errors);
+        if (! empty($errors)) {
+            $response .= "\n⚠️ Beberapa produk tidak dapat ditambahkan:\n".implode("\n", $errors);
         }
 
         $response .= "\nKetik 'lihat keranjang' untuk melihat ringkasan pesanan.";
@@ -1605,20 +1687,21 @@ class AiAgentService
             $aiAgent = $conversation->aiAgent;
 
             // Validate QRIS is enabled
-            if (!$aiAgent->isQrisEnabled()) {
+            if (! $aiAgent->isQrisEnabled()) {
                 $errors = $aiAgent->validateQrisConfiguration();
-                if (!empty($errors)) {
+                if (! empty($errors)) {
                     Log::warning('QRIS not properly configured', [
                         'ai_agent_id' => $aiAgent->id,
                         'errors' => $errors,
                     ]);
                 }
+
                 return 'Maaf, pembayaran QRIS belum tersedia saat ini. Silakan hubungi penjual untuk metode pembayaran lain.';
             }
 
             // Get SubMerchant
             $subMerchant = $aiAgent->getSubMerchant();
-            if (!$subMerchant) {
+            if (! $subMerchant) {
                 return 'Maaf, pembayaran QRIS belum tersedia. Silakan hubungi penjual.';
             }
 
@@ -1655,10 +1738,10 @@ class AiAgentService
 
             // Format response message
             $expiryTime = $qrisTransaction->expires_at->format('H:i');
-            $formattedAmount = 'Rp ' . number_format($amount, 0, ',', '.');
+            $formattedAmount = 'Rp '.number_format($amount, 0, ',', '.');
 
             $shareableLink = $qrisTransaction->getShareableLink();
-            
+
             $response = "💳 Pembayaran QRIS\n\n";
             $response .= "Total: {$formattedAmount}\n\n";
             $response .= "📱 Silakan bayar melalui link berikut:\n";
@@ -1692,14 +1775,14 @@ class AiAgentService
         try {
             $qrisTransaction = $conversation->getCurrentQrisTransaction();
 
-            if (!$qrisTransaction) {
+            if (! $qrisTransaction) {
                 return 'Tidak ada pembayaran yang sedang diproses. Silakan buat pesanan terlebih dahulu.';
             }
 
             // Refresh from database
             $qrisTransaction->refresh();
 
-            $formattedAmount = 'Rp ' . number_format($qrisTransaction->amount, 0, ',', '.');
+            $formattedAmount = 'Rp '.number_format($qrisTransaction->amount, 0, ',', '.');
 
             switch ($qrisTransaction->status) {
                 case QrisTransaction::STATUS_SETTLEMENT:
@@ -1708,35 +1791,36 @@ class AiAgentService
                     $conversation->clearCart();
                     $conversation->clearPendingOrder();
 
-                    return "✅ Pembayaran Berhasil!\n\n" .
-                           "Jumlah: {$formattedAmount}\n" .
-                           "No. Transaksi: {$qrisTransaction->order_id}\n\n" .
-                           "Terima kasih atas pembayaran Anda! Pesanan sedang diproses. 🙏";
+                    return "✅ Pembayaran Berhasil!\n\n".
+                           "Jumlah: {$formattedAmount}\n".
+                           "No. Transaksi: {$qrisTransaction->order_id}\n\n".
+                           'Terima kasih atas pembayaran Anda! Pesanan sedang diproses. 🙏';
 
                 case QrisTransaction::STATUS_PENDING:
                     if ($qrisTransaction->isExpired()) {
-                        return "⏰ Kode pembayaran sudah kadaluarsa.\n\n" .
+                        return "⏰ Kode pembayaran sudah kadaluarsa.\n\n".
                                "Ketik 'buat qris baru' untuk mendapatkan kode pembayaran baru.";
                     }
 
                     $remainingMinutes = ceil($qrisTransaction->getRemainingTimeInSeconds() / 60);
-                    return "⏳ Pembayaran Menunggu\n\n" .
-                           "Jumlah: {$formattedAmount}\n" .
-                           "Sisa waktu: {$remainingMinutes} menit\n\n" .
-                           "Silakan selesaikan pembayaran melalui QR Code yang sudah diberikan.\n" .
-                           "Jika sudah membayar, tunggu beberapa saat lalu cek status kembali.";
+
+                    return "⏳ Pembayaran Menunggu\n\n".
+                           "Jumlah: {$formattedAmount}\n".
+                           "Sisa waktu: {$remainingMinutes} menit\n\n".
+                           "Silakan selesaikan pembayaran melalui QR Code yang sudah diberikan.\n".
+                           'Jika sudah membayar, tunggu beberapa saat lalu cek status kembali.';
 
                 case QrisTransaction::STATUS_EXPIRE:
-                    return "⏰ Kode pembayaran sudah kadaluarsa.\n\n" .
+                    return "⏰ Kode pembayaran sudah kadaluarsa.\n\n".
                            "Ketik 'buat qris baru' untuk mendapatkan kode pembayaran baru.";
 
                 case QrisTransaction::STATUS_CANCEL:
-                    return "❌ Pembayaran dibatalkan.\n\n" .
-                           "Silakan buat pesanan baru jika ingin melanjutkan.";
+                    return "❌ Pembayaran dibatalkan.\n\n".
+                           'Silakan buat pesanan baru jika ingin melanjutkan.';
 
                 default:
-                    return "Status pembayaran: {$qrisTransaction->status}\n" .
-                           "Silakan hubungi penjual untuk informasi lebih lanjut.";
+                    return "Status pembayaran: {$qrisTransaction->status}\n".
+                           'Silakan hubungi penjual untuk informasi lebih lanjut.';
             }
 
         } catch (\Exception $e) {
@@ -1822,7 +1906,7 @@ class AiAgentService
             // Check if QRIS is enabled - auto generate QRIS
             if ($aiAgent->isQrisEnabled()) {
                 $subMerchant = $aiAgent->getSubMerchant();
-                
+
                 if ($subMerchant) {
                     try {
                         // Generate QRIS for the order
@@ -1848,10 +1932,10 @@ class AiAgentService
 
                         // Send order confirmation with QRIS
                         $expiryTime = $qrisTransaction->expires_at->format('H:i');
-                        $formattedTotal = 'Rp ' . number_format($order->total, 0, ',', '.');
+                        $formattedTotal = 'Rp '.number_format($order->total, 0, ',', '.');
 
                         $shareableLink = $qrisTransaction->getShareableLink();
-                        
+
                         $response = "✅ Pesanan berhasil dibuat!\n\n";
                         $response .= "Nomor Pesanan: {$order->order_number}\n";
                         $response .= "Total: {$formattedTotal}\n\n";
@@ -1866,6 +1950,7 @@ class AiAgentService
                         $response .= "Ketik 'cek status' setelah membayar. 🙏";
 
                         $this->sendReply($account, $contact->wa_id, $response);
+
                         return;
 
                     } catch (\Exception $e) {
@@ -1881,10 +1966,10 @@ class AiAgentService
             // Send confirmation without QRIS (fallback or QRIS not enabled)
             $response = "✅ Pesanan Berhasil Dibuat!\n\n";
             $response .= "📋 No. Pesanan: {$order->order_number}\n";
-            $response .= "💰 Total: Rp ".number_format($order->total, 0, ',', '.')."\n\n";
+            $response .= '💰 Total: Rp '.number_format($order->total, 0, ',', '.')."\n\n";
             $response .= "Pesanan Anda sedang diproses.\n";
             $response .= "Silakan tunjukkan pesan ini ke kasir untuk melakukan pembayaran.\n\n";
-            $response .= "Terima kasih! 🙏";
+            $response .= 'Terima kasih! 🙏';
 
             $this->sendReply($account, $contact->wa_id, $response);
 
@@ -1934,11 +2019,12 @@ class AiAgentService
             $conversation = AiAgentConversation::where('current_qris_transaction_id', $qrisTransaction->id)
                 ->first();
 
-            if (!$conversation) {
+            if (! $conversation) {
                 Log::info('No conversation found for QRIS transaction, skipping notification', [
                     'qris_transaction_id' => $qrisTransaction->id,
                     'order_id' => $qrisTransaction->order_id,
                 ]);
+
                 return;
             }
 
@@ -1946,35 +2032,37 @@ class AiAgentService
             $contact = $conversation->whatsappContact;
             $aiAgent = $conversation->aiAgent;
 
-            if (!$contact || !$aiAgent) {
+            if (! $contact || ! $aiAgent) {
                 Log::warning('Missing contact or AI agent for payment confirmation', [
                     'conversation_id' => $conversation->id,
                     'has_contact' => $contact !== null,
                     'has_ai_agent' => $aiAgent !== null,
                 ]);
+
                 return;
             }
 
             $account = $aiAgent->whatsappAccount;
-            if (!$account || !$account->is_active) {
+            if (! $account || ! $account->is_active) {
                 Log::warning('WhatsApp account not available for payment confirmation', [
                     'ai_agent_id' => $aiAgent->id,
                 ]);
+
                 return;
             }
 
             // Format confirmation message
-            $formattedAmount = 'Rp ' . number_format($qrisTransaction->amount, 0, ',', '.');
+            $formattedAmount = 'Rp '.number_format($qrisTransaction->amount, 0, ',', '.');
             $order = $conversation->getCurrentOrder();
 
             $message = "✅ Pembayaran Berhasil!\n\n";
             $message .= "Jumlah: {$formattedAmount}\n";
             $message .= "No. Transaksi: {$qrisTransaction->order_id}\n";
-            
+
             if ($order) {
                 $message .= "No. Pesanan: {$order->order_number}\n";
             }
-            
+
             $message .= "\nTerima kasih atas pembayaran Anda! Pesanan sedang diproses. 🙏";
 
             // Send WhatsApp message

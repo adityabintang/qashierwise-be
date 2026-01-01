@@ -282,10 +282,10 @@ class AiAgentController extends Controller
             }
 
             // If trying to enable, validate configuration
-            if (!$aiAgent->qris_enabled) {
+            if (! $aiAgent->qris_enabled) {
                 $errors = $aiAgent->validateQrisConfiguration();
-                
-                if (!empty($errors)) {
+
+                if (! empty($errors)) {
                     return response()->json([
                         'success' => false,
                         'message' => 'Cannot enable QRIS feature',
@@ -377,7 +377,8 @@ class AiAgentController extends Controller
             $response = $this->aiAgentService->callLLM(
                 $systemPrompt,
                 $conversation->messages ?? [],
-                $tools
+                $tools,
+                $aiAgent
             );
 
             // Handle tool calls if present
@@ -395,7 +396,7 @@ class AiAgentController extends Controller
             $conversation->refresh();
 
             // Convert messages format from type to role for test compatibility
-            $conversationHistory = array_map(function($msg) {
+            $conversationHistory = array_map(function ($msg) {
                 return [
                     'role' => $msg['type'] === 'human' ? 'user' : 'assistant',
                     'content' => $msg['content'],
@@ -427,7 +428,7 @@ class AiAgentController extends Controller
      */
     protected function getTestToolDefinitions(AiAgent $aiAgent): ?array
     {
-        if (!$aiAgent->isOrderEnabled()) {
+        if (! $aiAgent->isOrderEnabled()) {
             return null;
         }
 
@@ -580,9 +581,9 @@ class AiAgentController extends Controller
         foreach ($toolCalls as $toolCall) {
             $functionName = $toolCall['function']['name'] ?? null;
             $arguments = json_decode($toolCall['function']['arguments'] ?? '{}', true);
-            
+
             // Ensure arguments is always an array
-            if (!is_array($arguments)) {
+            if (! is_array($arguments)) {
                 $arguments = [];
             }
 
@@ -592,15 +593,16 @@ class AiAgentController extends Controller
             ]);
 
             $result = $this->executeTestToolCall($functionName, $arguments, $userId, $conversation, $aiAgent);
-            
+
             // For search calls, don't show raw results to user - just log them
             if (in_array($functionName, ['search_products', 'search_multiple_products'])) {
                 Log::info('Search result (internal)', ['result' => $result]);
+
                 // Don't add to results - search is internal only
                 continue;
             }
-            
-            if (!empty($result)) {
+
+            if (! empty($result)) {
                 $results[] = $result;
             }
         }
@@ -622,27 +624,30 @@ class AiAgentController extends Controller
             // Validate parameters based on function requirements
             switch ($functionName) {
                 case 'search_products':
-                    if (!isset($arguments['query'])) {
+                    if (! isset($arguments['query'])) {
                         return 'Maaf, parameter pencarian tidak lengkap. Mohon berikan kata kunci pencarian.';
                     }
+
                     return $this->searchProducts($userId, $arguments['query']);
 
                 case 'search_multiple_products':
-                    if (!isset($arguments['queries']) || !is_array($arguments['queries'])) {
+                    if (! isset($arguments['queries']) || ! is_array($arguments['queries'])) {
                         return 'Maaf, parameter pencarian tidak lengkap. Mohon berikan array kata kunci.';
                     }
+
                     return $this->searchMultipleProducts($userId, $arguments['queries']);
 
                 case 'get_all_products':
                     return $this->getAllProducts($userId);
 
                 case 'get_product_details':
-                    if (!isset($arguments['product_id'])) {
+                    if (! isset($arguments['product_id'])) {
                         return 'Maaf, parameter tidak lengkap. Mohon berikan ID produk.';
                     }
-                    if (!is_numeric($arguments['product_id'])) {
+                    if (! is_numeric($arguments['product_id'])) {
                         return 'Maaf, ID produk harus berupa angka.';
                     }
+
                     return $this->getProductDetails($userId, (int) $arguments['product_id']);
 
                 case 'add_to_cart':
@@ -653,24 +658,26 @@ class AiAgentController extends Controller
                     // Support products array with product_id (legacy)
                     elseif (isset($arguments['products']) && is_array($arguments['products'])) {
                         return $this->addMultipleToCart($conversation, $userId, $arguments['products']);
-                    } 
+                    }
                     // Support single product_name
                     elseif (isset($arguments['product_name'])) {
-                        if (!isset($arguments['quantity'])) {
+                        if (! isset($arguments['quantity'])) {
                             return 'Maaf, parameter tidak lengkap. Mohon berikan jumlah pesanan.';
                         }
+
                         return $this->addToCartByName(
                             $conversation,
                             $userId,
                             $arguments['product_name'],
                             (int) $arguments['quantity']
                         );
-                    } 
+                    }
                     // Support single product_id (legacy)
                     elseif (isset($arguments['product_id'])) {
-                        if (!isset($arguments['quantity'])) {
+                        if (! isset($arguments['quantity'])) {
                             return 'Maaf, parameter tidak lengkap. Mohon berikan jumlah pesanan.';
                         }
+
                         return $this->addToCart(
                             $conversation,
                             $userId,
@@ -688,21 +695,23 @@ class AiAgentController extends Controller
                     return $this->clearCart($conversation);
 
                 case 'remove_from_cart':
-                    if (!isset($arguments['product_name'])) {
+                    if (! isset($arguments['product_name'])) {
                         return 'Maaf, mohon sebutkan nama produk yang ingin dihapus.';
                     }
+
                     return $this->removeFromCart($conversation, $arguments['product_name']);
 
                 case 'confirm_order':
                     return $this->confirmOrder($conversation, $aiAgent, $userId);
 
                 case 'generate_qris':
-                    if (!isset($arguments['amount'])) {
+                    if (! isset($arguments['amount'])) {
                         return 'Maaf, parameter tidak lengkap. Mohon berikan jumlah pembayaran.';
                     }
-                    if (!is_numeric($arguments['amount'])) {
+                    if (! is_numeric($arguments['amount'])) {
                         return 'Maaf, jumlah pembayaran harus berupa angka.';
                     }
+
                     return $this->generateTestQris(
                         $conversation,
                         $aiAgent,
@@ -740,14 +749,15 @@ class AiAgentController extends Controller
     ): string {
         try {
             // Validate QRIS is enabled
-            if (!$aiAgent->isQrisEnabled()) {
+            if (! $aiAgent->isQrisEnabled()) {
                 $errors = $aiAgent->validateQrisConfiguration();
-                return 'Maaf, pembayaran QRIS belum tersedia. ' . implode(' ', $errors);
+
+                return 'Maaf, pembayaran QRIS belum tersedia. '.implode(' ', $errors);
             }
 
             // Get SubMerchant
             $subMerchant = $aiAgent->getSubMerchant();
-            if (!$subMerchant) {
+            if (! $subMerchant) {
                 return 'Maaf, pembayaran QRIS belum tersedia. Sub-merchant belum dikonfigurasi.';
             }
 
@@ -782,7 +792,7 @@ class AiAgentController extends Controller
 
             // Format response message
             $expiryTime = $qrisTransaction->expires_at->format('H:i');
-            $formattedAmount = 'Rp ' . number_format($amount, 0, ',', '.');
+            $formattedAmount = 'Rp '.number_format($amount, 0, ',', '.');
             $shareableLink = $qrisTransaction->getShareableLink();
 
             $response = "💳 Pembayaran QRIS (Test)\n\n";
@@ -796,7 +806,7 @@ class AiAgentController extends Controller
             return $response;
 
         } catch (\Exception $e) {
-            return 'Maaf, terjadi kesalahan saat membuat kode pembayaran: ' . $e->getMessage();
+            return 'Maaf, terjadi kesalahan saat membuat kode pembayaran: '.$e->getMessage();
         }
     }
 
@@ -808,35 +818,36 @@ class AiAgentController extends Controller
         try {
             $qrisTransaction = $conversation->getCurrentQrisTransaction();
 
-            if (!$qrisTransaction) {
+            if (! $qrisTransaction) {
                 return 'Tidak ada pembayaran yang sedang diproses.';
             }
 
             // Refresh from database
             $qrisTransaction->refresh();
 
-            $formattedAmount = 'Rp ' . number_format($qrisTransaction->amount, 0, ',', '.');
+            $formattedAmount = 'Rp '.number_format($qrisTransaction->amount, 0, ',', '.');
 
             switch ($qrisTransaction->status) {
                 case QrisTransaction::STATUS_SETTLEMENT:
-                    return "✅ Pembayaran Berhasil!\n\n" .
-                           "Jumlah: {$formattedAmount}\n" .
+                    return "✅ Pembayaran Berhasil!\n\n".
+                           "Jumlah: {$formattedAmount}\n".
                            "No. Transaksi: {$qrisTransaction->order_id}";
 
                 case QrisTransaction::STATUS_PENDING:
                     if ($qrisTransaction->isExpired()) {
-                        return "⏰ Kode pembayaran sudah kadaluarsa.";
+                        return '⏰ Kode pembayaran sudah kadaluarsa.';
                     }
                     $remainingMinutes = ceil($qrisTransaction->getRemainingTimeInSeconds() / 60);
-                    return "⏳ Pembayaran Menunggu\n\n" .
-                           "Jumlah: {$formattedAmount}\n" .
+
+                    return "⏳ Pembayaran Menunggu\n\n".
+                           "Jumlah: {$formattedAmount}\n".
                            "Sisa waktu: {$remainingMinutes} menit";
 
                 case QrisTransaction::STATUS_EXPIRE:
-                    return "⏰ Kode pembayaran sudah kadaluarsa.";
+                    return '⏰ Kode pembayaran sudah kadaluarsa.';
 
                 case QrisTransaction::STATUS_CANCEL:
-                    return "❌ Pembayaran dibatalkan.";
+                    return '❌ Pembayaran dibatalkan.';
 
                 default:
                     return "Status: {$qrisTransaction->status}";
@@ -869,7 +880,7 @@ class AiAgentController extends Controller
                 // Case-insensitive search using LOWER()
                 $q->whereRaw('LOWER(name) LIKE ?', ["%{$cleanQuery}%"])
                     ->orWhereRaw('LOWER(sku) LIKE ?', ["%{$cleanQuery}%"]);
-                
+
                 // Also match if ANY keyword is present (more flexible)
                 foreach ($keywords as $keyword) {
                     if (strlen($keyword) >= 2) {
@@ -922,7 +933,7 @@ class AiAgentController extends Controller
                 ->where(function ($q) use ($cleanQuery, $keywords) {
                     $q->whereRaw('LOWER(name) LIKE ?', ["%{$cleanQuery}%"])
                         ->orWhereRaw('LOWER(sku) LIKE ?', ["%{$cleanQuery}%"]);
-                    
+
                     foreach ($keywords as $keyword) {
                         if (strlen($keyword) >= 2) {
                             $q->orWhereRaw('LOWER(name) LIKE ?', ["%{$keyword}%"]);
@@ -936,7 +947,7 @@ class AiAgentController extends Controller
                 $notFound[] = $query;
             } else {
                 foreach ($products as $product) {
-                    if (!isset($allResults[$product->id])) {
+                    if (! isset($allResults[$product->id])) {
                         $allResults[$product->id] = [
                             'id' => $product->id,
                             'name' => $product->name,
@@ -948,8 +959,8 @@ class AiAgentController extends Controller
             }
         }
 
-        if (empty($allResults) && !empty($notFound)) {
-            return "Maaf, tidak ada produk yang ditemukan untuk: " . implode(', ', $notFound);
+        if (empty($allResults) && ! empty($notFound)) {
+            return 'Maaf, tidak ada produk yang ditemukan untuk: '.implode(', ', $notFound);
         }
 
         $response = "Berikut produk yang saya temukan:\n\n";
@@ -959,11 +970,11 @@ class AiAgentController extends Controller
             $response .= "   Stok: {$product['stock']}\n\n";
         }
 
-        if (!empty($notFound)) {
-            $response .= "⚠️ Tidak ditemukan: " . implode(', ', $notFound) . "\n\n";
+        if (! empty($notFound)) {
+            $response .= '⚠️ Tidak ditemukan: '.implode(', ', $notFound)."\n\n";
         }
 
-        $response .= "**INSTRUKSI**: Gunakan ID di atas untuk add_to_cart.";
+        $response .= '**INSTRUKSI**: Gunakan ID di atas untuk add_to_cart.';
 
         return $response;
     }
@@ -975,26 +986,22 @@ class AiAgentController extends Controller
     {
         $products = \App\Models\Product::where('user_id', $userId)
             ->where('is_active', true)
-            ->limit(20)
-            ->get(['id', 'name', 'price', 'stock_quantity', 'description']);
+            ->orderBy('name', 'asc')
+            ->limit(10)
+            ->get(['id', 'name', 'price', 'stock_quantity']);
 
         if ($products->isEmpty()) {
-            return 'Maaf, belum ada produk yang tersedia saat ini.';
+            return 'Belum ada produk.';
         }
 
-        $response = "📋 Berikut daftar menu/produk kami:\n\n";
-        foreach ($products as $index => $product) {
-            $response .= ($index + 1).". {$product->name}\n";
-            $response .= '   💰 Rp '.number_format($product->price, 0, ',', '.')."\n";
-            if ($product->description) {
-                $response .= "   📝 {$product->description}\n";
-            }
-            $response .= "\n";
+        // Compact format to reduce tokens
+        $lines = [];
+        foreach ($products as $product) {
+            $price = number_format($product->price, 0, ',', '.');
+            $lines[] = "{$product->name}|Rp{$price}|Stok:{$product->stock_quantity}";
         }
 
-        $response .= 'Silakan pilih produk yang Anda inginkan! 😊';
-
-        return $response;
+        return "MENU(10):\n".implode("\n", $lines)."\n\nPilih mana? Cari lain: search_products";
     }
 
     /**
@@ -1011,22 +1018,22 @@ class AiAgentController extends Controller
             ->where('is_active', true)
             ->first(['id', 'name', 'price', 'stock_quantity', 'description', 'sku']);
 
-        if (!$product) {
+        if (! $product) {
             return 'Maaf, produk tidak ditemukan.';
         }
 
         $response = "📦 Detail Produk\n\n";
         $response .= "Nama: {$product->name}\n";
         $response .= '💰 Harga: Rp '.number_format($product->price, 0, ',', '.')."\n";
-        
+
         if ($product->stock_quantity !== null) {
             $response .= "📊 Stok: {$product->stock_quantity}\n";
         }
-        
+
         if ($product->sku) {
             $response .= "🏷️ SKU: {$product->sku}\n";
         }
-        
+
         if ($product->description) {
             $response .= "\n📝 Deskripsi:\n{$product->description}\n";
         }
@@ -1057,7 +1064,7 @@ class AiAgentController extends Controller
             ->where('is_active', true)
             ->first(['id', 'name', 'price', 'stock_quantity']);
 
-        if (!$product) {
+        if (! $product) {
             return 'Maaf, produk tidak ditemukan.';
         }
 
@@ -1081,12 +1088,12 @@ class AiAgentController extends Controller
         if ($existingIndex !== null) {
             // Update existing item
             $newQuantity = $cart[$existingIndex]['quantity'] + $quantity;
-            
+
             // Check stock for new quantity
             if ($product->stock_quantity !== null && $product->stock_quantity < $newQuantity) {
                 return "Maaf, stok tidak mencukupi. Stok tersedia: {$product->stock_quantity}";
             }
-            
+
             $cart[$existingIndex]['quantity'] = $newQuantity;
         } else {
             // Add new item
@@ -1105,9 +1112,9 @@ class AiAgentController extends Controller
         $subtotal = $product->price * $quantity;
         $formattedSubtotal = 'Rp '.number_format($subtotal, 0, ',', '.');
 
-        return "✅ Berhasil menambahkan ke keranjang!\n\n" .
-               "📦 {$product->name}\n" .
-               "💰 {$formattedPrice} x {$quantity} = {$formattedSubtotal}\n\n" .
+        return "✅ Berhasil menambahkan ke keranjang!\n\n".
+               "📦 {$product->name}\n".
+               "💰 {$formattedPrice} x {$quantity} = {$formattedSubtotal}\n\n".
                "Ketik 'lihat keranjang' untuk melihat ringkasan pesanan.";
     }
 
@@ -1131,7 +1138,7 @@ class AiAgentController extends Controller
             $productId = $item['product_id'] ?? null;
             $quantity = $item['quantity'] ?? 1;
 
-            if (!$productId || !is_numeric($productId)) {
+            if (! $productId || ! is_numeric($productId)) {
                 continue;
             }
 
@@ -1147,13 +1154,15 @@ class AiAgentController extends Controller
                 ->where('is_active', true)
                 ->first(['id', 'name', 'price', 'stock_quantity']);
 
-            if (!$product) {
+            if (! $product) {
                 $errors[] = "Produk ID {$productId} tidak ditemukan";
+
                 continue;
             }
 
             if ($product->stock_quantity !== null && $product->stock_quantity < $quantity) {
                 $errors[] = "{$product->name}: stok tidak mencukupi";
+
                 continue;
             }
 
@@ -1167,7 +1176,7 @@ class AiAgentController extends Controller
                 }
             }
 
-            if (!$found) {
+            if (! $found) {
                 $cart[] = [
                     'product_id' => $product->id,
                     'product_name' => $product->name,
@@ -1179,12 +1188,12 @@ class AiAgentController extends Controller
             $addedProducts[] = "{$product->name} x{$quantity}";
         }
 
-        if (!empty($addedProducts)) {
+        if (! empty($addedProducts)) {
             $conversation->updateCart($cart);
         }
 
-        if (empty($addedProducts) && !empty($errors)) {
-            return "❌ Gagal menambahkan produk:\n" . implode("\n", $errors);
+        if (empty($addedProducts) && ! empty($errors)) {
+            return "❌ Gagal menambahkan produk:\n".implode("\n", $errors);
         }
 
         $response = "✅ Berhasil menambahkan ke keranjang!\n\n";
@@ -1192,8 +1201,8 @@ class AiAgentController extends Controller
             $response .= "📦 {$p}\n";
         }
 
-        if (!empty($errors)) {
-            $response .= "\n⚠️ " . implode(", ", $errors);
+        if (! empty($errors)) {
+            $response .= "\n⚠️ ".implode(', ', $errors);
         }
 
         $response .= "\nKetik 'lihat keranjang' untuk melihat ringkasan pesanan.";
@@ -1233,7 +1242,7 @@ class AiAgentController extends Controller
 
             // Search product by name (case-insensitive)
             $cleanName = trim(strtolower($productName));
-            
+
             $product = \App\Models\Product::where('user_id', $userId)
                 ->where('is_active', true)
                 ->where(function ($q) use ($cleanName) {
@@ -1241,13 +1250,15 @@ class AiAgentController extends Controller
                 })
                 ->first(['id', 'name', 'price', 'stock_quantity']);
 
-            if (!$product) {
+            if (! $product) {
                 $errors[] = "'{$productName}' tidak ditemukan";
+
                 continue;
             }
 
             if ($product->stock_quantity !== null && $product->stock_quantity < $quantity) {
                 $errors[] = "{$product->name}: stok tidak mencukupi";
+
                 continue;
             }
 
@@ -1261,7 +1272,7 @@ class AiAgentController extends Controller
                 }
             }
 
-            if (!$found) {
+            if (! $found) {
                 $cart[] = [
                     'product_id' => $product->id,
                     'product_name' => $product->name,
@@ -1280,29 +1291,29 @@ class AiAgentController extends Controller
             ];
         }
 
-        if (!empty($addedProducts)) {
+        if (! empty($addedProducts)) {
             $conversation->updateCart($cart);
         }
 
-        if (empty($addedProducts) && !empty($errors)) {
-            return "❌ Gagal menambahkan produk:\n" . implode("\n", $errors);
+        if (empty($addedProducts) && ! empty($errors)) {
+            return "❌ Gagal menambahkan produk:\n".implode("\n", $errors);
         }
 
         $response = "✅ Berhasil menambahkan ke keranjang!\n\n";
         foreach ($addedProducts as $p) {
-            $formattedPrice = 'Rp ' . number_format($p['price'], 0, ',', '.');
-            $formattedSubtotal = 'Rp ' . number_format($p['subtotal'], 0, ',', '.');
+            $formattedPrice = 'Rp '.number_format($p['price'], 0, ',', '.');
+            $formattedSubtotal = 'Rp '.number_format($p['subtotal'], 0, ',', '.');
             $response .= "📦 {$p['name']} x{$p['quantity']}\n";
             $response .= "   {$formattedPrice} × {$p['quantity']} = {$formattedSubtotal}\n";
         }
 
-        if (!empty($errors)) {
-            $response .= "\n⚠️ " . implode(", ", $errors);
+        if (! empty($errors)) {
+            $response .= "\n⚠️ ".implode(', ', $errors);
         }
 
         // Show total added
         $response .= "\n─────────────────\n";
-        $response .= "💰 Subtotal: Rp " . number_format($totalAdded, 0, ',', '.') . "\n\n";
+        $response .= '💰 Subtotal: Rp '.number_format($totalAdded, 0, ',', '.')."\n\n";
         $response .= "Ketik 'lihat keranjang' untuk melihat ringkasan pesanan atau 'konfirmasi' untuk checkout.";
 
         return $response;
@@ -1327,7 +1338,7 @@ class AiAgentController extends Controller
 
         // Search product by name (case-insensitive)
         $cleanName = trim(strtolower($productName));
-        
+
         $product = \App\Models\Product::where('user_id', $userId)
             ->where('is_active', true)
             ->where(function ($q) use ($cleanName) {
@@ -1335,7 +1346,7 @@ class AiAgentController extends Controller
             })
             ->first(['id', 'name', 'price', 'stock_quantity']);
 
-        if (!$product) {
+        if (! $product) {
             return "Maaf, produk '{$productName}' tidak ditemukan. Ketik 'menu' untuk melihat daftar produk.";
         }
 
@@ -1359,12 +1370,12 @@ class AiAgentController extends Controller
         if ($existingIndex !== null) {
             // Update existing item
             $newQuantity = $cart[$existingIndex]['quantity'] + $quantity;
-            
+
             // Check stock for new quantity
             if ($product->stock_quantity !== null && $product->stock_quantity < $newQuantity) {
                 return "Maaf, stok tidak mencukupi. Stok tersedia: {$product->stock_quantity}";
             }
-            
+
             $cart[$existingIndex]['quantity'] = $newQuantity;
         } else {
             // Add new item
@@ -1383,9 +1394,9 @@ class AiAgentController extends Controller
         $subtotal = $product->price * $quantity;
         $formattedSubtotal = 'Rp '.number_format($subtotal, 0, ',', '.');
 
-        return "✅ Berhasil menambahkan ke keranjang!\n\n" .
-               "📦 {$product->name}\n" .
-               "💰 {$formattedPrice} x {$quantity} = {$formattedSubtotal}\n\n" .
+        return "✅ Berhasil menambahkan ke keranjang!\n\n".
+               "📦 {$product->name}\n".
+               "💰 {$formattedPrice} x {$quantity} = {$formattedSubtotal}\n\n".
                "Ketik 'lihat keranjang' untuk melihat ringkasan pesanan.";
     }
 
@@ -1407,10 +1418,10 @@ class AiAgentController extends Controller
             $itemSubtotal = $item['price'] * $item['quantity'];
             $subtotal += $itemSubtotal;
 
-            $response .= ($index + 1) . ". {$item['product_name']}\n";
-            $response .= '   💰 Rp ' . number_format($item['price'], 0, ',', '.') . 
-                        " x {$item['quantity']} = Rp " . 
-                        number_format($itemSubtotal, 0, ',', '.') . "\n\n";
+            $response .= ($index + 1).". {$item['product_name']}\n";
+            $response .= '   💰 Rp '.number_format($item['price'], 0, ',', '.').
+                        " x {$item['quantity']} = Rp ".
+                        number_format($itemSubtotal, 0, ',', '.')."\n\n";
         }
 
         // Calculate tax (11%)
@@ -1418,9 +1429,9 @@ class AiAgentController extends Controller
         $total = $subtotal + $taxAmount;
 
         $response .= "━━━━━━━━━━━━━━━━━━━━\n";
-        $response .= 'Subtotal: Rp ' . number_format($subtotal, 0, ',', '.') . "\n";
-        $response .= 'Pajak (11%): Rp ' . number_format($taxAmount, 0, ',', '.') . "\n";
-        $response .= '💰 Total: Rp ' . number_format($total, 0, ',', '.') . "\n\n";
+        $response .= 'Subtotal: Rp '.number_format($subtotal, 0, ',', '.')."\n";
+        $response .= 'Pajak (11%): Rp '.number_format($taxAmount, 0, ',', '.')."\n";
+        $response .= '💰 Total: Rp '.number_format($total, 0, ',', '.')."\n\n";
         $response .= "📝 Anda masih bisa:\n";
         $response .= "• Tambah pesanan lagi\n";
         $response .= "• Ketik 'hapus [nama produk]' untuk menghapus item\n";
@@ -1469,16 +1480,16 @@ class AiAgentController extends Controller
             }
         }
 
-        if (!$removedItem) {
+        if (! $removedItem) {
             return "❌ Produk '{$productName}' tidak ditemukan di keranjang.";
         }
 
         $conversation->updateCart($newCart);
 
         $response = "✅ {$removedItem['product_name']} berhasil dihapus dari keranjang.\n\n";
-        
+
         if (empty($newCart)) {
-            $response .= "🛒 Keranjang sekarang kosong.";
+            $response .= '🛒 Keranjang sekarang kosong.';
         } else {
             $response .= "Ketik 'lihat keranjang' untuk melihat sisa pesanan.";
         }
@@ -1501,11 +1512,12 @@ class AiAgentController extends Controller
         }
 
         // Validate store is configured
-        if (!$aiAgent->default_store_id) {
+        if (! $aiAgent->default_store_id) {
             Log::warning('Order creation failed - no default store', [
                 'user_id' => $userId,
                 'ai_agent_id' => $aiAgent->id,
             ]);
+
             return 'Maaf, toko default belum dikonfigurasi.';
         }
 
@@ -1570,7 +1582,7 @@ class AiAgentController extends Controller
                 // Check if QRIS is enabled - auto generate QRIS
                 if ($aiAgent->isQrisEnabled()) {
                     $subMerchant = $aiAgent->getSubMerchant();
-                    
+
                     if ($subMerchant) {
                         try {
                             Log::info('Auto-generating QRIS for order', [
@@ -1606,11 +1618,11 @@ class AiAgentController extends Controller
 
                             // Send order confirmation with QRIS
                             $expiryTime = $qrisTransaction->expires_at->format('H:i');
-                            $formattedTotal = 'Rp ' . number_format($order->total, 0, ',', '.');
+                            $formattedTotal = 'Rp '.number_format($order->total, 0, ',', '.');
 
                             $response = "✅ Pesanan Berhasil Dibuat!\n\n";
                             $shareableLink = $qrisTransaction->getShareableLink();
-                            
+
                             $response .= "📋 No. Pesanan: {$order->order_number}\n";
                             $response .= "💰 Total: {$formattedTotal}\n\n";
                             $response .= "💳 Silakan bayar melalui link berikut:\n";
@@ -1641,14 +1653,14 @@ class AiAgentController extends Controller
                 }
 
                 // Format response (fallback without QRIS)
-                $formattedTotal = 'Rp ' . number_format($order->total, 0, ',', '.');
+                $formattedTotal = 'Rp '.number_format($order->total, 0, ',', '.');
 
-                return "✅ Pesanan Berhasil Dibuat!\n\n" .
-                       "📋 No. Pesanan: {$order->order_number}\n" .
-                       "💰 Total: {$formattedTotal}\n\n" .
-                       "Pesanan Anda sedang diproses.\n" .
-                       "Silakan tunjukkan pesan ini ke kasir untuk melakukan pembayaran.\n\n" .
-                       "Terima kasih! 🙏";
+                return "✅ Pesanan Berhasil Dibuat!\n\n".
+                       "📋 No. Pesanan: {$order->order_number}\n".
+                       "💰 Total: {$formattedTotal}\n\n".
+                       "Pesanan Anda sedang diproses.\n".
+                       "Silakan tunjukkan pesan ini ke kasir untuk melakukan pembayaran.\n\n".
+                       'Terima kasih! 🙏';
             });
 
         } catch (\InvalidArgumentException $e) {
@@ -1657,6 +1669,7 @@ class AiAgentController extends Controller
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
             return "Maaf, gagal membuat pesanan: {$e->getMessage()}";
         } catch (\Exception $e) {
             Log::error('Order creation failed - unexpected error', [
@@ -1664,6 +1677,7 @@ class AiAgentController extends Controller
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
             return 'Maaf, terjadi kesalahan saat membuat pesanan.';
         }
     }
