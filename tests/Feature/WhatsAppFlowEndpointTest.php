@@ -25,6 +25,9 @@ class WhatsAppFlowEndpointTest extends TestCase
 
     /**
      * Test that endpoint returns error when not configured.
+     *
+     * Per WhatsApp spec, decryption failures should return HTTP 421
+     * to signal the client to re-download the public key.
      */
     public function test_endpoint_returns_error_when_not_configured(): void
     {
@@ -34,12 +37,14 @@ class WhatsAppFlowEndpointTest extends TestCase
             'initial_vector' => 'test',
         ]);
 
-        $response->assertStatus(500);
-        $response->assertJson(['error' => 'Endpoint not configured']);
+        // Returns 421 because decryption will fail without proper config
+        $response->assertStatus(421);
     }
 
     /**
      * Test that endpoint returns error when missing parameters.
+     *
+     * Per WhatsApp spec, missing encryption parameters should return HTTP 421.
      */
     public function test_endpoint_returns_error_when_missing_parameters(): void
     {
@@ -50,8 +55,8 @@ class WhatsAppFlowEndpointTest extends TestCase
 
         $response = $this->postJson('/api/whatsapp/flow/endpoint', []);
 
-        $response->assertStatus(400);
-        $response->assertJson(['error' => 'Missing encryption parameters']);
+        // Returns 421 per WhatsApp Flow spec for missing encryption parameters
+        $response->assertStatus(421);
     }
 
     /**

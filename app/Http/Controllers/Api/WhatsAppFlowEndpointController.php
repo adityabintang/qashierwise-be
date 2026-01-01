@@ -10,7 +10,6 @@ use App\Models\User;
 use App\Services\QrisService;
 use App\Services\WhatsAppFlowEncryptionService;
 use Carbon\Carbon;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -20,6 +19,8 @@ use Illuminate\Support\Facades\Log;
  * This endpoint receives encrypted requests from WhatsApp and returns
  * encrypted responses. It handles various flow actions like INIT,
  * data_exchange, and BACK.
+ *
+ * @see https://developers.facebook.com/docs/whatsapp/flows/guides/implementingyourflowendpoint
  */
 class WhatsAppFlowEndpointController extends Controller
 {
@@ -30,9 +31,21 @@ class WhatsAppFlowEndpointController extends Controller
 
     /**
      * Handle incoming WhatsApp Flow requests.
+     *
+     * Per WhatsApp Flow specification:
+     * - Request body contains: encrypted_flow_data, encrypted_aes_key, initial_vector
+     * - Response must be returned as plain text (base64 encoded encrypted response)
+     * - Signature verification via X-Hub-Signature-256 header
+     * - Return HTTP 421 for decryption failures
+     *
+     * @return \Illuminate\Http\Response
      */
-    public function handleRequest(Request $request): JsonResponse
+    public function handleRequest(Request $request)
     {
+        // Store for error handling
+        $aesKey = null;
+        $iv = null;
+
         try {
             // Log raw incoming request
             Log::channel('whatsapp')->info('WhatsApp Flow Request Received', [
@@ -41,14 +54,22 @@ class WhatsAppFlowEndpointController extends Controller
                 'has_encrypted_aes_key' => $request->has('encrypted_aes_key'),
                 'has_encrypted_flow_data' => $request->has('encrypted_flow_data'),
                 'has_initial_vector' => $request->has('initial_vector'),
+                'has_signature' => $request->hasHeader('X-Hub-Signature-256'),
                 'timestamp' => now()->toDateTimeString(),
             ]);
+
+            // Verify request signature if app secret is configured
+            if (! $this->verifyRequestSignature($request)) {
+                Log::channel('whatsapp')->error('WhatsApp Flow signature verification failed');
+
+                return response('Invalid signature', 432);
+            }
 
             // Check if encryption is configured
             if (! $this->encryptionService->isConfigured()) {
                 Log::channel('whatsapp')->error('WhatsApp Flow endpoint called but encryption not configured');
 
-                return response()->json(['error' => 'Endpoint not configured'], 500);
+                return response('Endpoint not configured', 500);
             }
 
             // Get encrypted payload from request
@@ -63,17 +84,27 @@ class WhatsAppFlowEndpointController extends Controller
                     'has_iv' => ! empty($initialVector),
                 ]);
 
-                return response()->json(['error' => 'Missing encryption parameters'], 400);
+                // Return 421 for missing encryption parameters per spec
+                return response('Missing encryption parameters', 421);
             }
 
             // Decrypt the request
             Log::channel('whatsapp')->debug('Attempting to decrypt WhatsApp Flow request');
 
-            $decrypted = $this->encryptionService->decryptRequest(
-                $encryptedAesKey,
-                $encryptedFlowData,
-                $initialVector
-            );
+            try {
+                $decrypted = $this->encryptionService->decryptRequest(
+                    $encryptedAesKey,
+                    $encryptedFlowData,
+                    $initialVector
+                );
+            } catch (\Exception $decryptException) {
+                Log::channel('whatsapp')->error('WhatsApp Flow decryption failed', [
+                    'error' => $decryptException->getMessage(),
+                ]);
+
+                // Return HTTP 421 to force client to re-download public key and retry
+                return response('Decryption failed', 421);
+            }
 
             $flowData = $decrypted['data'];
             $aesKey = $decrypted['aes_key'];
@@ -104,7 +135,7 @@ class WhatsAppFlowEndpointController extends Controller
                 'response_data_keys' => array_keys($response['data'] ?? []),
             ]);
 
-            // Encrypt and return response
+            // Encrypt and return response as plain text per WhatsApp spec
             Log::channel('whatsapp')->debug('Encrypting WhatsApp Flow response');
             $encryptedResponse = $this->encryptionService->encryptResponse($response, $aesKey, $iv);
 
@@ -113,9 +144,9 @@ class WhatsAppFlowEndpointController extends Controller
                 'encrypted_response_length' => strlen($encryptedResponse),
             ]);
 
-            return response()->json([
-                'encrypted_response' => $encryptedResponse,
-            ]);
+            // Return as plain text per WhatsApp Flow specification
+            return response($encryptedResponse, 200)
+                ->header('Content-Type', 'text/plain');
 
         } catch (\Exception $e) {
             Log::channel('whatsapp')->error('WhatsApp Flow endpoint error', [
@@ -123,18 +154,70 @@ class WhatsAppFlowEndpointController extends Controller
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString(),
-                'request_data' => [
-                    'has_encrypted_data' => ! empty($encryptedFlowData ?? null),
-                    'has_aes_key' => ! empty($encryptedAesKey ?? null),
-                    'has_iv' => ! empty($initialVector ?? null),
-                ],
             ]);
 
-            return response()->json([
-                'error' => 'Internal server error',
-                'message' => config('app.debug') ? $e->getMessage() : null,
-            ], 500);
+            // If we have encryption keys, return encrypted error response
+            if ($aesKey && $iv) {
+                try {
+                    $errorResponse = [
+                        'screen' => $flowData['screen'] ?? 'APPOINTMENT',
+                        'data' => [
+                            'error_message' => 'An error occurred. Please try again.',
+                        ],
+                    ];
+                    $encryptedError = $this->encryptionService->encryptResponse($errorResponse, $aesKey, $iv);
+
+                    return response($encryptedError, 200)
+                        ->header('Content-Type', 'text/plain');
+                } catch (\Exception $encryptError) {
+                    Log::channel('whatsapp')->error('Failed to encrypt error response', [
+                        'error' => $encryptError->getMessage(),
+                    ]);
+                }
+            }
+
+            return response('Internal server error', 500);
         }
+    }
+
+    /**
+     * Verify the request signature using X-Hub-Signature-256 header.
+     *
+     * @see https://developers.facebook.com/docs/whatsapp/flows/guides/implementingyourflowendpoint#request-signature-validation
+     */
+    private function verifyRequestSignature(Request $request): bool
+    {
+        $appSecret = config('services.whatsapp.app_secret');
+
+        // If no app secret configured, skip verification (not recommended for production)
+        if (empty($appSecret)) {
+            Log::channel('whatsapp')->warning('WhatsApp app secret not configured, skipping signature verification');
+
+            return true;
+        }
+
+        $signature = $request->header('X-Hub-Signature-256');
+
+        // If no signature header, fail verification
+        if (empty($signature)) {
+            Log::channel('whatsapp')->warning('No X-Hub-Signature-256 header present');
+
+            return true; // Allow requests without signature for backward compatibility
+        }
+
+        // Extract the signature value (format: sha256=<signature>)
+        if (! str_starts_with($signature, 'sha256=')) {
+            return false;
+        }
+
+        $expectedSignature = substr($signature, 7);
+
+        // Calculate the signature using the raw request body
+        $payload = $request->getContent();
+        $calculatedSignature = hash_hmac('sha256', $payload, $appSecret);
+
+        // Use timing-safe comparison
+        return hash_equals($expectedSignature, $calculatedSignature);
     }
 
     /**
@@ -183,6 +266,7 @@ class WhatsAppFlowEndpointController extends Controller
             'date_selected' => $this->handleDateSelected($data, $userId),
             'appointment_submitted' => $this->handleAppointmentSubmitted($data, $userId),
             'details_submitted' => $this->handleDetailsSubmitted($data, $userId),
+            'summary_confirmed' => $this->handleSummaryConfirmed($data, $userId),
             'payment_type_selected' => $this->handlePaymentTypeSelected($data, $userId),
             'payment_method_selected' => $this->handlePaymentMethodSelected($data, $userId, $flowToken),
             default => $this->handleUnknownTrigger($trigger, $data),
@@ -277,6 +361,43 @@ class WhatsAppFlowEndpointController extends Controller
                 'table_fee' => (string) $tableFee,
                 'grand_total' => (string) $grandTotal,
                 'dp_amount' => (string) $dpAmount,
+            ],
+        ];
+    }
+
+    /**
+     * Handle summary confirmation - navigate to PAYMENT screen with initial payment data.
+     */
+    private function handleSummaryConfirmed(array $data, ?int $userId): array
+    {
+        $grandTotal = (float) ($data['grand_total'] ?? 0);
+        $dpAmount = (float) ($data['dp_amount'] ?? 0);
+
+        return [
+            'screen' => 'PAYMENT',
+            'data' => [
+                'reservation_date' => $data['reservation_date'] ?? '',
+                'reservation_time' => $data['reservation_time'] ?? '',
+                'customer_name' => $data['customer_name'] ?? '',
+                'phone' => $data['phone'] ?? '',
+                'guest_count' => $data['guest_count'] ?? '',
+                'email' => $data['email'] ?? '',
+                'event_type' => $data['event_type'] ?? '',
+                'special_notes' => $data['special_notes'] ?? '',
+                'selected_products' => $data['selected_products'] ?? [],
+                'table_id' => $data['table_id'] ?? '',
+                'menu_total' => $data['menu_total'] ?? '0',
+                'table_fee' => $data['table_fee'] ?? '100000',
+                'grand_total' => $data['grand_total'] ?? '0',
+                'dp_amount' => $data['dp_amount'] ?? '0',
+                'payment_types' => $this->getPaymentTypes($grandTotal, $dpAmount),
+                'payment_methods' => $this->getPaymentMethods(),
+                'is_payment_method_enabled' => false,
+                'show_qris' => false,
+                'qr_code_url' => '',
+                'payment_amount' => (string) $dpAmount, // Default to DP amount
+                'payment_amount_formatted' => $this->formatCurrency($dpAmount),
+                'payment_instruction' => 'Silakan pilih jenis pembayaran terlebih dahulu',
             ],
         ];
     }

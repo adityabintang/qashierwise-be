@@ -391,12 +391,9 @@
                                 "type": "Footer",
                                 "label": "Lanjut ke Pembayaran",
                                 "on-click-action": {
-                                    "name": "navigate",
-                                    "next": {
-                                        "type": "screen",
-                                        "name": "PAYMENT"
-                                    },
+                                    "name": "data_exchange",
                                     "payload": {
+                                        "trigger": "summary_confirmed",
                                         "reservation_date": "${data.reservation_date}",
                                         "reservation_time": "${data.reservation_time}",
                                         "customer_name": "${data.customer_name}",
