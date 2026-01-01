@@ -221,6 +221,96 @@ class WhatsAppFlowEndpointController extends Controller
     }
 
     /**
+     * Get the public key for WhatsApp Flow encryption.
+     *
+     * Meta fetches this endpoint to get the public key for signing.
+     * The public key is derived from the private key stored in config.
+     *
+     * @see https://developers.facebook.com/docs/whatsapp/flows/guides/implementingyourflowendpoint#upload-public-key
+     */
+    public function getPublicKey(): \Illuminate\Http\JsonResponse
+    {
+        try {
+            $privateKeyRaw = config('services.whatsapp.flow_private_key');
+            $passphrase = config('services.whatsapp.flow_passphrase');
+
+            if (empty($privateKeyRaw)) {
+                Log::channel('whatsapp')->error('WhatsApp Flow private key not configured');
+
+                return response()->json([
+                    'error' => 'Public key not available',
+                ], 500);
+            }
+
+            // Decode the private key (handle various formats)
+            $privateKeyPem = $this->decodePrivateKeyForPublicKey($privateKeyRaw);
+
+            // Load the private key
+            $privateKey = openssl_pkey_get_private($privateKeyPem, $passphrase ?? '');
+
+            if ($privateKey === false) {
+                Log::channel('whatsapp')->error('Failed to load private key for public key extraction', [
+                    'error' => openssl_error_string(),
+                ]);
+
+                return response()->json([
+                    'error' => 'Failed to extract public key',
+                ], 500);
+            }
+
+            // Extract the public key
+            $keyDetails = openssl_pkey_get_details($privateKey);
+            $publicKey = $keyDetails['key'];
+
+            Log::channel('whatsapp')->info('WhatsApp Flow public key requested', [
+                'key_bits' => $keyDetails['bits'],
+                'ip' => request()->ip(),
+            ]);
+
+            return response()->json([
+                'public_key' => $publicKey,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::channel('whatsapp')->error('Error getting public key', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Decode the private key from various formats (for public key extraction).
+     */
+    private function decodePrivateKeyForPublicKey(string $key): string
+    {
+        // If it already looks like a PEM key, return as-is
+        if (str_contains($key, '-----BEGIN')) {
+            return $key;
+        }
+
+        // Try base64 decoding
+        $decoded = base64_decode($key, true);
+        if ($decoded !== false && str_contains($decoded, '-----BEGIN')) {
+            return $decoded;
+        }
+
+        // Try replacing literal \n with newlines
+        $withNewlines = str_replace('\\n', "\n", $key);
+        if (str_contains($withNewlines, '-----BEGIN')) {
+            return $withNewlines;
+        }
+
+        // Assume it's a base64-encoded key without headers
+        return "-----BEGIN PRIVATE KEY-----\n".
+            chunk_split($key, 64, "\n").
+            "-----END PRIVATE KEY-----\n";
+    }
+
+    /**
      * Handle INIT action - called when flow is first opened.
      */
     private function handleInit(array $flowData): array

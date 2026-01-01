@@ -54,6 +54,11 @@ Route::post('/whatsapp/webhook', [WhatsAppWebhookController::class, 'handle']);
 // This endpoint receives encrypted requests from WhatsApp Flow and returns encrypted responses
 Route::post('/whatsapp/flow/endpoint', [WhatsAppFlowEndpointController::class, 'handleRequest']);
 
+// WhatsApp Flow Public Key Endpoint
+// Meta will fetch this endpoint to get the public key for signing
+// See: https://developers.facebook.com/docs/whatsapp/flows/guides/implementingyourflowendpoint#upload-public-key
+Route::get('/whatsapp/flow/public-key', [WhatsAppFlowEndpointController::class, 'getPublicKey']);
+
 // Polar.sh Webhook (must be public for Polar to access)
 Route::post('/webhooks/polar', [PolarWebhookController::class, 'handle']);
 
