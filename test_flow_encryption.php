@@ -7,10 +7,14 @@
  * to send requests to your endpoint, helping verify your private key
  * and encryption service are working correctly.
  *
+ * Uses phpseclib3 for RSA-OAEP with SHA-256 (as required by WhatsApp Flow spec).
+ *
  * Usage: php test_flow_encryption.php
  */
 
 require_once __DIR__.'/vendor/autoload.php';
+
+use phpseclib3\Crypt\RSA;
 
 // Bootstrap Laravel
 $app = require_once __DIR__.'/bootstrap/app.php';
@@ -96,17 +100,16 @@ try {
     $flowDataJson = json_encode($sampleFlowData);
     echo "   Original data: $flowDataJson\n";
 
-    // Encrypt the AES key with RSA-OAEP
-    $encryptedAesKey = '';
-    $encryptResult = openssl_public_encrypt(
-        $aesKey,
-        $encryptedAesKey,
-        $publicKey,
-        OPENSSL_PKCS1_OAEP_PADDING
-    );
+    // Encrypt the AES key with RSA-OAEP using SHA-256 (as required by WhatsApp spec)
+    $rsaPublic = RSA::load($publicKey)
+        ->withPadding(RSA::ENCRYPTION_OAEP)
+        ->withHash('sha256')
+        ->withMGFHash('sha256');
 
-    if ($encryptResult === false) {
-        throw new Exception('Failed to encrypt AES key: '.openssl_error_string());
+    $encryptedAesKey = $rsaPublic->encrypt($aesKey);
+
+    if ($encryptedAesKey === false) {
+        throw new Exception('Failed to encrypt AES key');
     }
 
     // Encrypt the flow data with AES-128-GCM

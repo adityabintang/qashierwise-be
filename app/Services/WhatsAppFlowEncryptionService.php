@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Log;
+use phpseclib3\Crypt\RSA;
 use RuntimeException;
 
 /**
@@ -13,7 +14,7 @@ use RuntimeException;
  * https://developers.facebook.com/docs/whatsapp/flows/guides/implementingyourflowendpoint
  *
  * Encryption uses:
- * - RSA-OAEP with SHA-256 for key exchange
+ * - RSA-OAEP with SHA-256 for both hash and MGF1 (key exchange)
  * - AES-128-GCM for payload encryption
  */
 class WhatsAppFlowEncryptionService
@@ -51,24 +52,19 @@ class WhatsAppFlowEncryptionService
             // Decode the private key (it may be base64 encoded in env)
             $privateKeyPem = $this->decodePrivateKey($this->privateKey);
 
-            // Load the private key
-            $privateKey = openssl_pkey_get_private($privateKeyPem, $this->passphrase ?? '');
-            if ($privateKey === false) {
-                throw new RuntimeException('Failed to load private key: '.openssl_error_string());
-            }
+            // Load and configure RSA with OAEP padding using SHA-256 for both hash and MGF1
+            // This is required by WhatsApp Flow spec: RSA/ECB/OAEPWithSHA-256AndMGF1Padding
+            $rsa = RSA::load($privateKeyPem, $this->passphrase ?? '');
+            $rsa = $rsa->withPadding(RSA::ENCRYPTION_OAEP)
+                ->withHash('sha256')
+                ->withMGFHash('sha256');
 
             // Decrypt the AES key using RSA-OAEP with SHA-256
             $encryptedAesKeyBytes = base64_decode($encryptedAesKey);
-            $aesKey = '';
-            $decryptResult = openssl_private_decrypt(
-                $encryptedAesKeyBytes,
-                $aesKey,
-                $privateKey,
-                OPENSSL_PKCS1_OAEP_PADDING
-            );
+            $aesKey = $rsa->decrypt($encryptedAesKeyBytes);
 
-            if ($decryptResult === false) {
-                throw new RuntimeException('Failed to decrypt AES key: '.openssl_error_string());
+            if ($aesKey === false) {
+                throw new RuntimeException('Failed to decrypt AES key');
             }
 
             // Decode the encrypted flow data and IV
@@ -173,19 +169,15 @@ class WhatsAppFlowEncryptionService
     /**
      * Flip the IV bytes for response encryption.
      *
-     * WhatsApp requires the response IV to be the bitwise flip of the request IV.
+     * WhatsApp requires the response IV to be the bitwise flip (NOT) of the request IV.
+     * Using PHP's bitwise NOT operator (~) as shown in official Meta documentation.
      *
      * @param  string  $iv  The original IV bytes
      * @return string The flipped IV bytes
      */
     private function flipIv(string $iv): string
     {
-        $flipped = '';
-        for ($i = 0; $i < strlen($iv); $i++) {
-            $flipped .= chr(ord($iv[$i]) ^ 0xFF);
-        }
-
-        return $flipped;
+        return ~$iv;
     }
 
     /**
