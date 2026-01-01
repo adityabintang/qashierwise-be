@@ -163,6 +163,16 @@ class ReservationFlowConfigController extends Controller
                 ], 422);
             }
 
+            // Check if APP_URL is publicly accessible (not localhost)
+            $appUrl = config('app.url');
+            if (str_contains($appUrl, 'localhost') || str_contains($appUrl, '127.0.0.1')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'APP_URL masih menggunakan localhost. Untuk publish flow, APP_URL harus menggunakan domain publik dengan HTTPS (contoh: https://api.qashierwise.com). Untuk testing, gunakan mode DRAFT dengan mengirim flow ke nomor test.',
+                    'hint' => 'Anda bisa test flow dalam mode DRAFT tanpa perlu publish. Gunakan tombol "Send" untuk mengirim draft flow ke nomor WhatsApp Anda.',
+                ], 422);
+            }
+
             // Create flow if not exists
             if (!$config->hasFlow()) {
                 $result = $this->flowService->createReservationFlowWithConfig(Auth::id(), $config);
@@ -187,7 +197,7 @@ class ReservationFlowConfigController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal mempublish flow. Pastikan endpoint URI dapat diakses dan public key sudah ter-upload. Cek log untuk detail.',
+                'message' => 'Gagal mempublish flow. Pastikan: 1) Endpoint ' . $appUrl . '/api/whatsapp/flow/endpoint dapat diakses dari internet, 2) Public key sudah ter-upload ke Meta. Untuk sandbox account, coba test dengan mode DRAFT terlebih dahulu.',
             ], 500);
 
         } catch (\Exception $e) {
@@ -282,6 +292,7 @@ class ReservationFlowConfigController extends Controller
 
     /**
      * Send flow to a phone number.
+     * Supports both DRAFT (for testing) and PUBLISHED flows.
      */
     public function send(\Illuminate\Http\Request $request): JsonResponse
     {
@@ -291,24 +302,41 @@ class ReservationFlowConfigController extends Controller
 
         $config = ReservationFlowConfig::getOrCreateForUser(Auth::id());
 
-        if (!$config->hasFlow() || !$config->isPublished()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Flow belum dipublish. Silakan publish flow terlebih dahulu.',
-            ], 422);
+        if (!$config->hasFlow()) {
+            // Create flow if not exists
+            try {
+                $result = $this->flowService->createReservationFlowWithConfig(Auth::id(), $config);
+                $config->update([
+                    'flow_id' => $result['id'],
+                    'flow_status' => ReservationFlowConfig::STATUS_DRAFT,
+                ]);
+                $config->refresh();
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Gagal membuat flow: ' . $e->getMessage(),
+                ], 500);
+            }
         }
 
         try {
+            // Send flow (works for both DRAFT and PUBLISHED)
+            // Note: DRAFT flows will show a warning banner on the user's device
             $result = $this->flowService->sendReservationFlowWithConfig(
                 Auth::id(),
                 $request->phone,
                 $config
             );
 
+            $statusMessage = $config->isPublished() 
+                ? 'Flow reservasi berhasil dikirim' 
+                : 'Flow DRAFT berhasil dikirim (akan tampil dengan banner peringatan untuk testing)';
+
             return response()->json([
                 'success' => true,
-                'message' => 'Flow reservasi berhasil dikirim',
+                'message' => $statusMessage,
                 'data' => $result,
+                'is_draft' => !$config->isPublished(),
             ]);
 
         } catch (\Exception $e) {
