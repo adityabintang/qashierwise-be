@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Helpers\ToonFormatter;
 use App\Models\AiAgent;
 use App\Models\AiAgentConversation;
 use App\Models\Order;
@@ -14,6 +13,7 @@ use App\Models\WhatsAppContact;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Netflie\WhatsAppCloudApi\WhatsAppCloudApi;
+use Sbsaga\Toon\Facades\Toon;
 
 class AiAgentService
 {
@@ -160,8 +160,11 @@ class AiAgentService
                 }
             }
 
-            // Build system prompt
-            $systemPrompt = $aiAgent->buildSystemPrompt($account->user_id);
+            // Detect user intent for optimization
+            $userIntent = \App\Enums\UserIntent::detect($messageText);
+
+            // Build system prompt with intent-based optimization
+            $systemPrompt = $aiAgent->buildSystemPrompt($account->user_id, $messageText);
 
             // Get conversation context (summary + recent messages OR full messages)
             $messages = $this->conversationSummarizer->getContextForLLM($conversation);
@@ -173,10 +176,15 @@ class AiAgentService
                 'using_summary' => $hasSummary,
                 'context_message_count' => count($messages),
                 'total_message_count' => count($conversation->messages ?? []),
+                'user_intent' => $userIntent->value,
             ]);
 
-            // Call LLM with tools
-            $tools = $this->getToolDefinitionsForAgent($aiAgent);
+            // Conditional tool loading based on intent (saves ~500-800 tokens for simple messages)
+            $tools = null;
+            if ($this->intentNeedsTools($userIntent)) {
+                $tools = $this->getToolDefinitionsForAgent($aiAgent);
+            }
+
             $response = $this->callLLM($systemPrompt, $messages, $tools, $aiAgent);
 
             // Handle tool calls if present
@@ -448,6 +456,8 @@ class AiAgentService
 
     /**
      * Get tool definitions for LLM function calling.
+     * MINIMAL: Only 4 essential tools (~150 tokens)
+     * Removed: search_products, search_multiple_products (merged into get_all_products)
      */
     protected function getToolDefinitions(): array
     {
@@ -456,65 +466,13 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'get_all_products',
-                    'description' => 'Get top 10 popular products. For specific items, use search_products.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [],
-                        'required' => [],
-                    ],
-                ],
-            ],
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'search_products',
-                    'description' => 'Search ONE product by name. For multiple products use search_multiple_products.',
+                    'description' => 'Menu list',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
-                            'query' => [
-                                'type' => 'string',
-                                'description' => 'Short keyword for ONE product',
-                            ],
+                            'page' => ['type' => 'integer'],
+                            'search' => ['type' => 'string'],
                         ],
-                        'required' => ['query'],
-                    ],
-                ],
-            ],
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'search_multiple_products',
-                    'description' => 'Search multiple products at once. Required when user orders 2+ items.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'queries' => [
-                                'type' => 'array',
-                                'description' => 'Array of keywords, one per product',
-                                'items' => [
-                                    'type' => 'string',
-                                ],
-                            ],
-                        ],
-                        'required' => ['queries'],
-                    ],
-                ],
-            ],
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'get_product_details',
-                    'description' => 'Get product details by ID',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'product_id' => [
-                                'type' => 'integer',
-                                'description' => 'Product ID',
-                            ],
-                        ],
-                        'required' => ['product_id'],
                     ],
                 ],
             ],
@@ -522,22 +480,17 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'add_to_cart',
-                    'description' => 'Add products to cart. Get product_id from search first.',
+                    'description' => 'Order items',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
                             'products' => [
                                 'type' => 'array',
-                                'description' => 'Products with id and qty',
                                 'items' => [
                                     'type' => 'object',
                                     'properties' => [
-                                        'product_id' => [
-                                            'type' => 'integer',
-                                        ],
-                                        'quantity' => [
-                                            'type' => 'integer',
-                                        ],
+                                        'product_id' => ['type' => 'integer'],
+                                        'quantity' => ['type' => 'integer'],
                                     ],
                                     'required' => ['product_id', 'quantity'],
                                 ],
@@ -551,25 +504,36 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'get_cart_summary',
-                    'description' => 'Get current cart summary',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [],
-                    ],
+                    'description' => 'Cart',
+                    'parameters' => ['type' => 'object', 'properties' => []],
                 ],
             ],
             [
                 'type' => 'function',
                 'function' => [
                     'name' => 'confirm_order',
-                    'description' => 'Confirm and create order from cart',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [],
-                    ],
+                    'description' => 'Checkout',
+                    'parameters' => ['type' => 'object', 'properties' => []],
                 ],
             ],
         ];
+    }
+
+    /**
+     * Check if user intent requires tools to be loaded.
+     * Greeting, off-topic, and business info intents don't need tools.
+     * This saves ~500-800 tokens per request for simple messages.
+     */
+    protected function intentNeedsTools(\App\Enums\UserIntent $intent): bool
+    {
+        // These intents don't need product/order tools
+        $noToolIntents = [
+            \App\Enums\UserIntent::GREETING,
+            \App\Enums\UserIntent::OFF_TOPIC,
+            \App\Enums\UserIntent::BUSINESS_INFO,
+        ];
+
+        return ! in_array($intent, $noToolIntents);
     }
 
     /**
@@ -592,7 +556,7 @@ class AiAgentService
     }
 
     /**
-     * Get QRIS-specific tool definitions.
+     * Get QRIS-specific tool definitions (optimized).
      */
     protected function getQrisToolDefinitions(): array
     {
@@ -601,18 +565,12 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'generate_qris',
-                    'description' => 'Generate QRIS payment code after order confirmed',
+                    'description' => 'QRIS payment',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
-                            'amount' => [
-                                'type' => 'number',
-                                'description' => 'Amount in Rupiah',
-                            ],
-                            'description' => [
-                                'type' => 'string',
-                                'description' => 'Payment description (optional)',
-                            ],
+                            'amount' => ['type' => 'number'],
+                            'description' => ['type' => 'string'],
                         ],
                         'required' => ['amount'],
                     ],
@@ -622,11 +580,8 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'check_payment_status',
-                    'description' => 'Check last QRIS payment status',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [],
-                    ],
+                    'description' => 'Check payment',
+                    'parameters' => ['type' => 'object', 'properties' => []],
                 ],
             ],
         ];
@@ -676,7 +631,8 @@ class AiAgentService
             $result = $this->executeToolCall($functionName, $arguments, $account->user_id, $conversation, $aiAgent);
 
             // Track what type of calls we have
-            if (in_array($functionName, ['search_products', 'search_multiple_products'])) {
+            // get_all_products is also a "search" type call that needs LLM to format for user
+            if (in_array($functionName, ['search_products', 'search_multiple_products', 'get_all_products'])) {
                 $hasSearchCall = true;
             }
             if (in_array($functionName, ['add_to_cart', 'confirm_order', 'get_cart_summary', 'generate_qris', 'check_payment_status'])) {
@@ -725,8 +681,10 @@ class AiAgentService
 
             Log::info('Search completed, calling LLM again to process results and add to cart');
 
-            // Build messages with tool results for LLM to continue
-            $messages = $conversation->messages ?? [];
+            // OPTIMIZED: Only use last 2 messages + tool results to minimize tokens
+            // This keeps follow-up calls under 1000 tokens
+            $recentMessages = array_slice($conversation->messages ?? [], -2);
+            $messages = $recentMessages;
 
             // Add assistant message with tool calls
             $messages[] = [
@@ -735,12 +693,17 @@ class AiAgentService
                 'tool_calls' => $toolCalls,
             ];
 
-            // Add tool results
+            // Add tool results (COMPACT: truncate large results)
             foreach ($toolResults as $tr) {
+                $resultContent = $tr['result'];
+                // Truncate very large tool results to save tokens
+                if (strlen($resultContent) > 1500) {
+                    $resultContent = substr($resultContent, 0, 1500)."\n[TRUNCATED]";
+                }
                 $messages[] = [
                     'role' => 'tool',
                     'tool_call_id' => $tr['tool_call_id'],
-                    'content' => $tr['result'],
+                    'content' => $resultContent,
                 ];
             }
 
@@ -793,8 +756,8 @@ class AiAgentService
         // For final actions or if follow-up failed, send results to user
         $userFacingResults = [];
         foreach ($toolResults as $tr) {
-            // Don't show raw search results to user - they're internal
-            if (! in_array($tr['function_name'], ['search_products', 'search_multiple_products'])) {
+            // Don't show raw search/menu results to user - they're internal and need LLM formatting
+            if (! in_array($tr['function_name'], ['search_products', 'search_multiple_products', 'get_all_products'])) {
                 $userFacingResults[] = $tr['result'];
             }
         }
@@ -1121,7 +1084,10 @@ class AiAgentService
             // Validate parameters based on function requirements
             switch ($functionName) {
                 case 'get_all_products':
-                    return $this->getAllProducts($userId, $useToon);
+                    $page = isset($arguments['page']) ? (int) $arguments['page'] : 1;
+                    $search = $arguments['search'] ?? null;
+
+                    return $this->getAllProducts($userId, $useToon, $page, $search);
 
                 case 'search_products':
                     if (! isset($arguments['query'])) {
@@ -1229,6 +1195,7 @@ class AiAgentService
 
         $products = Product::where('user_id', $userId)
             ->where('is_active', true)
+            ->with('category:id,name')
             ->where(function ($q) use ($cleanQuery, $keywords) {
                 // Case-insensitive search using LOWER()
                 $q->whereRaw('LOWER(name) LIKE ?', ["%{$cleanQuery}%"])
@@ -1241,35 +1208,45 @@ class AiAgentService
                     }
                 }
             })
+            ->orderBy('category_id', 'asc')
+            ->orderBy('name', 'asc')
             ->limit(10)
-            ->get(['id', 'name', 'price', 'stock_quantity', 'description']);
+            ->get(['id', 'name', 'price', 'stock_quantity', 'description', 'category_id']);
 
         if ($products->isEmpty()) {
             // CRITICAL: Return clear message that product was NOT FOUND
             return "NOT_FOUND\nquery:{$query}\naction:katakan tidak tersedia, jangan sebutkan produk ini";
         }
 
-        // Use TOON format if enabled (saves ~40% tokens)
+        // Group by category for better display
+        $groupedProducts = $products->groupBy(function ($product) {
+            return $product->category?->name ?? 'Lainnya';
+        });
+
+        // Use TOON format if enabled (saves ~67% tokens with sbsaga/toon)
         if ($useToon) {
-            $productArray = $products->map(fn ($p) => [
-                'id' => $p->id,
-                'name' => $p->name,
-                'price' => $p->price,
-                'stock' => $p->stock_quantity,
-            ])->toArray();
+            $categorizedArray = [];
+            foreach ($groupedProducts as $categoryName => $categoryProducts) {
+                $categorizedArray[$categoryName] = $categoryProducts->map(fn ($p) => [
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'price' => $p->price,
+                    'stock' => $p->stock_quantity,
+                ])->toArray();
+            }
 
-            return "FOUND\n".ToonFormatter::encodeProducts($productArray)."\naction:panggil add_to_cart dengan ID di atas";
+            return "FOUND\n".Toon::convert(['results' => $categorizedArray])."\naction:panggil add_to_cart dengan ID di atas";
         }
 
-        // Legacy text format
-        $response = "HASIL PENCARIAN PRODUK:\n\n";
-        foreach ($products as $product) {
-            $response .= "- {$product->name} [ID:{$product->id}] - Rp ".number_format($product->price, 0, ',', '.')." - Stok: {$product->stock_quantity}\n";
+        // ULTRA-COMPACT format to minimize tokens
+        $items = [];
+        foreach ($groupedProducts as $categoryProducts) {
+            foreach ($categoryProducts as $product) {
+                $items[] = "{$product->name}[{$product->id}]Rp".number_format($product->price, 0, ',', '.');
+            }
         }
 
-        $response .= "\n**INSTRUKSI WAJIB**: Sekarang LANGSUNG panggil add_to_cart dengan ID di atas. JANGAN search lagi! JANGAN tampilkan daftar produk ke user lagi!";
-
-        return $response;
+        return "FOUND:{$query}|".implode('|', $items).'|ACT:add_to_cart(id,qty)';
     }
 
     /**
@@ -1295,6 +1272,7 @@ class AiAgentService
 
             $products = Product::where('user_id', $userId)
                 ->where('is_active', true)
+                ->with('category:id,name')
                 ->where(function ($q) use ($cleanQuery, $keywords) {
                     $q->whereRaw('LOWER(name) LIKE ?', ["%{$cleanQuery}%"])
                         ->orWhereRaw('LOWER(sku) LIKE ?', ["%{$cleanQuery}%"]);
@@ -1306,7 +1284,7 @@ class AiAgentService
                     }
                 })
                 ->limit(5)
-                ->get(['id', 'name', 'price', 'stock_quantity']);
+                ->get(['id', 'name', 'price', 'stock_quantity', 'category_id']);
 
             if ($products->isEmpty()) {
                 $notFound[] = $query;
@@ -1319,6 +1297,7 @@ class AiAgentService
                             'name' => $product->name,
                             'price' => $product->price,
                             'stock' => $product->stock_quantity,
+                            'category' => $product->category?->name ?? 'Lainnya',
                         ];
                     }
                 }
@@ -1330,11 +1309,23 @@ class AiAgentService
             return "NOT_FOUND\nqueries:".implode(',', $notFound)."\naction:katakan tidak tersedia";
         }
 
-        // Use TOON format if enabled (saves ~40% tokens)
+        // Group results by category
+        $groupedResults = collect($allResults)->groupBy('category');
+
+        // Use TOON format if enabled (saves ~67% tokens with sbsaga/toon)
         if ($useToon) {
             $response = '';
             if (! empty($allResults)) {
-                $response .= "FOUND\n".ToonFormatter::encodeProducts(array_values($allResults));
+                $categorizedArray = [];
+                foreach ($groupedResults as $categoryName => $categoryProducts) {
+                    $categorizedArray[$categoryName] = $categoryProducts->map(fn ($p) => [
+                        'id' => $p['id'],
+                        'name' => $p['name'],
+                        'price' => $p['price'],
+                        'stock' => $p['stock'],
+                    ])->toArray();
+                }
+                $response .= "FOUND\n".Toon::convert(['results' => $categorizedArray]);
             }
             if (! empty($notFound)) {
                 $response .= "\nNOT_FOUND[".count($notFound).']: '.implode(',', $notFound);
@@ -1344,64 +1335,104 @@ class AiAgentService
             return $response;
         }
 
-        // Legacy text format
-        $response = "HASIL PENCARIAN PRODUK:\n\n";
-
-        if (! empty($allResults)) {
-            $response .= "✅ PRODUK DITEMUKAN:\n";
-            foreach ($allResults as $product) {
-                $response .= "- {$product['name']} [ID:{$product['id']}] - Rp ".number_format($product['price'], 0, ',', '.')." - Stok: {$product['stock']}\n";
+        // ULTRA-COMPACT format to minimize tokens
+        $items = [];
+        foreach ($groupedResults as $categoryProducts) {
+            foreach ($categoryProducts as $product) {
+                $items[] = "{$product['name']}[{$product['id']}]Rp".number_format($product['price'], 0, ',', '.');
             }
         }
 
+        $response = 'FOUND:'.implode('|', $items);
         if (! empty($notFound)) {
-            $response .= "\n❌ PRODUK TIDAK DITEMUKAN:\n";
-            $response .= '- '.implode("\n- ", $notFound)."\n";
-            $response .= "\n**INSTRUKSI UNTUK AI**: Untuk produk yang tidak ditemukan, katakan ke user: \"Mohon maaf, untuk menu [nama] tidak tersedia di restoran kami.\"\n";
+            $response .= '|NOTFOUND:'.implode(',', $notFound);
         }
-
-        if (! empty($allResults)) {
-            $response .= "\n**INSTRUKSI WAJIB**: Sekarang LANGSUNG panggil add_to_cart dengan SEMUA ID yang DITEMUKAN di atas dalam SATU array. JANGAN tambahkan produk yang tidak ditemukan! JANGAN search lagi!";
-        }
+        $response .= '|ACT:add_to_cart(id,qty)';
 
         return $response;
     }
 
     /**
-     * Get all active products.
+     * Get all active products with pagination (20 per page), grouped by category.
      */
-    protected function getAllProducts(int $userId, bool $useToon = false): string
+    protected function getAllProducts(int $userId, bool $useToon = false, int $page = 1, ?string $search = null): string
     {
-        $products = Product::where('user_id', $userId)
-            ->where('is_active', true)
+        $perPage = 20;
+        $offset = ($page - 1) * $perPage;
+
+        // Build base query
+        $query = Product::where('user_id', $userId)->where('is_active', true);
+
+        // Add search filter if provided
+        if ($search) {
+            $cleanSearch = trim(strtolower($search));
+            $query->where(function ($q) use ($cleanSearch) {
+                $q->whereRaw('LOWER(name) LIKE ?', ["%{$cleanSearch}%"]);
+            });
+        }
+
+        // Get total count for pagination info
+        $totalProducts = $query->count();
+        $totalPages = max(1, ceil($totalProducts / $perPage));
+
+        // Get products with category relation
+        $products = $query->with('category:id,name')
+            ->orderBy('category_id', 'asc')
             ->orderBy('name', 'asc')
-            ->limit(10)
-            ->get(['id', 'name', 'price', 'stock_quantity']);
+            ->offset($offset)
+            ->limit($perPage)
+            ->get(['id', 'name', 'price', 'stock_quantity', 'category_id']);
 
         if ($products->isEmpty()) {
+            if ($page > 1) {
+                return "EMPTY\npage:{$page}\naction:katakan tidak ada produk lagi di halaman ini";
+            }
+
             return "EMPTY\naction:katakan belum ada menu tersedia";
         }
 
-        // Use TOON format if enabled (saves ~40% tokens)
+        // Group products by category
+        $groupedProducts = $products->groupBy(function ($product) {
+            return $product->category?->name ?? 'Lainnya';
+        });
+
+        // Use TOON format if enabled (saves ~67% tokens with sbsaga/toon)
         if ($useToon) {
-            $productArray = $products->map(fn ($p) => [
-                'id' => $p->id,
-                'name' => $p->name,
-                'price' => $p->price,
-                'stock' => $p->stock_quantity,
-            ])->toArray();
+            $categorizedArray = [];
+            foreach ($groupedProducts as $categoryName => $categoryProducts) {
+                $categorizedArray[$categoryName] = $categoryProducts->map(fn ($p) => [
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'price' => $p->price,
+                    'stock' => $p->stock_quantity,
+                ])->toArray();
+            }
 
-            return "MENU(10)\n".ToonFormatter::encodeProducts($productArray)."\nHide ID|Cari lain:search_products";
+            $paginationInfo = "page:{$page}/{$totalPages}|total:{$totalProducts}";
+            if ($page < $totalPages) {
+                $paginationInfo .= '|next:get_all_products(page='.($page + 1).')';
+            }
+
+            return "DATA_MENU\n".Toon::convert(['menu' => $categorizedArray])."\n{$paginationInfo}\nINSTRUKSI: Tampilkan menu per kategori ke user (nama - harga). JANGAN tampilkan ID/TOON ke user. Jika ada halaman berikutnya dan user minta menu lainnya, panggil get_all_products(page=X).";
         }
 
-        // Compact format to reduce tokens
+        // ULTRA-COMPACT format to minimize tokens
         $lines = [];
-        foreach ($products as $product) {
-            $price = number_format($product->price, 0, ',', '.');
-            $lines[] = "[{$product->id}]{$product->name}|Rp{$price}|Stok:{$product->stock_quantity}";
+        $lines[] = "MENU p{$page}/{$totalPages}({$totalProducts})";
+
+        foreach ($groupedProducts as $categoryName => $categoryProducts) {
+            $items = [];
+            foreach ($categoryProducts as $product) {
+                $price = number_format($product->price, 0, ',', '.');
+                $items[] = "{$product->name}[{$product->id}]Rp{$price}";
+            }
+            $lines[] = "{$categoryName}:".implode('|', $items);
         }
 
-        return "MENU(10):\n".implode("\n", $lines)."\n\nTampilkan TANPA ID|Cari lain:search_products|Pesan:add_to_cart(id)";
+        // Minimal instruction
+        $lines[] = 'ACT:show nama-harga per kategori,HIDE ID,order→add_to_cart(id,qty)';
+
+        return implode("\n", $lines);
     }
 
     /**

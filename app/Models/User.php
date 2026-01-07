@@ -99,6 +99,38 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the WhatsApp accounts associated with the user.
+     */
+    public function whatsappAccounts(): HasMany
+    {
+        return $this->hasMany(WhatsAppAccount::class);
+    }
+
+    /**
+     * Get the active WhatsApp account for the user.
+     */
+    public function activeWhatsAppAccount(): HasOne
+    {
+        return $this->hasOne(WhatsAppAccount::class)->where('is_active', true);
+    }
+
+    /**
+     * Get the WhatsApp contacts associated with the user.
+     */
+    public function whatsappContacts(): HasMany
+    {
+        return $this->hasMany(WhatsAppContact::class);
+    }
+
+    /**
+     * Get the WhatsApp messages associated with the user.
+     */
+    public function whatsappMessages(): HasMany
+    {
+        return $this->hasMany(WhatsAppMessage::class);
+    }
+
+    /**
      * Get the credential access logs for the user.
      */
     public function credentialAccessLogs(): HasMany

@@ -7,7 +7,6 @@ use App\Models\User;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
 use App\Models\WhatsAppMessage;
-use App\Services\MediaStorageService;
 use App\Services\WhatsAppAccountService;
 use Eris\Generators;
 use Eris\TestTrait;
@@ -17,13 +16,13 @@ use Tests\TestCase;
 
 /**
  * Property-based tests for WhatsAppWebhookController multi-tenant routing
- * 
+ *
  * Feature: whatsapp-embedded-signup
  */
 class WhatsAppWebhookControllerPropertyTest extends TestCase
 {
-    use TestTrait;
     use RefreshDatabase;
+    use TestTrait;
 
     /**
      * Generate a valid phone number ID (numeric string).
@@ -51,6 +50,7 @@ class WhatsAppWebhookControllerPropertyTest extends TestCase
         for ($i = 0; $i < 100; $i++) {
             $token .= $chars[rand(0, strlen($chars) - 1)];
         }
+
         return $token;
     }
 
@@ -59,7 +59,7 @@ class WhatsAppWebhookControllerPropertyTest extends TestCase
      */
     private function generateWaId(): string
     {
-        return '62' . rand(8000000000, 8999999999);
+        return '62'.rand(8000000000, 8999999999);
     }
 
     /**
@@ -67,15 +67,14 @@ class WhatsAppWebhookControllerPropertyTest extends TestCase
      */
     private function generateMessageId(): string
     {
-        return 'wamid.' . bin2hex(random_bytes(16));
+        return 'wamid.'.bin2hex(random_bytes(16));
     }
-
 
     /**
      * Feature: whatsapp-embedded-signup, Property 9: Webhook Routing Correctness
      * Validates: Requirements 5.1
-     * 
-     * For any incoming webhook payload containing a phone_number_id, the system 
+     *
+     * For any incoming webhook payload containing a phone_number_id, the system
      * SHALL correctly identify the user whose WhatsAppAccount has that phone_number_id.
      */
     #[Test]
@@ -87,7 +86,7 @@ class WhatsAppWebhookControllerPropertyTest extends TestCase
                 Generators::choose(2, 5) // Number of users to create
             )
             ->then(function (int $userCount) {
-                $service = new WhatsAppAccountService();
+                $service = new WhatsAppAccountService;
                 $users = [];
                 $accounts = [];
 
@@ -120,7 +119,7 @@ class WhatsAppWebhookControllerPropertyTest extends TestCase
 
                     $this->assertNotNull(
                         $foundAccount,
-                        'Account should be found for phone_number_id: ' . $data['phone_number_id']
+                        'Account should be found for phone_number_id: '.$data['phone_number_id']
                     );
 
                     $this->assertEquals(
@@ -149,8 +148,8 @@ class WhatsAppWebhookControllerPropertyTest extends TestCase
     /**
      * Feature: whatsapp-embedded-signup, Property 10: Unknown Phone Number Handling
      * Validates: Requirements 5.2
-     * 
-     * For any webhook payload with a phone_number_id that does not match any stored 
+     *
+     * For any webhook payload with a phone_number_id that does not match any stored
      * WhatsAppAccount, the system SHALL skip processing and not create any message records.
      */
     #[Test]
@@ -162,7 +161,7 @@ class WhatsAppWebhookControllerPropertyTest extends TestCase
                 Generators::choose(1, 5) // Number of unknown phone numbers to test
             )
             ->then(function (int $testCount) {
-                $service = new WhatsAppAccountService();
+                $service = new WhatsAppAccountService;
 
                 // Create a user with a known phone_number_id
                 $user = User::factory()->create();
@@ -183,7 +182,7 @@ class WhatsAppWebhookControllerPropertyTest extends TestCase
                 // Test with unknown phone_number_ids
                 for ($i = 0; $i < $testCount; $i++) {
                     $unknownPhoneNumberId = $this->generatePhoneNumberId();
-                    
+
                     // Ensure it's different from the known one
                     while ($unknownPhoneNumberId === $knownPhoneNumberId) {
                         $unknownPhoneNumberId = $this->generatePhoneNumberId();
@@ -194,7 +193,7 @@ class WhatsAppWebhookControllerPropertyTest extends TestCase
 
                     $this->assertNull(
                         $foundAccount,
-                        'No account should be found for unknown phone_number_id: ' . $unknownPhoneNumberId
+                        'No account should be found for unknown phone_number_id: '.$unknownPhoneNumberId
                     );
                 }
 
@@ -212,12 +211,11 @@ class WhatsAppWebhookControllerPropertyTest extends TestCase
             });
     }
 
-
     /**
      * Feature: whatsapp-embedded-signup, Property 11: Message Isolation
      * Validates: Requirements 5.4
-     * 
-     * For any two distinct users with connected WhatsApp accounts, messages belonging 
+     *
+     * For any two distinct users with connected WhatsApp accounts, messages belonging
      * to user A SHALL never be visible to user B when querying messages.
      */
     #[Test]
@@ -249,23 +247,25 @@ class WhatsAppWebhookControllerPropertyTest extends TestCase
                         'connection_method' => 'embedded_signup',
                     ]);
 
-                    // Create a contact for this user
-                    $contact = WhatsAppContact::create([
+                    // Create a contact for this user (include phone_number_id for RLS)
+                    $contact = WhatsAppContact::withoutGlobalScopes()->create([
                         'user_id' => $user->id,
+                        'phone_number_id' => $phoneNumberId,
                         'wa_id' => $this->generateWaId(),
-                        'name' => 'Test Contact ' . $i,
+                        'name' => 'Test Contact '.$i,
                     ]);
 
-                    // Create messages for this user
+                    // Create messages for this user (include phone_number_id for RLS)
                     $userMessages = [];
                     for ($j = 0; $j < $messagesPerUser; $j++) {
-                        $message = WhatsAppMessage::create([
+                        $message = WhatsAppMessage::withoutGlobalScopes()->create([
                             'user_id' => $user->id,
+                            'phone_number_id' => $phoneNumberId,
                             'contact_id' => $contact->id,
                             'message_id' => $this->generateMessageId(),
                             'direction' => 'incoming',
                             'type' => 'text',
-                            'content' => 'Test message ' . $j . ' for user ' . $i,
+                            'content' => 'Test message '.$j.' for user '.$i,
                             'status' => 'delivered',
                         ]);
                         $userMessages[] = $message->id;
@@ -279,9 +279,12 @@ class WhatsAppWebhookControllerPropertyTest extends TestCase
                 // Property: Each user should only see their own messages
                 foreach ($users as $user) {
                     $userMessageIds = $messagesByUser[$user->id];
-                    
-                    // Query messages for this user
-                    $queriedMessages = WhatsAppMessage::where('user_id', $user->id)->get();
+
+                    // Authenticate as this user to test RLS
+                    $this->actingAs($user);
+
+                    // Query messages for this user (global scope will filter by authenticated user)
+                    $queriedMessages = WhatsAppMessage::query()->get();
 
                     // All queried messages should belong to this user
                     foreach ($queriedMessages as $message) {
@@ -319,9 +322,9 @@ class WhatsAppWebhookControllerPropertyTest extends TestCase
                     }
                 }
 
-                // Clean up - delete in reverse order due to foreign keys
-                WhatsAppMessage::whereIn('user_id', collect($users)->pluck('id'))->delete();
-                WhatsAppContact::whereIn('user_id', collect($users)->pluck('id'))->delete();
+                // Clean up - delete in reverse order due to foreign keys (bypass global scopes)
+                WhatsAppMessage::withoutGlobalScopes()->whereIn('user_id', collect($users)->pluck('id'))->delete();
+                WhatsAppContact::withoutGlobalScopes()->whereIn('user_id', collect($users)->pluck('id'))->delete();
                 foreach ($accounts as $account) {
                     $account->delete();
                 }
@@ -334,7 +337,7 @@ class WhatsAppWebhookControllerPropertyTest extends TestCase
     /**
      * Feature: whatsapp-embedded-signup, Property 9: Webhook Routing Correctness
      * Validates: Requirements 5.1
-     * 
+     *
      * Test that inactive accounts are not returned for webhook routing.
      */
     #[Test]
@@ -346,7 +349,7 @@ class WhatsAppWebhookControllerPropertyTest extends TestCase
                 Generators::choose(1, 5) // Number of inactive accounts to test
             )
             ->then(function (int $accountCount) {
-                $service = new WhatsAppAccountService();
+                $service = new WhatsAppAccountService;
                 $users = [];
                 $accounts = [];
 

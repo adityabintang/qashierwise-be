@@ -171,11 +171,13 @@ class WhatsAppWebhookController extends Controller
         ]);
 
         // Get or create contact
+        // Note: Bypass global scope because webhooks are not authenticated
         $contactName = $value['contacts'][0]['profile']['name'] ?? $from;
 
-        $contact = WhatsAppContact::firstOrCreate(
+        $contact = WhatsAppContact::withoutGlobalScopes()->firstOrCreate(
             [
                 'user_id' => $userId,
+                'phone_number_id' => $whatsappAccount->phone_number_id,
                 'wa_id' => $from,
             ],
             [
@@ -320,10 +322,12 @@ class WhatsAppWebhookController extends Controller
         }
 
         // Save message to database (use updateOrCreate to prevent duplicate errors)
-        $whatsappMessage = WhatsAppMessage::updateOrCreate(
+        // Note: Bypass global scope because webhooks are not authenticated
+        $whatsappMessage = WhatsAppMessage::withoutGlobalScopes()->updateOrCreate(
             ['message_id' => $messageId],
             [
                 'user_id' => $userId,
+                'phone_number_id' => $whatsappAccount->phone_number_id,
                 'contact_id' => $contact->id,
                 'direction' => 'incoming',
                 'type' => $type,
@@ -382,15 +386,30 @@ class WhatsAppWebhookController extends Controller
         $statusValue = $status['status']; // sent, delivered, read, failed
         $timestamp = $status['timestamp'];
 
-        Log::info("Status update: $messageId -> $statusValue");
+        Log::info("Status update: $messageId -> $statusValue", [
+            'user_id' => $userId,
+            'status_data' => $status,
+        ]);
 
         // Find message in database
-        $message = WhatsAppMessage::where('message_id', $messageId)
+        // Note: Bypass global scope because webhooks are not authenticated
+        $message = WhatsAppMessage::withoutGlobalScopes()
+            ->where('message_id', $messageId)
             ->where('user_id', $userId)
             ->first();
 
         if (! $message) {
-            Log::warning('Message not found for status update', ['message_id' => $messageId]);
+            // Try to find without user_id filter for debugging
+            $messageWithoutFilter = WhatsAppMessage::withoutGlobalScopes()
+                ->where('message_id', $messageId)
+                ->first();
+
+            Log::warning('Message not found for status update', [
+                'message_id' => $messageId,
+                'user_id' => $userId,
+                'found_without_filter' => $messageWithoutFilter ? true : false,
+                'actual_user_id' => $messageWithoutFilter?->user_id,
+            ]);
 
             return;
         }
@@ -407,13 +426,33 @@ class WhatsAppWebhookController extends Controller
 
         $message->update($updateData);
 
-        // Broadcast status update to frontend
-        broadcast(new MessageStatusUpdated($message));
+        // Refresh message to get updated data
+        $message->refresh();
 
-        Log::info('Message status updated and broadcasted', [
-            'message_id' => $messageId,
-            'status' => $statusValue,
+        Log::info('Broadcasting MessageStatusUpdated', [
+            'message_id' => $message->id,
+            'wa_message_id' => $message->message_id,
+            'user_id' => $message->user_id,
+            'status' => $message->status,
         ]);
+
+        // Broadcast status update to frontend
+        try {
+            broadcast(new MessageStatusUpdated($message));
+
+            Log::info('Message status updated and broadcasted successfully', [
+                'message_id' => $messageId,
+                'status' => $statusValue,
+                'user_id' => $message->user_id,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to broadcast MessageStatusUpdated', [
+                'message_id' => $messageId,
+                'status' => $statusValue,
+                'user_id' => $message->user_id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         if ($statusValue === 'failed' && isset($status['errors'])) {
             Log::error('Message delivery failed', [

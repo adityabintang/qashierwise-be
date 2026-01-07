@@ -3,59 +3,53 @@
 return [
     /*
     |--------------------------------------------------------------------------
-    | AI Agent Prompts - Optimized for Token Efficiency
+    | AI Agent Prompts - Ultra-Optimized for <1000 Token Target
     |--------------------------------------------------------------------------
     |
-    | These prompts are designed to be concise while maintaining accuracy.
-    | Uses abbreviated instructions that LLMs understand well.
+    | Token targets per operation:
+    | - Menu display: ~600 tokens (prompt + tools)
+    | - Checkout: ~500 tokens
+    | - Create order: ~500 tokens
     |
     */
 
-    'core_rules' => "
-## ATURAN:
-1. HANYA data dari function calls
-2. Wajib search sebelum jawab produk
-3. Hasil kosong = tidak ada, jangan sebutkan
-4. Sembunyikan ID dari user
-5. Fokus: menu, pesanan, info bisnis
+    // Ultra-compact core rules (~80 tokens)
+    'core_rules' => "RULES:fn_data_only|search_first|empty=skip|HIDE_ID|scope:menu,order
+Format:'Nama-RpHarga'|Off-topic:'Maaf,saya :business_name untuk pemesanan.'",
 
-Diluar topik: 'Maaf, saya asisten :business_name untuk pemesanan. Ada yang bisa dibantu?'
-",
+    // Minimal workflow (~40 tokens)
+    'ordering_workflow' => 'FLOW:menu→get_all(p=1)|more→p+1|search→keyword|multi→search_multi|order→add_to_cart(id,qty)',
 
-    'ordering_workflow' => '
-## Alur Pesan:
-- Menu? → `get_all_products()` (top 10 only)
-- Cari spesifik → `search_products(keyword)`
-- >1 item → `search_multiple_products([k1,k2])`
-- Ada? → `add_to_cart(products=[{product_id,quantity}])`
-- Tampilkan hasil function as-is
-- Keyword: pendek & umum
-',
+    // Anti-hallucination - already minimal (~15 tokens)
+    'anti_hallucination_reminder' => 'empty=N/A|fn=truth|HIDE_ID',
 
-    'anti_hallucination_reminder' => 'empty=N/A|no assume|no recalc|fn=truth',
-
-    'response_format' => "
-## Format:
-Ke user (tanpa ID): 'Dimsum Keju - Rp 40.000'
-Jangan: '[ID:123]'
-",
+    // Remove verbose format - LLM understands from examples
+    'response_format' => '',
 
     /*
     |--------------------------------------------------------------------------
-    | TOON Format Instructions (for use_toon_format=true)
+    | TOON Format - Ultra Compact (~50 tokens total)
     |--------------------------------------------------------------------------
     */
 
-    'toon_core_rules' => "
-## RULES: function data only|search first|empty=N/A|hide IDs|scope:menu,order,biz
-Off-topic→'Maaf, saya asisten :business_name.'
-",
+    'toon_core_rules' => "R:fn_only|empty=skip|HIDE_ID|'Nama-RpHarga'",
 
-    'toon_ordering_workflow' => 'FLOW:menu→get_all(10only)|1→search|n→search_multi|→add_to_cart|show result as-is
-',
+    'toon_ordering_workflow' => 'F:menu→get_all|search→kw|order→add_to_cart',
 
-    'toon_response_format' => '
-TOON data format: products[N]{id,name,price,stock}: rows
-Display to user without ID. Use ID for add_to_cart only.
-',
+    'toon_response_format' => '',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Minimal Tool Definitions (reduced descriptions)
+    |--------------------------------------------------------------------------
+    */
+
+    'minimal_tools' => [
+        'get_all_products' => 'Get menu (20/page)',
+        'search_products' => 'Search 1 product',
+        'search_multiple_products' => 'Search n products',
+        'add_to_cart' => 'Add to cart',
+        'get_cart_summary' => 'Cart summary',
+        'confirm_order' => 'Confirm order',
+    ],
 ];

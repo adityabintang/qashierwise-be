@@ -367,11 +367,24 @@ class AiAgentController extends Controller
             // Add user message
             $conversation->addMessage('human', $request->message);
 
-            // Build system prompt
-            $systemPrompt = $aiAgent->buildSystemPrompt($userId);
+            // Detect user intent for optimization
+            $userIntent = \App\Enums\UserIntent::detect($request->message);
 
-            // Get tool definitions including QRIS if enabled
-            $tools = $this->getTestToolDefinitions($aiAgent);
+            // Build system prompt with intent-based optimization
+            $systemPrompt = $aiAgent->buildSystemPrompt($userId, $request->message);
+
+            // Conditional tool loading based on intent (saves ~500-800 tokens for simple messages)
+            $tools = null;
+            if ($this->intentNeedsTools($userIntent)) {
+                $tools = $this->getTestToolDefinitions($aiAgent);
+            }
+
+            // Log token optimization info
+            Log::info('Test endpoint using intent-based optimization', [
+                'user_intent' => $userIntent->value,
+                'tools_loaded' => $tools !== null,
+                'message' => substr($request->message, 0, 50),
+            ]);
 
             // Call LLM
             $response = $this->aiAgentService->callLLM(
@@ -424,7 +437,24 @@ class AiAgentController extends Controller
     }
 
     /**
+     * Check if user intent requires tools to be loaded.
+     * Greeting, off-topic, and business info intents don't need tools.
+     * This saves ~500-800 tokens per request for simple messages.
+     */
+    protected function intentNeedsTools(\App\Enums\UserIntent $intent): bool
+    {
+        $noToolIntents = [
+            \App\Enums\UserIntent::GREETING,
+            \App\Enums\UserIntent::OFF_TOPIC,
+            \App\Enums\UserIntent::BUSINESS_INFO,
+        ];
+
+        return ! in_array($intent, $noToolIntents);
+    }
+
+    /**
      * Get tool definitions for test endpoint.
+     * OPTIMIZED: Minimal tools (~150 tokens) to keep total under 1000
      */
     protected function getTestToolDefinitions(AiAgent $aiAgent): ?array
     {
@@ -437,11 +467,13 @@ class AiAgentController extends Controller
                 'type' => 'function',
                 'function' => [
                     'name' => 'get_all_products',
-                    'description' => 'Dapatkan semua produk/menu yang tersedia. HANYA gunakan ketika user bertanya "menunya apa?", "ada apa aja?", "daftar menu", atau pertanyaan serupa tentang DAFTAR menu. JANGAN gunakan saat user ingin MEMESAN produk.',
+                    'description' => 'Menu list',
                     'parameters' => [
                         'type' => 'object',
-                        'properties' => [],
-                        'required' => [],
+                        'properties' => [
+                            'page' => ['type' => 'integer'],
+                            'search' => ['type' => 'string'],
+                        ],
                     ],
                 ],
             ],
@@ -449,24 +481,17 @@ class AiAgentController extends Controller
                 'type' => 'function',
                 'function' => [
                     'name' => 'add_to_cart',
-                    'description' => 'GUNAKAN INI ketika user ingin MEMESAN/BELI/PESAN produk (contoh: "pesan nasi goreng 2", "beli dimsum 1", "mau teh jumbo 3"). Tambahkan produk ke keranjang berdasarkan NAMA produk yang disebutkan user. PENTING: HANYA gunakan nama produk yang BENAR-BENAR disebutkan user atau yang ada di daftar menu. JANGAN tambahkan produk yang tidak disebutkan user. Untuk multiple produk, masukkan semua dalam satu array.',
+                    'description' => 'Order items by name',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
                             'items' => [
                                 'type' => 'array',
-                                'description' => 'Array produk yang dipesan. Setiap item berisi nama produk PERSIS seperti yang disebutkan user dan jumlah.',
                                 'items' => [
                                     'type' => 'object',
                                     'properties' => [
-                                        'product_name' => [
-                                            'type' => 'string',
-                                            'description' => 'Nama produk PERSIS seperti yang disebutkan user (contoh: "nasi goreng", "dimsum", "teh jumbo"). Gunakan huruf kecil.',
-                                        ],
-                                        'quantity' => [
-                                            'type' => 'integer',
-                                            'description' => 'Jumlah yang dipesan',
-                                        ],
+                                        'product_name' => ['type' => 'string'],
+                                        'quantity' => ['type' => 'integer'],
                                     ],
                                     'required' => ['product_name', 'quantity'],
                                 ],
@@ -480,75 +505,31 @@ class AiAgentController extends Controller
                 'type' => 'function',
                 'function' => [
                     'name' => 'get_cart_summary',
-                    'description' => 'Lihat ringkasan keranjang belanja saat ini.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [],
-                        'required' => [],
-                    ],
-                ],
-            ],
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'clear_cart',
-                    'description' => 'Kosongkan/batalkan semua item di keranjang. Gunakan ketika user ingin cancel, batalkan pesanan, atau mulai dari awal.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [],
-                        'required' => [],
-                    ],
-                ],
-            ],
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'remove_from_cart',
-                    'description' => 'Hapus satu produk dari keranjang berdasarkan nama.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'product_name' => [
-                                'type' => 'string',
-                                'description' => 'Nama produk yang ingin dihapus dari keranjang',
-                            ],
-                        ],
-                        'required' => ['product_name'],
-                    ],
+                    'description' => 'Cart',
+                    'parameters' => ['type' => 'object', 'properties' => []],
                 ],
             ],
             [
                 'type' => 'function',
                 'function' => [
                     'name' => 'confirm_order',
-                    'description' => 'Konfirmasi dan buat pesanan dari keranjang belanja.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [],
-                        'required' => [],
-                    ],
+                    'description' => 'Checkout',
+                    'parameters' => ['type' => 'object', 'properties' => []],
                 ],
             ],
         ];
 
-        // Add QRIS tools if enabled
+        // Add QRIS tools if enabled (minimal)
         if ($aiAgent->isQrisEnabled()) {
             $tools[] = [
                 'type' => 'function',
                 'function' => [
                     'name' => 'generate_qris',
-                    'description' => 'Generate kode QRIS untuk pembayaran. Gunakan setelah pesanan dikonfirmasi.',
+                    'description' => 'QRIS payment',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
-                            'amount' => [
-                                'type' => 'number',
-                                'description' => 'Jumlah pembayaran dalam Rupiah',
-                            ],
-                            'description' => [
-                                'type' => 'string',
-                                'description' => 'Deskripsi pembayaran (opsional)',
-                            ],
+                            'amount' => ['type' => 'number'],
                         ],
                         'required' => ['amount'],
                     ],
@@ -559,11 +540,8 @@ class AiAgentController extends Controller
                 'type' => 'function',
                 'function' => [
                     'name' => 'check_payment_status',
-                    'description' => 'Cek status pembayaran QRIS terakhir',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [],
-                    ],
+                    'description' => 'Check payment',
+                    'parameters' => ['type' => 'object', 'properties' => []],
                 ],
             ];
         }
@@ -638,7 +616,9 @@ class AiAgentController extends Controller
                     return $this->searchMultipleProducts($userId, $arguments['queries']);
 
                 case 'get_all_products':
-                    return $this->getAllProducts($userId);
+                    $page = isset($arguments['page']) ? (int) $arguments['page'] : 1;
+
+                    return $this->getAllProducts($userId, $page);
 
                 case 'get_product_details':
                     if (! isset($arguments['product_id'])) {
@@ -980,28 +960,74 @@ class AiAgentController extends Controller
     }
 
     /**
-     * Get all active products.
+     * Get all active products with pagination (20 per page), grouped by category.
+     * Formatted directly for user display (no internal instructions).
      */
-    protected function getAllProducts(int $userId): string
+    protected function getAllProducts(int $userId, int $page = 1): string
     {
+        $perPage = 20;
+        $offset = ($page - 1) * $perPage;
+
+        // Get total count
+        $totalProducts = \App\Models\Product::where('user_id', $userId)
+            ->where('is_active', true)
+            ->count();
+
+        if ($totalProducts === 0) {
+            return 'Maaf, belum ada menu tersedia saat ini.';
+        }
+
+        $totalPages = ceil($totalProducts / $perPage);
+
+        // Get products with category
         $products = \App\Models\Product::where('user_id', $userId)
             ->where('is_active', true)
+            ->with('category:id,name')
+            ->orderBy('category_id', 'asc')
             ->orderBy('name', 'asc')
-            ->limit(10)
-            ->get(['id', 'name', 'price', 'stock_quantity']);
+            ->offset($offset)
+            ->limit($perPage)
+            ->get(['id', 'name', 'price', 'stock_quantity', 'category_id']);
 
         if ($products->isEmpty()) {
-            return 'Belum ada produk.';
+            if ($page > 1) {
+                return 'Tidak ada menu lagi di halaman ini.';
+            }
+
+            return 'Maaf, belum ada menu tersedia saat ini.';
         }
 
-        // Compact format to reduce tokens
+        // Group by category
+        $groupedProducts = $products->groupBy(function ($product) {
+            return $product->category?->name ?? 'Lainnya';
+        });
+
+        // Format directly for user (no internal instructions)
         $lines = [];
-        foreach ($products as $product) {
-            $price = number_format($product->price, 0, ',', '.');
-            $lines[] = "{$product->name}|Rp{$price}|Stok:{$product->stock_quantity}";
+        $lines[] = "📋 **DAFTAR MENU** (Halaman {$page}/{$totalPages})";
+        $lines[] = str_repeat('─', 30);
+
+        foreach ($groupedProducts as $categoryName => $categoryProducts) {
+            $lines[] = "\n🏷️ **{$categoryName}**";
+            foreach ($categoryProducts as $product) {
+                $price = number_format($product->price, 0, ',', '.');
+                $stock = $product->stock_quantity > 0 ? '' : ' _(Habis)_';
+                $lines[] = "  • {$product->name} - Rp {$price}{$stock}";
+            }
         }
 
-        return "MENU(10):\n".implode("\n", $lines)."\n\nPilih mana? Cari lain: search_products";
+        $lines[] = "\n".str_repeat('─', 30);
+
+        if ($page < $totalPages) {
+            $remaining = $totalProducts - ($page * $perPage);
+            $lines[] = "📄 Masih ada {$remaining} menu lagi. Ketik \"menu lainnya\" untuk lihat selanjutnya.";
+        } else {
+            $lines[] = "✅ Total: {$totalProducts} menu tersedia.";
+        }
+
+        $lines[] = "\n💬 Mau pesan apa? Contoh: \"pesan nasi goreng 2 porsi\"";
+
+        return implode("\n", $lines);
     }
 
     /**

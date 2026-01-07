@@ -3,10 +3,10 @@
 namespace App\Services;
 
 use App\Enums\UserIntent;
-use App\Helpers\ToonFormatter;
 use App\Models\AiAgent;
 use App\Models\Product;
 use Illuminate\Support\Facades\Cache;
+use Sbsaga\Toon\Facades\Toon;
 
 class AiAgentPromptBuilder
 {
@@ -25,10 +25,22 @@ class AiAgentPromptBuilder
 
     /**
      * Build optimized system prompt based on context
+     * Target: <1000 tokens for menu/checkout/order operations
      */
     public function build(): string
     {
-        // Check if caching is enabled
+        // For simple intents (greeting, off-topic), use minimal prompt to save tokens
+        if ($this->isSimpleIntent()) {
+            return $this->buildMinimalPrompt();
+        }
+
+        // ALWAYS use ultra-compact mode for ordering operations (including unknown/null intent)
+        // This is the key optimization to achieve <1000 tokens
+        if ($this->isOrderingIntent() || $this->intent === null || $this->intent === UserIntent::UNKNOWN) {
+            return $this->buildUltraCompactPrompt();
+        }
+
+        // Check if caching is enabled (fallback for other intents)
         if ($this->agent->enable_prompt_caching ?? false) {
             return $this->buildWithCaching();
         }
@@ -53,6 +65,91 @@ class AiAgentPromptBuilder
         }
 
         return implode("\n\n", array_filter($sections));
+    }
+
+    /**
+     * Check if this is an ordering-related intent
+     */
+    private function isOrderingIntent(): bool
+    {
+        if ($this->intent === null) {
+            return false;
+        }
+
+        return in_array($this->intent, [
+            UserIntent::VIEW_MENU,
+            UserIntent::SEARCH_PRODUCT,
+            UserIntent::ORDER,
+            UserIntent::VIEW_CART,
+            UserIntent::CHECKOUT,
+        ]);
+    }
+
+    /**
+     * Build ultra-compact prompt for ordering operations
+     * Target: ~200-300 tokens for system prompt only
+     */
+    private function buildUltraCompactPrompt(): string
+    {
+        $botName = $this->agent->bot_name;
+
+        // Ultra-compact system context (~50 tokens)
+        $prompt = "Asisten {$botName}. ";
+        $prompt .= config('ai_agent_prompts.core_rules');
+        $prompt .= "\n".config('ai_agent_prompts.ordering_workflow');
+
+        return str_replace(':business_name', $botName, $prompt);
+    }
+
+    /**
+     * Check if this is a simple intent that needs minimal prompt
+     */
+    private function isSimpleIntent(): bool
+    {
+        if ($this->intent === null) {
+            return false;
+        }
+
+        return in_array($this->intent, [
+            UserIntent::GREETING,
+            UserIntent::OFF_TOPIC,
+        ]);
+    }
+
+    /**
+     * Build minimal prompt for simple intents (greeting, off-topic)
+     * Saves ~800-1500 tokens compared to full prompt
+     */
+    private function buildMinimalPrompt(): string
+    {
+        $botName = $this->agent->bot_name;
+        $businessInfo = $this->agent->business_info;
+
+        // For greeting - friendly welcome with basic info
+        if ($this->intent === UserIntent::GREETING) {
+            $prompt = "Kamu adalah {$botName}, asisten virtual yang ramah.\n";
+            $prompt .= "Tugas: menyapa pelanggan dan membantu pemesanan.\n";
+
+            // Add minimal business info if available
+            if (! empty($businessInfo['operating_hours'])) {
+                $prompt .= "Jam buka: {$businessInfo['operating_hours']}\n";
+            }
+
+            $prompt .= "\nBahas singkat dan ramah. Tawarkan untuk lihat menu atau bantu pesan.";
+            $prompt .= "\nContoh: 'Halo! Selamat datang di {$botName}. Ada yang bisa saya bantu? Ketik \"menu\" untuk lihat daftar menu kami.'";
+
+            return $prompt;
+        }
+
+        // For off-topic - polite redirection
+        if ($this->intent === UserIntent::OFF_TOPIC) {
+            return "Kamu adalah {$botName}, asisten pemesanan.\n".
+                   "Jika ditanya di luar topik (bukan tentang menu/pesanan/bisnis), jawab:\n".
+                   "'Maaf, saya hanya bisa membantu untuk pemesanan di {$botName}. Ketik \"menu\" untuk lihat daftar menu kami.'";
+        }
+
+        // Fallback to custom system prompt only
+        return $this->agent->system_prompt;
     }
 
     /**
@@ -184,50 +281,70 @@ class AiAgentPromptBuilder
             return '';
         }
 
-        // Limit to 5 products in TOON mode for token efficiency
-        $limit = ($this->agent->use_toon_format ?? false) ? 5 : 10;
-        $cacheKey = "ai_agent_products_{$this->userId}_limit{$limit}";
+        // Limit products for token efficiency (5 for TOON, 5 for legacy)
+        $limit = 5;
+        $cacheKey = "ai_agent_products_{$this->userId}_limit{$limit}_v2";
 
         // Clear old cache format
         Cache::forget("ai_agent_products_{$this->userId}");
+        Cache::forget("ai_agent_products_{$this->userId}_limit{$limit}");
 
         $products = Cache::remember($cacheKey, 300, function () use ($limit) {
             return Product::where('user_id', $this->userId)
                 ->where('is_active', true)
+                ->with('category:id,name')
+                ->orderBy('category_id', 'asc')
                 ->orderBy('name', 'asc')
                 ->limit($limit)
-                ->get(['id', 'name', 'price', 'stock_quantity']);
+                ->get(['id', 'name', 'price', 'stock_quantity', 'category_id']);
         });
 
         if ($products->isEmpty()) {
             return '';
         }
 
-        // Use TOON format if enabled (saves ~35% tokens)
-        if ($this->agent->use_toon_format ?? false) {
-            $productArray = $products->map(fn ($p) => [
-                'id' => $p->id,
-                'name' => $p->name,
-                'price' => $p->price,
-                'stock' => $p->stock_quantity,
-            ])->toArray();
+        // Group by category
+        $groupedProducts = $products->groupBy(function ($product) {
+            return $product->category?->name ?? 'Lainnya';
+        });
 
-            $lines = ['## Produk:'];
-            $lines[] = ToonFormatter::encodeProducts($productArray);
-            $lines[] = 'Full: get_all_products() | Hide ID';
+        // Get total product count for info
+        $totalProducts = Product::where('user_id', $this->userId)
+            ->where('is_active', true)
+            ->count();
+
+        // Use TOON format if enabled (saves ~67% tokens with sbsaga/toon)
+        if ($this->agent->use_toon_format ?? false) {
+            $categorizedArray = [];
+            foreach ($groupedProducts as $categoryName => $categoryProducts) {
+                $categorizedArray[$categoryName] = $categoryProducts->map(fn ($p) => [
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'price' => $p->price,
+                    'stock' => $p->stock_quantity,
+                ])->toArray();
+            }
+
+            $lines = ['## Produk (Sample):'];
+            $lines[] = Toon::convert(['menu' => $categorizedArray]);
+            $lines[] = "Total: {$totalProducts} produk | Full: get_all_products(page=1) | 20/page | Hide ID";
 
             return implode("\n", $lines);
         }
 
-        // Legacy text format
-        $lines = ['## Sample Produk (10 teratas):'];
+        // Legacy text format - grouped by category
+        $lines = ["## Sample Produk ({$limit} dari {$totalProducts} produk):"];
 
-        foreach ($products as $product) {
-            $price = number_format($product->price, 0, ',', '.');
-            $lines[] = "- {$product->name} [ID:{$product->id}] Rp{$price} Stok:{$product->stock_quantity}";
+        foreach ($groupedProducts as $categoryName => $categoryProducts) {
+            $lines[] = "\n**{$categoryName}**";
+            foreach ($categoryProducts as $product) {
+                $price = number_format($product->price, 0, ',', '.');
+                $lines[] = "- {$product->name} [ID:{$product->id}] Rp{$price} Stok:{$product->stock_quantity}";
+            }
         }
 
-        $lines[] = "\n**PENTING**: Ini hanya sample. Untuk data lengkap: `get_all_products()`";
+        $lines[] = "\n**PENTING**: Ini hanya sample. Untuk menu lengkap: `get_all_products(page=1)` (20 produk per halaman, dikategorikan)";
+        $lines[] = "Jika user minta 'menu lainnya': `get_all_products(page=2)`, dst.";
         $lines[] = 'Jangan tampilkan [ID:X] ke user!';
 
         return implode("\n", $lines);
@@ -254,18 +371,52 @@ class AiAgentPromptBuilder
 
     private function shouldIncludeBusinessInfo(): bool
     {
-        return $this->intent === null || $this->intent->needsBusinessInfo();
+        // Only include for greeting, business_info, or unknown intents
+        if ($this->intent === null) {
+            return true;
+        }
+
+        return in_array($this->intent, [
+            UserIntent::GREETING,
+            UserIntent::BUSINESS_INFO,
+            UserIntent::UNKNOWN,
+        ]);
     }
 
     private function shouldIncludeProductSamples(): bool
     {
-        return $this->intent === null || $this->intent->needsProductList();
+        // Only include for menu viewing, searching, or ordering
+        if ($this->intent === null) {
+            return true;
+        }
+
+        return in_array($this->intent, [
+            UserIntent::VIEW_MENU,
+            UserIntent::SEARCH_PRODUCT,
+            UserIntent::ORDER,
+            UserIntent::UNKNOWN,
+        ]);
     }
 
     private function shouldIncludeOrderingWorkflow(): bool
     {
-        return $this->agent->isOrderEnabled() &&
-               ($this->intent === null || $this->intent->needsOrderWorkflow());
+        if (! $this->agent->isOrderEnabled()) {
+            return false;
+        }
+
+        // Only include for ordering-related intents
+        if ($this->intent === null) {
+            return true;
+        }
+
+        return in_array($this->intent, [
+            UserIntent::VIEW_MENU,
+            UserIntent::SEARCH_PRODUCT,
+            UserIntent::ORDER,
+            UserIntent::VIEW_CART,
+            UserIntent::CHECKOUT,
+            UserIntent::UNKNOWN,
+        ]);
     }
 
     /**

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 return [
     'required' => 'The :attribute field is required.',
@@ -9,6 +9,7 @@ return [
     'unique' => 'The :attribute has already been taken.',
     'regex' => 'The :attribute format is invalid.',
     'date' => 'The :attribute is not a valid date.',
+    'date_format' => 'The :attribute does not match the format :format.',
     'numeric' => 'The :attribute must be a number.',
     'integer' => 'The :attribute must be an integer.',
     'string' => 'The :attribute must be a string.',
@@ -26,4 +27,46 @@ return [
     'image' => 'The :attribute must be an image.',
     'before' => 'The :attribute must be a date before :date.',
     'after' => 'The :attribute must be a date after :date.',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Custom Validation Messages
+    |--------------------------------------------------------------------------
+    */
+    'custom' => [
+        'opening_time' => [
+            'date_format' => 'The opening time must be in HH:MM:SS format.',
+        ],
+        'closing_time' => [
+            'date_format' => 'The closing time must be in HH:MM:SS format.',
+        ],
+        'blocked_times' => [
+            'array' => 'The blocked times must be an array.',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Custom Validation Attributes
+    |--------------------------------------------------------------------------
+    */
+    'attributes' => [
+        'opening_time' => 'opening time',
+        'closing_time' => 'closing time',
+        'blocked_times' => 'blocked times',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Custom Validation Values
+    |--------------------------------------------------------------------------
+    */
+    'values' => [],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Validation Language Lines (Laravel defaults)
+    |--------------------------------------------------------------------------
+    */
+    '(and :count more errors)' => '(and :count more errors)',
 ];

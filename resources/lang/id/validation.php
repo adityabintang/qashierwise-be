@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 return [
     'required' => 'Kolom :attribute wajib diisi.',
@@ -9,6 +9,7 @@ return [
     'unique' => 'Nilai :attribute sudah digunakan.',
     'regex' => 'Format :attribute tidak valid.',
     'date' => ':attribute bukan tanggal yang valid.',
+    'date_format' => ':attribute tidak sesuai dengan format :format.',
     'numeric' => 'Kolom :attribute harus berupa angka.',
     'integer' => 'Kolom :attribute harus berupa bilangan bulat.',
     'string' => 'Kolom :attribute harus berupa teks.',
@@ -26,4 +27,46 @@ return [
     'image' => 'Kolom :attribute harus berupa gambar.',
     'before' => 'Kolom :attribute harus berupa tanggal sebelum :date.',
     'after' => 'Kolom :attribute harus berupa tanggal setelah :date.',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Pesan Validasi Kustom
+    |--------------------------------------------------------------------------
+    */
+    'custom' => [
+        'opening_time' => [
+            'date_format' => 'Jam buka harus dalam format HH:MM:SS.',
+        ],
+        'closing_time' => [
+            'date_format' => 'Jam tutup harus dalam format HH:MM:SS.',
+        ],
+        'blocked_times' => [
+            'array' => 'Waktu yang diblokir harus berupa array.',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Atribut Validasi Kustom
+    |--------------------------------------------------------------------------
+    */
+    'attributes' => [
+        'opening_time' => 'jam buka',
+        'closing_time' => 'jam tutup',
+        'blocked_times' => 'waktu diblokir',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Nilai Validasi Kustom
+    |--------------------------------------------------------------------------
+    */
+    'values' => [],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Laravel Default Messages
+    |--------------------------------------------------------------------------
+    */
+    '(and :count more errors)' => '(dan :count error lainnya)',
 ];

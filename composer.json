@@ -15,7 +15,8 @@
         "netflie/whatsapp-cloud-api": "^2.2",
         "phpseclib/phpseclib": "~3.0",
         "polar-sh/sdk": "^0.7.0",
-        "pusher/pusher-php-server": "^7.2"
+        "pusher/pusher-php-server": "^7.2",
+        "sbsaga/toon": "*"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

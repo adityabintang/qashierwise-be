@@ -70,6 +70,18 @@ return [
 
         /*
         |--------------------------------------------------------------------------
+        | Max Recent Messages (Token Optimization)
+        |--------------------------------------------------------------------------
+        |
+        | Maximum number of recent messages to send to LLM when no summary exists.
+        | This helps keep token usage under 1000 for ordering operations.
+        | Default is 4 messages (user + ai pairs).
+        |
+        */
+        'max_recent_messages' => env('CONVERSATION_MAX_RECENT_MESSAGES', 4),
+
+        /*
+        |--------------------------------------------------------------------------
         | LLM Temperature
         |--------------------------------------------------------------------------
         |

@@ -18,23 +18,23 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(MediaStorageService::class, function ($app) {
-            return new MediaStorageService();
+            return new MediaStorageService;
         });
 
         // Register LocalizationHelper as singleton
         $this->app->singleton(LocalizationHelper::class, function ($app) {
-            return new LocalizationHelper();
+            return new LocalizationHelper;
         });
 
         // Register FinancialAuditService as singleton
         $this->app->singleton(FinancialAuditService::class, function ($app) {
-            $service = new FinancialAuditService();
-            
+            $service = new FinancialAuditService;
+
             // Set request context if available
             if ($app->has('request')) {
                 $service->setRequest($app->make('request'));
             }
-            
+
             return $service;
         });
 
@@ -43,6 +43,7 @@ class AppServiceProvider extends ServiceProvider
             if ($app->has(FinancialAuditService::class)) {
                 $service->setAuditService($app->make(FinancialAuditService::class));
             }
+
             return $service;
         });
 
@@ -51,6 +52,7 @@ class AppServiceProvider extends ServiceProvider
             if ($app->has(FinancialAuditService::class)) {
                 $service->setAuditService($app->make(FinancialAuditService::class));
             }
+
             return $service;
         });
 
@@ -59,6 +61,7 @@ class AppServiceProvider extends ServiceProvider
             if ($app->has(FinancialAuditService::class)) {
                 $service->setAuditService($app->make(FinancialAuditService::class));
             }
+
             return $service;
         });
     }
@@ -76,6 +79,28 @@ class AppServiceProvider extends ServiceProvider
         // Handle missing translation keys in development
         if ($this->app->isLocal()) {
             \Illuminate\Support\Facades\Lang::handleMissingKeysUsing(function ($key) {
+                // Skip logging for:
+                // - Test keys (used for testing)
+                // - HTTP status messages (e.g., "Not Found", "Unauthorized")
+                // - Keys containing spaces without dots (likely raw strings, not translation keys)
+                $skipPatterns = [
+                    '/^test\./',  // Test keys
+                    '/^(Not Found|Unauthorized|Forbidden|Bad Request|Internal Server Error|Service Unavailable)$/i',  // HTTP status messages
+                ];
+
+                foreach ($skipPatterns as $pattern) {
+                    if (preg_match($pattern, $key)) {
+                        return $key;
+                    }
+                }
+
+                // Skip if key doesn't look like a valid translation key
+                // Valid keys typically contain dots (e.g., "messages.error.not_found")
+                // or start with known prefixes
+                if (! str_contains($key, '.') && ! str_contains($key, '_') && str_contains($key, ' ')) {
+                    return $key;
+                }
+
                 \Illuminate\Support\Facades\Log::channel('missing_translations')
                     ->warning('Missing translation key', [
                         'key' => $key,
@@ -83,7 +108,7 @@ class AppServiceProvider extends ServiceProvider
                         'url' => request()->fullUrl(),
                         'timestamp' => now()->toDateTimeString(),
                     ]);
-                
+
                 return $key;
             });
         }
@@ -104,7 +129,7 @@ class AppServiceProvider extends ServiceProvider
 
         // @locale directive for current locale
         \Illuminate\Support\Facades\Blade::directive('locale', function () {
-            return "<?php echo app()->getLocale(); ?>";
+            return '<?php echo app()->getLocale(); ?>';
         });
     }
 }

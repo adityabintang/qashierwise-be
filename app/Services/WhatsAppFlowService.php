@@ -109,7 +109,7 @@ class WhatsAppFlowService
 
     /**
      * Publish a flow (make it live)
-     * 
+     *
      * Before publishing, this method ensures:
      * 1. Endpoint URI is configured
      * 2. Public signing key is uploaded
@@ -121,12 +121,13 @@ class WhatsAppFlowService
 
         if (! $account) {
             \Log::warning('publishFlow: No active account found', ['user_id' => $userId]);
+
             return false;
         }
 
         // Step 1: Configure endpoint URI
-        $endpointUri = config('app.url') . '/api/whatsapp/flow/endpoint';
-        
+        $endpointUri = config('app.url').'/api/whatsapp/flow/endpoint';
+
         \Log::info('publishFlow: Setting endpoint URI', [
             'flow_id' => $flowId,
             'endpoint_uri' => $endpointUri,
@@ -159,12 +160,25 @@ class WhatsAppFlowService
             ->post("https://graph.facebook.com/v21.0/{$flowId}/publish");
 
         if (! $response->successful()) {
+            $errorResponse = $response->json();
+            $errorCode = $errorResponse['error']['code'] ?? null;
+            $errorSubcode = $errorResponse['error']['error_subcode'] ?? null;
+
             \Log::error('publishFlow failed', [
                 'user_id' => $userId,
                 'flow_id' => $flowId,
                 'status' => $response->status(),
-                'response' => $response->json(),
+                'response' => $errorResponse,
             ]);
+
+            // Handle specific error: Integrity requirements not met (sandbox/unverified account)
+            if ($errorCode == 139000 && $errorSubcode == 4233020) {
+                throw new \Exception(
+                    'Gagal publish flow: Akun WhatsApp Business Anda belum memenuhi syarat integrity Meta. '.
+                    'Ini biasanya terjadi pada akun sandbox/test atau Meta Business Manager yang belum diverifikasi. '.
+                    'Untuk testing, gunakan mode DRAFT dengan tombol "Kirim ke Pelanggan" tanpa perlu publish.'
+                );
+            }
         }
 
         return $response->successful();
@@ -177,21 +191,23 @@ class WhatsAppFlowService
     public function uploadPublicSigningKey($account): bool
     {
         $privateKeyRaw = config('services.whatsapp.flow_private_key');
-        
+
         if (empty($privateKeyRaw)) {
             \Log::error('uploadPublicSigningKey: Private key not configured');
+
             return false;
         }
 
         // Decode private key and extract public key
         $privateKeyPem = $this->decodePrivateKey($privateKeyRaw);
         $passphrase = config('services.whatsapp.flow_passphrase', '');
-        
+
         $privateKey = openssl_pkey_get_private($privateKeyPem, $passphrase);
         if ($privateKey === false) {
             \Log::error('uploadPublicSigningKey: Failed to load private key', [
                 'error' => openssl_error_string(),
             ]);
+
             return false;
         }
 
@@ -213,6 +229,7 @@ class WhatsAppFlowService
 
         if ($response->successful() && ($response->json()['success'] ?? false)) {
             \Log::info('uploadPublicSigningKey: Public key uploaded successfully');
+
             return true;
         }
 
@@ -247,8 +264,8 @@ class WhatsAppFlowService
         }
 
         // Assume it's a base64-encoded key without headers
-        return "-----BEGIN PRIVATE KEY-----\n" .
-            chunk_split($key, 64, "\n") .
+        return "-----BEGIN PRIVATE KEY-----\n".
+            chunk_split($key, 64, "\n").
             "-----END PRIVATE KEY-----\n";
     }
 
@@ -879,17 +896,17 @@ class WhatsAppFlowService
     {
         $account = $this->accountService->getActiveAccount($userId);
 
-        if (!$account) {
+        if (! $account) {
             throw new \Exception('No active WhatsApp account found');
         }
 
         $wabaId = $account->waba_id ?? $account->business_account_id;
         $flowJson = $this->buildFlowJsonFromConfig($config);
-        $endpointUri = config('app.url') . '/api/whatsapp/flow/endpoint';
+        $endpointUri = config('app.url').'/api/whatsapp/flow/endpoint';
 
         $response = Http::withToken($account->access_token)
             ->post("https://graph.facebook.com/v21.0/{$wabaId}/flows", [
-                'name' => $config->flow_name . '_' . Str::random(6),
+                'name' => $config->flow_name.'_'.Str::random(6),
                 'categories' => ['APPOINTMENT_BOOKING'],
                 'endpoint_uri' => $endpointUri,
                 'data_api_version' => '3.0',
@@ -901,7 +918,7 @@ class WhatsAppFlowService
                 'user_id' => $userId,
             ]);
 
-            throw new \Exception('Failed to create flow: ' . ($response->json()['error']['message'] ?? 'Unknown error'));
+            throw new \Exception('Failed to create flow: '.($response->json()['error']['message'] ?? 'Unknown error'));
         }
 
         $result = $response->json();
@@ -937,11 +954,11 @@ class WhatsAppFlowService
     ): array {
         $account = $this->accountService->getActiveAccount($userId);
 
-        if (!$account) {
+        if (! $account) {
             throw new \Exception('No active WhatsApp account found');
         }
 
-        $flowToken = $userId . '_' . Str::uuid()->toString();
+        $flowToken = $userId.'_'.Str::uuid()->toString();
 
         $response = Http::withToken($account->access_token)
             ->post("https://graph.facebook.com/v21.0/{$account->phone_number_id}/messages", [
@@ -981,7 +998,7 @@ class WhatsAppFlowService
                 'phone' => $phoneNumber,
             ]);
 
-            throw new \Exception('Failed to send flow: ' . ($response->json()['error']['message'] ?? 'Unknown error'));
+            throw new \Exception('Failed to send flow: '.($response->json()['error']['message'] ?? 'Unknown error'));
         }
 
         return [
@@ -994,6 +1011,7 @@ class WhatsAppFlowService
     /**
      * Build flow JSON from config.
      * Follows Meta's WhatsApp Flow JSON specification v3.0
+     *
      * @see https://developers.facebook.com/docs/whatsapp/flows/reference/flowjson
      */
     private function buildFlowJsonFromConfig(\App\Models\ReservationFlowConfig $config): array
@@ -1022,14 +1040,14 @@ class WhatsAppFlowService
 
         // Build routing model - all possible transitions
         $routingModel = [];
-        
+
         if ($hasDetails) {
             $routingModel['APPOINTMENT'] = ['DETAILS'];
             $routingModel['DETAILS'] = ['SUMMARY', 'APPOINTMENT'];
         } else {
             $routingModel['APPOINTMENT'] = ['SUMMARY'];
         }
-        
+
         if ($config->enable_payment) {
             $routingModel['SUMMARY'] = ['PAYMENT', 'APPOINTMENT', 'DETAILS'];
             $routingModel['PAYMENT'] = ['SUCCESS', 'SUMMARY'];
@@ -1348,7 +1366,7 @@ class WhatsAppFlowService
     private function buildSummaryScreen(\App\Models\ReservationFlowConfig $config): array
     {
         $nextScreen = $config->enable_payment ? 'PAYMENT' : 'SUCCESS';
-        
+
         return [
             'id' => 'SUMMARY',
             'title' => 'Ringkasan',

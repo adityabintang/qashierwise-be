@@ -8,6 +8,7 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 class MessageStatusUpdated implements ShouldBroadcastNow
 {
@@ -21,6 +22,33 @@ class MessageStatusUpdated implements ShouldBroadcastNow
     public function __construct(WhatsAppMessage $message)
     {
         $this->message = $message;
+
+        // Log broadcast attempt for debugging
+        Log::info('MessageStatusUpdated event created', [
+            'message_id' => $message->id,
+            'wa_message_id' => $message->message_id,
+            'user_id' => $message->user_id,
+            'status' => $message->status,
+            'has_user_id' => ! empty($message->user_id),
+        ]);
+    }
+
+    /**
+     * Determine if this event should broadcast.
+     */
+    public function broadcastWhen(): bool
+    {
+        // Only broadcast if user_id exists
+        if (empty($this->message->user_id)) {
+            Log::warning('MessageStatusUpdated broadcast skipped: missing user_id', [
+                'message_id' => $this->message->id,
+                'wa_message_id' => $this->message->message_id,
+            ]);
+
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -30,8 +58,16 @@ class MessageStatusUpdated implements ShouldBroadcastNow
      */
     public function broadcastOn(): array
     {
+        $channel = 'whatsapp.'.$this->message->user_id;
+
+        Log::info('MessageStatusUpdated broadcasting to channel', [
+            'channel' => $channel,
+            'message_id' => $this->message->id,
+            'status' => $this->message->status,
+        ]);
+
         return [
-            new PrivateChannel('whatsapp.'.$this->message->user_id),
+            new PrivateChannel($channel),
         ];
     }
 

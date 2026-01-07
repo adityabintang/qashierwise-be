@@ -10,7 +10,7 @@ use Netflie\WhatsAppCloudApi\WhatsAppCloudApi;
 
 /**
  * Service class for managing WhatsApp account operations.
- * 
+ *
  * This service provides methods to retrieve WhatsApp clients configured
  * with user-specific credentials, supporting multi-tenant WhatsApp messaging.
  */
@@ -19,15 +19,15 @@ class WhatsAppAccountService
     /**
      * Get a WhatsApp Cloud API client configured for a specific user.
      *
-     * @param int $userId User ID
-     * @return WhatsAppCloudApi
+     * @param  int  $userId  User ID
+     *
      * @throws \App\Exceptions\WhatsAppNotConnectedException
      */
     public function getClientForUser(int $userId): WhatsAppCloudApi
     {
         $account = $this->getActiveAccount($userId);
 
-        if (!$account) {
+        if (! $account) {
             throw new \App\Exceptions\WhatsAppNotConnectedException(
                 'No connected WhatsApp account found for this user.'
             );
@@ -42,8 +42,7 @@ class WhatsAppAccountService
     /**
      * Get the active WhatsApp account for a user.
      *
-     * @param int $userId User ID
-     * @return WhatsAppAccount|null
+     * @param  int  $userId  User ID
      */
     public function getActiveAccount(int $userId): ?WhatsAppAccount
     {
@@ -52,12 +51,10 @@ class WhatsAppAccountService
             ->first();
     }
 
-
     /**
      * Check if a user has a connected WhatsApp account.
      *
-     * @param int $userId User ID
-     * @return bool
+     * @param  int  $userId  User ID
      */
     public function hasConnectedAccount(int $userId): bool
     {
@@ -70,12 +67,16 @@ class WhatsAppAccountService
      * Get account by phone number ID.
      * Used for webhook routing to identify the correct user.
      *
-     * @param string $phoneNumberId Phone number ID from webhook payload
-     * @return WhatsAppAccount|null
+     * Note: This method bypasses the global scope because webhooks
+     * are not authenticated and need to find accounts by phone_number_id.
+     *
+     * @param  string  $phoneNumberId  Phone number ID from webhook payload
      */
     public function getAccountByPhoneNumberId(string $phoneNumberId): ?WhatsAppAccount
     {
-        return WhatsAppAccount::where('phone_number_id', $phoneNumberId)
+        // Bypass global scope for webhook routing (no authenticated user during webhooks)
+        return WhatsAppAccount::withoutGlobalScope('userAccounts')
+            ->where('phone_number_id', $phoneNumberId)
             ->where('is_active', true)
             ->first();
     }
@@ -83,14 +84,14 @@ class WhatsAppAccountService
     /**
      * Deactivate a user's WhatsApp account (disconnect).
      *
-     * @param int $userId User ID
+     * @param  int  $userId  User ID
      * @return bool True if account was deactivated, false if no account found
      */
     public function deactivateAccount(int $userId): bool
     {
         $account = $this->getActiveAccount($userId);
 
-        if (!$account) {
+        if (! $account) {
             return false;
         }
 
@@ -103,14 +104,14 @@ class WhatsAppAccountService
     /**
      * Get account status information for display.
      *
-     * @param int $userId User ID
+     * @param  int  $userId  User ID
      * @return array|null Account status data or null if no account
      */
     public function getAccountStatus(int $userId): ?array
     {
         $account = WhatsAppAccount::where('user_id', $userId)->first();
 
-        if (!$account) {
+        if (! $account) {
             return null;
         }
 
@@ -128,21 +129,22 @@ class WhatsAppAccountService
 
     /**
      * Validate a user's WhatsApp account token status.
-     * 
+     *
      * This method checks if the user's token is valid and not expired.
      * It throws appropriate exceptions for different error conditions.
      *
-     * @param int $userId User ID
+     * @param  int  $userId  User ID
+     * @return WhatsAppAccount The validated account
+     *
      * @throws WhatsAppNotConnectedException If user has no connected account
      * @throws WhatsAppTokenExpiredException If the access token has expired
      * @throws WhatsAppTokenInvalidException If the access token is invalid
-     * @return WhatsAppAccount The validated account
      */
     public function validateAccountToken(int $userId): WhatsAppAccount
     {
         $account = $this->getActiveAccount($userId);
 
-        if (!$account) {
+        if (! $account) {
             throw new WhatsAppNotConnectedException(
                 'No connected WhatsApp account found for this user.'
             );
@@ -167,12 +169,13 @@ class WhatsAppAccountService
 
     /**
      * Check if a token validation result indicates an invalid token.
-     * 
+     *
      * This is used to process API responses and throw appropriate exceptions.
      *
-     * @param array $validationResult Result from EmbeddedSignupService::validateToken
-     * @param bool $isValid Whether the token is valid
-     * @param bool $isExpired Whether the token is expired
+     * @param  array  $validationResult  Result from EmbeddedSignupService::validateToken
+     * @param  bool  $isValid  Whether the token is valid
+     * @param  bool  $isExpired  Whether the token is expired
+     *
      * @throws WhatsAppTokenExpiredException If the token is expired
      * @throws WhatsAppTokenInvalidException If the token is invalid
      */
@@ -184,7 +187,7 @@ class WhatsAppAccountService
             );
         }
 
-        if (!$isValid) {
+        if (! $isValid) {
             throw new WhatsAppTokenInvalidException(
                 'Your WhatsApp access token is invalid. Please re-authenticate.'
             );

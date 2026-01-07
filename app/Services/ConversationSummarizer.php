@@ -542,6 +542,7 @@ PROMPT;
 
     /**
      * Get context for LLM call (either summary or full messages).
+     * OPTIMIZED: Limits messages to reduce token usage to <1000
      *
      * @param  AiAgentConversation  $conversation  The conversation
      * @return array Context array with messages or summary
@@ -549,6 +550,9 @@ PROMPT;
     public function getContextForLLM(AiAgentConversation $conversation): array
     {
         try {
+            // Get configured limit for recent messages (default 4 for token optimization)
+            $maxRecentMessages = config('conversation.summarization.max_recent_messages', 4);
+
             // Check if conversation has summary
             if ($conversation->hasSummary()) {
                 $summary = $conversation->getSummary();
@@ -578,8 +582,16 @@ PROMPT;
                 }
             }
 
-            // Fallback: return full message history if no summary or error
-            return $conversation->messages ?? [];
+            // OPTIMIZED: Limit messages even without summary to control token usage
+            // Only return the last N messages to keep tokens under 1000
+            $allMessages = $conversation->messages ?? [];
+
+            if (count($allMessages) > $maxRecentMessages) {
+                // Return only recent messages to save tokens
+                return array_slice($allMessages, -$maxRecentMessages);
+            }
+
+            return $allMessages;
 
         } catch (\Exception $e) {
             Log::error('Error getting context for LLM', [
@@ -587,8 +599,10 @@ PROMPT;
                 'error' => $e->getMessage(),
             ]);
 
-            // Fallback to full messages on error
-            return $conversation->messages ?? [];
+            // Fallback to limited messages on error
+            $allMessages = $conversation->messages ?? [];
+
+            return array_slice($allMessages, -4);
         }
     }
 
