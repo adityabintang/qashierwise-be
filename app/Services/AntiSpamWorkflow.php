@@ -101,8 +101,11 @@ class AntiSpamWorkflow
     ): bool {
         $phoneNumber = $contact->wa_id;
 
-        // Push message to buffer
+        // Push message to buffer FIRST
         $this->messageBuffer->push($phoneNumber, $messageContent);
+        
+        // Get buffer size after push for logging
+        $bufferSize = $this->messageBuffer->getBufferSize($phoneNumber);
 
         // Mark message as seen for deduplication
         $this->messageDeduplicator->markAsSeen($phoneNumber, $messageContent);
@@ -124,13 +127,20 @@ class AntiSpamWorkflow
             Log::info('Buffered message: job scheduled', [
                 'phone_number' => $phoneNumber,
                 'message_id' => $messageId,
+                'message_content' => $messageContent,
                 'debounce_seconds' => $debounceSeconds,
+                'buffer_size' => $bufferSize,
+                'job_will_run_at' => now()->addSeconds($debounceSeconds)->toDateTimeString(),
             ]);
         } else {
+            // Extend debounce timer for subsequent messages
+            $this->messageBuffer->extendDebounce($phoneNumber);
+            
             Log::info('Buffered message: added to existing buffer', [
                 'phone_number' => $phoneNumber,
                 'message_id' => $messageId,
-                'buffer_size' => $this->messageBuffer->getBufferSize($phoneNumber),
+                'message_content' => $messageContent,
+                'buffer_size' => $bufferSize,
             ]);
         }
 

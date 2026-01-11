@@ -54,14 +54,16 @@ class ProcessBufferedMessages implements ShouldQueue
                 'phone_number' => $phoneNumber,
                 'contact_id' => $this->contact->id,
                 'account_id' => $this->account->id,
+                'buffer_size_before_flush' => $messageBuffer->getBufferSize($phoneNumber),
             ]);
             
             // Flush all buffered messages
             $messages = $messageBuffer->flush($phoneNumber);
             
             if (empty($messages)) {
-                Log::info('No messages in buffer, skipping', [
+                Log::warning('No messages in buffer - possible race condition or stale job', [
                     'phone_number' => $phoneNumber,
+                    'hint' => 'This can happen if buffer was flushed by another process or job was delayed too long',
                 ]);
                 return;
             }
@@ -79,7 +81,7 @@ class ProcessBufferedMessages implements ShouldQueue
             Log::info('Sending merged message to AI Agent', [
                 'phone_number' => $phoneNumber,
                 'original_count' => count($messages),
-                'merged_message_preview' => substr($mergedMessage, 0, 100),
+                'merged_message' => $mergedMessage,
             ]);
             
             // Process the merged message through AI Agent

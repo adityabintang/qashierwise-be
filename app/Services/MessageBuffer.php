@@ -97,9 +97,31 @@ class MessageBuffer
             'phone_number' => $phoneNumber,
             'is_first_message' => $isFirst,
             'debounce_seconds' => $debounceSeconds,
+            'buffer_size' => $this->getBufferSize($phoneNumber),
         ]);
         
         return $isFirst;
+    }
+
+    /**
+     * Extend debounce timer when new messages arrive.
+     * This ensures the job waits for all rapid messages.
+     *
+     * @param string $phoneNumber User's WhatsApp phone number
+     * @return void
+     */
+    public function extendDebounce(string $phoneNumber): void
+    {
+        $lockKey = $this->getLockKey($phoneNumber);
+        $debounceSeconds = $this->getDebounceSeconds();
+        
+        // Reset the debounce timer
+        Cache::put($lockKey, time(), $debounceSeconds);
+        
+        Log::info('Debounce extended', [
+            'phone_number' => $phoneNumber,
+            'debounce_seconds' => $debounceSeconds,
+        ]);
     }
 
     /**
