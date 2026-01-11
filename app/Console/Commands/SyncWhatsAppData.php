@@ -110,13 +110,14 @@ class SyncWhatsAppData extends Command
 
                 WhatsAppTemplate::updateOrCreate(
                     [
-                        'whatsapp_account_id' => $account->id,
+                        'phone_number_id' => $account->phone_number_id,
                         'name' => $templateData['name'],
+                        'language' => $templateData['language'],
                     ],
                     [
+                        'whatsapp_account_id' => $account->id,
                         'status' => $templateData['status'],
                         'category' => $templateData['category'],
-                        'language' => $templateData['language'],
                         'header' => $header,
                         'header_type' => $headerType,
                         'body' => $body,

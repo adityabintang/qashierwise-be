@@ -15,6 +15,7 @@ class WhatsAppTemplate extends Model
     /**
      * The "booted" method of the model.
      * Apply Row Level Security - only show templates for user's ACTIVE WhatsApp account
+     * Uses phone_number_id for filtering (consistent with contacts and messages)
      */
     protected static function booted(): void
     {
@@ -24,13 +25,14 @@ class WhatsAppTemplate extends Model
                 $userId = auth()->id();
 
                 // Get user's active WhatsApp account
-                $activeAccount = WhatsAppAccount::where('user_id', $userId)
+                $activeAccount = WhatsAppAccount::withoutGlobalScopes()
+                    ->where('user_id', $userId)
                     ->where('is_active', true)
                     ->first();
 
                 if ($activeAccount) {
-                    // Only show templates for this user's ACTIVE account
-                    $builder->where('whatsapp_account_id', $activeAccount->id);
+                    // Only show templates for this user's ACTIVE account using phone_number_id
+                    $builder->where('phone_number_id', $activeAccount->phone_number_id);
                 } else {
                     // No active account = no templates shown
                     $builder->whereRaw('1 = 0');
@@ -44,6 +46,7 @@ class WhatsAppTemplate extends Model
 
     protected $fillable = [
         'whatsapp_account_id',
+        'phone_number_id',
         'template_id',
         'name',
         'language',

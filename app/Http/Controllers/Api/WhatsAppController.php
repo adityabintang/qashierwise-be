@@ -1848,11 +1848,12 @@ class WhatsAppController extends Controller
 
             WhatsAppTemplate::updateOrCreate(
                 [
-                    'whatsapp_account_id' => $account->id,
+                    'phone_number_id' => $account->phone_number_id,
                     'name' => $templateData['name'],
                     'language' => $templateData['language'],
                 ],
                 [
+                    'whatsapp_account_id' => $account->id,
                     'template_id' => $templateData['id'] ?? null,
                     'status' => $templateData['status'],
                     'category' => $templateData['category'],
@@ -2031,6 +2032,7 @@ class WhatsAppController extends Controller
 
             $template = WhatsAppTemplate::create([
                 'whatsapp_account_id' => $account->id,
+                'phone_number_id' => $account->phone_number_id,
                 'template_id' => $result['data']['id'] ?? null,
                 'name' => $data['name'],
                 'language' => $data['language'],

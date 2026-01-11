@@ -49,6 +49,12 @@ class AiAgentService
         WhatsAppContact $contact,
         string $messageText
     ): void {
+        // DEBUG: Marker to verify code version
+        Log::info('AiAgentService::processMessage called [v2-buffer]', [
+            'contact_wa_id' => $contact->wa_id,
+            'message_preview' => substr($messageText, 0, 30),
+        ]);
+        
         try {
             // Get AI Agent for this account
             $aiAgent = AiAgent::where('whatsapp_account_id', $account->id)
@@ -194,7 +200,8 @@ class AiAgentService
                     $conversation,
                     $account,
                     $contact,
-                    $aiAgent
+                    $aiAgent,
+                    1  // Start with iteration 1
                 );
 
                 return;
@@ -456,7 +463,7 @@ class AiAgentService
 
     /**
      * Get tool definitions for LLM function calling.
-     * MINIMAL: Only 4 essential tools (~150 tokens)
+     * MINIMAL: Only essential tools (~200 tokens)
      * Removed: search_products, search_multiple_products (merged into get_all_products)
      */
     protected function getToolDefinitions(): array
@@ -466,7 +473,7 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'get_all_products',
-                    'description' => 'Menu list',
+                    'description' => 'Show menu list to user. Only use when user asks to see menu.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
@@ -480,24 +487,47 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'add_to_cart',
-                    'description' => 'Order items',
+                    'description' => 'DIRECTLY add items to cart by product name. Auto-searches product. Use this IMMEDIATELY when user wants to order - NO need to search first!',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
-                            'products' => [
+                            'items' => [
                                 'type' => 'array',
+                                'description' => 'Array of items to add. Can add multiple items at once.',
                                 'items' => [
                                     'type' => 'object',
                                     'properties' => [
-                                        'product_id' => ['type' => 'integer'],
-                                        'quantity' => ['type' => 'integer'],
+                                        'product_name' => ['type' => 'string', 'description' => 'Product name (partial match OK)'],
+                                        'quantity' => ['type' => 'integer', 'description' => 'Quantity to order, default 1'],
                                     ],
-                                    'required' => ['product_id', 'quantity'],
+                                    'required' => ['product_name', 'quantity'],
                                 ],
                             ],
                         ],
-                        'required' => ['products'],
+                        'required' => ['items'],
                     ],
+                ],
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'remove_from_cart',
+                    'description' => 'Remove specific item from cart by product name',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'product_name' => ['type' => 'string', 'description' => 'Product name to remove from cart'],
+                        ],
+                        'required' => ['product_name'],
+                    ],
+                ],
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'clear_cart',
+                    'description' => 'Clear all items from cart',
+                    'parameters' => ['type' => 'object', 'properties' => []],
                 ],
             ],
             [
@@ -595,10 +625,28 @@ class AiAgentService
         AiAgentConversation $conversation,
         WhatsAppAccount $account,
         WhatsAppContact $contact,
-        AiAgent $aiAgent
+        AiAgent $aiAgent,
+        int $iteration = 1
     ): void {
+        // Prevent infinite loops - max 3 iterations
+        if ($iteration > 3) {
+            Log::error('Tool call iteration limit reached, stopping to prevent infinite loop', [
+                'conversation_id' => $conversation->id,
+                'iteration' => $iteration,
+            ]);
+
+            $errorMessage = "Maaf, saya mengalami kesulitan memproses pesanan Anda. Silakan coba lagi dengan format yang lebih sederhana.\n\n";
+            $errorMessage .= "Contoh: 'pesan dimsum 2 porsi'";
+
+            $conversation->addMessage('ai', $errorMessage);
+            $this->sendReply($account, $contact->wa_id, $errorMessage);
+
+            return;
+        }
+
         // Log how many tool calls received
         Log::info('Handling tool calls from LLM', [
+            'iteration' => $iteration,
             'tool_calls_count' => count($toolCalls),
             'tool_calls' => array_map(function ($tc) {
                 return [
@@ -635,7 +683,7 @@ class AiAgentService
             if (in_array($functionName, ['search_products', 'search_multiple_products', 'get_all_products'])) {
                 $hasSearchCall = true;
             }
-            if (in_array($functionName, ['add_to_cart', 'confirm_order', 'get_cart_summary', 'generate_qris', 'check_payment_status'])) {
+            if (in_array($functionName, ['add_to_cart', 'confirm_order', 'get_cart_summary', 'generate_qris', 'check_payment_status', 'remove_from_cart', 'clear_cart'])) {
                 $hasFinalAction = true;
             }
 
@@ -714,14 +762,15 @@ class AiAgentService
             try {
                 $response = $this->callLLMWithToolResults($systemPrompt, $messages, $tools);
 
-                // If LLM returns more tool calls, handle them
+                // If LLM returns more tool calls, handle them (with iteration counter)
                 if (isset($response['tool_calls'])) {
                     $this->handleToolCalls(
                         $response['tool_calls'],
                         $conversation,
                         $account,
                         $contact,
-                        $aiAgent
+                        $aiAgent,
+                        $iteration + 1
                     );
 
                     return;
@@ -1114,12 +1163,24 @@ class AiAgentService
                     return $this->getProductDetails($userId, (int) $arguments['product_id']);
 
                 case 'add_to_cart':
-                    // Support both array of products and single product
-                    if (isset($arguments['products']) && is_array($arguments['products'])) {
-                        // Batch add to cart
+                    // Support items array with product_name (preferred - no ID needed)
+                    if (isset($arguments['items']) && is_array($arguments['items'])) {
+                        return $this->addItemsByName($conversation, $userId, $arguments['items']);
+                    }
+                    // Support products array with product_id (legacy)
+                    elseif (isset($arguments['products']) && is_array($arguments['products'])) {
                         return $this->addMultipleToCart($conversation, $userId, $arguments['products']);
-                    } elseif (isset($arguments['product_id']) && isset($arguments['quantity'])) {
-                        // Single product (backward compatibility)
+                    }
+                    // Support single product_name
+                    elseif (isset($arguments['product_name'])) {
+                        $quantity = isset($arguments['quantity']) ? (int) $arguments['quantity'] : 1;
+
+                        return $this->addItemsByName($conversation, $userId, [
+                            ['product_name' => $arguments['product_name'], 'quantity' => $quantity],
+                        ]);
+                    }
+                    // Support single product_id (legacy backward compatibility)
+                    elseif (isset($arguments['product_id']) && isset($arguments['quantity'])) {
                         if (! is_numeric($arguments['product_id'])) {
                             return 'Maaf, ID produk harus berupa angka.';
                         }
@@ -1134,7 +1195,7 @@ class AiAgentService
                             (int) $arguments['quantity']
                         );
                     } else {
-                        return 'Maaf, parameter tidak lengkap. Mohon berikan products (array) atau product_id dan quantity.';
+                        return 'Maaf, parameter tidak lengkap. Mohon berikan items dengan product_name dan quantity.';
                     }
 
                 case 'get_cart_summary':
@@ -1142,6 +1203,16 @@ class AiAgentService
 
                 case 'confirm_order':
                     return $this->prepareOrderConfirmation($conversation, $userId);
+
+                case 'remove_from_cart':
+                    if (! isset($arguments['product_name'])) {
+                        return 'Maaf, mohon sebutkan nama produk yang ingin dihapus dari keranjang.';
+                    }
+
+                    return $this->removeFromCart($conversation, $arguments['product_name']);
+
+                case 'clear_cart':
+                    return $this->clearCart($conversation);
 
                 case 'generate_qris':
                     if (! isset($arguments['amount'])) {
@@ -1413,7 +1484,7 @@ class AiAgentService
                 $paginationInfo .= '|next:get_all_products(page='.($page + 1).')';
             }
 
-            return "DATA_MENU\n".Toon::convert(['menu' => $categorizedArray])."\n{$paginationInfo}\nINSTRUKSI: Tampilkan menu per kategori ke user (nama - harga). JANGAN tampilkan ID/TOON ke user. Jika ada halaman berikutnya dan user minta menu lainnya, panggil get_all_products(page=X).";
+            return "DATA_MENU\n".Toon::convert(['menu' => $categorizedArray])."\n{$paginationInfo}\nINSTRUKSI: Tampilkan menu per kategori ke user (nama - harga). JANGAN tampilkan ID/TOON ke user. Untuk order, panggil add_to_cart dengan items=[{product_name:'nama',quantity:X}].";
         }
 
         // ULTRA-COMPACT format to minimize tokens
@@ -1424,13 +1495,14 @@ class AiAgentService
             $items = [];
             foreach ($categoryProducts as $product) {
                 $price = number_format($product->price, 0, ',', '.');
-                $items[] = "{$product->name}[{$product->id}]Rp{$price}";
+                // Simplified format - just name and price, no ID needed
+                $items[] = "{$product->name} Rp{$price}";
             }
             $lines[] = "{$categoryName}:".implode('|', $items);
         }
 
-        // Minimal instruction
-        $lines[] = 'ACT:show nama-harga per kategori,HIDE ID,order→add_to_cart(id,qty)';
+        // Clear instruction for LLM - use product_name not product_id
+        $lines[] = 'ACT:show menu to user,order→add_to_cart(items=[{product_name:"nama",quantity:X}])';
 
         return implode("\n", $lines);
     }
@@ -1634,6 +1706,116 @@ class AiAgentService
     }
 
     /**
+     * Add items to cart by product name (search and add in one step).
+     * This is the preferred method as it doesn't require product_id.
+     */
+    protected function addItemsByName(
+        AiAgentConversation $conversation,
+        int $userId,
+        array $items
+    ): string {
+        if (empty($items)) {
+            return 'Maaf, tidak ada produk yang ditambahkan.';
+        }
+
+        $cart = $conversation->getCart();
+        $addedProducts = [];
+        $errors = [];
+        $totalAdded = 0;
+
+        foreach ($items as $item) {
+            $productName = $item['product_name'] ?? null;
+            $quantity = $item['quantity'] ?? 1;
+
+            if (empty($productName)) {
+                continue;
+            }
+
+            $quantity = (int) $quantity;
+            if ($quantity <= 0) {
+                $quantity = 1;
+            }
+
+            // Search product by name (case-insensitive)
+            $cleanName = trim(strtolower($productName));
+
+            $product = Product::where('user_id', $userId)
+                ->where('is_active', true)
+                ->where(function ($q) use ($cleanName) {
+                    $q->whereRaw('LOWER(name) LIKE ?', ["%{$cleanName}%"]);
+                })
+                ->first(['id', 'name', 'price', 'stock_quantity']);
+
+            if (! $product) {
+                $errors[] = "'{$productName}' tidak ditemukan";
+
+                continue;
+            }
+
+            if ($product->stock_quantity !== null && $product->stock_quantity < $quantity) {
+                $errors[] = "{$product->name}: stok tidak mencukupi";
+
+                continue;
+            }
+
+            // Add to cart
+            $found = false;
+            foreach ($cart as &$cartItem) {
+                if ($cartItem['product_id'] == $product->id) {
+                    $cartItem['quantity'] += $quantity;
+                    $found = true;
+                    break;
+                }
+            }
+
+            if (! $found) {
+                $cart[] = [
+                    'product_id' => $product->id,
+                    'product_name' => $product->name,
+                    'price' => (float) $product->price,
+                    'quantity' => $quantity,
+                ];
+            }
+
+            $subtotal = $product->price * $quantity;
+            $totalAdded += $subtotal;
+            $addedProducts[] = [
+                'name' => $product->name,
+                'quantity' => $quantity,
+                'price' => $product->price,
+                'subtotal' => $subtotal,
+            ];
+        }
+
+        if (! empty($addedProducts)) {
+            $conversation->updateCart($cart);
+        }
+
+        if (empty($addedProducts) && ! empty($errors)) {
+            return "❌ Gagal menambahkan produk:\n".implode("\n", $errors);
+        }
+
+        $response = "✅ Berhasil menambahkan ke keranjang!\n\n";
+        foreach ($addedProducts as $p) {
+            $formattedPrice = 'Rp '.number_format($p['price'], 0, ',', '.');
+            $formattedSubtotal = 'Rp '.number_format($p['subtotal'], 0, ',', '.');
+            $response .= "📦 {$p['name']} x{$p['quantity']}\n";
+            $response .= "   {$formattedPrice} × {$p['quantity']} = {$formattedSubtotal}\n";
+        }
+
+        if (! empty($errors)) {
+            $response .= "\n⚠️ ".implode(', ', $errors);
+        }
+
+        // Show total added
+        $response .= "\n─────────────────\n";
+        $response .= '💰 Subtotal: Rp '.number_format($totalAdded, 0, ',', '.')."\n\n";
+        $response .= "Ketik 'lihat keranjang' untuk melihat ringkasan pesanan atau 'konfirmasi' untuk checkout.";
+
+        return $response;
+    }
+
+    /**
      * Get cart summary.
      */
     protected function getCartSummary(AiAgentConversation $conversation, int $userId): string
@@ -1656,8 +1838,9 @@ class AiAgentService
             $response .= '  Subtotal: Rp '.number_format($subtotal, 0, ',', '.')."\n\n";
         }
 
-        $tax = $total * 0.11;
-        $grandTotal = $total + $tax;
+        // Use round(..., 2) to match OrderService calculation
+        $tax = round($total * 0.11, 2);
+        $grandTotal = round($total + $tax, 2);
 
         $response .= 'Subtotal: Rp '.number_format($total, 0, ',', '.')."\n";
         $response .= 'Pajak (11%): Rp '.number_format($tax, 0, ',', '.')."\n";
@@ -1665,6 +1848,74 @@ class AiAgentService
         $response .= "Ketik 'konfirmasi pesanan' untuk melanjutkan checkout.";
 
         return $response;
+    }
+
+    /**
+     * Remove a product from cart by name.
+     */
+    protected function removeFromCart(AiAgentConversation $conversation, string $productName): string
+    {
+        $cart = $conversation->getCart();
+
+        if (empty($cart)) {
+            return '🛒 Keranjang sudah kosong.';
+        }
+
+        $cleanName = trim(strtolower($productName));
+        $removedItem = null;
+        $newCart = [];
+
+        foreach ($cart as $item) {
+            // Match by partial name (case-insensitive)
+            if (stripos($item['product_name'], $cleanName) !== false) {
+                $removedItem = $item;
+            } else {
+                $newCart[] = $item;
+            }
+        }
+
+        if (! $removedItem) {
+            return "❌ Produk '{$productName}' tidak ditemukan di keranjang.\n\nKetik 'lihat keranjang' untuk melihat isi keranjang Anda.";
+        }
+
+        $conversation->updateCart($newCart);
+
+        $response = "✅ {$removedItem['product_name']} berhasil dihapus dari keranjang.\n\n";
+
+        if (empty($newCart)) {
+            $response .= '🛒 Keranjang sekarang kosong.';
+        } else {
+            // Show remaining cart summary
+            $total = 0;
+            $response .= "📦 Sisa pesanan:\n";
+            foreach ($newCart as $item) {
+                $subtotal = $item['price'] * $item['quantity'];
+                $total += $subtotal;
+                $response .= "• {$item['product_name']} x{$item['quantity']} - Rp ".number_format($subtotal, 0, ',', '.')."\n";
+            }
+            $tax = round($total * 0.11, 2);
+            $grandTotal = round($total + $tax, 2);
+            $response .= "\nTotal: Rp ".number_format($grandTotal, 0, ',', '.')."\n";
+            $response .= "\nKetik 'konfirmasi' untuk checkout atau tambah pesanan lagi.";
+        }
+
+        return $response;
+    }
+
+    /**
+     * Clear all items from cart.
+     */
+    protected function clearCart(AiAgentConversation $conversation): string
+    {
+        $cart = $conversation->getCart();
+
+        if (empty($cart)) {
+            return '🛒 Keranjang sudah kosong.';
+        }
+
+        $conversation->updateCart([]);
+
+        return "🗑️ Keranjang berhasil dikosongkan.\n\nSilakan mulai pesan lagi jika berubah pikiran! 😊";
     }
 
     /**
@@ -1693,8 +1944,9 @@ class AiAgentService
             $response .= '  Rp '.number_format($subtotal, 0, ',', '.')."\n";
         }
 
-        $tax = $total * 0.11;
-        $grandTotal = $total + $tax;
+        // Use round(..., 2) to match OrderService calculation
+        $tax = round($total * 0.11, 2);
+        $grandTotal = round($total + $tax, 2);
 
         $response .= "\nSubtotal: Rp ".number_format($total, 0, ',', '.')."\n";
         $response .= 'Pajak (11%): Rp '.number_format($tax, 0, ',', '.')."\n";

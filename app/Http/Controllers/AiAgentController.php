@@ -428,6 +428,13 @@ class AiAgentController extends Controller
             ], 200);
 
         } catch (\Exception $e) {
+            Log::error('Test AI Agent failed', [
+                'user_id' => auth()->id(),
+                'message' => $request->message ?? null,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to process test message',
@@ -1450,9 +1457,9 @@ class AiAgentController extends Controller
                         number_format($itemSubtotal, 0, ',', '.')."\n\n";
         }
 
-        // Calculate tax (11%)
-        $taxAmount = $subtotal * 0.11;
-        $total = $subtotal + $taxAmount;
+        // Calculate tax (11%) - use round(..., 2) to match OrderService
+        $taxAmount = round($subtotal * 0.11, 2);
+        $total = round($subtotal + $taxAmount, 2);
 
         $response .= "━━━━━━━━━━━━━━━━━━━━\n";
         $response .= 'Subtotal: Rp '.number_format($subtotal, 0, ',', '.')."\n";
