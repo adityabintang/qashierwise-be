@@ -555,7 +555,12 @@ class WhatsAppFlowService
     private function getDefaultReservationFlowStructure(): array
     {
         return [
-            'version' => '3.0',
+            'version' => '7.3',
+            'data_api_version' => '3.0',
+            'routing_model' => [
+                'RESERVATION_FORM' => ['CONFIRMATION_SCREEN'],
+                'CONFIRMATION_SCREEN' => [],
+            ],
             'screens' => [
                 [
                     'id' => 'RESERVATION_FORM',
@@ -649,8 +654,9 @@ class WhatsAppFlowService
                                         'type' => 'Footer',
                                         'label' => 'Kirim',
                                         'on-click-action' => [
-                                            'name' => 'complete',
+                                            'name' => 'data_exchange',
                                             'payload' => [
+                                                'trigger' => 'reservation_submitted',
                                                 'customer_name' => '${form.customer_name}',
                                                 'phone' => '${form.phone}',
                                                 'reservation_date' => '${form.reservation_date}',
@@ -692,6 +698,14 @@ class WhatsAppFlowService
                             [
                                 'type' => 'TextCaption',
                                 'text' => 'Kami akan menghubungi Anda untuk konfirmasi.',
+                            ],
+                            [
+                                'type' => 'Footer',
+                                'label' => 'Selesai',
+                                'on-click-action' => [
+                                    'name' => 'complete',
+                                    'payload' => [],
+                                ],
                             ],
                         ],
                     ],
@@ -937,8 +951,8 @@ class WhatsAppFlowService
                 'response' => $errorResponse,
             ]);
 
-            $validationErrors = $errorResponse['error']['error_user_msg'] ?? 
-                               $errorResponse['error']['message'] ?? 
+            $validationErrors = $errorResponse['error']['error_user_msg'] ??
+                               $errorResponse['error']['message'] ??
                                'Unknown error';
             throw new \Exception("Failed to update flow JSON: {$validationErrors}");
         }
@@ -989,7 +1003,7 @@ class WhatsAppFlowService
         // Update flow JSON using multipart form-data (required by Meta API)
         if ($flowId) {
             $flowJsonString = json_encode($flowJson, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            
+
             Log::info('Uploading flow JSON to Meta', [
                 'flow_id' => $flowId,
                 'json_length' => strlen($flowJsonString),
@@ -1021,14 +1035,14 @@ class WhatsAppFlowService
                     'status' => $updateResponse->status(),
                     'response' => $errorResponse,
                 ]);
-                
+
                 // Throw exception with validation errors if present
-                $validationErrors = $errorResponse['error']['error_user_msg'] ?? 
-                                   $errorResponse['error']['message'] ?? 
+                $validationErrors = $errorResponse['error']['error_user_msg'] ??
+                                   $errorResponse['error']['message'] ??
                                    'Unknown error';
                 throw new \Exception("Failed to upload flow JSON: {$validationErrors}");
             }
-            
+
             Log::info('Flow JSON uploaded successfully', [
                 'flow_id' => $flowId,
                 'response' => $updateResponse->json(),
@@ -1204,6 +1218,14 @@ class WhatsAppFlowService
                     [
                         'type' => 'TextCaption',
                         'text' => 'Kami akan menghubungi Anda untuk konfirmasi. Terima kasih!',
+                    ],
+                    [
+                        'type' => 'Footer',
+                        'label' => 'Selesai',
+                        'on-click-action' => [
+                            'name' => 'complete',
+                            'payload' => [],
+                        ],
                     ],
                 ],
             ],
@@ -1728,8 +1750,9 @@ class WhatsAppFlowService
                                 'type' => 'Footer',
                                 'label' => 'Konfirmasi Pembayaran',
                                 'on-click-action' => [
-                                    'name' => 'complete',
+                                    'name' => 'data_exchange',
                                     'payload' => [
+                                        'trigger' => 'payment_confirmed',
                                         'payment_type' => '${form.payment_type}',
                                         'payment_method' => '${form.payment_method}',
                                     ],
