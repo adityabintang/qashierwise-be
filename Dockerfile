@@ -31,9 +31,18 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     zip \
     intl
 
-# Install Redis extension using install-php-extensions (more reliable)
-ADD --chmod=0755 https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
-RUN install-php-extensions redis
+# Install Redis extension from source (avoiding PECL network issues)
+RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
+    && mkdir -p /tmp/redis \
+    && curl -fsSL https://github.com/phpredis/phpredis/archive/refs/tags/6.0.2.tar.gz | tar xz -C /tmp/redis --strip-components=1 \
+    && cd /tmp/redis \
+    && phpize \
+    && ./configure \
+    && make -j$(nproc) \
+    && make install \
+    && docker-php-ext-enable redis \
+    && rm -rf /tmp/redis \
+    && apk del .build-deps
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
