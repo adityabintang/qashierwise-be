@@ -32,7 +32,13 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     intl
 
 # Install Redis extension
-RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
+RUN apk add --no-cache --virtual .build-deps \
+    $PHPIZE_DEPS \
+    autoconf \
+    gcc \
+    g++ \
+    make \
+    linux-headers \
     && pecl install redis \
     && docker-php-ext-enable redis \
     && apk del .build-deps
