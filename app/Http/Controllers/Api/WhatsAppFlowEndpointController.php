@@ -328,7 +328,7 @@ class WhatsAppFlowEndpointController extends Controller
         $guestOptions = $config ? $config->getGuestCountOptions() : $this->getDefaultGuestOptions();
 
         return [
-            'screen' => 'APPOINTMENT',
+            'screen' => 'WELCOME_SCREEN',
             'data' => [
                 'dates' => $dates,
                 'times' => $times,
@@ -369,6 +369,7 @@ class WhatsAppFlowEndpointController extends Controller
 
         return match ($trigger) {
             'date_selected' => $this->handleDateSelected($data, $userId),
+            'welcome_submitted' => $this->handleWelcomeSubmitted($data, $userId),
             'appointment_submitted' => $this->handleAppointmentSubmitted($data, $userId),
             'details_submitted' => $this->handleDetailsSubmitted($data, $userId),
             'summary_confirmed' => $this->handleSummaryConfirmed($data, $userId),
@@ -378,6 +379,72 @@ class WhatsAppFlowEndpointController extends Controller
         };
     }
 
+    /**
+     * Handle welcome form submission - navigate to DETAILS or SUMMARY screen.
+     */
+    private function handleWelcomeSubmitted(array $data, ?int $userId): array
+    {
+        $config = $this->getFlowConfig($userId);
+        $hasDetails = $config && ($config->enable_menu_selection || $config->enable_table_selection);
+
+        if ($hasDetails) {
+            // Get event types
+            $eventTypes = $this->getEventTypes();
+
+            // Get products for the user
+            $products = $this->getProductsForCheckbox($userId);
+
+            // Get available tables
+            $tables = $this->getTablesForDropdown($userId);
+
+            return [
+                'screen' => 'DETAILS',
+                'data' => [
+                    'reservation_date' => $data['reservation_date'] ?? '',
+                    'reservation_time' => $data['reservation_time'] ?? '',
+                    'customer_name' => $data['customer_name'] ?? '',
+                    'phone' => $data['phone'] ?? '',
+                    'guest_count' => $data['guest_count'] ?? '',
+                    'event_types' => $eventTypes,
+                    'products' => $products,
+                    'tables' => $tables,
+                ],
+            ];
+        }
+
+        // Skip to SUMMARY if no details needed
+        $tableFee = (float) config('services.whatsapp.flow_table_fee', 100000);
+        $menuTotal = 0;
+        $grandTotal = $menuTotal + $tableFee;
+        $dpAmount = ceil($grandTotal * 0.5);
+
+        $appointmentSummary = $this->buildAppointmentSummary($data);
+        $priceBreakdown = $this->buildPriceBreakdown($menuTotal, $tableFee, $grandTotal, $dpAmount);
+
+        return [
+            'screen' => 'SUMMARY',
+            'data' => [
+                'reservation_date' => $data['reservation_date'] ?? '',
+                'reservation_time' => $data['reservation_time'] ?? '',
+                'customer_name' => $data['customer_name'] ?? '',
+                'phone' => $data['phone'] ?? '',
+                'guest_count' => $data['guest_count'] ?? '',
+                'email' => '',
+                'event_type' => '',
+                'special_notes' => '',
+                'selected_products' => [],
+                'table_id' => '',
+                'appointment_summary' => $appointmentSummary,
+                'menu_summary' => '🍽️ Tidak ada menu yang dipilih',
+                'table_summary' => '🪑 Meja akan ditentukan saat kedatangan',
+                'price_breakdown' => $priceBreakdown,
+                'menu_total' => '0',
+                'table_fee' => (string) $tableFee,
+                'grand_total' => (string) $grandTotal,
+                'dp_amount' => (string) $dpAmount,
+            ],
+        ];
+    }
     /**
      * Handle date selection - filter available time slots.
      */
@@ -391,7 +458,7 @@ class WhatsAppFlowEndpointController extends Controller
         $guestOptions = $config ? $config->getGuestCountOptions() : $this->getDefaultGuestOptions();
 
         return [
-            'screen' => 'APPOINTMENT',
+            'screen' => 'WELCOME_SCREEN',
             'data' => [
                 'times' => $times,
                 'is_time_enabled' => true,
@@ -637,14 +704,14 @@ class WhatsAppFlowEndpointController extends Controller
      */
     private function handleBack(array $flowData): array
     {
-        $currentScreen = $flowData['screen'] ?? 'APPOINTMENT';
+        $currentScreen = $flowData['screen'] ?? 'WELCOME_SCREEN';
 
         // Determine previous screen
         $previousScreen = match ($currentScreen) {
-            'DETAILS' => 'APPOINTMENT',
+            'DETAILS' => 'WELCOME_SCREEN',
             'SUMMARY' => 'DETAILS',
             'PAYMENT' => 'SUMMARY',
-            default => 'APPOINTMENT',
+            default => 'WELCOME_SCREEN',
         };
 
         return [
@@ -677,7 +744,7 @@ class WhatsAppFlowEndpointController extends Controller
         ]);
 
         return [
-            'screen' => 'APPOINTMENT',
+            'screen' => 'WELCOME_SCREEN',
             'data' => [
                 'dates' => $this->getAvailableDates(30),
                 'times' => $this->getAllTimeSlots(),

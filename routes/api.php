@@ -186,6 +186,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/publish', [\App\Http\Controllers\Api\ReservationFlowConfigController::class, 'publish']);
             Route::post('/sync', [\App\Http\Controllers\Api\ReservationFlowConfigController::class, 'sync']);
             Route::post('/send', [\App\Http\Controllers\Api\ReservationFlowConfigController::class, 'send']);
+            Route::post('/regenerate', [\App\Http\Controllers\Api\ReservationFlowConfigController::class, 'regenerateFlow']);
             Route::delete('/', [\App\Http\Controllers\Api\ReservationFlowConfigController::class, 'destroy']);
         });
 

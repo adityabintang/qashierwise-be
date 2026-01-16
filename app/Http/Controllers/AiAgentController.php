@@ -352,6 +352,7 @@ class AiAgentController extends Controller
                 [
                     'user_id' => $userId,
                     'wa_id' => 'test_user_'.$userId,
+                    'phone_number_id' => $whatsappAccount->phone_number_id,
                 ],
                 [
                     'name' => 'Test Contact',

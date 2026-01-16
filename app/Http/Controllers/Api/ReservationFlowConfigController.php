@@ -96,6 +96,19 @@ class ReservationFlowConfigController extends Controller
 
         $config->update($request->validated());
 
+        // If flow exists, update the flow JSON to reflect config changes
+        if ($config->hasFlow()) {
+            try {
+                $this->flowService->updateFlowJson(Auth::id(), $config->flow_id, $config);
+            } catch (\Exception $e) {
+                \Log::warning('Failed to update flow JSON after config change', [
+                    'error' => $e->getMessage(),
+                    'flow_id' => $config->flow_id,
+                ]);
+                // Don't fail the request, just log the warning
+            }
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Konfigurasi berhasil diperbarui',
@@ -105,6 +118,36 @@ class ReservationFlowConfigController extends Controller
                 'dates_preview' => array_slice($config->getAvailableDates(), 0, 7),
             ],
         ]);
+    }
+
+    /**
+     * Regenerate flow JSON for existing flow.
+     */
+    public function regenerateFlow(): JsonResponse
+    {
+        $config = ReservationFlowConfig::getOrCreateForUser(Auth::id());
+
+        if (!$config->hasFlow()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Belum ada flow yang dibuat. Silakan buat flow terlebih dahulu.',
+            ], 404);
+        }
+
+        try {
+            $this->flowService->updateFlowJson(Auth::id(), $config->flow_id, $config);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Flow JSON berhasil diperbarui',
+                'data' => $config,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**
