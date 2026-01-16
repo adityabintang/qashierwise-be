@@ -124,6 +124,7 @@ class WhatsAppFlowEndpointController extends Controller
             $response = match ($action) {
                 'INIT' => $this->handleInit($flowData),
                 'data_exchange' => $this->handleDataExchange($flowData),
+                'complete' => $this->handleComplete($flowData),
                 'BACK' => $this->handleBack($flowData),
                 'ping' => $this->handlePing(),
                 default => $this->handleUnknownAction($flowData),
@@ -347,6 +348,7 @@ class WhatsAppFlowEndpointController extends Controller
         for ($i = 1; $i <= 10; $i++) {
             $options[] = ['id' => (string) $i, 'title' => "{$i} orang"];
         }
+
         return $options;
     }
 
@@ -445,6 +447,7 @@ class WhatsAppFlowEndpointController extends Controller
             ],
         ];
     }
+
     /**
      * Handle date selection - filter available time slots.
      */
@@ -732,6 +735,171 @@ class WhatsAppFlowEndpointController extends Controller
                 'status' => 'active',
             ],
         ];
+    }
+
+    /**
+     * Handle complete action - finalize the reservation and return SUCCESS screen data.
+     *
+     * This is called when the PAYMENT screen's footer with "name": "complete" is submitted.
+     * It creates the reservation and returns the extension_message_response to close the flow.
+     *
+     * @see https://developers.facebook.com/docs/whatsapp/flows/guides/implementingyourflowendpoint#final-response-payload
+     */
+    private function handleComplete(array $flowData): array
+    {
+        $data = $flowData['data'] ?? [];
+        $flowToken = $flowData['flow_token'] ?? '';
+        $userId = $this->extractUserIdFromFlowToken($flowToken);
+
+        Log::channel('whatsapp')->info('WhatsApp Flow complete action triggered', [
+            'user_id' => $userId,
+            'data_keys' => array_keys($data),
+            'payment_type' => $data['payment_type'] ?? 'unknown',
+            'payment_method' => $data['payment_method'] ?? 'unknown',
+        ]);
+
+        try {
+            // Create the reservation
+            $reservationCode = $this->createReservation($data, $userId, $flowToken);
+
+            Log::channel('whatsapp')->info('Reservation created successfully from WhatsApp Flow', [
+                'user_id' => $userId,
+                'reservation_code' => $reservationCode,
+            ]);
+
+            // Return the final response to close the flow
+            // This uses extension_message_response format as per Meta documentation
+            return [
+                'screen' => 'SUCCESS',
+                'data' => [
+                    'extension_message_response' => [
+                        'params' => [
+                            'flow_token' => $flowToken,
+                            'reservation_code' => $reservationCode,
+                            'status' => 'success',
+                        ],
+                    ],
+                    'confirmation_message' => $this->buildConfirmationMessage($data, $reservationCode),
+                    'reservation_code' => $reservationCode,
+                ],
+            ];
+
+        } catch (\Exception $e) {
+            Log::channel('whatsapp')->error('Failed to create reservation from WhatsApp Flow', [
+                'error' => $e->getMessage(),
+                'user_id' => $userId,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            // Return error on the current screen
+            return [
+                'screen' => 'PAYMENT',
+                'data' => [
+                    'error_message' => 'Gagal membuat reservasi: '.$e->getMessage(),
+                    'payment_types' => $this->getPaymentTypes(
+                        (float) ($data['grand_total'] ?? 0),
+                        (float) ($data['dp_amount'] ?? 0)
+                    ),
+                    'payment_methods' => $this->getPaymentMethods(),
+                    'is_payment_method_enabled' => true,
+                    'payment_instruction' => 'Terjadi kesalahan. Silakan coba lagi.',
+                ],
+            ];
+        }
+    }
+
+    /**
+     * Create a reservation from the flow data.
+     */
+    private function createReservation(array $data, ?int $userId, string $flowToken): string
+    {
+        if (! $userId) {
+            throw new \Exception('User ID tidak ditemukan');
+        }
+
+        // Generate unique reservation code with better uniqueness
+        $prefix = 'RES';
+        $timestamp = now()->format('ymd');
+        $random = strtoupper(substr(uniqid(), -4));
+        $reservationCode = "{$prefix}-{$timestamp}-{$random}";
+
+        // Parse payment details
+        $paymentType = $data['payment_type'] ?? 'dp';
+        $paymentMethod = $data['payment_method'] ?? 'cash';
+        $grandTotal = (float) ($data['grand_total'] ?? 0);
+        $dpAmount = (float) ($data['dp_amount'] ?? 0);
+        $paidAmount = $paymentType === 'lunas' ? $grandTotal : $dpAmount;
+        $paymentLabel = $paymentType === 'lunas' ? 'Lunas' : 'DP';
+
+        // Get pre-order items from selected products
+        $preOrderItems = [];
+        if (! empty($data['selected_products'])) {
+            $productIds = is_array($data['selected_products'])
+                ? $data['selected_products']
+                : [$data['selected_products']];
+
+            $products = Product::whereIn('id', $productIds)->get();
+            foreach ($products as $product) {
+                $preOrderItems[] = [
+                    'product_id' => $product->id,
+                    'name' => $product->name,
+                    'price' => $product->price,
+                    'quantity' => 1,
+                ];
+            }
+        }
+
+        // Create reservation with correct field names matching the model
+        $reservation = Reservation::create([
+            'user_id' => $userId,
+            'customer_name' => $data['customer_name'] ?? '',
+            'phone' => $data['phone'] ?? '',
+            'email' => $data['email'] ?? null,
+            'reservation_date' => Carbon::parse($data['reservation_date'] ?? now()),
+            'reservation_time' => $data['reservation_time'] ?? null,
+            'guest_count' => (int) ($data['guest_count'] ?? 1),
+            'table_id' => ! empty($data['table_id']) ? (int) $data['table_id'] : null,
+            'event_type' => $data['event_type'] ?? 'regular',
+            'special_notes' => $data['special_notes'] ?? null,
+            'menu_total' => (float) ($data['menu_total'] ?? 0),
+            'table_fee' => (float) ($data['table_fee'] ?? 0),
+            'total_amount' => $grandTotal,
+            'deposit' => $dpAmount,
+            'deposit_paid' => $paymentMethod !== 'cash' && $paymentType === 'dp',
+            'paid_amount' => $paymentMethod === 'cash' ? 0 : $paidAmount,
+            'payment_type' => $paymentType,
+            'payment_method' => $paymentMethod,
+            'payment_label' => $paymentLabel,
+            'status' => 'pending',
+            'flow_token' => $flowToken,
+            'pre_order_items' => $preOrderItems,
+        ]);
+
+        // Store reservation code in preferences for retrieval
+        $reservation->update([
+            'preferences' => array_merge(
+                $reservation->preferences ?? [],
+                ['reservation_code' => $reservationCode]
+            ),
+        ]);
+
+        return $reservationCode;
+    }
+
+    /**
+     * Build confirmation message for SUCCESS screen.
+     */
+    private function buildConfirmationMessage(array $data, string $reservationCode): string
+    {
+        $date = Carbon::parse($data['reservation_date'] ?? now())->locale('id')->isoFormat('dddd, DD MMMM YYYY');
+        $time = $data['reservation_time'] ?? '';
+        $guests = $data['guest_count'] ?? 1;
+        $paymentType = ($data['payment_type'] ?? 'dp') === 'lunas' ? 'Lunas' : 'DP';
+        $paymentMethod = ($data['payment_method'] ?? 'cash') === 'qris' ? 'QRIS' : 'Bayar di Tempat';
+
+        return "Reservasi Anda untuk {$guests} tamu pada {$date} jam {$time} WIB telah berhasil dibuat.\n\n".
+               "Pembayaran: {$paymentType} via {$paymentMethod}\n\n".
+               'Kami akan menghubungi Anda untuk konfirmasi lebih lanjut. Terima kasih!';
     }
 
     /**
@@ -1090,7 +1258,7 @@ class WhatsAppFlowEndpointController extends Controller
      */
     private function getFlowConfig(?int $userId): ?\App\Models\ReservationFlowConfig
     {
-        if (!$userId) {
+        if (! $userId) {
             return null;
         }
 
@@ -1105,7 +1273,7 @@ class WhatsAppFlowEndpointController extends Controller
         // Get base time slots from config or default
         $allSlots = $config ? $config->getTimeSlots() : $this->getAllTimeSlots();
 
-        if (!$userId || !$date) {
+        if (! $userId || ! $date) {
             return $allSlots;
         }
 
@@ -1133,7 +1301,7 @@ class WhatsAppFlowEndpointController extends Controller
      */
     private function getTablesForDropdownWithConfig(?int $userId, ?\App\Models\ReservationFlowConfig $config): array
     {
-        if (!$userId) {
+        if (! $userId) {
             return [];
         }
 
@@ -1142,7 +1310,7 @@ class WhatsAppFlowEndpointController extends Controller
             ->orderBy('number');
 
         // Filter by config if available_table_ids is set
-        if ($config && !empty($config->available_table_ids)) {
+        if ($config && ! empty($config->available_table_ids)) {
             $query->whereIn('id', $config->available_table_ids);
         }
 
@@ -1157,7 +1325,7 @@ class WhatsAppFlowEndpointController extends Controller
      */
     private function getProductsForCheckboxWithConfig(?int $userId, ?\App\Models\ReservationFlowConfig $config): array
     {
-        if (!$userId) {
+        if (! $userId) {
             return [];
         }
 
@@ -1166,7 +1334,7 @@ class WhatsAppFlowEndpointController extends Controller
             ->orderBy('name');
 
         // Filter by config if available_product_ids is set
-        if ($config && !empty($config->available_product_ids)) {
+        if ($config && ! empty($config->available_product_ids)) {
             $query->whereIn('id', $config->available_product_ids);
         }
 
@@ -1181,7 +1349,7 @@ class WhatsAppFlowEndpointController extends Controller
      */
     private function getPaymentTypesWithConfig(float $grandTotal, float $dpAmount, ?\App\Models\ReservationFlowConfig $config): array
     {
-        if (!$config) {
+        if (! $config) {
             return $this->getPaymentTypes($grandTotal, $dpAmount);
         }
 
@@ -1209,7 +1377,7 @@ class WhatsAppFlowEndpointController extends Controller
      */
     private function getPaymentMethodsWithConfig(?\App\Models\ReservationFlowConfig $config): array
     {
-        if (!$config) {
+        if (! $config) {
             return $this->getPaymentMethods();
         }
 
@@ -1240,6 +1408,7 @@ class WhatsAppFlowEndpointController extends Controller
     private function calculateDpAmountFromConfig(float $grandTotal, ?\App\Models\ReservationFlowConfig $config): float
     {
         $percentage = $config ? $config->dp_percentage : 50;
+
         return ceil($grandTotal * ($percentage / 100));
     }
 }
