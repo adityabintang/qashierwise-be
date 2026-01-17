@@ -19,6 +19,7 @@ return [
     'profile_title' => 'Business Profile - QashierWise',
     'whatsapp_account_title' => 'WhatsApp Account - QashierWise',
     'ai_agent_title' => 'AI Agent - QashierWise',
+    'reservations_title' => 'Reservations - QashierWise',
 
     // Main Navigation Menu Items
     'menu_dashboard' => 'Dashboard',
@@ -230,5 +231,17 @@ return [
     'this_week' => 'This week',
     'this_month' => 'This month',
     'last_month' => 'Last month',
+
+    // Reservations
+    'reservations' => 'Reservations',
+    'manage_reservations' => 'Manage customer reservations',
+    'whatsapp_flows' => 'WhatsApp Flows',
+    'flow_configuration' => 'Flow Configuration',
+    'upcoming' => 'Upcoming',
+    'pending' => 'Pending',
+    'reservations_today' => 'Reservations today',
+    'future_reservations' => 'Future reservations',
+    'awaiting_confirmation' => 'Awaiting confirmation',
+    'total_reservations' => 'Total reservations',
 
 ];

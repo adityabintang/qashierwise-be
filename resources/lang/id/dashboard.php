@@ -19,6 +19,7 @@ return [
     'profile_title' => 'Profil Bisnis - QashierWise',
     'whatsapp_account_title' => 'Akun WhatsApp - QashierWise',
     'ai_agent_title' => 'Agen AI - QashierWise',
+    'reservations_title' => 'Reservasi - QashierWise',
 
     // Main Navigation Menu Items
     'menu_dashboard' => 'Dasbor',
@@ -230,5 +231,17 @@ return [
     'this_week' => 'Minggu ini',
     'this_month' => 'Bulan ini',
     'last_month' => 'Bulan lalu',
+
+    // Reservations
+    'reservations' => 'Reservasi',
+    'manage_reservations' => 'Kelola reservasi pelanggan',
+    'whatsapp_flows' => 'WhatsApp Flows',
+    'flow_configuration' => 'Konfigurasi Flow',
+    'upcoming' => 'Mendatang',
+    'pending' => 'Menunggu',
+    'reservations_today' => 'Reservasi hari ini',
+    'future_reservations' => 'Reservasi mendatang',
+    'awaiting_confirmation' => 'Menunggu konfirmasi',
+    'total_reservations' => 'Total reservasi',
 
 ];

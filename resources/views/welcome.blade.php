@@ -432,7 +432,7 @@
                         @auth
                             <a href="{{ url('/dashboard') }}" class="text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.dashboard') }}</a>
                         @else
-                            <a href="/login" class="text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.view_demo') }}</a>
+                            <a href="https://youtu.be/knoL8c0CJs8?si=N8RBGATUSK940ZF4" target="_blank" rel="noopener noreferrer" class="text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.view_demo') }}</a>
                             <a href="/login" class="bg-primary text-white px-5 py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-all">
                                 {{ __('landing.nav.try_free') }}
                             </a>
@@ -483,7 +483,7 @@
                         @auth
                             <a href="{{ url('/dashboard') }}" class="block py-3 px-4 text-center text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.dashboard') }}</a>
                         @else
-                            <a href="/login" class="block py-3 px-4 text-center text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.view_demo') }}</a>
+                            <a href="https://youtu.be/knoL8c0CJs8?si=N8RBGATUSK940ZF4" target="_blank" rel="noopener noreferrer" class="block py-3 px-4 text-center text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.view_demo') }}</a>
                             <a href="/login" class="block py-3 px-4 text-center bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-all">
                                 {{ __('landing.nav.try_free') }}
                             </a>
@@ -538,7 +538,7 @@
                         <a href="/login" class="inline-flex items-center justify-center px-6 md:px-8 py-3 md:py-4 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all text-sm md:text-base">
                             <span>{{ __('landing.hero.cta_primary') }}</span>
                         </a>
-                        <a href="#demo" class="inline-flex items-center justify-center px-6 md:px-8 py-3 md:py-4 bg-white text-primary rounded-xl font-semibold border-2 border-primary/30 hover:border-primary transition-all text-sm md:text-base">
+                        <a href="https://youtu.be/knoL8c0CJs8?si=N8RBGATUSK940ZF4" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center px-6 md:px-8 py-3 md:py-4 bg-white text-primary rounded-xl font-semibold border-2 border-primary/30 hover:border-primary transition-all text-sm md:text-base">
                             <i class="fas fa-play-circle mr-2"></i>
                             <span>{{ __('landing.hero.cta_secondary') }}</span>
                         </a>
@@ -1102,16 +1102,16 @@
                         AB
                     </div>
                     <div>
-                        <h3 class="font-semibold text-gray-900 text-base">Aditya Bintang Fadila</h3>
-                        <p class="text-gray-600 text-sm">QashierWise dibuat oleh Aditya Bintang Fadila, yang berkomitmen untuk menghadirkan solusi teknologi terbaik bagi industri F&B di Indonesia.</p>
+                        <h3 class="font-semibold text-gray-900 text-base">{{ __('landing.about.founder_name') }}</h3>
+                        <p class="text-gray-600 text-sm">{{ __('landing.about.founder_description') }}</p>
                     </div>
                 </div>
             </div>
 
             <div class="mt-12">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Visi Kami</h3>
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ __('landing.about.vision_title') }}</h3>
                 <p class="text-gray-600">
-                    Menjadi platform terdepan dalam transformasi digital restoran di Indonesia, membantu bisnis F&B berkembang dengan teknologi yang mudah, modern dan terjangkau.
+                    {{ __('landing.about.vision_description') }}
                 </p>
             </div>
         </div>

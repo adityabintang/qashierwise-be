@@ -57,7 +57,7 @@
                         @auth
                             <a href="{{ url('/dashboard') }}" class="text-gray-600 hover:text-primary font-medium transition">Dashboard</a>
                         @else
-                            <a href="/login" class="text-gray-600 hover:text-primary font-medium transition">Lihat Demo</a>
+                            <a href="https://youtu.be/knoL8c0CJs8?si=N8RBGATUSK940ZF4" target="_blank" rel="noopener noreferrer" class="text-gray-600 hover:text-primary font-medium transition">Lihat Demo</a>
                             <a href="/register" class="bg-primary text-white px-5 py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-all">
                                 Coba Gratis 14 Hari
                             </a>

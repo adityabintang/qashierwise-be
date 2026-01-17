@@ -284,10 +284,8 @@ return [
     // Common Actions
     // ========================================
     'view' => 'Lihat',
-    'edit' => 'Edit',
     'delete' => 'Hapus',
     'save' => 'Simpan',
-    'cancel' => 'Batal',
     'close' => 'Tutup',
     'confirm' => 'Konfirmasi',
     'back' => 'Kembali',
@@ -319,5 +317,38 @@ return [
     'body_required' => 'Isi pesan wajib diisi',
     'contact_required' => 'Silakan pilih kontak',
     
-];
 
+    // ========================================
+    // Profile
+    // ========================================
+    'profile_information' => 'Informasi Profil',
+    'phone_information' => 'Informasi Telepon',
+    'profile_picture' => 'Foto Profil',
+    'about' => 'Tentang',
+    'address' => 'Alamat',
+    'description' => 'Deskripsi',
+    'email' => 'Email',
+    'industry' => 'Industri',
+    'websites' => 'Website',
+    'phone_number' => 'Nomor Telepon',
+    'verified' => 'Terverifikasi',
+    'not_verified' => 'Belum Terverifikasi',
+    'quality' => 'Kualitas',
+    'msg_limit' => 'Batas Pesan',
+    'upload_profile_picture' => 'Unggah foto profil bisnis Anda',
+    'profile_tips' => 'Tips Profil',
+    'keep_profile_updated' => 'Perbarui profil Anda secara berkala',
+    'add_accurate_details' => 'Tambahkan detail bisnis yang akurat',
+    'use_professional_picture' => 'Gunakan foto profil yang profesional',
+    'edit' => 'Edit',
+    'cancel' => 'Batal',
+    'save_changes' => 'Simpan Perubahan',
+    'saving' => 'Menyimpan...',
+    'add_website' => 'Tambah Website',
+    'change' => 'Ubah',
+    'uploading' => 'Mengunggah...',
+    'select_industry' => 'Pilih industri...',
+    'tell_about_business' => 'Ceritakan tentang bisnis Anda kepada pelanggan...',
+    'business_address' => 'Alamat bisnis',
+    'detailed_description' => 'Deskripsi detail...',
+];

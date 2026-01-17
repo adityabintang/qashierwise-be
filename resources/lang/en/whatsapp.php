@@ -319,5 +319,39 @@ return [
     'body_required' => 'Message body is required',
     'contact_required' => 'Please select a contact',
     
-];
 
+    // ========================================
+    // Profile
+    // ========================================
+    'profile_information' => 'Profile Information',
+    'phone_information' => 'Phone Information',
+    'profile_picture' => 'Profile Picture',
+    'about' => 'About',
+    'address' => 'Address',
+    'description' => 'Description',
+    'email' => 'Email',
+    'industry' => 'Industry',
+    'websites' => 'Websites',
+    'phone_number' => 'Phone Number',
+    'verified' => 'Verified',
+    'not_verified' => 'Not Verified',
+    'quality' => 'Quality',
+    'msg_limit' => 'Msg Limit',
+    'upload_profile_picture' => 'Upload your business profile picture',
+    'profile_tips' => 'Profile Tips',
+    'keep_profile_updated' => 'Keep your profile up-to-date',
+    'add_accurate_details' => 'Add accurate business details',
+    'use_professional_picture' => 'Use a professional profile picture',
+    'edit' => 'Edit',
+    'cancel' => 'Cancel',
+    'save_changes' => 'Save Changes',
+    'saving' => 'Saving...',
+    'add_website' => 'Add Website',
+    'change' => 'Change',
+    'uploading' => 'Uploading...',
+    'select_industry' => 'Select industry...',
+    'tell_about_business' => 'Tell customers about your business...',
+    'business_address' => 'Business address',
+    'detailed_description' => 'Detailed description...',
+
+];

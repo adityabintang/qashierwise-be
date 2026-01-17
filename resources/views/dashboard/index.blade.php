@@ -21,12 +21,12 @@
                                     <i class="fas fa-exclamation-triangle text-2xl"></i>
                                 </div>
                                 <div>
-                                    <h3 class="text-lg font-bold">Trial Period Expired</h3>
-                                    <p class="text-white/90 text-sm">Your free trial has ended. Upgrade now to continue using all features.</p>
+                                    <h3 class="text-lg font-bold">{{ __('dashboard.trial_expired') }}</h3>
+                                    <p class="text-white/90 text-sm">{{ __('dashboard.trial_expired_message') }}</p>
                                 </div>
                             </div>
                             <a href="/#pricing" class="btn bg-white text-red-600 hover:bg-white/90 font-semibold px-6 py-2 rounded-lg transition-colors flex-shrink-0">
-                                <i class="fas fa-rocket mr-2"></i>Upgrade Now
+                                <i class="fas fa-rocket mr-2"></i>{{ __('dashboard.upgrade_now') }}
                             </a>
                         </div>
                     </div>
@@ -52,7 +52,7 @@
                     <div x-show="!loading" class="card stats-card p-5 hover:shadow-md transition-shadow">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Total Contacts</p>
+                                <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('dashboard.total_contacts') }}</p>
                                 <p class="text-3xl font-bold mt-1" x-text="stats.totalContacts || '0'">0</p>
                             </div>
                             <div class="h-12 w-12 rounded-xl bg-indigo-50 flex items-center justify-center">
@@ -64,7 +64,7 @@
                                 <i class="fas mr-1 text-xs" :class="stats.contactsGrowth >= 0 ? 'fa-arrow-up' : 'fa-arrow-down'"></i>
                                 <span x-text="(stats.contactsGrowth >= 0 ? '+' : '') + stats.contactsGrowth.toFixed(1) + '%'">0%</span>
                             </span>
-                            <span class="text-[hsl(var(--muted-foreground))]">from last month</span>
+                            <span class="text-[hsl(var(--muted-foreground))]">{{ __('dashboard.from_last_month') }}</span>
                         </div>
                     </div>
 
@@ -72,7 +72,7 @@
                     <div x-show="!loading" class="card stats-card p-5 hover:shadow-md transition-shadow">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Total Messages</p>
+                                <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('dashboard.total_messages') }}</p>
                                 <p class="text-3xl font-bold mt-1" x-text="stats.totalMessages || '0'">0</p>
                             </div>
                             <div class="h-12 w-12 rounded-xl bg-emerald-50 flex items-center justify-center">
@@ -84,7 +84,7 @@
                                 <i class="fas mr-1 text-xs" :class="stats.messagesGrowth >= 0 ? 'fa-arrow-up' : 'fa-arrow-down'"></i>
                                 <span x-text="(stats.messagesGrowth >= 0 ? '+' : '') + stats.messagesGrowth.toFixed(1) + '%'">0%</span>
                             </span>
-                            <span class="text-[hsl(var(--muted-foreground))]">from last week</span>
+                            <span class="text-[hsl(var(--muted-foreground))]">{{ __('dashboard.from_last_week') }}</span>
                         </div>
                     </div>
 
@@ -92,7 +92,7 @@
                     <div x-show="!loading" class="card stats-card p-5 hover:shadow-md transition-shadow">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Templates</p>
+                                <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('dashboard.templates') }}</p>
                                 <p class="text-3xl font-bold mt-1" x-text="stats.totalTemplates || '0'">0</p>
                             </div>
                             <div class="h-12 w-12 rounded-xl bg-cyan-50 flex items-center justify-center">
@@ -100,7 +100,7 @@
                             </div>
                         </div>
                         <div class="flex items-center gap-1 mt-3 text-sm text-[hsl(var(--muted-foreground))]">
-                            <span x-text="stats.approvedTemplates || '0'">0</span> approved
+                            <span x-text="stats.approvedTemplates || '0'">0</span> {{ __('dashboard.approved') }}
                         </div>
                     </div>
 
@@ -108,7 +108,7 @@
                     <div x-show="!loading" class="card stats-card p-5 hover:shadow-md transition-shadow">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Unread Messages</p>
+                                <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('dashboard.unread_messages') }}</p>
                                 <p class="text-3xl font-bold mt-1" x-text="stats.unreadMessages || '0'">0</p>
                             </div>
                             <div class="h-12 w-12 rounded-xl bg-orange-50 flex items-center justify-center">
@@ -116,7 +116,7 @@
                             </div>
                         </div>
                         <div class="mt-3">
-                            <a href="/dashboard/messages" class="text-sm text-[hsl(var(--primary))] hover:underline font-medium">View all messages →</a>
+                            <a href="/dashboard/messages" class="text-sm text-[hsl(var(--primary))] hover:underline font-medium">{{ __('dashboard.view_all_messages') }} →</a>
                         </div>
                     </div>
                 </div>
@@ -125,17 +125,17 @@
                 <div class="card p-6" x-data="weeklyChart()">
                     <div class="flex items-center justify-between mb-6">
                         <div>
-                            <h2 class="text-lg font-semibold">Weekly Messages</h2>
-                            <p class="text-sm text-[hsl(var(--muted-foreground))]">Message statistics for the past 7 days</p>
+                            <h2 class="text-lg font-semibold">{{ __('dashboard.weekly_messages') }}</h2>
+                            <p class="text-sm text-[hsl(var(--muted-foreground))]">{{ __('dashboard.message_statistics') }}</p>
                         </div>
                         <div class="flex items-center gap-4 text-sm">
                             <span class="flex items-center gap-2">
                                 <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
-                                <span class="text-[hsl(var(--muted-foreground))]">Incoming</span>
+                                <span class="text-[hsl(var(--muted-foreground))]">{{ __('dashboard.incoming') }}</span>
                             </span>
                             <span class="flex items-center gap-2">
                                 <span class="w-3 h-3 rounded-full bg-blue-500"></span>
-                                <span class="text-[hsl(var(--muted-foreground))]">Outgoing</span>
+                                <span class="text-[hsl(var(--muted-foreground))]">{{ __('dashboard.outgoing') }}</span>
                             </span>
                         </div>
                     </div>
@@ -192,15 +192,15 @@
                         <!-- Actual Stats -->
                         <div x-show="!loading" class="text-center">
                             <p class="text-2xl font-bold" x-text="chartSummary.totalIncoming">0</p>
-                            <p class="text-sm text-[hsl(var(--muted-foreground))]">Incoming</p>
+                            <p class="text-sm text-[hsl(var(--muted-foreground))]">{{ __('dashboard.incoming') }}</p>
                         </div>
                         <div x-show="!loading" class="text-center">
                             <p class="text-2xl font-bold" x-text="chartSummary.totalOutgoing">0</p>
-                            <p class="text-sm text-[hsl(var(--muted-foreground))]">Outgoing</p>
+                            <p class="text-sm text-[hsl(var(--muted-foreground))]">{{ __('dashboard.outgoing') }}</p>
                         </div>
                         <div x-show="!loading" class="text-center">
                             <p class="text-2xl font-bold" x-text="chartSummary.total">0</p>
-                            <p class="text-sm text-[hsl(var(--muted-foreground))]">Total</p>
+                            <p class="text-sm text-[hsl(var(--muted-foreground))]">{{ __('dashboard.total') }}</p>
                         </div>
                     </div>
                 </div>
@@ -211,10 +211,10 @@
                     <div class="lg:col-span-2 card" x-data="recentMessages()">
                         <div class="card-header !flex-row items-center justify-between">
                             <div>
-                                <h2 class="card-title">Recent Messages</h2>
-                                <p class="card-description">Latest conversations</p>
+                                <h2 class="card-title">{{ __('dashboard.recent_messages') }}</h2>
+                                <p class="card-description">{{ __('dashboard.latest_conversations') }}</p>
                             </div>
-                            <a href="/dashboard/messages" class="text-sm text-[hsl(var(--primary))] hover:underline font-medium">View all →</a>
+                            <a href="/dashboard/messages" class="text-sm text-[hsl(var(--primary))] hover:underline font-medium">{{ __('dashboard.view_all') }} →</a>
                         </div>
                         <div class="card-content">
                             <div x-show="loading" class="space-y-3">
@@ -265,8 +265,8 @@
                                 </template>
                                 <div x-show="!messages || messages.length === 0" class="empty-state">
                                     <div class="empty-state-icon"><i class="fas fa-inbox text-xl"></i></div>
-                                    <p class="text-sm font-medium">No messages yet</p>
-                                    <p class="text-xs text-[hsl(var(--muted-foreground))]">Messages will appear here</p>
+                                    <p class="text-sm font-medium">{{ __('dashboard.no_messages_yet') }}</p>
+                                    <p class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('dashboard.messages_will_appear') }}</p>
                                 </div>
                             </div>
                         </div>
@@ -277,7 +277,7 @@
                         <!-- Subscription Status Card -->
                         <div class="card" x-data="subscriptionStatus()" x-init="init()">
                             <div class="card-header">
-                                <h2 class="card-title">Subscription</h2>
+                                <h2 class="card-title">{{ __('dashboard.subscription') }}</h2>
                             </div>
                             <div class="card-content">
                                 <!-- Always show content, no loading state -->
@@ -356,37 +356,37 @@
 
                         <!-- Phone Info -->
                         <div class="card" x-data="phoneInfo()">
-                            <div class="card-header"><h2 class="card-title">Phone Information</h2></div>
+                            <div class="card-header"><h2 class="card-title">{{ __('dashboard.phone_information') }}</h2></div>
                             <div class="card-content space-y-4">
                                 <div class="flex items-center gap-3">
                                     <div class="h-9 w-9 rounded-lg bg-[hsl(var(--primary)/0.1)] flex items-center justify-center"><i class="fas fa-phone text-[hsl(var(--primary))]"></i></div>
-                                    <div><p class="text-xs text-[hsl(var(--muted-foreground))]">Phone Number</p><p class="text-sm font-medium" x-text="info.display_phone_number || '-'">-</p></div>
+                                    <div><p class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('dashboard.phone_number') }}</p><p class="text-sm font-medium" x-text="info.display_phone_number || '-'">-</p></div>
                                 </div>
                                 <div class="flex items-center gap-3">
                                     <div class="h-9 w-9 rounded-lg bg-blue-50 flex items-center justify-center"><i class="fas fa-shield-alt text-blue-500"></i></div>
-                                    <div><p class="text-xs text-[hsl(var(--muted-foreground))]">Verified</p><p class="text-sm font-medium" :class="info.verified_name ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--muted-foreground))]'" x-text="info.verified_name || 'Not Verified'">-</p></div>
+                                    <div><p class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('dashboard.verified') }}</p><p class="text-sm font-medium" :class="info.verified_name ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--muted-foreground))]'" x-text="info.verified_name || '{{ __('dashboard.not_verified') }}'">-</p></div>
                                 </div>
                                 <div class="flex items-center gap-3">
                                     <div class="h-9 w-9 rounded-lg bg-purple-50 flex items-center justify-center"><i class="fas fa-star text-purple-500"></i></div>
-                                    <div><p class="text-xs text-[hsl(var(--muted-foreground))]">Quality</p><p class="text-sm font-medium capitalize" x-text="info.quality_rating || '-'">-</p></div>
+                                    <div><p class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('dashboard.quality') }}</p><p class="text-sm font-medium capitalize" x-text="info.quality_rating || '-'">-</p></div>
                                 </div>
                             </div>
                         </div>
                         <!-- Quick Actions -->
                         <div class="card">
-                            <div class="card-header"><h2 class="card-title">Quick Actions</h2></div>
+                            <div class="card-header"><h2 class="card-title">{{ __('dashboard.quick_actions') }}</h2></div>
                             <div class="card-content space-y-2">
                                 <a href="/dashboard/contacts" class="flex items-center gap-3 p-3 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors">
                                     <div class="h-9 w-9 rounded-lg bg-blue-500 flex items-center justify-center"><i class="fas fa-users text-white"></i></div>
-                                    <div><p class="text-sm font-medium">Manage Contacts</p><p class="text-xs text-[hsl(var(--muted-foreground))]">View and organize</p></div>
+                                    <div><p class="text-sm font-medium">{{ __('dashboard.manage_contacts') }}</p><p class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('dashboard.view_and_organize') }}</p></div>
                                 </a>
                                 <a href="/dashboard/messages" class="flex items-center gap-3 p-3 rounded-lg bg-[hsl(var(--primary)/0.1)] hover:bg-[hsl(var(--primary)/0.15)] transition-colors">
                                     <div class="h-9 w-9 rounded-lg bg-[hsl(var(--primary))] flex items-center justify-center"><i class="fas fa-paper-plane text-white"></i></div>
-                                    <div><p class="text-sm font-medium">Send Message</p><p class="text-xs text-[hsl(var(--muted-foreground))]">Start a conversation</p></div>
+                                    <div><p class="text-sm font-medium">{{ __('dashboard.send_message') }}</p><p class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('dashboard.start_conversation') }}</p></div>
                                 </a>
                                 <a href="/dashboard/templates" class="flex items-center gap-3 p-3 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors">
                                     <div class="h-9 w-9 rounded-lg bg-purple-500 flex items-center justify-center"><i class="fas fa-file-alt text-white"></i></div>
-                                    <div><p class="text-sm font-medium">Templates</p><p class="text-xs text-[hsl(var(--muted-foreground))]">Manage templates</p></div>
+                                    <div><p class="text-sm font-medium">{{ __('dashboard.templates') }}</p><p class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('dashboard.manage_templates') }}</p></div>
                                 </a>
                             </div>
                         </div>

@@ -1,13 +1,13 @@
 @extends('layouts.app')
 
-@section('title', 'Reservations - QashierWise')
+@section('title', __('dashboard.reservations_title'))
 
 @section('content')
 <div x-data="reservationsApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
     @include('components.dashboard-sidebar', ['activePage' => 'reservations'])
 
     <div class="flex-1 flex flex-col min-h-screen">
-        @include('components.dashboard-header', ['title' => 'Reservations', 'description' => 'Manage customer reservations'])
+        @include('components.dashboard-header', ['title' => __('dashboard.reservations'), 'description' => __('dashboard.manage_reservations')])
 
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto space-y-6">
@@ -19,19 +19,19 @@
                             @click="activeTab = 'reservations'"
                             :class="activeTab === 'reservations' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'"
                             class="px-6 py-3 font-medium transition-colors hover:text-primary whitespace-nowrap">
-                            <i class="fas fa-calendar-check mr-2"></i>Reservations
+                            <i class="fas fa-calendar-check mr-2"></i>{{ __('dashboard.reservations') }}
                         </button>
                         <button
                             @click="activeTab = 'flows'"
                             :class="activeTab === 'flows' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'"
                             class="px-6 py-3 font-medium transition-colors hover:text-primary whitespace-nowrap">
-                            <i class="fab fa-whatsapp mr-2"></i>WhatsApp Flows
+                            <i class="fab fa-whatsapp mr-2"></i>{{ __('dashboard.whatsapp_flows') }}
                         </button>
                         <button
                             @click="activeTab = 'flow-config'; loadFlowConfig()"
                             :class="activeTab === 'flow-config' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'"
                             class="px-6 py-3 font-medium transition-colors hover:text-primary whitespace-nowrap">
-                            <i class="fas fa-cog mr-2"></i>Flow Configuration
+                            <i class="fas fa-cog mr-2"></i>{{ __('dashboard.flow_configuration') }}
                         </button>
                     </div>
                 </div>
@@ -43,53 +43,53 @@
                     <div class="card stats-card p-5">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm text-muted-foreground font-medium">Today</p>
+                                <p class="text-sm text-muted-foreground font-medium">{{ __('dashboard.today') }}</p>
                                 <p class="text-3xl font-bold mt-1" x-text="stats.today"></p>
                             </div>
                             <div class="h-12 w-12 rounded-xl bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
                                 <i class="fas fa-calendar-day text-blue-600 dark:text-blue-400 text-xl"></i>
                             </div>
                         </div>
-                        <p class="text-xs text-muted-foreground mt-3">Reservations today</p>
+                        <p class="text-xs text-muted-foreground mt-3">{{ __('dashboard.reservations_today') }}</p>
                     </div>
 
                     <div class="card stats-card p-5">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm text-muted-foreground font-medium">Upcoming</p>
+                                <p class="text-sm text-muted-foreground font-medium">{{ __('dashboard.upcoming') }}</p>
                                 <p class="text-3xl font-bold mt-1" x-text="stats.upcoming"></p>
                             </div>
                             <div class="h-12 w-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center">
                                 <i class="fas fa-clock text-emerald-600 dark:text-emerald-400 text-xl"></i>
                             </div>
                         </div>
-                        <p class="text-xs text-muted-foreground mt-3">Future reservations</p>
+                        <p class="text-xs text-muted-foreground mt-3">{{ __('dashboard.future_reservations') }}</p>
                     </div>
 
                     <div class="card stats-card p-5">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm text-muted-foreground font-medium">Pending</p>
+                                <p class="text-sm text-muted-foreground font-medium">{{ __('dashboard.pending') }}</p>
                                 <p class="text-3xl font-bold mt-1" x-text="stats.pending"></p>
                             </div>
                             <div class="h-12 w-12 rounded-xl bg-yellow-100 dark:bg-yellow-900/20 flex items-center justify-center">
                                 <i class="fas fa-hourglass-half text-yellow-600 dark:text-yellow-400 text-xl"></i>
                             </div>
                         </div>
-                        <p class="text-xs text-muted-foreground mt-3">Awaiting confirmation</p>
+                        <p class="text-xs text-muted-foreground mt-3">{{ __('dashboard.awaiting_confirmation') }}</p>
                     </div>
 
                     <div class="card stats-card p-5">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm text-muted-foreground font-medium">This Month</p>
+                                <p class="text-sm text-muted-foreground font-medium">{{ __('dashboard.this_month') }}</p>
                                 <p class="text-3xl font-bold mt-1" x-text="stats.total_this_month"></p>
                             </div>
                             <div class="h-12 w-12 rounded-xl bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center">
                                 <i class="fas fa-chart-line text-purple-600 dark:text-purple-400 text-xl"></i>
                             </div>
                         </div>
-                        <p class="text-xs text-muted-foreground mt-3">Total reservations</p>
+                        <p class="text-xs text-muted-foreground mt-3">{{ __('dashboard.total_reservations') }}</p>
                     </div>
                 </div>
 

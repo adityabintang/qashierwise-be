@@ -182,7 +182,7 @@ return [
         'what_is_title' => 'Apa itu QashierWise?',
         'what_is_description_1' => 'QashierWise adalah solusi modern yang menghadirkan AI Chatbot WhatsApp dengan sistem POS (Point of Sale) untuk restoran dan manajemen untuk proses reservasi dan pemesanan melalui WhatsApp. Serta menyajikan operasional bisnis dengan integrasi QRIS.',
         'what_is_description_2' => 'Dengan QashierWise restoran dapat mengelola operasional lewat API, mengubah pesan secara otomatis, memiliki pembayaran QRIS, dan meningkatkan bisnis yang kompetitif - semua dalam satu platform yang mudah digunakan.',
-        'founder_title' => 'Pengelola',
+        'founder_title' => 'Founder',
         'founder_name' => 'Aditya Bintang Fadila',
         'founder_description' => 'QashierWise dibuat oleh Aditya Bintang Fadila, yang berkomitmen untuk menghadirkan solusi teknologi terbaik bagi industri F&B di Indonesia.',
         'vision_title' => 'Visi Kami',

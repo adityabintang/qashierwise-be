@@ -54,15 +54,15 @@
                 <!-- Header with Create Button -->
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
-                        <h2 class="text-lg font-semibold">Message Templates</h2>
-                        <p class="text-sm text-[hsl(var(--muted-foreground))] hidden sm:block">Create and manage your WhatsApp message templates</p>
+                        <h2 class="text-lg font-semibold">{{ __('whatsapp.message_templates') }}</h2>
+                        <p class="text-sm text-[hsl(var(--muted-foreground))] hidden sm:block">{{ __('whatsapp.create_manage_templates') }}</p>
                     </div>
                     <div class="flex gap-2">
                         @if(config('app.debug'))
                         <button @click="refreshTemplates()" :disabled="refreshing" class="btn btn-outline btn-md flex-1 sm:flex-none">
                             <i class="fas" :class="refreshing ? 'fa-spinner animate-spin' : 'fa-sync-alt'"></i>
-                            <span class="hidden sm:inline" x-text="refreshing ? 'Syncing...' : 'Sync from Meta'"></span>
-                            <span class="sm:hidden" x-text="refreshing ? '' : 'Sync'"></span>
+                            <span class="hidden sm:inline" x-text="refreshing ? '{{ __('whatsapp.syncing') }}' : '{{ __('whatsapp.sync_from_meta') }}'"></span>
+                            <span class="sm:hidden" x-text="refreshing ? '' : '{{ __('whatsapp.sync') }}'"></span>
                         </button>
                         @endif
                         <button @click="openCreateModal()" class="btn btn-primary btn-md flex-1 sm:flex-none">
@@ -77,28 +77,28 @@
                 <div class="card p-3 sm:p-4">
                     <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                         <div>
-                            <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">Status</label>
+                            <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">{{ __('dashboard.status') }}</label>
                             <select x-model="filters.status" @change="filterTemplates" class="input w-full min-h-[44px]">
-                                <option value="">All Statuses</option>
-                                <option value="APPROVED">Approved</option>
-                                <option value="PENDING">Pending</option>
-                                <option value="REJECTED">Rejected</option>
+                                <option value="">{{ __('whatsapp.all_statuses') }}</option>
+                                <option value="APPROVED">{{ __('whatsapp.approved') }}</option>
+                                <option value="PENDING">{{ __('whatsapp.pending') }}</option>
+                                <option value="REJECTED">{{ __('whatsapp.rejected') }}</option>
                             </select>
                         </div>
                         <div>
-                            <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">Category</label>
+                            <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">{{ __('whatsapp.category') }}</label>
                             <select x-model="filters.category" @change="filterTemplates" class="input w-full min-h-[44px]">
-                                <option value="">All Categories</option>
-                                <option value="MARKETING">Marketing</option>
-                                <option value="UTILITY">Utility</option>
-                                <option value="AUTHENTICATION">Authentication</option>
+                                <option value="">{{ __('whatsapp.all_categories') }}</option>
+                                <option value="MARKETING">{{ __('whatsapp.marketing') }}</option>
+                                <option value="UTILITY">{{ __('whatsapp.utility') }}</option>
+                                <option value="AUTHENTICATION">{{ __('whatsapp.authentication') }}</option>
                             </select>
                         </div>
                         <div class="col-span-2 sm:col-span-1">
-                            <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">Search</label>
+                            <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">{{ __('dashboard.search') }}</label>
                             <div class="relative">
                                 <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none"></i>
-                                <input type="text" x-model="filters.search" @input="filterTemplates" placeholder="Search templates..." class="input pl-10 w-full min-h-[44px]">
+                                <input type="text" x-model="filters.search" @input="filterTemplates" placeholder="{{ __('whatsapp.search_templates') }}" class="input pl-10 w-full min-h-[44px]">
                             </div>
                         </div>
                     </div>
@@ -243,8 +243,8 @@
                         <div class="empty-state-icon">
                             <i class="fas fa-file-alt text-2xl"></i>
                         </div>
-                        <h3 class="font-semibold mt-4">No templates found</h3>
-                        <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">Your message templates will appear here.</p>
+                        <h3 class="font-semibold mt-4">{{ __('whatsapp.no_templates_found') }}</h3>
+                        <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">{{ __('whatsapp.templates_will_appear') }}</p>
                     </div>
                 </div>
 
