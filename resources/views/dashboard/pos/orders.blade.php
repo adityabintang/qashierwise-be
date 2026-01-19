@@ -48,8 +48,8 @@
                         <div class="col-span-2 sm:col-span-2">
                             <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">Search</label>
                             <div class="relative">
-                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm"></i>
-                                <input type="text" x-model="search" @input.debounce.300ms="fetchOrders()" placeholder="Search order number..." class="input pl-10 w-full min-h-[44px]">
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none z-10"></i>
+                                <input type="text" x-model="search" @input="debounceSearch()" placeholder="Search order number..." class="input pl-10 w-full min-h-[44px]" style="padding-left: 2.5rem;">
                             </div>
                         </div>
                     </div>
@@ -335,10 +335,19 @@ function ordersApp() {
         createForm: { store_id: '', table_id: '' },
         pagination: { currentPage: 1, lastPage: 1, from: 0, to: 0, total: 0 },
         sidebarOpen: window.innerWidth >= 1024, isMobile: window.innerWidth < 768, user: null, notifications: [],
+        searchTimeout: null,
 
         async init() {
             this.initSidebar();
             await Promise.all([this.fetchOrders(), this.fetchStores()]);
+        },
+
+        debounceSearch() {
+            clearTimeout(this.searchTimeout);
+            this.searchTimeout = setTimeout(() => {
+                this.pagination.currentPage = 1;
+                this.fetchOrders();
+            }, 300);
         },
 
         initSidebar() {

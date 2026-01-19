@@ -17,8 +17,8 @@
                         <div class="sm:col-span-2">
                             <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">Search</label>
                             <div class="relative">
-                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm"></i>
-                                <input type="text" x-model="search" @input.debounce.300ms="fetchTransactions()" placeholder="Search order number..." class="input pl-10 w-full min-h-[44px]">
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none z-10"></i>
+                                <input type="text" x-model="search" @input.debounce.300ms="fetchTransactions()" placeholder="Search order number..."  class="input w-full min-h-[44px]" style="padding-left: 2.5rem;">
                             </div>
                         </div>
                         <div>

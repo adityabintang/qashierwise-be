@@ -18,17 +18,18 @@
                 <!-- Search & Filter -->
                 <div class="card p-3 md:p-4 -mx-4 md:mx-0 rounded-none md:rounded-lg">
                     <div class="flex flex-col sm:flex-row gap-3 md:gap-4">
-                        <div class="flex-1 relative">
-                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none"></i>
+                        <div class="relative" style="flex: 1 1 0%; min-width: 0;">
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none z-10"></i>
                             <input
                                 type="text"
                                 x-model="searchQuery"
                                 @input="filterContacts"
                                 placeholder="{{ __('whatsapp.search_contacts') }}"
-                                class="input pl-10 w-full"
+                                class="input w-full"
+                                style="padding-left: 2.5rem;"
                             >
                         </div>
-                        <select x-model="sortBy" @change="sortContacts" class="input w-full sm:w-48">
+                        <select x-model="sortBy" @change="sortContacts" class="input w-full sm:w-auto" style="flex: 0 0 auto; min-width: 180px; max-width: 220px;">
                             <option value="name_asc">{{ __('whatsapp.name_asc') }}</option>
                             <option value="name_desc">{{ __('whatsapp.name_desc') }}</option>
                             <option value="recent">{{ __('whatsapp.recently_added') }}</option>

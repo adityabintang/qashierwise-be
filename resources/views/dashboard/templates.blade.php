@@ -79,7 +79,7 @@
                         <div>
                             <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">{{ __('dashboard.status') }}</label>
                             <select x-model="filters.status" @change="filterTemplates" class="input w-full min-h-[44px]">
-                                <option value="">{{ __('whatsapp.all_statuses') }}</option>
+                                <option value="">All Status</option>
                                 <option value="APPROVED">{{ __('whatsapp.approved') }}</option>
                                 <option value="PENDING">{{ __('whatsapp.pending') }}</option>
                                 <option value="REJECTED">{{ __('whatsapp.rejected') }}</option>
@@ -97,8 +97,8 @@
                         <div class="col-span-2 sm:col-span-1">
                             <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">{{ __('dashboard.search') }}</label>
                             <div class="relative">
-                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none"></i>
-                                <input type="text" x-model="filters.search" @input="filterTemplates" placeholder="{{ __('whatsapp.search_templates') }}" class="input pl-10 w-full min-h-[44px]">
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none z-10"></i>
+                                <input type="text" x-model="filters.search" @input="filterTemplates" placeholder="{{ __('whatsapp.search_templates') }}" class="input w-full min-h-[44px]" style="padding-left: 2.5rem;">
                             </div>
                         </div>
                     </div>

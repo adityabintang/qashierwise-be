@@ -27,7 +27,8 @@
                                     x-model="contactSearch"
                                     @input="filterContactList"
                                     placeholder="{{ __('whatsapp.search_contacts') }}"
-                                    class="input pl-10 w-full h-9 text-sm"
+                                    class="input w-full"
+                                    style="padding-left: 2.5rem;"
                                 >
                             </div>
                         </div>

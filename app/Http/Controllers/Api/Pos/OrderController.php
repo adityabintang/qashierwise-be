@@ -31,10 +31,20 @@ class OrderController extends Controller
         }
 
         $perPage = $request->input('per_page', 20);
+        
+        // Clean search input - remove # if present
+        $search = $request->input('search');
+        if ($search) {
+            $search = str_replace('#', '', $search);
+        }
+        
         $orders = Order::with(['store', 'table', 'posUser.user', 'items.product'])
             ->whereHas('store', fn($q) => $q->where('user_id', $userId))
             ->when($request->input('store_id'), fn($q, $storeId) => $q->where('store_id', $storeId))
             ->when($request->input('status'), fn($q, $status) => $q->where('status', $status))
+            ->when($search, fn($q) => 
+                $q->where('order_number', 'like', '%' . $search . '%')
+            )
             ->orderBy('created_at', 'desc')
             ->paginate($perPage);
 
