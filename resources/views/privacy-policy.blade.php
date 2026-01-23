@@ -210,6 +210,7 @@
                     <ul class="space-y-2 text-sm">
                         <li><a href="/privacy-policy" class="text-gray-600 hover:text-primary transition">Kebijakan Privasi</a></li>
                         <li><a href="/terms-of-service" class="text-gray-600 hover:text-primary transition">Ketentuan Layanan</a></li>
+                        <li><a href="/refund-policy" class="text-gray-600 hover:text-primary transition">Kebijakan Pengembalian Dana</a></li>
                     </ul>
                 </div>
 

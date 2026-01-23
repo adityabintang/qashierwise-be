@@ -1211,6 +1211,7 @@
                     <ul class="space-y-2 text-sm">
                         <li><a href="/privacy-policy" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.privacy_policy') }}</a></li>
                         <li><a href="/terms-of-service" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.terms_of_service') }}</a></li>
+                        <li><a href="/refund-policy" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.refund_policy') }}</a></li>
                     </ul>
                 </div>
 

@@ -40,6 +40,10 @@ Route::get('/terms-of-service', function () {
     return view('terms-of-service');
 })->name('terms-of-service');
 
+Route::get('/refund-policy', function () {
+    return view('refund-policy');
+})->name('refund-policy');
+
 // Public QRIS Payment Page
 Route::get('/pay/qris/{orderId}', [App\Http\Controllers\QrisPaymentPageController::class, 'show'])
     ->name('qris.payment.page');

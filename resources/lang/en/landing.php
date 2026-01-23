@@ -223,6 +223,7 @@ return [
         'product_title' => 'Product',
         'privacy_policy' => 'Privacy Policy',
         'terms_of_service' => 'Terms of Service',
+        'refund_policy' => 'Refund Policy',
         'console' => 'QashierWise Console',
         'chatbot' => 'WhatsApp Chatbot',
         'copyright' => '&copy; 2025 QashierWise by Aditya Bintang Fadila. All Rights Reserved.',
