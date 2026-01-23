@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Kebijakan Pengembalian Dana - QashierWise</title>
+    <title>{{ __('legal.refund_policy.meta_title') }}</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -27,39 +27,89 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
     <style>
         body { font-family: 'Inter', sans-serif; }
+        [x-cloak] { display: none !important; }
     </style>
 </head>
 <body class="bg-white">
     <!-- Navigation -->
-    <nav class="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
+    <nav x-data="{ menuOpen: false }" class="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <!-- Logo -->
                 <div class="flex items-center space-x-2 mb-4">
                         <img src="{{ asset('images/logo-48.png') }}" class="h-7 rounded-xl" alt="Logo" width="28" height="28" loading="eager">
-                        <span class="text-xl font-bold text-primary">QashierWise</span>
+                        <span class="text-xl font-bold text-primary">{{ __('legal.company_name') }}</span>
                 </div>
 
                 <!-- Desktop Menu -->
                 <div class="hidden md:flex items-center space-x-8">
-                    <a href="/#features" class="text-gray-600 hover:text-primary transition">Cara Kerja</a>
-                    <a href="/#fitur" class="text-gray-600 hover:text-primary transition">Fitur</a>
-                    <a href="/#pricing" class="text-gray-600 hover:text-primary transition">Harga</a>
-                    <a href="/#about" class="text-gray-600 hover:text-primary transition">Tentang Kami</a>
-                    <a href="/#faq" class="text-gray-600 hover:text-primary transition">FAQ</a>
+                    <a href="/#features" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.how_it_works') }}</a>
+                    <a href="/#fitur" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.features') }}</a>
+                    <a href="/#pricing" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.pricing') }}</a>
+                    <a href="/#about" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.about') }}</a>
+                    <a href="/#faq" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.faq') }}</a>
                 </div>
 
                 <!-- CTA Buttons -->
-                <div class="flex items-center space-x-4">
+                <div class="hidden md:flex items-center space-x-4">
+                    <!-- Language Switcher -->
+                    <x-language-switcher />
+                    
                     @if (Route::has('login'))
                         @auth
-                            <a href="{{ url('/dashboard') }}" class="text-gray-600 hover:text-primary font-medium transition">Dashboard</a>
+                            <a href="{{ url('/dashboard') }}" class="text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.dashboard') }}</a>
                         @else
-                            <a href="https://youtu.be/knoL8c0CJs8?si=N8RBGATUSK940ZF4" target="_blank" rel="noopener noreferrer" class="text-gray-600 hover:text-primary font-medium transition">Lihat Demo</a>
+                            <a href="https://youtu.be/knoL8c0CJs8?si=N8RBGATUSK940ZF4" target="_blank" rel="noopener noreferrer" class="text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.view_demo') }}</a>
                             <a href="/register" class="bg-primary text-white px-5 py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-all">
-                                Coba Gratis 14 Hari
+                                {{ __('landing.nav.try_free') }}
+                            </a>
+                        @endauth
+                    @endif
+                </div>
+
+                <!-- Mobile Hamburger Button -->
+                <button
+                    @click="menuOpen = !menuOpen"
+                    class="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    aria-label="Toggle menu"
+                >
+                    <i x-show="!menuOpen" class="fas fa-bars text-xl"></i>
+                    <i x-show="menuOpen" x-cloak class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile Menu -->
+        <div
+            x-show="menuOpen"
+            x-cloak
+            @click.away="menuOpen = false"
+            class="md:hidden bg-white border-t border-gray-100 shadow-lg"
+        >
+            <div class="px-4 py-4 space-y-3">
+                <a href="/#features" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.how_it_works') }}</a>
+                <a href="/#fitur" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.features') }}</a>
+                <a href="/#pricing" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.pricing') }}</a>
+                <a href="/#about" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.about') }}</a>
+                <a href="/#faq" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.faq') }}</a>
+
+                <div class="pt-4 border-t border-gray-100 space-y-3">
+                    <div class="flex justify-center">
+                        <x-language-switcher />
+                    </div>
+                    
+                    @if (Route::has('login'))
+                        @auth
+                            <a href="{{ url('/dashboard') }}" class="block py-3 px-4 text-center text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.dashboard') }}</a>
+                        @else
+                            <a href="https://youtu.be/knoL8c0CJs8?si=N8RBGATUSK940ZF4" target="_blank" rel="noopener noreferrer" class="block py-3 px-4 text-center text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.view_demo') }}</a>
+                            <a href="/register" class="block py-3 px-4 text-center bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-all">
+                                {{ __('landing.nav.try_free') }}
                             </a>
                         @endauth
                     @endif
@@ -74,134 +124,121 @@
             <!-- Back Link -->
             <a href="/" class="inline-flex items-center text-gray-600 hover:text-primary mb-8 transition">
                 <i class="fas fa-arrow-left mr-2"></i>
-                Kembali ke Beranda
+                {{ __('legal.back_to_home') }}
             </a>
 
             <!-- Title -->
-            <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-4">Kebijakan Pengembalian Dana</h1>
-            <p class="text-gray-500 mb-12">Terakhir diperbarui: 23 Januari 2026</p>
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-4">{{ __('legal.refund_policy.title') }}</h1>
+            <p class="text-gray-500 mb-12">{{ __('legal.last_updated') }}: {{ __('legal.refund_policy.last_updated_date') }}</p>
 
             <!-- Content -->
             <div class="prose prose-lg max-w-none">
                 <!-- Introduction -->
-                <p class="text-gray-600 mb-6">Di QashierWise, kami berkomitmen untuk memberikan layanan terbaik kepada pelanggan kami. Kebijakan pengembalian dana ini menjelaskan hak Anda terkait pengembalian dana untuk layanan berlangganan QashierWise.</p>
+                <p class="text-gray-600 mb-6">{{ __('legal.refund_policy.intro') }}</p>
 
                 <!-- Section 1 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">1. Periode Uji Coba Gratis</h2>
-                <p class="text-gray-600 mb-4">QashierWise menawarkan periode uji coba gratis selama 14 hari untuk pengguna baru:</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">1. {{ __('legal.refund_policy.section_1.title') }}</h2>
+                <p class="text-gray-600 mb-4">{{ __('legal.refund_policy.section_1.intro') }}</p>
                 <ul class="list-disc pl-6 text-gray-600 space-y-2 mb-6">
-                    <li>Tidak ada biaya yang dikenakan selama periode uji coba</li>
-                    <li>Anda dapat membatalkan kapan saja selama periode uji coba tanpa dikenakan biaya</li>
-                    <li>Setelah periode uji coba berakhir, langganan akan otomatis dikonversi ke paket berbayar yang dipilih</li>
-                    <li>Anda akan menerima notifikasi sebelum periode uji coba berakhir</li>
+                    @foreach(__('legal.refund_policy.section_1.items') as $item)
+                        <li>{{ $item }}</li>
+                    @endforeach
                 </ul>
 
                 <!-- Section 2 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">2. Kebijakan Pengembalian Dana 7 Hari</h2>
-                <p class="text-gray-600 mb-4">Kami menawarkan jaminan pengembalian dana 100% dalam 7 hari pertama setelah pembayaran pertama Anda:</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">2. {{ __('legal.refund_policy.section_2.title') }}</h2>
+                <p class="text-gray-600 mb-4">{{ __('legal.refund_policy.section_2.intro') }}</p>
                 <ul class="list-disc pl-6 text-gray-600 space-y-2 mb-6">
-                    <li>Berlaku untuk pembayaran pertama paket Standard dan Pro</li>
-                    <li>Permintaan pengembalian dana harus diajukan dalam 7 hari kalender sejak tanggal pembayaran</li>
-                    <li>Pengembalian dana akan diproses ke metode pembayaran asli</li>
-                    <li>Waktu pemrosesan pengembalian dana: 5-14 hari kerja tergantung penyedia pembayaran</li>
-                    <li>Akun Anda akan dinonaktifkan setelah pengembalian dana diproses</li>
+                    @foreach(__('legal.refund_policy.section_2.items') as $item)
+                        <li>{{ $item }}</li>
+                    @endforeach
                 </ul>
 
                 <!-- Section 3 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">3. Pembatalan Langganan</h2>
-                <p class="text-gray-600 mb-4">Anda dapat membatalkan langganan Anda kapan saja:</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">3. {{ __('legal.refund_policy.section_3.title') }}</h2>
+                <p class="text-gray-600 mb-4">{{ __('legal.refund_policy.section_3.intro') }}</p>
                 <ul class="list-disc pl-6 text-gray-600 space-y-2 mb-6">
-                    <li>Pembatalan dapat dilakukan melalui dashboard akun Anda</li>
-                    <li>Layanan akan tetap aktif hingga akhir periode billing yang telah dibayar</li>
-                    <li>Tidak ada pengembalian dana prorata untuk pembatalan di tengah periode billing (setelah 7 hari pertama)</li>
-                    <li>Data Anda akan disimpan selama 30 hari setelah pembatalan untuk memudahkan reaktivasi</li>
-                    <li>Setelah 30 hari, data akan dihapus secara permanen sesuai kebijakan privasi kami</li>
+                    @foreach(__('legal.refund_policy.section_3.items') as $item)
+                        <li>{{ $item }}</li>
+                    @endforeach
                 </ul>
 
                 <!-- Section 4 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">4. Kondisi yang Tidak Memenuhi Syarat Pengembalian Dana</h2>
-                <p class="text-gray-600 mb-4">Pengembalian dana tidak akan diberikan dalam kondisi berikut:</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">4. {{ __('legal.refund_policy.section_4.title') }}</h2>
+                <p class="text-gray-600 mb-4">{{ __('legal.refund_policy.section_4.intro') }}</p>
                 <ul class="list-disc pl-6 text-gray-600 space-y-2 mb-6">
-                    <li>Permintaan pengembalian dana diajukan setelah 7 hari sejak pembayaran pertama</li>
-                    <li>Pelanggaran terhadap Ketentuan Layanan kami</li>
-                    <li>Penyalahgunaan layanan atau aktivitas penipuan</li>
-                    <li>Pembayaran perpanjangan langganan (hanya pembayaran pertama yang memenuhi syarat)</li>
-                    <li>Biaya transaksi QRIS atau payment gateway yang dikenakan oleh pihak ketiga</li>
-                    <li>Downgrade dari paket Pro ke Standard atau Basic</li>
+                    @foreach(__('legal.refund_policy.section_4.items') as $item)
+                        <li>{{ $item }}</li>
+                    @endforeach
                 </ul>
 
                 <!-- Section 5 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">5. Cara Mengajukan Pengembalian Dana</h2>
-                <p class="text-gray-600 mb-4">Untuk mengajukan pengembalian dana, ikuti langkah-langkah berikut:</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">5. {{ __('legal.refund_policy.section_5.title') }}</h2>
+                <p class="text-gray-600 mb-4">{{ __('legal.refund_policy.section_5.intro') }}</p>
                 <ol class="list-decimal pl-6 text-gray-600 space-y-2 mb-6">
-                    <li>Hubungi tim support kami melalui email di support@qashierwise.com atau WhatsApp di +62 882-1545-7494</li>
-                    <li>Sertakan informasi berikut:
+                    <li>{{ __('legal.refund_policy.section_5.step_1') }}</li>
+                    <li>{{ __('legal.refund_policy.section_5.step_2') }}
                         <ul class="list-disc pl-6 mt-2 space-y-1">
-                            <li>Nama akun dan email terdaftar</li>
-                            <li>Nomor invoice atau ID transaksi</li>
-                            <li>Alasan permintaan pengembalian dana</li>
-                            <li>Tanggal pembayaran</li>
+                            @foreach(__('legal.refund_policy.section_5.step_2_items') as $item)
+                                <li>{{ $item }}</li>
+                            @endforeach
                         </ul>
                     </li>
-                    <li>Tim kami akan meninjau permintaan Anda dalam 2-3 hari kerja</li>
-                    <li>Jika disetujui, pengembalian dana akan diproses dalam 5-14 hari kerja</li>
-                    <li>Anda akan menerima konfirmasi email setelah pengembalian dana diproses</li>
+                    <li>{{ __('legal.refund_policy.section_5.step_3') }}</li>
+                    <li>{{ __('legal.refund_policy.section_5.step_4') }}</li>
+                    <li>{{ __('legal.refund_policy.section_5.step_5') }}</li>
                 </ol>
 
                 <!-- Section 6 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">6. Pengembalian Dana untuk Transaksi QRIS</h2>
-                <p class="text-gray-600 mb-4">Untuk transaksi QRIS yang dilakukan oleh pelanggan restoran Anda:</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">6. {{ __('legal.refund_policy.section_6.title') }}</h2>
+                <p class="text-gray-600 mb-4">{{ __('legal.refund_policy.section_6.intro') }}</p>
                 <ul class="list-disc pl-6 text-gray-600 space-y-2 mb-6">
-                    <li>QashierWise hanya menyediakan platform, bukan penyedia payment gateway</li>
-                    <li>Pengembalian dana transaksi QRIS diatur oleh kebijakan penyedia payment gateway Anda (Midtrans, Xendit, dll)</li>
-                    <li>Anda bertanggung jawab untuk mengelola pengembalian dana kepada pelanggan Anda</li>
-                    <li>QashierWise tidak bertanggung jawab atas sengketa transaksi antara Anda dan pelanggan Anda</li>
-                    <li>Biaya transaksi yang dikenakan oleh payment gateway tidak dapat dikembalikan</li>
+                    @foreach(__('legal.refund_policy.section_6.items') as $item)
+                        <li>{{ $item }}</li>
+                    @endforeach
                 </ul>
 
                 <!-- Section 7 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">7. Upgrade dan Downgrade Paket</h2>
-                <p class="text-gray-600 mb-4">Ketentuan untuk perubahan paket langganan:</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">7. {{ __('legal.refund_policy.section_7.title') }}</h2>
+                <p class="text-gray-600 mb-4">{{ __('legal.refund_policy.section_7.intro') }}</p>
                 <ul class="list-disc pl-6 text-gray-600 space-y-2 mb-6">
-                    <li><strong>Upgrade:</strong> Perbedaan harga akan diprorata dan ditagih segera. Fitur baru akan aktif setelah pembayaran berhasil</li>
-                    <li><strong>Downgrade:</strong> Perubahan akan berlaku pada periode billing berikutnya. Tidak ada pengembalian dana untuk perbedaan harga</li>
-                    <li>Anda dapat mengubah paket kapan saja melalui dashboard akun</li>
-                    <li>Fitur yang tidak tersedia di paket baru akan dinonaktifkan setelah downgrade</li>
+                    <li>{!! __('legal.refund_policy.section_7.upgrade') !!}</li>
+                    <li>{!! __('legal.refund_policy.section_7.downgrade') !!}</li>
+                    @foreach(__('legal.refund_policy.section_7.items') as $item)
+                        <li>{{ $item }}</li>
+                    @endforeach
                 </ul>
 
                 <!-- Section 8 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">8. Gangguan Layanan dan Kompensasi</h2>
-                <p class="text-gray-600 mb-4">Dalam hal terjadi gangguan layanan yang signifikan:</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">8. {{ __('legal.refund_policy.section_8.title') }}</h2>
+                <p class="text-gray-600 mb-4">{{ __('legal.refund_policy.section_8.intro') }}</p>
                 <ul class="list-disc pl-6 text-gray-600 space-y-2 mb-6">
-                    <li>Kami akan memberikan notifikasi tentang gangguan layanan melalui email atau dashboard</li>
-                    <li>Jika gangguan berlangsung lebih dari 24 jam berturut-turut, Anda berhak mendapatkan kredit layanan prorata</li>
-                    <li>Kredit layanan akan otomatis diterapkan ke periode billing berikutnya</li>
-                    <li>Gangguan yang disebabkan oleh pemeliharaan terjadwal tidak memenuhi syarat untuk kompensasi</li>
-                    <li>Force majeure (bencana alam, perang, dll) tidak termasuk dalam kebijakan kompensasi</li>
+                    @foreach(__('legal.refund_policy.section_8.items') as $item)
+                        <li>{{ $item }}</li>
+                    @endforeach
                 </ul>
 
                 <!-- Section 9 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">9. Perubahan Kebijakan</h2>
-                <p class="text-gray-600 mb-6">QashierWise berhak untuk mengubah kebijakan pengembalian dana ini kapan saja. Perubahan akan:</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">9. {{ __('legal.refund_policy.section_9.title') }}</h2>
+                <p class="text-gray-600 mb-6">{{ __('legal.refund_policy.section_9.intro') }}</p>
                 <ul class="list-disc pl-6 text-gray-600 space-y-2 mb-6">
-                    <li>Diposting di halaman ini dengan tanggal "terakhir diperbarui" yang baru</li>
-                    <li>Diberitahukan kepada pengguna aktif melalui email</li>
-                    <li>Berlaku untuk transaksi baru setelah tanggal perubahan</li>
-                    <li>Tidak mempengaruhi hak pengembalian dana yang sudah ada sebelum perubahan</li>
+                    @foreach(__('legal.refund_policy.section_9.items') as $item)
+                        <li>{{ $item }}</li>
+                    @endforeach
                 </ul>
 
                 <!-- Section 10 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">10. Hubungi Kami</h2>
-                <p class="text-gray-600 mb-6">Jika Anda memiliki pertanyaan tentang kebijakan pengembalian dana ini atau ingin mengajukan permintaan pengembalian dana, silakan hubungi kami:</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">10. {{ __('legal.refund_policy.section_10.title') }}</h2>
+                <p class="text-gray-600 mb-6">{{ __('legal.refund_policy.section_10.intro') }}</p>
 
                 <!-- Contact Box -->
                 <div class="bg-gray-50 rounded-xl p-6 mb-8">
-                    <h3 class="font-bold text-gray-900 mb-3">QashierWise - Customer Support</h3>
+                    <h3 class="font-bold text-gray-900 mb-3">{{ __('legal.customer_support') }}</h3>
                     <div class="text-gray-600 space-y-1">
-                        <p><span class="font-medium">Email:</span> support@qashierwise.com</p>
-                        <p><span class="font-medium">WhatsApp:</span> +62 882-1545-7494</p>
-                        <p><span class="font-medium">Jam Operasional:</span> Senin - Jumat, 09:00 - 17:00 WIB</p>
-                        <p><span class="font-medium">Alamat:</span> Jl. Widosari No. 55, Tegalrejo Raya, Salatiga, Jawa Tengah, Indonesia 50733</p>
+                        <p><span class="font-medium">{{ __('legal.email') }}:</span> support@qashierwise.com</p>
+                        <p><span class="font-medium">{{ __('legal.whatsapp') }}:</span> +62882003235019</p>
+                        <p><span class="font-medium">{{ __('legal.operating_hours') }}:</span> {{ __('legal.monday_friday') }}</p>
+                        <p><span class="font-medium">{{ __('legal.address') }}:</span> Jl. Widosari No. 55, Tegalrejo Raya, Salatiga, Jawa Tengah, Indonesia 50733</p>
                     </div>
                 </div>
 
@@ -212,9 +249,9 @@
                             <i class="fas fa-info-circle text-primary text-xl"></i>
                         </div>
                         <div class="ml-3">
-                            <h3 class="text-sm font-medium text-gray-900 mb-2">Catatan Penting</h3>
+                            <h3 class="text-sm font-medium text-gray-900 mb-2">{{ __('legal.refund_policy.important_notice.title') }}</h3>
                             <div class="text-sm text-gray-600">
-                                <p>Dengan menggunakan layanan QashierWise, Anda menyetujui kebijakan pengembalian dana ini. Kami sangat menyarankan Anda untuk memanfaatkan periode uji coba gratis 14 hari untuk memastikan layanan kami sesuai dengan kebutuhan bisnis Anda sebelum melakukan pembayaran.</p>
+                                <p>{{ __('legal.refund_policy.important_notice.content') }}</p>
                             </div>
                         </div>
                     </div>
@@ -231,50 +268,50 @@
                 <div>
                     <div class="flex items-center space-x-2 mb-4">
                         <img src="{{ asset('images/logo-48.png') }}" class="h-7 rounded-xl" alt="Logo" width="28" height="28" loading="lazy">
-                        <span class="text-xl font-bold text-primary">QashierWise</span>
+                        <span class="text-xl font-bold text-primary">{{ __('legal.company_name') }}</span>
                     </div>
                     <p class="text-sm text-gray-600 mb-4">
-                        Coba gratis 14 hari, QashierWise membantu restoran menerima reservasi & order via WhatsApp dengan cepat.
+                        {!! __('landing.footer.company_description') !!}
                     </p>
                     <div class="text-sm text-gray-600">
-                        <p class="font-semibold text-gray-900 mb-1">Alamat</p>
-                        <p>Jl. Widosari No. 55, Tegalrejo Raya<br>Salatiga, Jawa Tengah, Indonesia<br>50733</p>
+                        <p class="font-semibold text-gray-900 mb-1">{{ __('legal.address') }}</p>
+                        <p>{!! __('landing.footer.address') !!}</p>
                     </div>
                 </div>
 
                 <!-- Navigation -->
                 <div>
-                    <h3 class="text-gray-900 font-semibold mb-4">Navigasi</h3>
+                    <h3 class="text-gray-900 font-semibold mb-4">{{ __('landing.footer.navigation_title') }}</h3>
                     <ul class="space-y-2 text-sm">
-                        <li><a href="/#fitur" class="text-gray-600 hover:text-primary transition">Fitur</a></li>
-                        <li><a href="/#pricing" class="text-gray-600 hover:text-primary transition">Harga</a></li>
-                        <li><a href="/#about" class="text-gray-600 hover:text-primary transition">Tentang Kami</a></li>
-                        <li><a href="/#faq" class="text-gray-600 hover:text-primary transition">FAQ</a></li>
+                        <li><a href="/#fitur" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.features') }}</a></li>
+                        <li><a href="/#pricing" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.pricing') }}</a></li>
+                        <li><a href="/#about" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.about') }}</a></li>
+                        <li><a href="/#faq" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.faq') }}</a></li>
                     </ul>
                 </div>
 
                 <!-- Legal -->
                 <div>
-                    <h3 class="text-gray-900 font-semibold mb-4">Legal</h3>
+                    <h3 class="text-gray-900 font-semibold mb-4">{{ __('landing.footer.legal_title') }}</h3>
                     <ul class="space-y-2 text-sm">
-                        <li><a href="/privacy-policy" class="text-gray-600 hover:text-primary transition">Kebijakan Privasi</a></li>
-                        <li><a href="/terms-of-service" class="text-gray-600 hover:text-primary transition">Ketentuan Layanan</a></li>
-                        <li><a href="/refund-policy" class="text-gray-600 hover:text-primary transition">Kebijakan Pengembalian Dana</a></li>
+                        <li><a href="/privacy-policy" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.privacy_policy') }}</a></li>
+                        <li><a href="/terms-of-service" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.terms_of_service') }}</a></li>
+                        <li><a href="/refund-policy" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.refund_policy') }}</a></li>
                     </ul>
                 </div>
 
                 <!-- Product -->
                 <div>
-                    <h3 class="text-gray-900 font-semibold mb-4">Produk</h3>
+                    <h3 class="text-gray-900 font-semibold mb-4">{{ __('landing.footer.product_title') }}</h3>
                     <ul class="space-y-2 text-sm">
-                        <li><a href="#" class="text-gray-600 hover:text-primary transition">QashierWise Console</a></li>
-                        <li><a href="#" class="text-gray-600 hover:text-primary transition">Chatbot WhatsApp</a></li>
+                        <li><a href="#" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.console') }}</a></li>
+                        <li><a href="#" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.chatbot') }}</a></li>
                     </ul>
                 </div>
             </div>
 
             <div class="border-t border-gray-200 pt-8 text-center text-sm text-gray-600">
-                <p>&copy; 2025 QashierWise by Aditya Bintang Fadila. All Rights Reserved.</p>
+                <p>{!! __('landing.footer.copyright') !!}</p>
             </div>
         </div>
     </footer>
