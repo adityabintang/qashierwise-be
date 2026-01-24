@@ -11,6 +11,34 @@
 
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-4xl mx-auto space-y-6">
+                <!-- Flash Messages -->
+                @if(session('success'))
+                    <div class="p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-green-600 mt-1"></i>
+                            <p class="text-green-800">{{ session('success') }}</p>
+                        </div>
+                    </div>
+                @endif
+
+                @if(session('error'))
+                    <div class="p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-red-600 mt-1"></i>
+                            <p class="text-red-800">{{ session('error') }}</p>
+                        </div>
+                    </div>
+                @endif
+
+                @if(session('info'))
+                    <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <p class="text-blue-800">{{ session('info') }}</p>
+                        </div>
+                    </div>
+                @endif
+
                 <!-- Loading State -->
                 <div x-show="loading" class="space-y-6">
                     <div class="card p-6">
@@ -22,6 +50,25 @@
                     </div>
                 </div>
 
+                <!-- No Subscription State -->
+                @if($subscription === null)
+                <div x-show="!loading" class="card">
+                    <div class="card-content text-center py-12">
+                        <div class="h-20 w-20 rounded-full bg-purple-100 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-rocket text-4xl text-purple-600"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-2">No Active Subscription</h3>
+                        <p class="text-gray-600 mb-6 max-w-md mx-auto">
+                            You don't have an active subscription yet. Choose a plan to unlock all premium features and grow your business.
+                        </p>
+                        <a href="{{ route('subscription.pricing') }}" 
+                           class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all">
+                            <i class="fas fa-star"></i>
+                            View Plans & Pricing
+                        </a>
+                    </div>
+                </div>
+                @else
                 <!-- Subscription Details Card -->
                 <div x-show="!loading" class="card">
                     <div class="card-header">
@@ -156,6 +203,7 @@
                         </div>
                     </div>
                 </div>
+                @endif
 
                 <!-- Actions Card -->
                 <div x-show="!loading" class="card">

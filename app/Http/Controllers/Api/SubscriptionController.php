@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\MidtransSnapService;
 use App\Services\PlanConfig;
 use App\Services\PolarService;
 use App\Services\SubscriptionService;
@@ -21,6 +22,7 @@ class SubscriptionController extends Controller
 {
     public function __construct(
         private SubscriptionService $subscriptionService,
+        private MidtransSnapService $midtransSnapService,
         private PolarService $polarService,
         private PlanConfig $planConfig,
     ) {}
@@ -71,37 +73,57 @@ class SubscriptionController extends Controller
         $user = $request->user();
         $planId = $request->input('plan_id');
 
-        // Check if Polar service is configured
-        if (!$this->polarService->isConfigured()) {
+        Log::info('Checkout attempt', [
+            'userId' => $user->id,
+            'planId' => $planId,
+        ]);
+
+        // Check if Midtrans Snap service is configured
+        if (!$this->midtransSnapService->isConfigured()) {
+            Log::error('Midtrans Snap not configured', [
+                'userId' => $user->id,
+                'planId' => $planId,
+            ]);
+            
             return response()->json([
                 'success' => false,
                 'error' => [
-                    'code' => 'POLAR_CONFIG_MISSING',
+                    'code' => 'MIDTRANS_CONFIG_MISSING',
                     'message' => 'Subscription service is not configured',
                 ],
             ], 503);
         }
 
-        $result = $this->polarService->createCheckoutSessionWithError($user, $planId);
+        // Create Snap token
+        $result = $this->midtransSnapService->createSubscriptionSnapToken($user, $planId);
 
-        if ($result['session'] === null) {
+        if ($result === null) {
+            Log::error('Failed to create Snap token', [
+                'userId' => $user->id,
+                'planId' => $planId,
+            ]);
+            
             return response()->json([
                 'success' => false,
                 'error' => [
                     'code' => 'CHECKOUT_FAILED',
                     'message' => 'Failed to create checkout session',
-                    'detail' => config('app.debug') ? $result['error'] : null,
                 ],
             ], 500);
         }
 
-        $checkoutSession = $result['session'];
+        Log::info('Checkout session created successfully', [
+            'userId' => $user->id,
+            'planId' => $planId,
+            'hasSnapToken' => !empty($result['snap_token']),
+            'hasRedirectUrl' => !empty($result['redirect_url']),
+        ]);
 
         return response()->json([
             'success' => true,
             'data' => [
-                'checkout_url' => $checkoutSession->url,
-                'session_id' => $checkoutSession->id,
+                'redirect_url' => $result['redirect_url'],
+                'snap_token' => $result['snap_token'],
             ],
         ]);
     }

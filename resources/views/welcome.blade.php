@@ -1302,24 +1302,28 @@
                     this.selectedPlan = planId;
 
                     try {
-                        const response = await fetch('/subscription/checkout', {
+                        const response = await fetch('/api/subscription/checkout', {
                             method: 'POST',
                             headers: {
                                 'Authorization': `Bearer ${this.token}`,
                                 'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                                'Accept': 'application/json'
                             },
                             body: JSON.stringify({ plan_id: planId })
                         });
 
+                        if (!response.ok) {
+                            const errorData = await response.json().catch(() => ({ error: { message: 'Terjadi kesalahan pada server' } }));
+                            throw new Error(errorData.error?.message || 'Gagal membuat sesi checkout');
+                        }
+
                         const data = await response.json();
 
-                        if (response.ok && data.redirect_url) {
+                        if (response.ok && data.data?.redirect_url) {
                             // Redirect to Midtrans payment page
-                            window.location.href = data.redirect_url;
+                            window.location.href = data.data.redirect_url;
                         } else {
-                            this.error = data.message || 'Gagal membuat sesi checkout. Silakan coba lagi.';
+                            this.error = data.error?.message || 'Gagal membuat sesi checkout. Silakan coba lagi.';
                         }
                     } catch (e) {
                         console.error('Checkout error:', e);
