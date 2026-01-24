@@ -3,7 +3,80 @@
 @section('title', 'Manage Subscription - QashierWise')
 
 @section('content')
-<div x-data="manageSubscription()" x-init="init()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="{
+    ...manageSubscription(),
+    isMobile: window.innerWidth < 1024,
+    sidebarOpen: window.innerWidth >= 1024,
+    user: null,
+    notifications: [],
+    
+    initDashboard() {
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            this.isMobile = window.innerWidth < 1024;
+            if (!this.isMobile) {
+                this.sidebarOpen = true;
+            }
+        });
+        
+        // Load user info
+        let storedUser = localStorage.getItem('user');
+        if (storedUser) {
+            try {
+                this.user = JSON.parse(storedUser);
+            } catch (e) {
+                this.user = { name: 'User', email: 'user@example.com' };
+            }
+        } else {
+            this.user = { name: 'User', email: 'user@example.com' };
+        }
+        
+        // Initialize subscription data
+        this.init();
+    },
+    
+    clearNotifications() {
+        this.notifications = [];
+    },
+    
+    removeNotification(id) {
+        this.notifications = this.notifications.filter(n => n.id !== id);
+    },
+    
+    formatNotificationTime(time) {
+        if (!time) return '';
+        const date = new Date(time);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        
+        const diffHours = Math.floor(diffMins / 60);
+        if (diffHours < 24) return `${diffHours}h ago`;
+        
+        const diffDays = Math.floor(diffHours / 24);
+        if (diffDays < 7) return `${diffDays}d ago`;
+        
+        return date.toLocaleDateString();
+    },
+    
+    logout() {
+        let apiBaseUrl = window.location.origin + '/api';
+        fetch(`${apiBaseUrl}/logout`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Accept': 'application/json'
+            }
+        }).then(() => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        });
+    }
+}" x-init="initDashboard()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
     @include('components.dashboard-sidebar', ['activePage' => 'subscription'])
 
     <div class="flex-1 flex flex-col min-h-screen">
@@ -51,8 +124,7 @@
                 </div>
 
                 <!-- No Subscription State -->
-                @if($subscription === null)
-                <div x-show="!loading" class="card">
+                <div x-show="!loading && !subscription" class="card">
                     <div class="card-content text-center py-12">
                         <div class="h-20 w-20 rounded-full bg-purple-100 flex items-center justify-center mx-auto mb-4">
                             <i class="fas fa-rocket text-4xl text-purple-600"></i>
@@ -61,16 +133,16 @@
                         <p class="text-gray-600 mb-6 max-w-md mx-auto">
                             You don't have an active subscription yet. Choose a plan to unlock all premium features and grow your business.
                         </p>
-                        <a href="{{ route('subscription.pricing') }}" 
+                        <a href="/#pricing" 
                            class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all">
                             <i class="fas fa-star"></i>
                             View Plans & Pricing
                         </a>
                     </div>
                 </div>
-                @else
+
                 <!-- Subscription Details Card -->
-                <div x-show="!loading" class="card">
+                <div x-show="!loading && subscription" class="card">
                     <div class="card-header">
                         <h2 class="card-title">Current Plan</h2>
                         <p class="card-description">Your subscription details and billing information</p>
@@ -80,15 +152,15 @@
                             <div class="flex items-center gap-4">
                                 <div class="h-16 w-16 rounded-xl flex items-center justify-center"
                                      :class="{
-                                         'bg-gray-100': subscription.plan_name === 'free_trial',
-                                         'bg-blue-100': subscription.plan_name === 'standard',
-                                         'bg-purple-100': subscription.plan_name === 'pro'
+                                         'bg-gray-100': subscription?.plan_name === 'free_trial',
+                                         'bg-blue-100': subscription?.plan_name === 'standard',
+                                         'bg-purple-100': subscription?.plan_name === 'pro'
                                      }">
                                     <i class="fas text-3xl"
                                        :class="{
-                                           'fa-gift text-gray-600': subscription.plan_name === 'free_trial',
-                                           'fa-star text-blue-600': subscription.plan_name === 'standard',
-                                           'fa-crown text-purple-600': subscription.plan_name === 'pro'
+                                           'fa-gift text-gray-600': subscription?.plan_name === 'free_trial',
+                                           'fa-star text-blue-600': subscription?.plan_name === 'standard',
+                                           'fa-crown text-purple-600': subscription?.plan_name === 'pro'
                                        }"></i>
                                 </div>
                                 <div>
@@ -97,11 +169,11 @@
                                 </div>
                             </div>
                             <div class="text-right">
-                                <p class="text-3xl font-bold text-gray-900" x-show="subscription.plan_name !== 'free_trial'">
-                                    <span x-text="formatPrice(subscription.amount)">Rp 0</span>
+                                <p class="text-3xl font-bold text-gray-900" x-show="subscription?.plan_name !== 'free_trial'">
+                                    <span x-text="formatPrice(subscription?.amount)">Rp 0</span>
                                 </p>
-                                <p class="text-sm text-gray-600" x-show="subscription.plan_name !== 'free_trial'">per month</p>
-                                <p class="text-lg font-semibold text-gray-700" x-show="subscription.plan_name === 'free_trial'">
+                                <p class="text-sm text-gray-600" x-show="subscription?.plan_name !== 'free_trial'">per month</p>
+                                <p class="text-lg font-semibold text-gray-700" x-show="subscription?.plan_name === 'free_trial'">
                                     Free Trial
                                 </p>
                             </div>
@@ -115,57 +187,57 @@
                                 <div class="flex items-center gap-2">
                                     <span class="h-2 w-2 rounded-full"
                                           :class="{
-                                              'bg-green-500': subscription.status === 'active',
-                                              'bg-yellow-500': subscription.status === 'trial',
-                                              'bg-orange-500': subscription.status === 'cancelled',
-                                              'bg-red-500': subscription.status === 'expired' || subscription.status === 'trial_expired'
+                                              'bg-green-500': subscription?.status === 'active',
+                                              'bg-yellow-500': subscription?.status === 'trial',
+                                              'bg-orange-500': subscription?.status === 'cancelled',
+                                              'bg-red-500': subscription?.status === 'expired' || subscription?.status === 'trial_expired'
                                           }"></span>
-                                    <span class="font-semibold capitalize" x-text="subscription.status">-</span>
+                                    <span class="font-semibold capitalize" x-text="subscription?.status || '-'">-</span>
                                 </div>
                             </div>
 
                             <!-- Current Period -->
-                            <div class="p-4 bg-gray-50 rounded-lg" x-show="subscription.period_start">
+                            <div class="p-4 bg-gray-50 rounded-lg" x-show="subscription?.period_start">
                                 <p class="text-sm text-gray-600 mb-1">Current Period</p>
                                 <p class="font-semibold">
-                                    <span x-text="formatDate(subscription.period_start)">-</span>
+                                    <span x-text="formatDate(subscription?.period_start)">-</span>
                                     <span class="text-gray-500">to</span>
-                                    <span x-text="formatDate(subscription.period_end)">-</span>
+                                    <span x-text="formatDate(subscription?.period_end)">-</span>
                                 </p>
                             </div>
 
                             <!-- Next Billing Date -->
-                            <div class="p-4 bg-gray-50 rounded-lg" x-show="subscription.status === 'active' && subscription.period_end">
+                            <div class="p-4 bg-gray-50 rounded-lg" x-show="subscription?.status === 'active' && subscription?.period_end">
                                 <p class="text-sm text-gray-600 mb-1">Next Billing Date</p>
-                                <p class="font-semibold" x-text="formatDate(subscription.period_end)">-</p>
+                                <p class="font-semibold" x-text="formatDate(subscription?.period_end)">-</p>
                             </div>
 
                             <!-- Trial Days Remaining -->
-                            <div class="p-4 bg-amber-50 rounded-lg" x-show="subscription.status === 'trial'">
+                            <div class="p-4 bg-amber-50 rounded-lg" x-show="subscription?.status === 'trial'">
                                 <p class="text-sm text-amber-700 mb-1">Trial Days Remaining</p>
                                 <p class="font-semibold text-amber-900">
-                                    <span x-text="subscription.trial_days_remaining || 0">0</span> days
+                                    <span x-text="subscription?.trial_days_remaining || 0">0</span> days
                                 </p>
                             </div>
 
                             <!-- Cancelled At -->
-                            <div class="p-4 bg-orange-50 rounded-lg" x-show="subscription.cancelled_at">
+                            <div class="p-4 bg-orange-50 rounded-lg" x-show="subscription?.cancelled_at">
                                 <p class="text-sm text-orange-700 mb-1">Cancelled On</p>
-                                <p class="font-semibold text-orange-900" x-text="formatDate(subscription.cancelled_at)">-</p>
+                                <p class="font-semibold text-orange-900" x-text="formatDate(subscription?.cancelled_at)">-</p>
                             </div>
                         </div>
 
                         <!-- Alerts -->
                         <div class="mt-6 space-y-3">
                             <!-- Trial Expiring Soon -->
-                            <div x-show="subscription.status === 'trial' && subscription.trial_days_remaining <= 3" 
+                            <div x-show="subscription?.status === 'trial' && subscription?.trial_days_remaining <= 3" 
                                  class="p-4 bg-amber-50 border border-amber-200 rounded-lg">
                                 <div class="flex items-start gap-3">
                                     <i class="fas fa-exclamation-triangle text-amber-600 mt-1"></i>
                                     <div>
                                         <p class="font-semibold text-amber-900">Trial Ending Soon</p>
                                         <p class="text-sm text-amber-700 mt-1">
-                                            Your trial will expire in <span x-text="subscription.trial_days_remaining">0</span> days. 
+                                            Your trial will expire in <span x-text="subscription?.trial_days_remaining || 0">0</span> days. 
                                             Upgrade now to continue using all features.
                                         </p>
                                     </div>
@@ -173,7 +245,7 @@
                             </div>
 
                             <!-- Subscription Cancelled -->
-                            <div x-show="subscription.status === 'cancelled'" 
+                            <div x-show="subscription?.status === 'cancelled'" 
                                  class="p-4 bg-orange-50 border border-orange-200 rounded-lg">
                                 <div class="flex items-start gap-3">
                                     <i class="fas fa-info-circle text-orange-600 mt-1"></i>
@@ -181,14 +253,14 @@
                                         <p class="font-semibold text-orange-900">Subscription Cancelled</p>
                                         <p class="text-sm text-orange-700 mt-1">
                                             Your subscription has been cancelled. You'll have access until 
-                                            <span x-text="formatDate(subscription.period_end)">-</span>.
+                                            <span x-text="formatDate(subscription?.period_end)">-</span>.
                                         </p>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Trial Expired -->
-                            <div x-show="subscription.status === 'trial_expired'" 
+                            <div x-show="subscription?.status === 'trial_expired'" 
                                  class="p-4 bg-red-50 border border-red-200 rounded-lg">
                                 <div class="flex items-start gap-3">
                                     <i class="fas fa-times-circle text-red-600 mt-1"></i>
@@ -203,18 +275,17 @@
                         </div>
                     </div>
                 </div>
-                @endif
 
                 <!-- Actions Card -->
-                <div x-show="!loading" class="card">
+                <div x-show="!loading && subscription" class="card">
                     <div class="card-header">
                         <h2 class="card-title">Actions</h2>
                         <p class="card-description">Manage your subscription</p>
                     </div>
                     <div class="card-content space-y-3">
                         <!-- Upgrade Button (for trial/expired users) -->
-                        <a x-show="subscription.status === 'trial' || subscription.status === 'trial_expired' || subscription.status === 'expired'"
-                           href="{{ route('subscription.pricing') }}"
+                        <a x-show="subscription?.status === 'trial' || subscription?.status === 'trial_expired' || subscription?.status === 'expired'"
+                           href="/#pricing"
                            class="flex items-center justify-between p-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all">
                             <div class="flex items-center gap-3">
                                 <i class="fas fa-rocket text-2xl"></i>
@@ -227,7 +298,7 @@
                         </a>
 
                         <!-- View Pricing -->
-                        <a href="{{ route('subscription.pricing') }}"
+                        <a href="/#pricing"
                            class="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors">
                             <div class="flex items-center gap-3">
                                 <i class="fas fa-tags text-xl text-gray-600"></i>
@@ -240,7 +311,7 @@
                         </a>
 
                         <!-- Cancel Subscription (for active subscriptions) -->
-                        <button x-show="subscription.status === 'active' && subscription.plan_name !== 'free_trial'"
+                        <button x-show="subscription?.status === 'active' && subscription?.plan_name !== 'free_trial'"
                                 @click="showCancelModal = true"
                                 class="flex items-center justify-between w-full p-4 bg-red-50 hover:bg-red-100 rounded-xl transition-colors text-left">
                             <div class="flex items-center gap-3">
@@ -256,15 +327,59 @@
                 </div>
 
                 <!-- Billing History Card -->
-                <div x-show="!loading && subscription.plan_name !== 'free_trial'" class="card">
+                <div x-show="!loading && subscription && subscription.plan_name !== 'free_trial'" class="card">
                     <div class="card-header">
                         <h2 class="card-title">Billing History</h2>
                         <p class="card-description">Your payment history</p>
                     </div>
                     <div class="card-content">
-                        <div class="text-center py-8 text-gray-500">
+                        <!-- Loading State -->
+                        <div x-show="billingLoading" class="text-center py-8">
+                            <i class="fas fa-spinner fa-spin text-3xl text-gray-400 mb-3"></i>
+                            <p class="text-gray-500">Loading billing history...</p>
+                        </div>
+
+                        <!-- Empty State -->
+                        <div x-show="!billingLoading && billingHistory.length === 0" class="text-center py-8 text-gray-500">
                             <i class="fas fa-receipt text-4xl mb-3"></i>
                             <p>No billing history available yet</p>
+                        </div>
+
+                        <!-- Billing History List -->
+                        <div x-show="!billingLoading && billingHistory.length > 0" class="space-y-3">
+                            <template x-for="payment in billingHistory" :key="payment.id">
+                                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                    <div class="flex items-center gap-4">
+                                        <div class="h-10 w-10 rounded-full flex items-center justify-center"
+                                             :class="{
+                                                 'bg-green-100': payment.status === 'settlement' || payment.status === 'capture',
+                                                 'bg-yellow-100': payment.status === 'pending',
+                                                 'bg-red-100': payment.status === 'deny' || payment.status === 'cancel' || payment.status === 'expire'
+                                             }">
+                                            <i class="fas"
+                                               :class="{
+                                                   'fa-check text-green-600': payment.status === 'settlement' || payment.status === 'capture',
+                                                   'fa-clock text-yellow-600': payment.status === 'pending',
+                                                   'fa-times text-red-600': payment.status === 'deny' || payment.status === 'cancel' || payment.status === 'expire'
+                                               }"></i>
+                                        </div>
+                                        <div>
+                                            <p class="font-semibold text-gray-900" x-text="payment.plan_name"></p>
+                                            <p class="text-sm text-gray-600" x-text="formatDate(payment.transaction_time)"></p>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="font-semibold text-gray-900" x-text="formatPrice(payment.gross_amount)"></p>
+                                        <p class="text-xs capitalize"
+                                           :class="{
+                                               'text-green-600': payment.status === 'settlement' || payment.status === 'capture',
+                                               'text-yellow-600': payment.status === 'pending',
+                                               'text-red-600': payment.status === 'deny' || payment.status === 'cancel' || payment.status === 'expire'
+                                           }"
+                                           x-text="payment.status"></p>
+                                    </div>
+                                </div>
+                            </template>
                         </div>
                     </div>
                 </div>
@@ -293,7 +408,7 @@
                 </div>
 
                 <div class="space-y-3">
-                    <form action="{{ route('subscription.cancel.post') }}" method="POST">
+                    <form action="{{ route('subscription.cancel.post') }}" method="POST" @submit="cancelLoading = true">
                         @csrf
                         <button type="submit"
                                 :disabled="cancelLoading"
@@ -306,7 +421,8 @@
                         </button>
                     </form>
                     <button @click="showCancelModal = false"
-                            class="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-all">
+                            :disabled="cancelLoading"
+                            class="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-all disabled:opacity-50">
                         Keep Subscription
                     </button>
                 </div>
@@ -320,12 +436,17 @@
     function manageSubscription() {
         return {
             loading: true,
-            subscription: {},
+            subscription: null,
             showCancelModal: false,
             cancelLoading: false,
+            billingLoading: false,
+            billingHistory: [],
 
             async init() {
                 await this.fetchSubscription();
+                if (this.subscription && this.subscription.plan_name !== 'free_trial') {
+                    await this.fetchBillingHistory();
+                }
             },
 
             async fetchSubscription() {
@@ -339,7 +460,7 @@
                     
                     if (response.ok) {
                         const data = await response.json();
-                        this.subscription = data.subscription || {};
+                        this.subscription = data.data?.subscription || null;
                     }
                 } catch (error) {
                     console.error('Failed to fetch subscription:', error);
@@ -348,7 +469,29 @@
                 }
             },
 
+            async fetchBillingHistory() {
+                this.billingLoading = true;
+                try {
+                    const response = await fetch('/api/subscription/billing-history', {
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                            'Accept': 'application/json'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.billingHistory = data.data?.payments || [];
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch billing history:', error);
+                } finally {
+                    this.billingLoading = false;
+                }
+            },
+
             getPlanDisplayName() {
+                if (!this.subscription) return 'Unknown Plan';
                 const names = {
                     'free_trial': 'Free Trial',
                     'standard': 'Standard Plan',
@@ -358,6 +501,7 @@
             },
 
             getStatusText() {
+                if (!this.subscription) return 'Unknown';
                 const statuses = {
                     'active': 'Active',
                     'trial': 'Trial Period',

@@ -30,36 +30,47 @@
                 
                 <h3 class="text-2xl font-bold text-gray-900 mb-2">Standard</h3>
                 <div class="mb-6">
-                    <span class="text-4xl font-bold text-gray-900">Rp 99,000</span>
+                    <span class="text-4xl font-bold text-gray-900">Rp 350,000</span>
                     <span class="text-gray-600">/month</span>
+                </div>
+
+                <!-- Duration Selection -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Pilih Durasi</label>
+                    <select x-model="standardDuration" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="1_month">1 Bulan - Rp 350,000</option>
+                        <option value="3_months">3 Bulan - Rp 1,050,000</option>
+                        <option value="1_year">1 Tahun - Rp 3,780,000 (Hemat 10%)</option>
+                    </select>
                 </div>
 
                 <ul class="space-y-4 mb-8">
                     <li class="flex items-start gap-3">
                         <i class="fas fa-check-circle text-green-500 mt-1"></i>
-                        <span class="text-gray-700">Up to 1,000 messages/month</span>
+                        <span class="text-gray-700">Manajemen kontak unlimited</span>
                     </li>
                     <li class="flex items-start gap-3">
                         <i class="fas fa-check-circle text-green-500 mt-1"></i>
-                        <span class="text-gray-700">WhatsApp Business API</span>
+                        <span class="text-gray-700">Template pesan kustom</span>
                     </li>
                     <li class="flex items-start gap-3">
                         <i class="fas fa-check-circle text-green-500 mt-1"></i>
-                        <span class="text-gray-700">AI Agent Integration</span>
+                        <span class="text-gray-700">Laporan analitik dasar</span>
                     </li>
                     <li class="flex items-start gap-3">
                         <i class="fas fa-check-circle text-green-500 mt-1"></i>
-                        <span class="text-gray-700">Basic Analytics</span>
+                        <span class="text-gray-700">Hingga 2 outlet</span>
                     </li>
                     <li class="flex items-start gap-3">
                         <i class="fas fa-check-circle text-green-500 mt-1"></i>
-                        <span class="text-gray-700">Email Support</span>
+                        <span class="text-gray-700">QRIS unlimited</span>
                     </li>
                 </ul>
 
                 <form action="{{ route('subscription.checkout') }}" method="POST">
                     @csrf
                     <input type="hidden" name="plan_id" value="standard">
+                    <input type="hidden" name="duration" :value="standardDuration">
                     <button type="submit" 
                             :disabled="loading"
                             class="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
@@ -85,40 +96,51 @@
                 
                 <h3 class="text-2xl font-bold mb-2">Pro</h3>
                 <div class="mb-6">
-                    <span class="text-4xl font-bold">Rp 199,000</span>
+                    <span class="text-4xl font-bold">Rp 500,000</span>
                     <span class="text-white/80">/month</span>
+                </div>
+
+                <!-- Duration Selection -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-white/90 mb-2">Pilih Durasi</label>
+                    <select x-model="proDuration" class="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/10 text-white focus:ring-2 focus:ring-white/50 focus:border-transparent">
+                        <option value="1_month" class="text-gray-900">1 Bulan - Rp 500,000</option>
+                        <option value="3_months" class="text-gray-900">3 Bulan - Rp 1,500,000</option>
+                        <option value="1_year" class="text-gray-900">1 Tahun - Rp 5,400,000 (Hemat 10%)</option>
+                    </select>
                 </div>
 
                 <ul class="space-y-4 mb-8">
                     <li class="flex items-start gap-3">
                         <i class="fas fa-check-circle text-white mt-1"></i>
-                        <span class="text-white/90">Unlimited messages</span>
+                        <span class="text-white/90">Semua fitur Standard</span>
                     </li>
                     <li class="flex items-start gap-3">
                         <i class="fas fa-check-circle text-white mt-1"></i>
-                        <span class="text-white/90">WhatsApp Business API</span>
+                        <span class="text-white/90">API akses penuh</span>
                     </li>
                     <li class="flex items-start gap-3">
                         <i class="fas fa-check-circle text-white mt-1"></i>
-                        <span class="text-white/90">Advanced AI Agent</span>
+                        <span class="text-white/90">Laporan analitik lanjutan</span>
                     </li>
                     <li class="flex items-start gap-3">
                         <i class="fas fa-check-circle text-white mt-1"></i>
-                        <span class="text-white/90">Advanced Analytics</span>
+                        <span class="text-white/90">Dukungan prioritas</span>
                     </li>
                     <li class="flex items-start gap-3">
                         <i class="fas fa-check-circle text-white mt-1"></i>
-                        <span class="text-white/90">Priority Support</span>
+                        <span class="text-white/90">Unlimited outlet</span>
                     </li>
                     <li class="flex items-start gap-3">
                         <i class="fas fa-check-circle text-white mt-1"></i>
-                        <span class="text-white/90">Custom Integrations</span>
+                        <span class="text-white/90">Custom domain</span>
                     </li>
                 </ul>
 
                 <form action="{{ route('subscription.checkout') }}" method="POST">
                     @csrf
                     <input type="hidden" name="plan_id" value="pro">
+                    <input type="hidden" name="duration" :value="proDuration">
                     <button type="submit"
                             :disabled="loading"
                             class="w-full py-3 bg-white text-purple-600 rounded-xl font-semibold hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
@@ -205,7 +227,9 @@
 <script>
     function pricingPage() {
         return {
-            loading: false
+            loading: false,
+            standardDuration: '1_month',
+            proDuration: '1_month'
         }
     }
 </script>

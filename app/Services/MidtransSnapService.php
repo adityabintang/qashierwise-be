@@ -47,9 +47,18 @@ class MidtransSnapService
      * 
      * @param User $user
      * @param string $planId
+     * @param string $duration
+     * @param float|null $customAmount Optional custom amount (for promo codes)
+     * @param string|null $promoCode Optional promo code
      * @return array|null ['snap_token' => string, 'redirect_url' => string] or null on failure
      */
-    public function createSubscriptionSnapToken(User $user, string $planId): ?array
+    public function createSubscriptionSnapToken(
+        User $user, 
+        string $planId, 
+        string $duration,
+        ?float $customAmount = null,
+        ?string $promoCode = null
+    ): ?array
     {
         // Validate plan exists
         if (!isset($this->plans[$planId])) {
@@ -61,22 +70,43 @@ class MidtransSnapService
         }
 
         $plan = $this->plans[$planId];
+        
+        // Validate duration exists
+        if (!isset($plan['durations'][$duration])) {
+            Log::error('Invalid duration provided', [
+                'planId' => $planId,
+                'duration' => $duration,
+                'userId' => $user->id,
+            ]);
+            return null;
+        }
+        
+        $durationDetails = $plan['durations'][$duration];
+
+        // Use custom amount if provided (for promo codes), otherwise use plan price
+        $amount = $customAmount ?? $durationDetails['price'];
 
         // Generate unique order ID
-        $orderId = $this->generateOrderId($user->id);
+        $orderId = $this->generateOrderId($user->id, $duration);
+
+        // Build item name
+        $itemName = "{$plan['name']} Subscription - {$durationDetails['name']}";
+        if ($promoCode) {
+            $itemName .= " (Promo: {$promoCode})";
+        }
 
         // Build transaction payload
         $payload = [
             'transaction_details' => [
                 'order_id' => $orderId,
-                'gross_amount' => (int) $plan['price'],
+                'gross_amount' => (int) $amount,
             ],
             'item_details' => [
                 [
-                    'id' => $planId,
-                    'price' => (int) $plan['price'],
+                    'id' => $durationDetails['id'],
+                    'price' => (int) $amount,
                     'quantity' => 1,
-                    'name' => "{$plan['name']} Subscription",
+                    'name' => $itemName,
                 ],
             ],
             'customer_details' => [
@@ -85,15 +115,37 @@ class MidtransSnapService
                 'phone' => $user->phone ?? '',
             ],
             'custom_field1' => $planId,
-            'custom_field2' => 'subscription',
+            'custom_field2' => $duration,
             'custom_field3' => (string) $user->id,
+            'callbacks' => [
+                'finish' => route('subscription.success'),
+                'error' => route('subscription.error'),
+                'pending' => route('subscription.manage'),
+            ],
+            // Enable save card for recurring subscription
+            'credit_card' => [
+                'secure' => true,
+                'save_card' => true, // This enables card tokenization
+            ],
+            'enabled_payments' => [
+                'credit_card',
+                'bca_va',
+                'bni_va',
+                'bri_va',
+                'permata_va',
+                'other_va',
+                'gopay',
+                'shopeepay',
+            ],
         ];
 
         Log::info('Creating Midtrans Snap token', [
             'userId' => $user->id,
             'planId' => $planId,
+            'duration' => $duration,
             'orderId' => $orderId,
-            'amount' => $plan['price'],
+            'amount' => $durationDetails['price'],
+            'months' => $durationDetails['months'],
         ]);
 
         try {
@@ -142,16 +194,17 @@ class MidtransSnapService
     /**
      * Generate a unique order ID for subscription.
      * 
-     * Format: SUB-{user_id}-{timestamp}-{random}
+     * Format: SUB-{user_id}-{duration}-{timestamp}-{random}
      * 
      * @param int $userId
+     * @param string $duration
      * @return string
      */
-    private function generateOrderId(int $userId): string
+    private function generateOrderId(int $userId, string $duration): string
     {
         $timestamp = time();
         $random = substr(md5(uniqid((string) rand(), true)), 0, 8);
         
-        return "SUB-{$userId}-{$timestamp}-{$random}";
+        return "SUB-{$userId}-{$duration}-{$timestamp}-{$random}";
     }
 }

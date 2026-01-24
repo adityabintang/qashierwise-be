@@ -88,6 +88,8 @@ Route::middleware(['web', 'check.web.auth'])->group(function () {
             ->name('pricing');
         Route::post('/checkout', [App\Http\Controllers\SubscriptionController::class, 'createCheckout'])
             ->name('checkout');
+        Route::get('/payment', [App\Http\Controllers\SubscriptionController::class, 'payment'])
+            ->name('payment');
         Route::get('/success', [App\Http\Controllers\SubscriptionController::class, 'success'])
             ->name('success');
         Route::get('/cancel', [App\Http\Controllers\SubscriptionController::class, 'cancel'])

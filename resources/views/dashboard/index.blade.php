@@ -333,21 +333,12 @@
 
                                     <!-- Action Buttons -->
                                     <div class="pt-2 space-y-2">
-                                        <!-- Upgrade Button (for trial/expired users) -->
-                                        <a x-show="subscription.status === 'trial' || subscription.status === 'trial_expired' || subscription.status === 'expired'"
-                                           href="{{ route('subscription.pricing') }}"
-                                           class="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all font-medium text-sm">
-                                            <i class="fas fa-rocket"></i>
-                                            <span>Upgrade Plan</span>
-                                        </a>
-
-                                        <!-- Manage Subscription Button (for active/cancelled subscriptions) -->
-                                        <a x-show="subscription.status === 'active' || subscription.status === 'cancelled'"
-                                           href="{{ route('subscription.manage') }}"
+                                        <!-- Manage Subscription Button (for all users) -->
+                                        <a href="{{ route('subscription.manage') }}"
                                            class="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted)/0.8)] text-[hsl(var(--foreground))] rounded-lg transition-colors font-medium text-sm">
                                             <i class="fas fa-cog"></i>
                                             <span>Manage Subscription</span>
-                                        </button>
+                                        </a>
                                     </div>
                                 </div>
                             </div>
@@ -680,6 +671,7 @@ function subscriptionStatus() {
 
         async init() {
             console.log('[Subscription] Initializing...');
+            
             // Set timeout to prevent infinite loading
             setTimeout(() => {
                 if (this.loading) {
@@ -687,7 +679,33 @@ function subscriptionStatus() {
                     this.loading = false;
                 }
             }, 5000);
+            
             await this.fetchSubscriptionStatus();
+            
+            // If still on trial/expired after initial fetch, start polling
+            // This handles the case where user just completed payment
+            if (this.subscription.status === 'trial' || this.subscription.status === 'trial_expired') {
+                console.log('[Subscription] Starting polling for updates...');
+                this.startPolling();
+            }
+        },
+
+        startPolling() {
+            let pollCount = 0;
+            const maxPolls = 6; // Poll for 30 seconds (6 * 5 seconds)
+            
+            const pollInterval = setInterval(async () => {
+                pollCount++;
+                console.log(`[Subscription] Polling for updates (${pollCount}/${maxPolls})`);
+                
+                await this.fetchSubscriptionStatus();
+                
+                // Stop polling if subscription is active or max polls reached
+                if (this.subscription.status === 'active' || pollCount >= maxPolls) {
+                    clearInterval(pollInterval);
+                    console.log('[Subscription] Polling stopped. Final status:', this.subscription.status);
+                }
+            }, 5000); // Poll every 5 seconds
         },
 
         async fetchSubscriptionStatus() {

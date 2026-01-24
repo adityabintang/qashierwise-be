@@ -834,7 +834,88 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-10 md:mb-16">
                 <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 md:mb-4">{{ __('landing.pricing.title') }}</h2>
-                <p class="text-sm md:text-base text-gray-600">{{ __('landing.pricing.subtitle') }}</p>
+                <p class="text-sm md:text-base text-gray-600 mb-6">{{ __('landing.pricing.subtitle') }}</p>
+                
+                <!-- Duration Toggle -->
+                <div class="inline-flex items-center bg-white rounded-full p-1 shadow-md">
+                    <button 
+                        @click="selectedDuration = '1_month'"
+                        :class="selectedDuration === '1_month' ? 'bg-primary text-white' : 'text-gray-600 hover:text-gray-900'"
+                        class="px-4 md:px-6 py-2 rounded-full font-semibold transition-all text-xs md:text-sm"
+                    >
+                        1 Bulan
+                    </button>
+                    <button 
+                        @click="selectedDuration = '3_months'"
+                        :class="selectedDuration === '3_months' ? 'bg-primary text-white' : 'text-gray-600 hover:text-gray-900'"
+                        class="px-4 md:px-6 py-2 rounded-full font-semibold transition-all text-xs md:text-sm"
+                    >
+                        3 Bulan
+                    </button>
+                    <button 
+                        @click="selectedDuration = '1_year'"
+                        :class="selectedDuration === '1_year' ? 'bg-primary text-white' : 'text-gray-600 hover:text-gray-900'"
+                        class="px-4 md:px-6 py-2 rounded-full font-semibold transition-all text-xs md:text-sm relative"
+                    >
+                        1 Tahun
+                        <span class="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">-10%</span>
+                    </button>
+                </div>
+
+                <!-- Promo Code Input (only show if logged in) -->
+                <template x-if="token">
+                    <div class="mt-6 max-w-md mx-auto">
+                        <div class="bg-white rounded-xl p-4 shadow-md">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-tag mr-1"></i> Punya Kode Promo?
+                            </label>
+                            <div class="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    x-model="promoCode"
+                                    @input="promoError = null; promoSuccess = null"
+                                    placeholder="Masukkan kode promo"
+                                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm uppercase"
+                                    :disabled="promoValidating"
+                                >
+                                <button 
+                                    @click="validatePromoCode()"
+                                    :disabled="!promoCode || promoValidating"
+                                    class="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <span x-show="!promoValidating">Terapkan</span>
+                                    <span x-show="promoValidating" x-cloak>
+                                        <i class="fas fa-spinner fa-spin"></i>
+                                    </span>
+                                </button>
+                            </div>
+                            <!-- Promo Success Message -->
+                            <div x-show="promoSuccess" x-cloak class="mt-2 p-2 bg-green-100 border border-green-400 text-green-700 rounded-lg text-xs">
+                                <i class="fas fa-check-circle mr-1"></i>
+                                <span x-text="promoSuccess"></span>
+                            </div>
+                            <!-- Promo Error Message -->
+                            <div x-show="promoError" x-cloak class="mt-2 p-2 bg-red-100 border border-red-400 text-red-700 rounded-lg text-xs">
+                                <i class="fas fa-exclamation-circle mr-1"></i>
+                                <span x-text="promoError"></span>
+                            </div>
+                            <!-- Applied Promo Display -->
+                            <div x-show="appliedPromo" x-cloak class="mt-2 flex items-center justify-between p-2 bg-purple-50 border border-purple-200 rounded-lg">
+                                <div class="text-xs">
+                                    <span class="font-semibold text-purple-900" x-text="appliedPromo?.code"></span>
+                                    <span class="text-purple-700"> - Hemat </span>
+                                    <span class="font-semibold text-purple-900" x-text="'Rp' + formatPrice(appliedPromo?.discount || 0)"></span>
+                                </div>
+                                <button 
+                                    @click="removePromoCode()"
+                                    class="text-purple-600 hover:text-purple-800 text-xs"
+                                >
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
             </div>
 
             <!-- Error Message -->
@@ -869,23 +950,28 @@
                         </a>
                     </div>
 
-                    <!-- Standard Plan (Mobile) -->
+                    <!-- Pro Plan (Mobile) -->
                     <div class="bg-white rounded-2xl p-5 border-2 border-primary relative w-72 flex-shrink-0">
-                        <template x-if="token && isCurrentPlan('standard')">
+                        <template x-if="token && isCurrentPlan('pro')">
                             <div class="absolute -top-3 right-4 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
                                 Paket Saat Ini
                             </div>
                         </template>
-                        <template x-if="!token || !isCurrentPlan('standard')">
+                        <template x-if="!token || !isCurrentPlan('pro')">
                             <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary text-white px-3 py-1 rounded-full text-xs font-semibold">
                                 POPULER
                             </div>
                         </template>
-                        <h3 class="text-lg font-bold text-gray-900 mb-2 mt-2">Standard</h3>
+                        <h3 class="text-lg font-bold text-gray-900 mb-2 mt-2">Pro</h3>
                         <p class="text-gray-500 text-xs mb-3">Hingga 2 outlet, delivery + QRIS</p>
                         <div class="mb-4">
-                            <span class="text-2xl font-bold text-gray-900">Rp99.000</span>
-                            <span class="text-gray-500 text-sm">/bln</span>
+                            <span class="text-2xl font-bold text-gray-900" x-text="'Rp' + formatPrice(getPrice('pro'))">Rp350.000</span>
+                            <span class="text-gray-500 text-sm" x-show="selectedDuration === '1_month'">/bln</span>
+                            <span class="text-gray-500 text-sm" x-show="selectedDuration === '3_months'">/3bln</span>
+                            <span class="text-gray-500 text-sm" x-show="selectedDuration === '1_year'">/thn</span>
+                            <div x-show="selectedDuration !== '1_month'" class="text-xs text-gray-600 mt-1">
+                                <span x-text="'Rp' + formatPrice(getPricePerMonth('pro'))">Rp350.000</span>/bln
+                            </div>
                         </div>
                         <ul class="space-y-2 mb-6 text-xs text-gray-600">
                             <li class="flex items-start"><i class="fas fa-check text-primary mr-2 mt-0.5"></i>Delivery + antrean & biaya</li>
@@ -893,54 +979,14 @@
                             <li class="flex items-start"><i class="fas fa-check text-primary mr-2 mt-0.5"></i>Pengingat & auto confirm</li>
                             <li class="flex items-start"><i class="fas fa-check text-primary mr-2 mt-0.5"></i>XX pesan/bulan + Chat support</li>
                             <li class="flex items-start"><i class="fas fa-check text-primary mr-2 mt-0.5"></i>Customer Base</li>
-                        </ul>
-                        <template x-if="token">
-                            <button
-                                @click="checkout('standard')"
-                                :disabled="loading || isCurrentPlan('standard')"
-                                class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <span x-show="!loading || selectedPlan !== 'standard'">
-                                    <span x-show="isCurrentPlan('standard')">Paket Aktif</span>
-                                    <span x-show="!isCurrentPlan('standard')">Pilih Standard</span>
-                                </span>
-                                <span x-show="loading && selectedPlan === 'standard'" x-cloak>
-                                    <i class="fas fa-spinner fa-spin mr-2"></i>Memproses...
-                                </span>
-                            </button>
-                        </template>
-                        <template x-if="!token">
-                            <a href="/login?redirect=pricing&plan=standard" class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all text-sm">
-                                Pilih Standard
-                            </a>
-                        </template>
-                    </div>
-
-                    <!-- Pro Plan (Mobile) -->
-                    <div class="bg-white rounded-2xl p-5 border border-gray-200 w-72 flex-shrink-0 relative">
-                        <template x-if="token && isCurrentPlan('pro')">
-                            <div class="absolute -top-3 right-4 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                                Paket Saat Ini
-                            </div>
-                        </template>
-                        <h3 class="text-lg font-bold text-gray-900 mb-2">Pro</h3>
-                        <p class="text-gray-500 text-xs mb-3">Tim unlimited, Analytic & API</p>
-                        <div class="mb-4">
-                            <span class="text-2xl font-bold text-gray-900">Rp199.000</span>
-                            <span class="text-gray-500 text-sm">/bln</span>
-                        </div>
-                        <ul class="space-y-2 mb-6 text-xs text-gray-600">
-                            <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>Analytic + ekspor CSV</li>
-                            <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>Webhook & API</li>
-                            <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>Multi-outlet & branding</li>
-                            <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>Priority routing & handover</li>
-                            <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>SLA + dedicated support</li>
+                            <li class="flex items-start"><i class="fas fa-check text-primary mr-2 mt-0.5"></i>Analytic + ekspor CSV</li>
+                            <li class="flex items-start"><i class="fas fa-check text-primary mr-2 mt-0.5"></i>Webhook & API</li>
                         </ul>
                         <template x-if="token">
                             <button
                                 @click="checkout('pro')"
                                 :disabled="loading || isCurrentPlan('pro')"
-                                class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <span x-show="!loading || selectedPlan !== 'pro'">
                                     <span x-show="isCurrentPlan('pro')">Paket Aktif</span>
@@ -952,7 +998,7 @@
                             </button>
                         </template>
                         <template x-if="!token">
-                            <a href="/login?redirect=pricing&plan=pro" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition text-sm">
+                            <a href="/login?redirect=pricing&plan=pro" class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all text-sm">
                                 Pilih Pro
                             </a>
                         </template>
@@ -961,7 +1007,7 @@
             </div>
 
             <!-- Tablet/Desktop: grid layout -->
-            <div class="hidden md:grid md:grid-cols-3 gap-6 lg:gap-8 max-w-5xl mx-auto">
+            <div class="hidden md:grid md:grid-cols-2 gap-6 lg:gap-8 max-w-4xl mx-auto">
                 <!-- Basic Plan -->
                 <div class="bg-white rounded-2xl p-6 lg:p-8 border border-gray-200 relative">
                     <template x-if="token && isCurrentPlan('free_trial')">
@@ -986,23 +1032,28 @@
                     </a>
                 </div>
 
-                <!-- Standard Plan -->
+                <!-- Pro Plan -->
                 <div class="bg-white rounded-2xl p-6 lg:p-8 border-2 border-primary relative">
-                    <template x-if="token && isCurrentPlan('standard')">
+                    <template x-if="token && isCurrentPlan('pro')">
                         <div class="absolute -top-3 right-4 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
                             Paket Saat Ini
                         </div>
                     </template>
-                    <template x-if="!token || !isCurrentPlan('standard')">
+                    <template x-if="!token || !isCurrentPlan('pro')">
                         <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary text-white px-4 py-1 rounded-full text-xs font-semibold">
                             POPULER
                         </div>
                     </template>
-                    <h3 class="text-xl font-bold text-gray-900 mb-2">Standard</h3>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">Pro</h3>
                     <p class="text-gray-500 text-sm mb-4">Hingga 2 outlet, delivery + QRIS</p>
                     <div class="mb-6">
-                        <span class="text-3xl font-bold text-gray-900">Rp99.000</span>
-                        <span class="text-gray-500">/bln</span>
+                        <span class="text-3xl font-bold text-gray-900" x-text="'Rp' + formatPrice(getPrice('pro'))">Rp350.000</span>
+                        <span class="text-gray-500" x-show="selectedDuration === '1_month'">/bln</span>
+                        <span class="text-gray-500" x-show="selectedDuration === '3_months'">/3bln</span>
+                        <span class="text-gray-500" x-show="selectedDuration === '1_year'">/thn</span>
+                        <div x-show="selectedDuration !== '1_month'" class="text-sm text-gray-600 mt-1">
+                            <span x-text="'Rp' + formatPrice(getPricePerMonth('pro'))">Rp350.000</span>/bln
+                        </div>
                     </div>
                     <ul class="space-y-3 mb-8 text-sm text-gray-600">
                         <li class="flex items-center"><i class="fas fa-check text-primary mr-2"></i>Delivery + antrean & biaya</li>
@@ -1010,54 +1061,14 @@
                         <li class="flex items-center"><i class="fas fa-check text-primary mr-2"></i>Pengingat & auto confirm</li>
                         <li class="flex items-center"><i class="fas fa-check text-primary mr-2"></i>XX pesan/bulan + Chat support (2hr)</li>
                         <li class="flex items-center"><i class="fas fa-check text-primary mr-2"></i>Customer Base</li>
-                    </ul>
-                    <template x-if="token">
-                        <button
-                            @click="checkout('standard')"
-                            :disabled="loading || isCurrentPlan('standard')"
-                            class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <span x-show="!loading || selectedPlan !== 'standard'">
-                                <span x-show="isCurrentPlan('standard')">Paket Aktif</span>
-                                <span x-show="!isCurrentPlan('standard')">Pilih Standard</span>
-                            </span>
-                            <span x-show="loading && selectedPlan === 'standard'" x-cloak>
-                                <i class="fas fa-spinner fa-spin mr-2"></i>Memproses...
-                            </span>
-                        </button>
-                    </template>
-                    <template x-if="!token">
-                        <a href="/login?redirect=pricing&plan=standard" class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all">
-                            Pilih Standard
-                        </a>
-                    </template>
-                </div>
-
-                <!-- Pro Plan -->
-                <div class="bg-white rounded-2xl p-6 lg:p-8 border border-gray-200 relative">
-                    <template x-if="token && isCurrentPlan('pro')">
-                        <div class="absolute -top-3 right-4 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                            Paket Saat Ini
-                        </div>
-                    </template>
-                    <h3 class="text-xl font-bold text-gray-900 mb-2">Pro</h3>
-                    <p class="text-gray-500 text-sm mb-4">Tim unlimited, Analytic & API</p>
-                    <div class="mb-6">
-                        <span class="text-3xl font-bold text-gray-900">Rp199.000</span>
-                        <span class="text-gray-500">/bln</span>
-                    </div>
-                    <ul class="space-y-3 mb-8 text-sm text-gray-600">
-                        <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>Analytic + ekspor CSV</li>
-                        <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>Webhook & API</li>
-                        <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>Multi-outlet & branding</li>
-                        <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>Priority routing & handover</li>
-                        <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>SLA + dedicated support</li>
+                        <li class="flex items-center"><i class="fas fa-check text-primary mr-2"></i>Analytic + ekspor CSV</li>
+                        <li class="flex items-center"><i class="fas fa-check text-primary mr-2"></i>Webhook & API</li>
                     </ul>
                     <template x-if="token">
                         <button
                             @click="checkout('pro')"
                             :disabled="loading || isCurrentPlan('pro')"
-                            class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <span x-show="!loading || selectedPlan !== 'pro'">
                                 <span x-show="isCurrentPlan('pro')">Paket Aktif</span>
@@ -1069,7 +1080,7 @@
                         </button>
                     </template>
                     <template x-if="!token">
-                        <a href="/login?redirect=pricing&plan=pro" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition">
+                        <a href="/login?redirect=pricing&plan=pro" class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all">
                             Pilih Pro
                         </a>
                     </template>
@@ -1239,8 +1250,25 @@
                 loading: false,
                 error: null,
                 selectedPlan: null,
+                selectedDuration: '1_month', // Default to monthly
                 currentPlan: null,
                 token: null,
+                
+                // Promo code state
+                promoCode: '',
+                promoValidating: false,
+                promoError: null,
+                promoSuccess: null,
+                appliedPromo: null,
+                
+                // Pricing data from config
+                plans: {
+                    pro: {
+                        '1_month': { price: 350000, perMonth: 350000, discount: 0, label: '1 Bulan' },
+                        '3_months': { price: 1050000, perMonth: 350000, discount: 0, label: '3 Bulan' },
+                        '1_year': { price: 3780000, perMonth: 315000, discount: 10, label: '1 Tahun' }
+                    }
+                },
 
                 init() {
                     // Get auth token from localStorage (stored as 'token' during login)
@@ -1250,6 +1278,93 @@
                         // Check if we need to auto-checkout after login redirect
                         this.checkAutoCheckout();
                     }
+
+                    // Watch for duration changes and reset promo code
+                    this.$watch('selectedDuration', () => {
+                        if (this.appliedPromo) {
+                            this.removePromoCode();
+                        }
+                    });
+                },
+                
+                getPrice(plan) {
+                    const basePrice = this.plans[plan][this.selectedDuration].price;
+                    // If promo is applied and matches this plan, show discounted price
+                    if (this.appliedPromo && this.appliedPromo.plan === plan) {
+                        return this.appliedPromo.final_amount;
+                    }
+                    return basePrice;
+                },
+                
+                getPricePerMonth(plan) {
+                    const finalPrice = this.getPrice(plan);
+                    const months = this.selectedDuration === '1_month' ? 1 : 
+                                   this.selectedDuration === '3_months' ? 3 : 12;
+                    return Math.round(finalPrice / months);
+                },
+                
+                getDiscount(plan) {
+                    return this.plans[plan][this.selectedDuration].discount;
+                },
+                
+                formatPrice(amount) {
+                    return new Intl.NumberFormat('id-ID').format(amount);
+                },
+
+                async validatePromoCode() {
+                    if (!this.promoCode || this.promoValidating) return;
+
+                    this.promoValidating = true;
+                    this.promoError = null;
+                    this.promoSuccess = null;
+
+                    try {
+                        // We need to validate against a specific plan
+                        // For now, validate against standard plan
+                        // In real scenario, you might want to validate when user clicks checkout
+                        const response = await fetch('/api/promo-codes/validate', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${this.token}`,
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                code: this.promoCode.toUpperCase(),
+                                plan_id: 'pro', // Validate for pro plan
+                                duration: this.selectedDuration
+                            })
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok && data.success) {
+                            this.promoSuccess = data.data.message;
+                            this.appliedPromo = {
+                                code: data.data.code,
+                                discount: data.data.discount,
+                                final_amount: data.data.final_amount,
+                                original_amount: data.data.original_amount,
+                                plan: 'pro' // Store which plan this was validated for
+                            };
+                        } else {
+                            this.promoError = data.error?.message || 'Kode promo tidak valid';
+                            this.appliedPromo = null;
+                        }
+                    } catch (e) {
+                        console.error('Promo validation error:', e);
+                        this.promoError = 'Terjadi kesalahan. Silakan coba lagi.';
+                        this.appliedPromo = null;
+                    } finally {
+                        this.promoValidating = false;
+                    }
+                },
+
+                removePromoCode() {
+                    this.promoCode = '';
+                    this.appliedPromo = null;
+                    this.promoError = null;
+                    this.promoSuccess = null;
                 },
 
                 checkAutoCheckout() {
@@ -1302,6 +1417,16 @@
                     this.selectedPlan = planId;
 
                     try {
+                        const requestBody = { 
+                            plan_id: planId,
+                            duration: this.selectedDuration
+                        };
+
+                        // Add promo code if applied
+                        if (this.appliedPromo && this.appliedPromo.code) {
+                            requestBody.promo_code = this.appliedPromo.code;
+                        }
+
                         const response = await fetch('/api/subscription/checkout', {
                             method: 'POST',
                             headers: {
@@ -1309,7 +1434,7 @@
                                 'Content-Type': 'application/json',
                                 'Accept': 'application/json'
                             },
-                            body: JSON.stringify({ plan_id: planId })
+                            body: JSON.stringify(requestBody)
                         });
 
                         if (!response.ok) {

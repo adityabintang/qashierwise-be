@@ -22,6 +22,58 @@ class SubscriptionController extends Controller
     ) {}
 
     /**
+     * Show payment page with Midtrans Snap.
+     * 
+     * @return View|RedirectResponse
+     */
+    public function payment(): View|RedirectResponse
+    {
+        $user = auth()->user();
+        
+        // Explicit authentication check
+        if ($user === null) {
+            return redirect()->route('login')->with('error', 'Please login to continue.');
+        }
+        
+        // Check if snap token exists in session
+        $snapToken = session('snap_token');
+        $planId = session('selected_plan_id');
+        $duration = session('selected_duration');
+        
+        if (empty($snapToken) || empty($planId) || empty($duration)) {
+            Log::warning('Payment page accessed without snap token', [
+                'userId' => $user->id,
+                'hasSnapToken' => !empty($snapToken),
+                'hasPlanId' => !empty($planId),
+                'hasDuration' => !empty($duration),
+            ]);
+            return redirect()->route('subscription.pricing')->with('error', 'Please select a plan first.');
+        }
+        
+        $plan = config("subscription.plans.{$planId}");
+        
+        if ($plan === null || !isset($plan['durations'][$duration])) {
+            Log::error('Invalid plan or duration in session', [
+                'userId' => $user->id,
+                'planId' => $planId,
+                'duration' => $duration,
+            ]);
+            return redirect()->route('subscription.pricing')->with('error', 'Invalid plan selected.');
+        }
+        
+        $durationDetails = $plan['durations'][$duration];
+        
+        return view('subscription.payment', [
+            'snapToken' => $snapToken,
+            'plan' => $plan,
+            'planId' => $planId,
+            'duration' => $duration,
+            'durationDetails' => $durationDetails,
+            'clientKey' => config('midtrans.client_key'),
+        ]);
+    }
+
+    /**
      * Show pricing page with available subscription plans.
      * 
      * @return View
@@ -48,6 +100,7 @@ class SubscriptionController extends Controller
     {
         $request->validate([
             'plan_id' => 'required|string|in:standard,pro',
+            'duration' => 'required|string|in:1_month,3_months,1_year',
         ]);
 
         $user = $request->user();
@@ -62,6 +115,7 @@ class SubscriptionController extends Controller
         }
         
         $planId = $request->input('plan_id');
+        $duration = $request->input('duration');
 
         // Check if Midtrans service is configured
         if (!$this->midtransService->isConfigured()) {
@@ -88,25 +142,48 @@ class SubscriptionController extends Controller
                 'event' => 'checkout.initiated',
                 'userId' => $user->id,
                 'planId' => $planId,
+                'duration' => $duration,
                 'userEmail' => $user->email,
                 'hasExistingSubscription' => $existingSubscription !== null,
                 'existingStatus' => $existingSubscription?->status,
             ]);
             
-            // For now, we'll redirect to a payment token collection page
-            // In a real implementation, this would integrate with Midtrans Snap
-            // to get a payment token first, then create the subscription
+            // Create Midtrans Snap token
+            $snapData = app(\App\Services\MidtransSnapService::class)->createSubscriptionSnapToken($user, $planId, $duration);
             
-            // Store the plan selection in session for later use
-            session(['selected_plan_id' => $planId]);
+            if ($snapData === null || empty($snapData['snap_token'])) {
+                Log::error('Failed to create Snap token', [
+                    'event' => 'checkout.snap_token_failed',
+                    'userId' => $user->id,
+                    'planId' => $planId,
+                    'duration' => $duration,
+                ]);
+                return redirect()->back()->with('error', 'Failed to create payment session. Please try again.');
+            }
             
-            return redirect()->route('subscription.manage')->with('info', 'Please complete payment setup to activate your subscription.');
+            // Store snap token in session and redirect to payment page
+            session([
+                'selected_plan_id' => $planId,
+                'selected_duration' => $duration,
+                'snap_token' => $snapData['snap_token'],
+            ]);
+            
+            Log::info('Snap token created, redirecting to payment', [
+                'event' => 'checkout.snap_token_created',
+                'userId' => $user->id,
+                'planId' => $planId,
+                'duration' => $duration,
+            ]);
+            
+            // Redirect to payment page
+            return redirect()->route('subscription.payment');
         } catch (\Exception $e) {
             Log::error('Failed to create checkout session', [
                 'event' => 'checkout.failed',
                 'error' => $e->getMessage(),
                 'userId' => $user->id,
                 'planId' => $planId,
+                'duration' => $duration,
                 'trace' => $e->getTraceAsString(),
             ]);
             
@@ -142,9 +219,9 @@ class SubscriptionController extends Controller
         ]);
 
         // The actual subscription creation/update will be handled by webhook
-        // This is just a user-facing success page
+        // Redirect to dashboard with refresh parameter to force subscription reload
         
-        return redirect()->route('subscription.manage')->with('success', 'Payment successful! Your subscription will be activated shortly.');
+        return redirect()->route('dashboard')->with('success', 'Payment successful! Your subscription is now active.');
     }
 
     /**
@@ -277,16 +354,6 @@ class SubscriptionController extends Controller
             return redirect()->back()->with('error', 'No active subscription found.');
         }
 
-        // Check if subscription is from Midtrans
-        if ($subscription->provider !== 'midtrans' || empty($subscription->midtrans_subscription_id)) {
-            Log::warning('Cancel attempt for non-Midtrans subscription', [
-                'event' => 'subscription.cancel_wrong_provider',
-                'userId' => $user->id,
-                'provider' => $subscription->provider,
-            ]);
-            return redirect()->back()->with('error', 'This subscription cannot be cancelled through this interface.');
-        }
-
         // Check if already cancelled
         if ($subscription->status === 'cancelled') {
             Log::info('Cancel attempt for already cancelled subscription', [
@@ -298,16 +365,35 @@ class SubscriptionController extends Controller
         }
 
         try {
-            // Cancel subscription in Midtrans
-            $success = $this->midtransService->cancelSubscription($subscription->midtrans_subscription_id);
-
-            if (!$success) {
-                Log::error('Midtrans cancellation failed', [
-                    'event' => 'subscription.midtrans_cancel_failed',
+            // If subscription has Midtrans ID, cancel through Midtrans API
+            if ($subscription->provider === 'midtrans' && !empty($subscription->midtrans_subscription_id)) {
+                Log::info('Cancelling Midtrans subscription via API', [
+                    'event' => 'subscription.cancel_via_api',
                     'userId' => $user->id,
                     'subscriptionId' => $subscription->id,
+                    'midtransSubscriptionId' => $subscription->midtrans_subscription_id,
                 ]);
-                return redirect()->back()->with('error', 'Failed to cancel subscription. Please try again or contact support.');
+
+                // Cancel subscription in Midtrans
+                $success = $this->midtransService->cancelSubscription($subscription->midtrans_subscription_id);
+
+                if (!$success) {
+                    Log::error('Midtrans cancellation failed', [
+                        'event' => 'subscription.midtrans_cancel_failed',
+                        'userId' => $user->id,
+                        'subscriptionId' => $subscription->id,
+                    ]);
+                    return redirect()->back()->with('error', 'Failed to cancel subscription. Please try again or contact support.');
+                }
+            } else {
+                // For subscriptions without Midtrans ID (manual/legacy), just cancel locally
+                Log::info('Cancelling subscription locally (no Midtrans ID)', [
+                    'event' => 'subscription.cancel_local_only',
+                    'userId' => $user->id,
+                    'subscriptionId' => $subscription->id,
+                    'provider' => $subscription->provider,
+                    'hasMidtransId' => !empty($subscription->midtrans_subscription_id),
+                ]);
             }
 
             // Update local subscription status
@@ -320,7 +406,7 @@ class SubscriptionController extends Controller
                 'event' => 'subscription.user_cancelled',
                 'userId' => $user->id,
                 'subscriptionId' => $subscription->id,
-                'midtransSubscriptionId' => $subscription->midtrans_subscription_id,
+                'midtransSubscriptionId' => $subscription->midtrans_subscription_id ?? 'none',
                 'planName' => $subscription->plan_name,
                 'periodEnd' => $subscription->current_period_end?->toIso8601String(),
             ]);

@@ -90,10 +90,16 @@ Route::middleware('auth:sanctum')->group(function () {
     // Subscription routes
     Route::prefix('subscription')->group(function () {
         Route::get('/status', [SubscriptionController::class, 'status']);
+        Route::get('/billing-history', [SubscriptionController::class, 'billingHistory']);
         Route::post('/checkout', [SubscriptionController::class, 'createCheckout']);
         Route::get('/portal', [SubscriptionController::class, 'getPortalUrl']);
         Route::post('/sync', [SubscriptionController::class, 'syncFromPolar']);
         Route::post('/verify-checkout', [SubscriptionController::class, 'verifyCheckout']);
+    });
+
+    // Promo Code routes
+    Route::prefix('promo-codes')->group(function () {
+        Route::post('/validate', [\App\Http\Controllers\Api\PromoCodeController::class, 'validate']);
     });
 
     // WhatsApp Business API routes

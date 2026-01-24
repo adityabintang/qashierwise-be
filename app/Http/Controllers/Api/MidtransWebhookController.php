@@ -424,11 +424,13 @@ class MidtransWebhookController extends Controller
         $subscriptionId = $payload['subscription_id'] ?? null;
         $transactionStatus = $payload['transaction_status'] ?? null;
         $orderId = $payload['order_id'] ?? '';
+        $paymentType = $payload['custom_field2'] ?? null;
 
         Log::info('Routing subscription webhook', [
             'order_id' => $orderId,
             'subscription_id' => $subscriptionId,
             'transaction_status' => $transactionStatus,
+            'payment_type' => $paymentType,
         ]);
 
         // Determine event type based on payload structure
@@ -436,13 +438,17 @@ class MidtransWebhookController extends Controller
         // Recurring notification: has subscription_id and transaction_status
         // Pay account notification: has subscription_id and account-related fields
 
-        if ($subscriptionId !== null && $transactionStatus !== null) {
+        // Check if this is a Snap subscription payment (from custom_field2)
+        if ($paymentType === 'subscription' && $transactionStatus !== null) {
+            // This is a Snap subscription payment
+            $this->handlePaymentNotification($payload);
+        } elseif ($subscriptionId !== null && $transactionStatus !== null) {
             // This is a recurring notification (subsequent payments)
             $this->handleRecurringNotification($payload);
         } elseif ($transactionStatus !== null) {
             // This is a payment notification (first payment)
             // Check if order_id contains subscription pattern
-            if (str_contains($orderId, 'sub_')) {
+            if (str_contains($orderId, 'SUB-')) {
                 $this->handlePaymentNotification($payload);
             } else {
                 // Not a subscription payment, log and skip
@@ -544,7 +550,178 @@ class MidtransWebhookController extends Controller
             'transaction_id' => $transactionId,
         ]);
 
-        // Delegate to SubscriptionService
+        // Extract user ID and plan ID from custom fields or order ID
+        $userId = $payload['custom_field3'] ?? null;
+        $planId = $payload['custom_field1'] ?? null;
+        $duration = $payload['custom_field2'] ?? null;
+
+        // Check if this is a subscription payment
+        if ($duration && $userId && $planId) {
+            $user = \App\Models\User::find($userId);
+            
+            if ($user) {
+                // Get plan details
+                $plan = config("subscription.plans.{$planId}");
+                
+                if ($plan && isset($plan['durations'][$duration])) {
+                    $durationDetails = $plan['durations'][$duration];
+                    $months = $durationDetails['months'];
+                    
+                    // Create or update subscription
+                    $subscriptionData = [
+                        'user_id' => $user->id,
+                        'provider' => 'midtrans',
+                        'plan_name' => $planId,
+                        'status' => 'active',
+                        'current_period_start' => now(),
+                        'current_period_end' => now()->addMonths($months),
+                        'amount' => $payload['gross_amount'] ?? $durationDetails['price'],
+                        'metadata' => json_encode([
+                            'order_id' => $orderId,
+                            'transaction_id' => $transactionId,
+                            'amount' => $payload['gross_amount'] ?? $durationDetails['price'],
+                            'currency' => $plan['currency'] ?? 'IDR',
+                            'payment_type' => $payload['payment_type'] ?? 'snap',
+                            'duration' => $duration,
+                            'duration_name' => $durationDetails['name'],
+                            'months' => $months,
+                            'price_per_month' => $durationDetails['price_per_month'],
+                        ]),
+                    ];
+
+                    $subscription = $user->subscription;
+                    
+                    if ($subscription) {
+                        $subscription->update($subscriptionData);
+                        Log::info('Subscription updated from Snap payment', [
+                            'subscription_id' => $subscription->id,
+                            'user_id' => $user->id,
+                            'plan_id' => $planId,
+                            'duration' => $duration,
+                            'months' => $months,
+                            'order_id' => $orderId,
+                        ]);
+                    } else {
+                        $subscription = \App\Models\Subscription::create($subscriptionData);
+                        Log::info('Subscription created from Snap payment', [
+                            'subscription_id' => $subscription->id,
+                            'user_id' => $user->id,
+                            'plan_id' => $planId,
+                            'duration' => $duration,
+                            'months' => $months,
+                            'order_id' => $orderId,
+                        ]);
+                    }
+                    
+                    // Record promo code usage if promo code was used
+                    // Extract promo code from item name (format: "Plan Name - Duration (Promo: CODE)")
+                    $itemName = $payload['item_details'][0]['name'] ?? '';
+                    if (preg_match('/\(Promo: ([A-Z0-9]+)\)/', $itemName, $matches)) {
+                        $promoCode = $matches[1];
+                        
+                        try {
+                            $promoCodeModel = \App\Models\PromoCode::where('code', $promoCode)->first();
+                            if ($promoCodeModel) {
+                                $originalAmount = $plan['durations'][$duration]['price'];
+                                $finalAmount = $payload['gross_amount'] ?? $originalAmount;
+                                $discountAmount = $originalAmount - $finalAmount;
+                                
+                                $promoCodeService = app(\App\Services\PromoCodeService::class);
+                                $promoCodeService->recordUsage(
+                                    $promoCodeModel,
+                                    $user,
+                                    $originalAmount,
+                                    $discountAmount,
+                                    $finalAmount,
+                                    $subscription->id
+                                );
+                                
+                                Log::info('Promo code usage recorded', [
+                                    'promo_code' => $promoCode,
+                                    'user_id' => $user->id,
+                                    'subscription_id' => $subscription->id,
+                                    'discount_amount' => $discountAmount,
+                                ]);
+                            }
+                        } catch (\Exception $e) {
+                            Log::error('Failed to record promo code usage', [
+                                'promo_code' => $promoCode,
+                                'user_id' => $user->id,
+                                'error' => $e->getMessage(),
+                            ]);
+                            // Continue without recording promo usage
+                        }
+                    }
+                    
+                    // Try to create recurring subscription via Subscription API
+                    // This will enable auto-renewal and provide midtrans_subscription_id
+                    try {
+                        $midtransSubscriptionService = app(\App\Services\MidtransSubscriptionService::class);
+                        
+                        Log::info('Attempting to create recurring subscription from Snap payment', [
+                            'order_id' => $orderId,
+                            'user_id' => $user->id,
+                            'plan_id' => $planId,
+                        ]);
+                        
+                        $recurringSubscription = $midtransSubscriptionService->createSubscriptionFromSnapTransaction(
+                            $user,
+                            $orderId,
+                            $planId,
+                            $months
+                        );
+                        
+                        if ($recurringSubscription && isset($recurringSubscription['id'])) {
+                            // Update subscription with Midtrans subscription ID
+                            $subscription->update([
+                                'midtrans_subscription_id' => $recurringSubscription['id'],
+                                'midtrans_customer_id' => $recurringSubscription['customer_id'] ?? null,
+                            ]);
+                            
+                            Log::info('Recurring subscription created successfully', [
+                                'subscription_id' => $subscription->id,
+                                'midtrans_subscription_id' => $recurringSubscription['id'],
+                                'user_id' => $user->id,
+                                'plan_id' => $planId,
+                                'order_id' => $orderId,
+                            ]);
+                        } else {
+                            Log::warning('Failed to create recurring subscription, will continue with manual renewal', [
+                                'subscription_id' => $subscription->id,
+                                'user_id' => $user->id,
+                                'plan_id' => $planId,
+                                'order_id' => $orderId,
+                                'reason' => 'No saved token available or API call failed',
+                            ]);
+                        }
+                    } catch (\Exception $e) {
+                        Log::error('Exception while creating recurring subscription', [
+                            'subscription_id' => $subscription->id ?? null,
+                            'user_id' => $user->id,
+                            'plan_id' => $planId,
+                            'order_id' => $orderId,
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
+                        ]);
+                        // Continue without recurring subscription
+                        // User will need to renew manually
+                    }
+                } else {
+                    Log::warning('Plan or duration not found for subscription payment', [
+                        'plan_id' => $planId,
+                        'duration' => $duration,
+                        'order_id' => $orderId,
+                    ]);
+                }
+            } else {
+                Log::warning('User not found for subscription payment', [
+                    'user_id' => $userId,
+                    'order_id' => $orderId,
+                ]);
+            }
+        }
+
+        // Also delegate to SubscriptionService for any additional processing
         app(SubscriptionService::class)->processMidtransWebhook($payload);
 
         Log::info('Subscription payment success processed', [

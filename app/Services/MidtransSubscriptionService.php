@@ -127,6 +127,80 @@ class MidtransSubscriptionService
     }
 
     /**
+     * Create subscription from Snap transaction.
+     * 
+     * This method creates a recurring subscription after a successful Snap payment.
+     * It extracts the payment token from the transaction and creates a subscription.
+     *
+     * @param User $user The user
+     * @param string $orderId The Snap order ID
+     * @param string $planId The plan identifier
+     * @param int $months Number of months for the subscription
+     * @return array|null Subscription data or null on failure
+     */
+    public function createSubscriptionFromSnapTransaction(User $user, string $orderId, string $planId, int $months = 1): ?array
+    {
+        if (empty($this->serverKey)) {
+            Log::error('Cannot create subscription: Midtrans server key not configured');
+            return null;
+        }
+
+        try {
+            // Get transaction details to extract payment token
+            Log::info('Fetching Snap transaction for subscription creation', [
+                'orderId' => $orderId,
+                'userId' => $user->id,
+                'planId' => $planId,
+            ]);
+
+            $transactionResponse = Http::withBasicAuth($this->serverKey, '')
+                ->get("{$this->baseUrl}/{$orderId}/status");
+
+            if (!$transactionResponse->successful()) {
+                Log::error('Failed to fetch transaction details', [
+                    'orderId' => $orderId,
+                    'status' => $transactionResponse->status(),
+                ]);
+                return null;
+            }
+
+            $transaction = $transactionResponse->json();
+            
+            // Extract saved token if available
+            $savedTokenId = $transaction['saved_token_id'] ?? null;
+            $savedTokenIdExpiry = $transaction['saved_token_id_expired_at'] ?? null;
+
+            if (empty($savedTokenId)) {
+                Log::warning('No saved token found in transaction', [
+                    'orderId' => $orderId,
+                    'userId' => $user->id,
+                ]);
+                // Cannot create subscription without token
+                // This is expected for non-card payments
+                return null;
+            }
+
+            Log::info('Found saved token, creating subscription', [
+                'orderId' => $orderId,
+                'userId' => $user->id,
+                'tokenId' => substr($savedTokenId, 0, 10) . '...',
+            ]);
+
+            // Now create subscription with the token
+            return $this->createSubscription($user, $planId, $savedTokenId);
+
+        } catch (\Exception $e) {
+            Log::error('Exception creating subscription from Snap transaction', [
+                'error' => $e->getMessage(),
+                'orderId' => $orderId,
+                'userId' => $user->id,
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
      * Get subscription details.
      *
      * @param string $subscriptionId The Midtrans subscription ID

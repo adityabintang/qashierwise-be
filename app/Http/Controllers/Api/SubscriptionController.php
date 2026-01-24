@@ -38,11 +38,64 @@ class SubscriptionController extends Controller
         $user = $request->user();
         
         $status = $this->subscriptionService->getUserSubscriptionStatus($user);
+        $subscription = $user->subscription;
+
+        // Build subscription data
+        $subscriptionData = [
+            'status' => $status->status,
+            'plan_name' => $status->planName,
+            'trial_days_remaining' => $status->trialDaysRemaining,
+            'period_start' => $status->periodEnd ? $subscription?->current_period_start?->toIso8601String() : null,
+            'period_end' => $status->periodEnd?->toIso8601String(),
+            'cancelled_at' => $status->cancelledAt?->toIso8601String(),
+            'amount' => null,
+        ];
+
+        // Add amount if subscription exists
+        if ($subscription) {
+            $plan = config("subscription.plans.{$subscription->plan_name}");
+            $subscriptionData['amount'] = $plan['price'] ?? 0;
+        }
 
         return response()->json([
             'success' => true,
             'data' => [
-                'subscription' => $status->toArray(),
+                'subscription' => $subscriptionData,
+            ],
+        ]);
+    }
+
+    /**
+     * Get billing history for the current user.
+     * 
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function billingHistory(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $subscription = $user->subscription;
+
+        if (!$subscription || !$subscription->midtrans_subscription_id) {
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'payments' => [],
+                ],
+            ]);
+        }
+
+        // Get payment history from metadata or database
+        // For now, return empty array as we need to implement payment tracking
+        $payments = [];
+
+        // TODO: Implement payment history tracking in database
+        // This would require storing each successful payment in a separate table
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'payments' => $payments,
             ],
         ]);
     }
@@ -56,7 +109,9 @@ class SubscriptionController extends Controller
     public function createCheckout(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'plan_id' => 'required|string|in:standard,pro',
+            'plan_id' => 'required|string|in:pro',
+            'duration' => 'required|string|in:1_month,3_months,1_year',
+            'promo_code' => 'nullable|string|max:50',
         ]);
 
         if ($validator->fails()) {
@@ -64,7 +119,7 @@ class SubscriptionController extends Controller
                 'success' => false,
                 'error' => [
                     'code' => 'INVALID_PLAN',
-                    'message' => 'Invalid plan selected',
+                    'message' => 'Invalid plan or duration selected',
                 ],
                 'errors' => $validator->errors(),
             ], 422);
@@ -72,10 +127,14 @@ class SubscriptionController extends Controller
 
         $user = $request->user();
         $planId = $request->input('plan_id');
+        $duration = $request->input('duration');
+        $promoCode = $request->input('promo_code');
 
         Log::info('Checkout attempt', [
             'userId' => $user->id,
             'planId' => $planId,
+            'duration' => $duration,
+            'hasPromoCode' => !empty($promoCode),
         ]);
 
         // Check if Midtrans Snap service is configured
@@ -83,6 +142,7 @@ class SubscriptionController extends Controller
             Log::error('Midtrans Snap not configured', [
                 'userId' => $user->id,
                 'planId' => $planId,
+                'duration' => $duration,
             ]);
             
             return response()->json([
@@ -94,13 +154,65 @@ class SubscriptionController extends Controller
             ], 503);
         }
 
-        // Create Snap token
-        $result = $this->midtransSnapService->createSubscriptionSnapToken($user, $planId);
+        // Get plan price
+        $plan = config("subscription.plans.{$planId}");
+        if (!$plan || !isset($plan['durations'][$duration])) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'INVALID_PLAN',
+                    'message' => 'Invalid plan or duration',
+                ],
+            ], 422);
+        }
+
+        $originalAmount = $plan['durations'][$duration]['price'];
+        $finalAmount = $originalAmount;
+        $discountAmount = 0;
+        $promoCodeData = null;
+
+        // Validate and apply promo code if provided
+        if ($promoCode) {
+            $promoService = app(\App\Services\PromoCodeService::class);
+            $promoResult = $promoService->validateAndApply($promoCode, $planId, $originalAmount, $user);
+
+            if (!$promoResult['valid']) {
+                return response()->json([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'INVALID_PROMO_CODE',
+                        'message' => $promoResult['message'],
+                    ],
+                ], 422);
+            }
+
+            $finalAmount = $promoResult['final_amount'];
+            $discountAmount = $promoResult['discount'];
+            $promoCodeData = $promoResult['promo_code'];
+
+            Log::info('Promo code applied to checkout', [
+                'userId' => $user->id,
+                'promoCode' => $promoCode,
+                'originalAmount' => $originalAmount,
+                'discount' => $discountAmount,
+                'finalAmount' => $finalAmount,
+            ]);
+        }
+
+        // Create Snap token with final amount
+        $result = $this->midtransSnapService->createSubscriptionSnapToken(
+            $user, 
+            $planId, 
+            $duration,
+            $finalAmount,
+            $promoCodeData ? $promoCodeData->code : null
+        );
 
         if ($result === null) {
             Log::error('Failed to create Snap token', [
                 'userId' => $user->id,
                 'planId' => $planId,
+                'duration' => $duration,
             ]);
             
             return response()->json([
@@ -115,6 +227,10 @@ class SubscriptionController extends Controller
         Log::info('Checkout session created successfully', [
             'userId' => $user->id,
             'planId' => $planId,
+            'duration' => $duration,
+            'originalAmount' => $originalAmount,
+            'finalAmount' => $finalAmount,
+            'hasPromoCode' => !empty($promoCode),
             'hasSnapToken' => !empty($result['snap_token']),
             'hasRedirectUrl' => !empty($result['redirect_url']),
         ]);
@@ -124,6 +240,9 @@ class SubscriptionController extends Controller
             'data' => [
                 'redirect_url' => $result['redirect_url'],
                 'snap_token' => $result['snap_token'],
+                'original_amount' => $originalAmount,
+                'final_amount' => $finalAmount,
+                'discount' => $discountAmount,
             ],
         ]);
     }
