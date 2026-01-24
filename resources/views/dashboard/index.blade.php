@@ -335,19 +335,18 @@
                                     <div class="pt-2 space-y-2">
                                         <!-- Upgrade Button (for trial/expired users) -->
                                         <a x-show="subscription.status === 'trial' || subscription.status === 'trial_expired' || subscription.status === 'expired'"
-                                           href="/#pricing"
+                                           href="{{ route('subscription.pricing') }}"
                                            class="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all font-medium text-sm">
                                             <i class="fas fa-rocket"></i>
                                             <span>Upgrade Plan</span>
                                         </a>
 
                                         <!-- Manage Subscription Button (for active/cancelled subscriptions) -->
-                                        <button x-show="subscription.status === 'active' || subscription.status === 'cancelled'"
-                                                @click="openCustomerPortal()"
-                                                :disabled="portalLoading"
-                                                class="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted)/0.8)] text-[hsl(var(--foreground))] rounded-lg transition-colors font-medium text-sm disabled:opacity-50">
-                                            <i class="fas" :class="portalLoading ? 'fa-spinner fa-spin' : 'fa-cog'"></i>
-                                            <span x-text="portalLoading ? 'Loading...' : 'Manage Subscription'"></span>
+                                        <a x-show="subscription.status === 'active' || subscription.status === 'cancelled'"
+                                           href="{{ route('subscription.manage') }}"
+                                           class="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted)/0.8)] text-[hsl(var(--foreground))] rounded-lg transition-colors font-medium text-sm">
+                                            <i class="fas fa-cog"></i>
+                                            <span>Manage Subscription</span>
                                         </button>
                                     </div>
                                 </div>

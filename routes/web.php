@@ -82,6 +82,34 @@ Route::middleware(['web', 'check.web.auth'])->group(function () {
         return view('dashboard.ai-agent');
     })->name('dashboard.ai-agent');
 
+    // Subscription routes
+    Route::prefix('subscription')->name('subscription.')->group(function () {
+        Route::get('/pricing', [App\Http\Controllers\SubscriptionController::class, 'index'])
+            ->name('pricing');
+        Route::post('/checkout', [App\Http\Controllers\SubscriptionController::class, 'createCheckout'])
+            ->name('checkout');
+        Route::get('/success', [App\Http\Controllers\SubscriptionController::class, 'success'])
+            ->name('success');
+        Route::get('/cancel', [App\Http\Controllers\SubscriptionController::class, 'cancel'])
+            ->name('cancel');
+        Route::get('/error', [App\Http\Controllers\SubscriptionController::class, 'error'])
+            ->name('error');
+        Route::get('/manage', [App\Http\Controllers\SubscriptionController::class, 'manage'])
+            ->name('manage');
+        Route::post('/cancel', [App\Http\Controllers\SubscriptionController::class, 'cancelSubscription'])
+            ->name('cancel.post');
+    });
+
+    // Monitoring Dashboard routes (admin only)
+    Route::prefix('monitoring')->name('monitoring.')->middleware('can:view-monitoring')->group(function () {
+        Route::get('/dashboard', [App\Http\Controllers\MonitoringDashboardController::class, 'index'])
+            ->name('dashboard');
+        Route::get('/metrics', [App\Http\Controllers\MonitoringDashboardController::class, 'metrics'])
+            ->name('metrics');
+        Route::get('/health', [App\Http\Controllers\MonitoringDashboardController::class, 'health'])
+            ->name('health');
+    });
+
     // POS Routes
     Route::prefix('dashboard/pos')->name('dashboard.pos.')->group(function () {
         Route::get('/products', function () {

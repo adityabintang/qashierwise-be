@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessQrisPayment;
 use App\Models\QrisTransaction;
+use App\Services\SubscriptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -35,23 +37,33 @@ class MidtransWebhookController extends Controller
      */
     public function handleNotification(Request $request): JsonResponse
     {
+        $startTime = microtime(true);
         $payload = $request->all();
 
         Log::info('Midtrans webhook received', [
+            'event' => 'webhook.received',
+            'webhook_type' => 'payment',
             'order_id' => $payload['order_id'] ?? null,
             'transaction_status' => $payload['transaction_status'] ?? null,
             'payment_type' => $payload['payment_type'] ?? null,
+            'ip_address' => $request->ip(),
         ]);
 
         // Validate required fields
         if (!isset($payload['order_id']) || !isset($payload['transaction_status'])) {
-            Log::warning('Midtrans webhook missing required fields', $payload);
+            Log::warning('Midtrans webhook missing required fields', [
+                'event' => 'webhook.validation_failed',
+                'reason' => 'missing_required_fields',
+                'payload_keys' => array_keys($payload),
+            ]);
             return response()->json(['status' => 'error', 'message' => 'Missing required fields'], 400);
         }
 
         // Validate signature
         if (!$this->validateSignature($payload)) {
             Log::warning('Midtrans webhook invalid signature', [
+                'event' => 'webhook.validation_failed',
+                'reason' => 'invalid_signature',
                 'order_id' => $payload['order_id'],
             ]);
             return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
@@ -62,6 +74,7 @@ class MidtransWebhookController extends Controller
 
         if (!$transaction) {
             Log::warning('Midtrans webhook transaction not found', [
+                'event' => 'webhook.transaction_not_found',
                 'order_id' => $payload['order_id'],
             ]);
             // Return 200 to prevent Midtrans from retrying for unknown transactions
@@ -71,10 +84,23 @@ class MidtransWebhookController extends Controller
         // Process the notification based on transaction status
         try {
             $this->processPaymentNotification($transaction, $payload);
+            
+            $duration = microtime(true) - $startTime;
+            Log::info('Midtrans webhook processed successfully', [
+                'event' => 'webhook.processed',
+                'webhook_type' => 'payment',
+                'order_id' => $payload['order_id'],
+                'transaction_status' => $payload['transaction_status'],
+                'duration_ms' => round($duration * 1000, 2),
+            ]);
         } catch (\Exception $e) {
+            $duration = microtime(true) - $startTime;
             Log::error('Midtrans webhook processing error', [
+                'event' => 'webhook.processing_error',
+                'webhook_type' => 'payment',
                 'order_id' => $payload['order_id'],
                 'error' => $e->getMessage(),
+                'duration_ms' => round($duration * 1000, 2),
                 'trace' => $e->getTraceAsString(),
             ]);
             // Return 200 to prevent retries, we log the error for investigation
@@ -304,5 +330,505 @@ class MidtransWebhookController extends Controller
                 'new_status' => $status,
             ]);
         }
+    }
+
+    /**
+     * Handle incoming Midtrans subscription webhook notification.
+     *
+     * This method processes subscription-related webhooks including:
+     * - Payment notifications (first payment)
+     * - Recurring notifications (subsequent payments)
+     * - Pay account notifications (subscription status changes)
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function handleSubscriptionWebhook(Request $request): JsonResponse
+    {
+        $startTime = microtime(true);
+        $payload = $request->all();
+
+        Log::info('Midtrans subscription webhook received', [
+            'event' => 'webhook.received',
+            'webhook_type' => 'subscription',
+            'order_id' => $payload['order_id'] ?? null,
+            'subscription_id' => $payload['subscription_id'] ?? null,
+            'transaction_status' => $payload['transaction_status'] ?? null,
+            'status_code' => $payload['status_code'] ?? null,
+            'ip_address' => $request->ip(),
+        ]);
+
+        // Validate required fields
+        if (!isset($payload['order_id']) || !isset($payload['status_code'])) {
+            Log::warning('Midtrans subscription webhook missing required fields', [
+                'event' => 'webhook.validation_failed',
+                'webhook_type' => 'subscription',
+                'reason' => 'missing_required_fields',
+                'payload_keys' => array_keys($payload),
+            ]);
+            return response()->json(['status' => 'error', 'message' => 'Missing required fields'], 400);
+        }
+
+        // Validate signature
+        if (!$this->validateSignature($payload)) {
+            Log::warning('Midtrans subscription webhook invalid signature', [
+                'event' => 'webhook.validation_failed',
+                'webhook_type' => 'subscription',
+                'reason' => 'invalid_signature',
+                'order_id' => $payload['order_id'],
+            ]);
+            return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
+        }
+
+        // Process the webhook based on event type
+        try {
+            $this->processSubscriptionWebhook($payload);
+            
+            $duration = microtime(true) - $startTime;
+            Log::info('Midtrans subscription webhook processed successfully', [
+                'event' => 'webhook.processed',
+                'webhook_type' => 'subscription',
+                'order_id' => $payload['order_id'],
+                'subscription_id' => $payload['subscription_id'] ?? null,
+                'transaction_status' => $payload['transaction_status'] ?? null,
+                'duration_ms' => round($duration * 1000, 2),
+            ]);
+        } catch (\Exception $e) {
+            $duration = microtime(true) - $startTime;
+            Log::error('Midtrans subscription webhook processing error', [
+                'event' => 'webhook.processing_error',
+                'webhook_type' => 'subscription',
+                'order_id' => $payload['order_id'],
+                'subscription_id' => $payload['subscription_id'] ?? null,
+                'error' => $e->getMessage(),
+                'duration_ms' => round($duration * 1000, 2),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            // Return 200 to prevent retries, we log the error for investigation
+            return response()->json(['status' => 'ok', 'message' => 'Event received'], 200);
+        }
+
+        return response()->json(['status' => 'ok'], 200);
+    }
+
+    /**
+     * Process subscription webhook payload.
+     *
+     * Routes the webhook to the appropriate handler based on the event type.
+     *
+     * @param array $payload Webhook payload
+     * @return void
+     */
+    private function processSubscriptionWebhook(array $payload): void
+    {
+        $subscriptionId = $payload['subscription_id'] ?? null;
+        $transactionStatus = $payload['transaction_status'] ?? null;
+        $orderId = $payload['order_id'] ?? '';
+
+        Log::info('Routing subscription webhook', [
+            'order_id' => $orderId,
+            'subscription_id' => $subscriptionId,
+            'transaction_status' => $transactionStatus,
+        ]);
+
+        // Determine event type based on payload structure
+        // Payment notification: has transaction_status but may not have subscription_id initially
+        // Recurring notification: has subscription_id and transaction_status
+        // Pay account notification: has subscription_id and account-related fields
+
+        if ($subscriptionId !== null && $transactionStatus !== null) {
+            // This is a recurring notification (subsequent payments)
+            $this->handleRecurringNotification($payload);
+        } elseif ($transactionStatus !== null) {
+            // This is a payment notification (first payment)
+            // Check if order_id contains subscription pattern
+            if (str_contains($orderId, 'sub_')) {
+                $this->handlePaymentNotification($payload);
+            } else {
+                // Not a subscription payment, log and skip
+                Log::info('Non-subscription payment notification received', [
+                    'order_id' => $orderId,
+                ]);
+            }
+        } elseif ($subscriptionId !== null) {
+            // This is a pay account notification (subscription status change)
+            $this->handlePayAccountNotification($payload);
+        } else {
+            Log::warning('Unable to determine subscription webhook event type', [
+                'order_id' => $orderId,
+                'payload_keys' => array_keys($payload),
+            ]);
+        }
+    }
+
+    /**
+     * Handle payment notification (first payment).
+     *
+     * Processes the initial subscription payment notification from Midtrans.
+     *
+     * @param array $payload Webhook payload
+     * @return void
+     */
+    private function handlePaymentNotification(array $payload): void
+    {
+        $orderId = $payload['order_id'] ?? '';
+        $transactionStatus = $payload['transaction_status'] ?? '';
+        $fraudStatus = $payload['fraud_status'] ?? 'accept';
+
+        Log::info('Processing payment notification', [
+            'event' => 'webhook.payment_notification',
+            'order_id' => $orderId,
+            'transaction_status' => $transactionStatus,
+            'fraud_status' => $fraudStatus,
+            'payment_type' => $payload['payment_type'] ?? null,
+            'gross_amount' => $payload['gross_amount'] ?? null,
+        ]);
+
+        // Check idempotency
+        if ($this->isWebhookProcessed($orderId, 'payment')) {
+            Log::info('Payment notification already processed', ['order_id' => $orderId]);
+            return;
+        }
+
+        // Only process if fraud status is accept
+        if ($fraudStatus !== 'accept') {
+            Log::warning('Payment flagged for fraud', [
+                'order_id' => $orderId,
+                'fraud_status' => $fraudStatus,
+            ]);
+            $this->markWebhookProcessed($orderId, 'payment');
+            return;
+        }
+
+        // Process based on transaction status
+        switch ($transactionStatus) {
+            case 'capture':
+            case 'settlement':
+                $this->processSubscriptionPaymentSuccess($payload);
+                break;
+
+            case 'pending':
+                Log::info('Subscription payment pending', ['order_id' => $orderId]);
+                break;
+
+            case 'deny':
+            case 'cancel':
+            case 'expire':
+                $this->processSubscriptionPaymentFailed($payload);
+                break;
+
+            default:
+                Log::warning('Unknown payment transaction status', [
+                    'order_id' => $orderId,
+                    'status' => $transactionStatus,
+                ]);
+        }
+
+        // Mark as processed
+        $this->markWebhookProcessed($orderId, 'payment');
+    }
+
+    /**
+     * Process successful subscription payment.
+     *
+     * @param array $payload Webhook payload
+     * @return void
+     */
+    private function processSubscriptionPaymentSuccess(array $payload): void
+    {
+        $orderId = $payload['order_id'] ?? '';
+        $transactionId = $payload['transaction_id'] ?? null;
+
+        Log::info('Processing subscription payment success', [
+            'order_id' => $orderId,
+            'transaction_id' => $transactionId,
+        ]);
+
+        // Delegate to SubscriptionService
+        app(SubscriptionService::class)->processMidtransWebhook($payload);
+
+        Log::info('Subscription payment success processed', [
+            'order_id' => $orderId,
+        ]);
+    }
+
+    /**
+     * Process failed subscription payment.
+     *
+     * @param array $payload Webhook payload
+     * @return void
+     */
+    private function processSubscriptionPaymentFailed(array $payload): void
+    {
+        $orderId = $payload['order_id'] ?? '';
+        $transactionStatus = $payload['transaction_status'] ?? '';
+
+        Log::warning('Processing subscription payment failure', [
+            'order_id' => $orderId,
+            'transaction_status' => $transactionStatus,
+        ]);
+
+        // Delegate to SubscriptionService
+        app(SubscriptionService::class)->processMidtransWebhook($payload);
+
+        Log::info('Subscription payment failure processed', [
+            'order_id' => $orderId,
+        ]);
+    }
+
+    /**
+     * Handle recurring notification (subsequent payments).
+     *
+     * Processes recurring subscription payment notifications from Midtrans.
+     *
+     * @param array $payload Webhook payload
+     * @return void
+     */
+    private function handleRecurringNotification(array $payload): void
+    {
+        $subscriptionId = $payload['subscription_id'] ?? '';
+        $orderId = $payload['order_id'] ?? '';
+        $transactionStatus = $payload['transaction_status'] ?? '';
+
+        Log::info('Processing recurring notification', [
+            'event' => 'webhook.recurring_notification',
+            'subscription_id' => $subscriptionId,
+            'order_id' => $orderId,
+            'transaction_status' => $transactionStatus,
+            'gross_amount' => $payload['gross_amount'] ?? null,
+            'transaction_time' => $payload['transaction_time'] ?? null,
+        ]);
+
+        // Check idempotency
+        if ($this->isWebhookProcessed($orderId, 'recurring')) {
+            Log::info('Recurring notification already processed', [
+                'subscription_id' => $subscriptionId,
+                'order_id' => $orderId,
+            ]);
+            return;
+        }
+
+        // Process based on transaction status
+        switch ($transactionStatus) {
+            case 'capture':
+            case 'settlement':
+                $this->processRecurringPaymentSuccess($payload);
+                break;
+
+            case 'pending':
+                Log::info('Recurring payment pending', [
+                    'subscription_id' => $subscriptionId,
+                    'order_id' => $orderId,
+                ]);
+                break;
+
+            case 'deny':
+            case 'cancel':
+            case 'expire':
+                $this->processRecurringPaymentFailed($payload);
+                break;
+
+            default:
+                Log::warning('Unknown recurring transaction status', [
+                    'subscription_id' => $subscriptionId,
+                    'order_id' => $orderId,
+                    'status' => $transactionStatus,
+                ]);
+        }
+
+        // Mark as processed
+        $this->markWebhookProcessed($orderId, 'recurring');
+    }
+
+    /**
+     * Process successful recurring payment.
+     *
+     * @param array $payload Webhook payload
+     * @return void
+     */
+    private function processRecurringPaymentSuccess(array $payload): void
+    {
+        $subscriptionId = $payload['subscription_id'] ?? '';
+        $orderId = $payload['order_id'] ?? '';
+        $transactionId = $payload['transaction_id'] ?? null;
+
+        Log::info('Processing recurring payment success', [
+            'subscription_id' => $subscriptionId,
+            'order_id' => $orderId,
+            'transaction_id' => $transactionId,
+        ]);
+
+        // Update subscription period and status
+        app(SubscriptionService::class)->processMidtransWebhook($payload);
+
+        Log::info('Recurring payment success processed', [
+            'subscription_id' => $subscriptionId,
+            'order_id' => $orderId,
+        ]);
+    }
+
+    /**
+     * Process failed recurring payment.
+     *
+     * @param array $payload Webhook payload
+     * @return void
+     */
+    private function processRecurringPaymentFailed(array $payload): void
+    {
+        $subscriptionId = $payload['subscription_id'] ?? '';
+        $orderId = $payload['order_id'] ?? '';
+        $transactionStatus = $payload['transaction_status'] ?? '';
+
+        Log::warning('Processing recurring payment failure', [
+            'subscription_id' => $subscriptionId,
+            'order_id' => $orderId,
+            'transaction_status' => $transactionStatus,
+        ]);
+
+        // Update subscription status
+        app(SubscriptionService::class)->processMidtransWebhook($payload);
+
+        Log::info('Recurring payment failure processed', [
+            'subscription_id' => $subscriptionId,
+            'order_id' => $orderId,
+        ]);
+    }
+
+    /**
+     * Handle pay account notification (subscription status changes).
+     *
+     * Processes subscription status change notifications from Midtrans.
+     *
+     * @param array $payload Webhook payload
+     * @return void
+     */
+    private function handlePayAccountNotification(array $payload): void
+    {
+        $subscriptionId = $payload['subscription_id'] ?? '';
+        $accountStatus = $payload['account_status'] ?? null;
+        $orderId = $payload['order_id'] ?? '';
+
+        Log::info('Processing pay account notification', [
+            'event' => 'webhook.pay_account_notification',
+            'subscription_id' => $subscriptionId,
+            'account_status' => $accountStatus,
+            'order_id' => $orderId,
+            'status_code' => $payload['status_code'] ?? null,
+        ]);
+
+        // Check idempotency
+        if ($this->isWebhookProcessed($orderId, 'pay_account')) {
+            Log::info('Pay account notification already processed', [
+                'subscription_id' => $subscriptionId,
+                'order_id' => $orderId,
+            ]);
+            return;
+        }
+
+        // Process based on account status
+        if ($accountStatus !== null) {
+            switch ($accountStatus) {
+                case 'enabled':
+                case 'active':
+                    $this->processSubscriptionEnabled($payload);
+                    break;
+
+                case 'disabled':
+                case 'inactive':
+                    $this->processSubscriptionDisabled($payload);
+                    break;
+
+                default:
+                    Log::warning('Unknown account status', [
+                        'subscription_id' => $subscriptionId,
+                        'account_status' => $accountStatus,
+                    ]);
+            }
+        } else {
+            // If no account_status, delegate to SubscriptionService for general processing
+            app(SubscriptionService::class)->processMidtransWebhook($payload);
+        }
+
+        // Mark as processed
+        $this->markWebhookProcessed($orderId, 'pay_account');
+    }
+
+    /**
+     * Process subscription enabled notification.
+     *
+     * @param array $payload Webhook payload
+     * @return void
+     */
+    private function processSubscriptionEnabled(array $payload): void
+    {
+        $subscriptionId = $payload['subscription_id'] ?? '';
+
+        Log::info('Processing subscription enabled', [
+            'subscription_id' => $subscriptionId,
+        ]);
+
+        // Update subscription status to active
+        $payload['status'] = 'active';
+        app(SubscriptionService::class)->processMidtransWebhook($payload);
+
+        Log::info('Subscription enabled processed', [
+            'subscription_id' => $subscriptionId,
+        ]);
+    }
+
+    /**
+     * Process subscription disabled notification.
+     *
+     * @param array $payload Webhook payload
+     * @return void
+     */
+    private function processSubscriptionDisabled(array $payload): void
+    {
+        $subscriptionId = $payload['subscription_id'] ?? '';
+
+        Log::info('Processing subscription disabled', [
+            'subscription_id' => $subscriptionId,
+        ]);
+
+        // Update subscription status to cancelled
+        $payload['status'] = 'cancelled';
+        app(SubscriptionService::class)->processMidtransWebhook($payload);
+
+        Log::info('Subscription disabled processed', [
+            'subscription_id' => $subscriptionId,
+        ]);
+    }
+
+    /**
+     * Check if a webhook has already been processed (idempotency check).
+     *
+     * @param string $orderId The order ID
+     * @param string $eventType The event type (payment, recurring, pay_account)
+     * @return bool True if already processed
+     */
+    private function isWebhookProcessed(string $orderId, string $eventType): bool
+    {
+        $cacheKey = "midtrans_webhook_processed:{$eventType}:{$orderId}";
+        return Cache::has($cacheKey);
+    }
+
+    /**
+     * Mark a webhook as processed (idempotency tracking).
+     *
+     * @param string $orderId The order ID
+     * @param string $eventType The event type (payment, recurring, pay_account)
+     * @return void
+     */
+    private function markWebhookProcessed(string $orderId, string $eventType): void
+    {
+        $cacheKey = "midtrans_webhook_processed:{$eventType}:{$orderId}";
+        // Store for 7 days to prevent duplicate processing
+        Cache::put($cacheKey, true, now()->addDays(7));
+
+        Log::debug('Webhook marked as processed', [
+            'order_id' => $orderId,
+            'event_type' => $eventType,
+            'cache_key' => $cacheKey,
+        ]);
     }
 }

@@ -63,10 +63,18 @@ Route::get('/whatsapp/flow/public-key', [WhatsAppFlowEndpointController::class, 
 Route::post('/webhooks/polar', [PolarWebhookController::class, 'handle']);
 
 // Payment Provider Webhooks (must be public for providers to access)
-Route::post('/webhooks/midtrans', [MidtransWebhookController::class, 'handleNotification']);
+Route::post('/webhooks/midtrans', [MidtransWebhookController::class, 'handleNotification'])
+    ->middleware('throttle:60,1'); // Rate limit: 60 requests per minute
 Route::post('/webhooks/doku', [DokuWebhookController::class, 'handleNotification']);
 Route::post('/webhooks/xendit', [XenditWebhookController::class, 'handleNotification']);
 Route::post('/webhooks/duitku', [DuitkuWebhookController::class, 'handleNotification']);
+
+// Subscription Webhook (must be public for Midtrans to access)
+Route::post('/webhooks/midtrans/subscription', [MidtransWebhookController::class, 'handleSubscriptionWebhook'])
+    ->middleware('throttle:60,1'); // Rate limit: 60 requests per minute
+
+// Health Check Endpoint (public for monitoring services)
+Route::get('/health/subscription', [\App\Http\Controllers\MonitoringDashboardController::class, 'status']);
 
 // Broadcast authentication - Custom controller for Sanctum token auth
 Route::post('/broadcasting/auth', [BroadcastAuthController::class, 'authenticate'])

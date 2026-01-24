@@ -151,6 +151,38 @@ class SubscriptionService
     }
 
     /**
+     * Process a webhook event from Midtrans.
+     * 
+     * @param array $payload The webhook payload data
+     * @return void
+     */
+    public function processMidtransWebhook(array $payload): void
+    {
+        $transactionStatus = $payload['transaction_status'] ?? null;
+        $subscriptionId = $payload['subscription_id'] ?? null;
+        $orderId = $payload['order_id'] ?? null;
+
+        if ($transactionStatus === null) {
+            Log::warning('Midtrans webhook missing transaction_status', ['payload' => $payload]);
+            return;
+        }
+
+        Log::info('Processing Midtrans webhook', [
+            'transaction_status' => $transactionStatus,
+            'subscription_id' => $subscriptionId,
+            'order_id' => $orderId,
+        ]);
+
+        // Handle different transaction statuses
+        match ($transactionStatus) {
+            'capture', 'settlement' => $this->handleMidtransPaymentSuccess($payload),
+            'pending' => $this->handleMidtransPaymentPending($payload),
+            'deny', 'cancel', 'expire' => $this->handleMidtransPaymentFailed($payload),
+            default => Log::info('Unhandled Midtrans transaction status', ['status' => $transactionStatus]),
+        };
+    }
+
+    /**
      * Handle subscription.created webhook event.
      * 
      * @param array $event The webhook event data
@@ -203,6 +235,74 @@ class SubscriptionService
             : Carbon::now();
 
         $this->cancelSubscription($subscription, $cancelledAt);
+    }
+
+    /**
+     * Handle successful Midtrans payment.
+     * 
+     * @param array $payload The webhook payload
+     * @return void
+     */
+    private function handleMidtransPaymentSuccess(array $payload): void
+    {
+        $subscriptionId = $payload['subscription_id'] ?? null;
+        $orderId = $payload['order_id'] ?? null;
+
+        // If this is a subscription payment
+        if ($subscriptionId !== null) {
+            $this->updateFromMidtransWebhook($subscriptionId, [
+                'status' => 'active',
+                'transaction_status' => $payload['transaction_status'],
+                'transaction_id' => $payload['transaction_id'] ?? null,
+                'transaction_time' => $payload['transaction_time'] ?? null,
+            ]);
+        } else {
+            Log::info('Midtrans payment success without subscription_id', ['order_id' => $orderId]);
+        }
+    }
+
+    /**
+     * Handle pending Midtrans payment.
+     * 
+     * @param array $payload The webhook payload
+     * @return void
+     */
+    private function handleMidtransPaymentPending(array $payload): void
+    {
+        $subscriptionId = $payload['subscription_id'] ?? null;
+
+        if ($subscriptionId !== null) {
+            Log::info('Midtrans payment pending', [
+                'subscription_id' => $subscriptionId,
+                'order_id' => $payload['order_id'] ?? null,
+            ]);
+        }
+    }
+
+    /**
+     * Handle failed Midtrans payment.
+     * 
+     * @param array $payload The webhook payload
+     * @return void
+     */
+    private function handleMidtransPaymentFailed(array $payload): void
+    {
+        $subscriptionId = $payload['subscription_id'] ?? null;
+        $transactionStatus = $payload['transaction_status'] ?? 'failed';
+
+        if ($subscriptionId !== null) {
+            Log::warning('Midtrans payment failed', [
+                'subscription_id' => $subscriptionId,
+                'transaction_status' => $transactionStatus,
+                'order_id' => $payload['order_id'] ?? null,
+            ]);
+
+            // Update subscription status if payment failed
+            $this->updateFromMidtransWebhook($subscriptionId, [
+                'status' => 'expired',
+                'transaction_status' => $transactionStatus,
+            ]);
+        }
     }
 
     /**
@@ -302,12 +402,89 @@ class SubscriptionService
 
         if ($subscription !== null) {
             $subscription->update($data);
-            Log::info('Subscription updated', ['subscriptionId' => $subscription->id]);
+            Log::info('Subscription updated', [
+                'event' => 'subscription.updated',
+                'subscriptionId' => $subscription->id,
+                'userId' => $user->id,
+                'planName' => $data['plan_name'],
+                'status' => $data['status'],
+                'provider' => 'polar',
+            ]);
             return $subscription->fresh();
         }
 
         $subscription = Subscription::create($data);
-        Log::info('Subscription created', ['subscriptionId' => $subscription->id]);
+        Log::info('Subscription created', [
+            'event' => 'subscription.created',
+            'subscriptionId' => $subscription->id,
+            'userId' => $user->id,
+            'planName' => $data['plan_name'],
+            'status' => $data['status'],
+            'provider' => 'polar',
+        ]);
+
+        return $subscription;
+    }
+
+    /**
+     * Create a subscription from Midtrans data.
+     * 
+     * @param User $user The user
+     * @param array $midtransData The Midtrans subscription data
+     * @return Subscription
+     */
+    public function createMidtransSubscription(User $user, array $midtransData): Subscription
+    {
+        $subscription = $user->subscription;
+
+        $metadata = $midtransData['metadata'] ?? [];
+        $schedule = $midtransData['schedule'] ?? [];
+        
+        $data = [
+            'user_id' => $user->id,
+            'midtrans_subscription_id' => $midtransData['id'],
+            'midtrans_customer_id' => $midtransData['customer_id'] ?? null,
+            'provider' => 'midtrans',
+            'plan_name' => $metadata['plan_id'] ?? 'standard',
+            'status' => $this->mapMidtransStatus($midtransData['status'] ?? 'active'),
+            'current_period_start' => isset($schedule['start_time']) 
+                ? Carbon::parse($schedule['start_time']) 
+                : Carbon::now(),
+            'current_period_end' => isset($schedule['start_time']) 
+                ? Carbon::parse($schedule['start_time'])->addMonth() 
+                : Carbon::now()->addMonth(),
+            'metadata' => json_encode([
+                'midtrans_name' => $midtransData['name'] ?? null,
+                'amount' => $midtransData['amount'] ?? null,
+                'currency' => $midtransData['currency'] ?? 'IDR',
+                'payment_type' => $midtransData['payment_type'] ?? null,
+            ]),
+        ];
+
+        if ($subscription !== null) {
+            $subscription->update($data);
+            Log::info('Midtrans subscription updated', [
+                'event' => 'subscription.midtrans.updated',
+                'subscriptionId' => $subscription->id,
+                'midtransSubscriptionId' => $midtransData['id'],
+                'userId' => $user->id,
+                'planName' => $data['plan_name'],
+                'status' => $data['status'],
+                'provider' => 'midtrans',
+            ]);
+            return $subscription->fresh();
+        }
+
+        $subscription = Subscription::create($data);
+        Log::info('Midtrans subscription created', [
+            'event' => 'subscription.midtrans.created',
+            'subscriptionId' => $subscription->id,
+            'midtransSubscriptionId' => $midtransData['id'],
+            'userId' => $user->id,
+            'planName' => $data['plan_name'],
+            'status' => $data['status'],
+            'provider' => 'midtrans',
+        ]);
 
         return $subscription;
     }
@@ -326,11 +503,69 @@ class SubscriptionService
         ]);
 
         Log::info('Subscription cancelled', [
+            'event' => 'subscription.cancelled',
             'subscriptionId' => $subscription->id,
+            'userId' => $subscription->user_id,
+            'planName' => $subscription->plan_name,
+            'provider' => $subscription->provider,
             'cancelledAt' => $cancelledAt->toIso8601String(),
+            'periodEnd' => $subscription->current_period_end?->toIso8601String(),
         ]);
 
         return $subscription->fresh();
+    }
+
+    /**
+     * Update subscription from Midtrans webhook data.
+     * 
+     * @param string $midtransSubscriptionId The Midtrans subscription ID
+     * @param array $data The webhook data
+     * @return void
+     */
+    public function updateFromMidtransWebhook(string $midtransSubscriptionId, array $data): void
+    {
+        $subscription = Subscription::where('midtrans_subscription_id', $midtransSubscriptionId)->first();
+
+        if ($subscription === null) {
+            Log::warning('Subscription not found for Midtrans webhook update', [
+                'midtransSubscriptionId' => $midtransSubscriptionId,
+            ]);
+            return;
+        }
+
+        $updateData = [];
+
+        // Update status if provided
+        if (isset($data['status'])) {
+            $updateData['status'] = $this->mapMidtransStatus($data['status']);
+        }
+
+        // Update period dates if provided
+        if (isset($data['current_period_start'])) {
+            $updateData['current_period_start'] = Carbon::parse($data['current_period_start']);
+        }
+
+        if (isset($data['current_period_end'])) {
+            $updateData['current_period_end'] = Carbon::parse($data['current_period_end']);
+        }
+
+        // Update metadata with transaction info
+        if (isset($data['transaction_id']) || isset($data['transaction_status'])) {
+            $existingMetadata = $subscription->metadata ? json_decode($subscription->metadata, true) : [];
+            $existingMetadata['last_transaction_id'] = $data['transaction_id'] ?? null;
+            $existingMetadata['last_transaction_status'] = $data['transaction_status'] ?? null;
+            $existingMetadata['last_transaction_time'] = $data['transaction_time'] ?? null;
+            $updateData['metadata'] = json_encode($existingMetadata);
+        }
+
+        if (!empty($updateData)) {
+            $subscription->update($updateData);
+            Log::info('Subscription updated from Midtrans webhook', [
+                'subscriptionId' => $subscription->id,
+                'midtransSubscriptionId' => $midtransSubscriptionId,
+                'updates' => array_keys($updateData),
+            ]);
+        }
     }
 
     /**
@@ -409,6 +644,51 @@ class SubscriptionService
             PlanConfig::PLAN_STANDARD => PlanConfig::TIER_STANDARD,
             PlanConfig::PLAN_PRO => PlanConfig::TIER_PRO,
             default => PlanConfig::TIER_BASIC,
+        };
+    }
+
+    /**
+     * Map Midtrans subscription status to internal status.
+     * 
+     * @param string $midtransStatus The Midtrans status
+     * @return string The internal status
+     */
+    private function mapMidtransStatus(string $midtransStatus): string
+    {
+        return match (strtolower($midtransStatus)) {
+            'active' => 'active',
+            'inactive', 'disabled' => 'cancelled',
+            'expired' => 'expired',
+            default => 'active',
+        };
+    }
+
+    /**
+     * Get plan ID from Midtrans metadata.
+     * 
+     * @param array $metadata The Midtrans metadata
+     * @return string The plan ID
+     */
+    private function getPlanIdFromMetadata(array $metadata): string
+    {
+        return $metadata['plan_id'] ?? 'standard';
+    }
+
+    /**
+     * Calculate next period end date based on interval.
+     * 
+     * @param Carbon $startDate The start date
+     * @param string $interval The interval unit (month, year)
+     * @param int $intervalCount The interval count
+     * @return Carbon The end date
+     */
+    private function calculatePeriodEnd(Carbon $startDate, string $interval = 'month', int $intervalCount = 1): Carbon
+    {
+        return match ($interval) {
+            'month' => $startDate->copy()->addMonths($intervalCount),
+            'year' => $startDate->copy()->addYears($intervalCount),
+            'day' => $startDate->copy()->addDays($intervalCount),
+            default => $startDate->copy()->addMonth(),
         };
     }
 }

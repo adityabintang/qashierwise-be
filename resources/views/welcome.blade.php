@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <!-- Primary Meta Tags -->
     <title>QashierWise - AI Chatbot WhatsApp untuk Restoran | Reservasi & Order Otomatis</title>
     <meta name="title" content="QashierWise - AI Chatbot WhatsApp untuk Restoran | Reservasi & Order Otomatis">
@@ -883,7 +884,7 @@
                         <h3 class="text-lg font-bold text-gray-900 mb-2 mt-2">Standard</h3>
                         <p class="text-gray-500 text-xs mb-3">Hingga 2 outlet, delivery + QRIS</p>
                         <div class="mb-4">
-                            <span class="text-2xl font-bold text-gray-900">Rp249.000</span>
+                            <span class="text-2xl font-bold text-gray-900">Rp99.000</span>
                             <span class="text-gray-500 text-sm">/bln</span>
                         </div>
                         <ul class="space-y-2 mb-6 text-xs text-gray-600">
@@ -925,7 +926,7 @@
                         <h3 class="text-lg font-bold text-gray-900 mb-2">Pro</h3>
                         <p class="text-gray-500 text-xs mb-3">Tim unlimited, Analytic & API</p>
                         <div class="mb-4">
-                            <span class="text-2xl font-bold text-gray-900">Rp2.990.000</span>
+                            <span class="text-2xl font-bold text-gray-900">Rp199.000</span>
                             <span class="text-gray-500 text-sm">/bln</span>
                         </div>
                         <ul class="space-y-2 mb-6 text-xs text-gray-600">
@@ -1000,7 +1001,7 @@
                     <h3 class="text-xl font-bold text-gray-900 mb-2">Standard</h3>
                     <p class="text-gray-500 text-sm mb-4">Hingga 2 outlet, delivery + QRIS</p>
                     <div class="mb-6">
-                        <span class="text-3xl font-bold text-gray-900">Rp249.000</span>
+                        <span class="text-3xl font-bold text-gray-900">Rp99.000</span>
                         <span class="text-gray-500">/bln</span>
                     </div>
                     <ul class="space-y-3 mb-8 text-sm text-gray-600">
@@ -1042,7 +1043,7 @@
                     <h3 class="text-xl font-bold text-gray-900 mb-2">Pro</h3>
                     <p class="text-gray-500 text-sm mb-4">Tim unlimited, Analytic & API</p>
                     <div class="mb-6">
-                        <span class="text-3xl font-bold text-gray-900">Rp2.990.000</span>
+                        <span class="text-3xl font-bold text-gray-900">Rp199.000</span>
                         <span class="text-gray-500">/bln</span>
                     </div>
                     <ul class="space-y-3 mb-8 text-sm text-gray-600">
@@ -1301,23 +1302,24 @@
                     this.selectedPlan = planId;
 
                     try {
-                        const response = await fetch('/api/subscription/checkout', {
+                        const response = await fetch('/subscription/checkout', {
                             method: 'POST',
                             headers: {
                                 'Authorization': `Bearer ${this.token}`,
                                 'Content-Type': 'application/json',
                                 'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
                             },
                             body: JSON.stringify({ plan_id: planId })
                         });
 
                         const data = await response.json();
 
-                        if (data.success && data.data.checkout_url) {
-                            // Redirect to Polar.sh checkout
-                            window.location.href = data.data.checkout_url;
+                        if (response.ok && data.redirect_url) {
+                            // Redirect to Midtrans payment page
+                            window.location.href = data.redirect_url;
                         } else {
-                            this.error = data.error?.message || 'Gagal membuat sesi checkout. Silakan coba lagi.';
+                            this.error = data.message || 'Gagal membuat sesi checkout. Silakan coba lagi.';
                         }
                     } catch (e) {
                         console.error('Checkout error:', e);

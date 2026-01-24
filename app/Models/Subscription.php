@@ -17,11 +17,15 @@ class Subscription extends Model
         'user_id',
         'polar_subscription_id',
         'polar_customer_id',
+        'midtrans_subscription_id',
+        'midtrans_customer_id',
+        'provider',
         'plan_name',
         'status',
         'current_period_start',
         'current_period_end',
         'cancelled_at',
+        'metadata',
     ];
 
     /**
