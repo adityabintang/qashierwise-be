@@ -6,11 +6,11 @@ return [
     | Subscription Provider
     |--------------------------------------------------------------------------
     |
-    | The default subscription provider to use for new subscriptions.
-    | Supported: "polar", "midtrans"
+    | The subscription provider to use for subscriptions.
+    | Currently supports: "midtrans"
     |
     */
-    'provider' => env('SUBSCRIPTION_PROVIDER', 'midtrans'),
+    'provider' => 'midtrans',
 
     /*
     |--------------------------------------------------------------------------
@@ -31,6 +31,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Invoice Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for Midtrans Invoice API.
+    | Invoices are automatically sent to user's email after successful payment.
+    |
+    */
+    'invoice' => [
+        'enabled' => env('MIDTRANS_INVOICE_ENABLED', true),
+        'due_days' => env('MIDTRANS_INVOICE_DUE_DAYS', 7),
+        'payment_methods' => [
+            'bca_va',
+            'bni_va',
+            'bri_va',
+            'permata_va',
+            'gopay',
+            'shopeepay',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Subscription URLs
     |--------------------------------------------------------------------------
     |
@@ -38,9 +60,9 @@ return [
     |
     */
     'urls' => [
-        'success' => env('MIDTRANS_SUBSCRIPTION_SUCCESS_URL', env('APP_URL') . '/subscription/success'),
-        'cancel' => env('MIDTRANS_SUBSCRIPTION_CANCEL_URL', env('APP_URL') . '/subscription/cancel'),
-        'error' => env('MIDTRANS_SUBSCRIPTION_ERROR_URL', env('APP_URL') . '/subscription/error'),
+        'success' => env('MIDTRANS_SUBSCRIPTION_SUCCESS_URL', env('APP_URL').'/subscription/success'),
+        'cancel' => env('MIDTRANS_SUBSCRIPTION_CANCEL_URL', env('APP_URL').'/subscription/cancel'),
+        'error' => env('MIDTRANS_SUBSCRIPTION_ERROR_URL', env('APP_URL').'/subscription/error'),
     ],
 
     /*

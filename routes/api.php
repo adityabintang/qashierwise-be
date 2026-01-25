@@ -9,7 +9,6 @@ use App\Http\Controllers\Api\DuitkuWebhookController;
 use App\Http\Controllers\Api\EmbeddedSignupController;
 use App\Http\Controllers\Api\MidtransWebhookController;
 use App\Http\Controllers\Api\MigrationController;
-use App\Http\Controllers\Api\PolarWebhookController;
 use App\Http\Controllers\Api\Pos\CategoryController;
 use App\Http\Controllers\Api\Pos\OrderController;
 use App\Http\Controllers\Api\Pos\PaymentController;
@@ -59,9 +58,6 @@ Route::post('/whatsapp/flow/endpoint', [WhatsAppFlowEndpointController::class, '
 // See: https://developers.facebook.com/docs/whatsapp/flows/guides/implementingyourflowendpoint#upload-public-key
 Route::get('/whatsapp/flow/public-key', [WhatsAppFlowEndpointController::class, 'getPublicKey']);
 
-// Polar.sh Webhook (must be public for Polar to access)
-Route::post('/webhooks/polar', [PolarWebhookController::class, 'handle']);
-
 // Payment Provider Webhooks (must be public for providers to access)
 Route::post('/webhooks/midtrans', [MidtransWebhookController::class, 'handleNotification'])
     ->middleware('throttle:60,1'); // Rate limit: 60 requests per minute
@@ -92,9 +88,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/status', [SubscriptionController::class, 'status']);
         Route::get('/billing-history', [SubscriptionController::class, 'billingHistory']);
         Route::post('/checkout', [SubscriptionController::class, 'createCheckout']);
-        Route::get('/portal', [SubscriptionController::class, 'getPortalUrl']);
-        Route::post('/sync', [SubscriptionController::class, 'syncFromPolar']);
-        Route::post('/verify-checkout', [SubscriptionController::class, 'verifyCheckout']);
+        Route::post('/cancel', [SubscriptionController::class, 'cancelSubscription']);
     });
 
     // Promo Code routes

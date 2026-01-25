@@ -9,7 +9,6 @@ use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
 use App\Models\WhatsAppMessage;
 use App\Models\WhatsAppTemplate;
-use App\Services\AntiSpamWorkflow;
 use App\Services\MediaStorageService;
 use App\Services\WhatsAppAccountService;
 use Illuminate\Http\Request;
@@ -23,16 +22,12 @@ class WhatsAppWebhookController extends Controller
 
     protected WhatsAppAccountService $whatsAppAccountService;
 
-    protected AntiSpamWorkflow $antiSpamWorkflow;
-
     public function __construct(
         MediaStorageService $mediaStorageService,
-        WhatsAppAccountService $whatsAppAccountService,
-        AntiSpamWorkflow $antiSpamWorkflow
+        WhatsAppAccountService $whatsAppAccountService
     ) {
         $this->mediaStorageService = $mediaStorageService;
         $this->whatsAppAccountService = $whatsAppAccountService;
-        $this->antiSpamWorkflow = $antiSpamWorkflow;
     }
 
     /**
@@ -366,71 +361,17 @@ class WhatsAppWebhookController extends Controller
             ->first();
 
         if ($aiAgent && $type === 'text') {
-            Log::info('AI Agent active, processing text message', [
-                'message_id' => $messageId,
-                'contact_id' => $contact->id,
-                'ai_agent_id' => $aiAgent->id,
-                'content_preview' => substr($content, 0, 50),
-            ]);
-            
-            // Mark message as read/seen immediately when AI Agent will process it
-            try {
-                $whatsapp = new \Netflie\WhatsAppCloudApi\WhatsAppCloudApi([
-                    'from_phone_number_id' => $whatsappAccount->phone_number_id,
-                    'access_token' => $whatsappAccount->access_token,
-                ]);
-                $whatsapp->markMessageAsRead($messageId);
-
-                Log::info('Message marked as read for AI Agent processing', [
-                    'message_id' => $messageId,
-                    'contact_id' => $contact->id,
-                ]);
-            } catch (\Exception $e) {
-                Log::warning('Failed to mark message as read', [
-                    'message_id' => $messageId,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-
-            // Apply anti-spam workflow validation before dispatching to AI Agent
-            Log::info('Calling AntiSpamWorkflow->validate()', [
-                'phone_number' => $contact->wa_id,
-                'message_id' => $messageId,
-            ]);
-            
-            $shouldProcess = $this->antiSpamWorkflow->validate(
+            // Dispatch AI Agent processing to queue
+            \App\Jobs\ProcessAiAgentMessage::dispatch(
                 $whatsappAccount,
                 $contact,
-                $content,
-                $messageId
-            );
-            
-            Log::info('AntiSpamWorkflow->validate() returned', [
-                'should_process' => $shouldProcess,
-                'phone_number' => $contact->wa_id,
+                $content
+            )->onQueue('ai-agent');
+
+            Log::info('AI Agent message dispatched to queue', [
+                'contact_id' => $contact->id,
+                'ai_agent_id' => $aiAgent->id,
             ]);
-
-            if ($shouldProcess) {
-                // Dispatch AI Agent processing to queue
-                \App\Jobs\ProcessAiAgentMessage::dispatch(
-                    $whatsappAccount,
-                    $contact,
-                    $content
-                )->onQueue('ai-agent');
-
-                Log::info('AI Agent message dispatched to queue', [
-                    'contact_id' => $contact->id,
-                    'ai_agent_id' => $aiAgent->id,
-                ]);
-            } else {
-                // Message was either rejected (rate limit/duplicate) or buffered for debounce
-                // The anti-spam workflow handles dispatching ProcessBufferedMessages if buffering is enabled
-                Log::info('AI Agent message handled by anti-spam workflow (buffered or rejected)', [
-                    'contact_id' => $contact->id,
-                    'ai_agent_id' => $aiAgent->id,
-                    'phone_number' => $contact->wa_id,
-                ]);
-            }
         }
 
         return $messageData;
@@ -575,7 +516,7 @@ class WhatsAppWebhookController extends Controller
 
         // Strategy 1: Find by template_id if available (most reliable)
         if ($templateId) {
-            $template = WhatsAppTemplate::withoutGlobalScopes()->where('template_id', $templateId)->first();
+            $template = WhatsAppTemplate::where('template_id', $templateId)->first();
 
             if ($template) {
                 Log::info('Template found by template_id', ['template_id' => $templateId]);
@@ -584,17 +525,17 @@ class WhatsAppWebhookController extends Controller
 
         // Strategy 2: Find by name and language
         if (! $template && $templateName) {
-            $query = WhatsAppTemplate::withoutGlobalScopes()->where('name', $templateName);
+            $query = WhatsAppTemplate::where('name', $templateName);
 
             if ($templateLanguage) {
                 $query->where('language', $templateLanguage);
             }
 
-            // If we have waba_id, try to find the account's template using phone_number_id
+            // If we have waba_id, try to find the account's template
             if ($wabaId) {
-                $whatsappAccount = WhatsAppAccount::withoutGlobalScopes()->where('waba_id', $wabaId)->first();
+                $whatsappAccount = WhatsAppAccount::where('waba_id', $wabaId)->first();
                 if ($whatsappAccount) {
-                    $query->where('phone_number_id', $whatsappAccount->phone_number_id);
+                    $query->where('whatsapp_account_id', $whatsappAccount->id);
                 }
             }
 
@@ -610,7 +551,7 @@ class WhatsAppWebhookController extends Controller
 
         // Strategy 3: Find by name only (fallback for single-tenant or when language doesn't match)
         if (! $template && $templateName) {
-            $template = WhatsAppTemplate::withoutGlobalScopes()->where('name', $templateName)->first();
+            $template = WhatsAppTemplate::where('name', $templateName)->first();
 
             if ($template) {
                 Log::info('Template found by name only (fallback)', ['template_name' => $templateName]);

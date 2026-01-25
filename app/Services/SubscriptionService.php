@@ -126,33 +126,8 @@ class SubscriptionService
     }
 
     /**
-     * Process a webhook event from Polar.sh.
-     * 
-     * @param array $event The webhook event data
-     * @return void
-     */
-    public function processWebhookEvent(array $event): void
-    {
-        $eventType = $event['type'] ?? null;
-
-        if ($eventType === null) {
-            Log::warning('Webhook event missing type', ['event' => $event]);
-            return;
-        }
-
-        Log::info('Processing webhook event', ['type' => $eventType]);
-
-        match ($eventType) {
-            'subscription.created' => $this->handleSubscriptionCreated($event),
-            'subscription.updated' => $this->handleSubscriptionUpdated($event),
-            'subscription.cancelled', 'subscription.canceled' => $this->handleSubscriptionCancelled($event),
-            default => Log::info('Unhandled webhook event type', ['type' => $eventType]),
-        };
-    }
-
-    /**
      * Process a webhook event from Midtrans.
-     * 
+     *
      * @param array $payload The webhook payload data
      * @return void
      */
@@ -180,61 +155,6 @@ class SubscriptionService
             'deny', 'cancel', 'expire' => $this->handleMidtransPaymentFailed($payload),
             default => Log::info('Unhandled Midtrans transaction status', ['status' => $transactionStatus]),
         };
-    }
-
-    /**
-     * Handle subscription.created webhook event.
-     * 
-     * @param array $event The webhook event data
-     * @return void
-     */
-    private function handleSubscriptionCreated(array $event): void
-    {
-        $data = $event['data'] ?? [];
-        $this->createOrUpdateSubscriptionFromWebhook($data, 'active');
-    }
-
-    /**
-     * Handle subscription.updated webhook event.
-     * 
-     * @param array $event The webhook event data
-     * @return void
-     */
-    private function handleSubscriptionUpdated(array $event): void
-    {
-        $data = $event['data'] ?? [];
-        $status = $data['status'] ?? 'active';
-        $this->createOrUpdateSubscriptionFromWebhook($data, $status);
-    }
-
-    /**
-     * Handle subscription.cancelled webhook event.
-     * 
-     * @param array $event The webhook event data
-     * @return void
-     */
-    private function handleSubscriptionCancelled(array $event): void
-    {
-        $data = $event['data'] ?? [];
-        $subscriptionId = $data['id'] ?? null;
-
-        if ($subscriptionId === null) {
-            Log::warning('Subscription cancelled event missing subscription ID');
-            return;
-        }
-
-        $subscription = Subscription::where('polar_subscription_id', $subscriptionId)->first();
-
-        if ($subscription === null) {
-            Log::warning('Subscription not found for cancellation', ['subscriptionId' => $subscriptionId]);
-            return;
-        }
-
-        $cancelledAt = isset($data['canceled_at']) 
-            ? Carbon::parse($data['canceled_at']) 
-            : Carbon::now();
-
-        $this->cancelSubscription($subscription, $cancelledAt);
     }
 
     /**
@@ -306,98 +226,39 @@ class SubscriptionService
     }
 
     /**
-     * Create or update subscription from webhook data.
-     * 
-     * @param array $data The subscription data from webhook
-     * @param string $status The subscription status
-     * @return Subscription|null
-     */
-    private function createOrUpdateSubscriptionFromWebhook(array $data, string $status): ?Subscription
-    {
-        $subscriptionId = $data['id'] ?? null;
-        $customerId = $data['customer_id'] ?? null;
-        $metadata = $data['metadata'] ?? [];
-        $userId = $metadata['user_id'] ?? null;
-
-        if ($subscriptionId === null || $userId === null) {
-            Log::warning('Webhook data missing required fields', [
-                'subscriptionId' => $subscriptionId,
-                'userId' => $userId,
-            ]);
-            return null;
-        }
-
-        $user = User::find($userId);
-
-        if ($user === null) {
-            Log::warning('User not found for subscription', ['userId' => $userId]);
-            return null;
-        }
-
-        // Determine plan name from product ID
-        $productId = $data['product_id'] ?? null;
-        $planName = $this->getPlanNameFromProductId($productId) ?? ($metadata['plan_id'] ?? 'standard');
-
-        return $this->createOrUpdateSubscription($user, [
-            'polar_subscription_id' => $subscriptionId,
-            'polar_customer_id' => $customerId,
-            'plan_name' => $planName,
-            'status' => $status,
-            'current_period_start' => $data['current_period_start'] ?? null,
-            'current_period_end' => $data['current_period_end'] ?? null,
-        ]);
-    }
-
-
-    /**
-     * Get plan name from Polar product ID.
-     * 
-     * @param string|null $productId The Polar product ID
-     * @return string|null
-     */
-    private function getPlanNameFromProductId(?string $productId): ?string
-    {
-        if ($productId === null) {
-            return null;
-        }
-
-        $standardProductId = config('polar.products.standard');
-        $proProductId = config('polar.products.pro');
-
-        if ($productId === $standardProductId) {
-            return PlanConfig::PLAN_STANDARD;
-        }
-
-        if ($productId === $proProductId) {
-            return PlanConfig::PLAN_PRO;
-        }
-
-        return null;
-    }
-
-    /**
-     * Create or update a subscription for a user.
-     * 
+     * Create or update a subscription for a user from Midtrans data.
+     *
      * @param User $user The user
-     * @param array $polarData The subscription data
+     * @param array $midtransData The Midtrans subscription data
      * @return Subscription
      */
-    public function createOrUpdateSubscription(User $user, array $polarData): Subscription
+    public function createOrUpdateSubscription(User $user, array $midtransData): Subscription
     {
         $subscription = $user->subscription;
 
+        $metadata = $midtransData['metadata'] ?? [];
+        $schedule = $midtransData['schedule'] ?? [];
+
         $data = [
             'user_id' => $user->id,
-            'polar_subscription_id' => $polarData['polar_subscription_id'],
-            'polar_customer_id' => $polarData['polar_customer_id'],
-            'plan_name' => $polarData['plan_name'],
-            'status' => $polarData['status'],
-            'current_period_start' => isset($polarData['current_period_start']) 
-                ? Carbon::parse($polarData['current_period_start']) 
+            'midtrans_subscription_id' => $midtransData['id'],
+            'midtrans_customer_id' => $midtransData['customer_id'] ?? null,
+            'plan_name' => $metadata['plan_id'] ?? 'pro',
+            'status' => $this->mapMidtransStatus($midtransData['status'] ?? 'active'),
+            'current_period_start' => isset($schedule['start_time'])
+                ? Carbon::parse($schedule['start_time'])
                 : Carbon::now(),
-            'current_period_end' => isset($polarData['current_period_end']) 
-                ? Carbon::parse($polarData['current_period_end']) 
+            'current_period_end' => isset($schedule['start_time'])
+                ? Carbon::parse($schedule['start_time'])->addMonth()
                 : Carbon::now()->addMonth(),
+            'metadata' => json_encode([
+                'midtrans_name' => $midtransData['name'] ?? null,
+                'amount' => $midtransData['amount'] ?? null,
+                'currency' => $midtransData['currency'] ?? 'IDR',
+                'payment_type' => $midtransData['payment_type'] ?? null,
+                'interval' => $schedule['interval_unit'] ?? 'month',
+                'interval_count' => $schedule['interval'] ?? 1,
+            ]),
         ];
 
         if ($subscription !== null) {
@@ -405,10 +266,10 @@ class SubscriptionService
             Log::info('Subscription updated', [
                 'event' => 'subscription.updated',
                 'subscriptionId' => $subscription->id,
+                'midtransSubscriptionId' => $midtransData['id'],
                 'userId' => $user->id,
                 'planName' => $data['plan_name'],
                 'status' => $data['status'],
-                'provider' => 'polar',
             ]);
             return $subscription->fresh();
         }
@@ -417,73 +278,10 @@ class SubscriptionService
         Log::info('Subscription created', [
             'event' => 'subscription.created',
             'subscriptionId' => $subscription->id,
-            'userId' => $user->id,
-            'planName' => $data['plan_name'],
-            'status' => $data['status'],
-            'provider' => 'polar',
-        ]);
-
-        return $subscription;
-    }
-
-    /**
-     * Create a subscription from Midtrans data.
-     * 
-     * @param User $user The user
-     * @param array $midtransData The Midtrans subscription data
-     * @return Subscription
-     */
-    public function createMidtransSubscription(User $user, array $midtransData): Subscription
-    {
-        $subscription = $user->subscription;
-
-        $metadata = $midtransData['metadata'] ?? [];
-        $schedule = $midtransData['schedule'] ?? [];
-        
-        $data = [
-            'user_id' => $user->id,
-            'midtrans_subscription_id' => $midtransData['id'],
-            'midtrans_customer_id' => $midtransData['customer_id'] ?? null,
-            'provider' => 'midtrans',
-            'plan_name' => $metadata['plan_id'] ?? 'standard',
-            'status' => $this->mapMidtransStatus($midtransData['status'] ?? 'active'),
-            'current_period_start' => isset($schedule['start_time']) 
-                ? Carbon::parse($schedule['start_time']) 
-                : Carbon::now(),
-            'current_period_end' => isset($schedule['start_time']) 
-                ? Carbon::parse($schedule['start_time'])->addMonth() 
-                : Carbon::now()->addMonth(),
-            'metadata' => json_encode([
-                'midtrans_name' => $midtransData['name'] ?? null,
-                'amount' => $midtransData['amount'] ?? null,
-                'currency' => $midtransData['currency'] ?? 'IDR',
-                'payment_type' => $midtransData['payment_type'] ?? null,
-            ]),
-        ];
-
-        if ($subscription !== null) {
-            $subscription->update($data);
-            Log::info('Midtrans subscription updated', [
-                'event' => 'subscription.midtrans.updated',
-                'subscriptionId' => $subscription->id,
-                'midtransSubscriptionId' => $midtransData['id'],
-                'userId' => $user->id,
-                'planName' => $data['plan_name'],
-                'status' => $data['status'],
-                'provider' => 'midtrans',
-            ]);
-            return $subscription->fresh();
-        }
-
-        $subscription = Subscription::create($data);
-        Log::info('Midtrans subscription created', [
-            'event' => 'subscription.midtrans.created',
-            'subscriptionId' => $subscription->id,
             'midtransSubscriptionId' => $midtransData['id'],
             'userId' => $user->id,
             'planName' => $data['plan_name'],
             'status' => $data['status'],
-            'provider' => 'midtrans',
         ]);
 
         return $subscription;
@@ -507,7 +305,6 @@ class SubscriptionService
             'subscriptionId' => $subscription->id,
             'userId' => $subscription->user_id,
             'planName' => $subscription->plan_name,
-            'provider' => $subscription->provider,
             'cancelledAt' => $cancelledAt->toIso8601String(),
             'periodEnd' => $subscription->current_period_end?->toIso8601String(),
         ]);
@@ -569,14 +366,14 @@ class SubscriptionService
     }
 
     /**
-     * Calculate the remaining trial days for a user.
-     * 
+     * Calculate remaining trial days for a user.
+     *
      * @param User $user The user to check
      * @return int Days remaining (0 if trial expired)
      */
     public function calculateTrialDaysRemaining(User $user): int
     {
-        $trialDays = (int) config('polar.trial_days', self::TRIAL_DAYS);
+        $trialDays = (int) config('subscription.trial_days', self::TRIAL_DAYS);
         $registrationDate = $user->created_at;
 
         if ($registrationDate === null) {
@@ -586,7 +383,7 @@ class SubscriptionService
         // Use startOfDay to ensure consistent day calculation
         $registrationDay = $registrationDate->copy()->startOfDay();
         $today = Carbon::now()->startOfDay();
-        
+
         $daysSinceRegistration = (int) $registrationDay->diffInDays($today);
         $daysRemaining = $trialDays - $daysSinceRegistration;
 
@@ -610,8 +407,7 @@ class SubscriptionService
         // Define tier hierarchy (higher index = higher tier)
         $tierHierarchy = [
             PlanConfig::TIER_BASIC => 0,
-            PlanConfig::TIER_STANDARD => 1,
-            PlanConfig::TIER_PRO => 2,
+            PlanConfig::TIER_PRO => 1,
         ];
 
         $userTierLevel = $tierHierarchy[$userTier] ?? 0;
@@ -632,8 +428,8 @@ class SubscriptionService
     }
 
     /**
-     * Get the tier from a plan name.
-     * 
+     * Get tier from a plan name.
+     *
      * @param string $planName The plan name
      * @return string The tier
      */
@@ -641,7 +437,6 @@ class SubscriptionService
     {
         return match ($planName) {
             PlanConfig::PLAN_FREE_TRIAL => PlanConfig::TIER_BASIC,
-            PlanConfig::PLAN_STANDARD => PlanConfig::TIER_STANDARD,
             PlanConfig::PLAN_PRO => PlanConfig::TIER_PRO,
             default => PlanConfig::TIER_BASIC,
         };

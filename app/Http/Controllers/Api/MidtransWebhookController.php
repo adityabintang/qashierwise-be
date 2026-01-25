@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessQrisPayment;
 use App\Models\QrisTransaction;
+use App\Models\SubscriptionPayment;
 use App\Services\SubscriptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,7 +14,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Controller for handling Midtrans webhook notifications.
- * 
+ *
  * Receives and processes payment status updates from Midtrans
  * including settlement, expiration, and cancellation events.
  */
@@ -31,9 +32,6 @@ class MidtransWebhookController extends Controller
 
     /**
      * Handle incoming Midtrans webhook notification.
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function handleNotification(Request $request): JsonResponse
     {
@@ -50,33 +48,36 @@ class MidtransWebhookController extends Controller
         ]);
 
         // Validate required fields
-        if (!isset($payload['order_id']) || !isset($payload['transaction_status'])) {
+        if (! isset($payload['order_id']) || ! isset($payload['transaction_status'])) {
             Log::warning('Midtrans webhook missing required fields', [
                 'event' => 'webhook.validation_failed',
                 'reason' => 'missing_required_fields',
                 'payload_keys' => array_keys($payload),
             ]);
+
             return response()->json(['status' => 'error', 'message' => 'Missing required fields'], 400);
         }
 
         // Validate signature
-        if (!$this->validateSignature($payload)) {
+        if (! $this->validateSignature($payload)) {
             Log::warning('Midtrans webhook invalid signature', [
                 'event' => 'webhook.validation_failed',
                 'reason' => 'invalid_signature',
                 'order_id' => $payload['order_id'],
             ]);
+
             return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
         }
 
         // Find the transaction
         $transaction = QrisTransaction::where('order_id', $payload['order_id'])->first();
 
-        if (!$transaction) {
+        if (! $transaction) {
             Log::warning('Midtrans webhook transaction not found', [
                 'event' => 'webhook.transaction_not_found',
                 'order_id' => $payload['order_id'],
             ]);
+
             // Return 200 to prevent Midtrans from retrying for unknown transactions
             return response()->json(['status' => 'ok', 'message' => 'Transaction not found'], 200);
         }
@@ -84,7 +85,7 @@ class MidtransWebhookController extends Controller
         // Process the notification based on transaction status
         try {
             $this->processPaymentNotification($transaction, $payload);
-            
+
             $duration = microtime(true) - $startTime;
             Log::info('Midtrans webhook processed successfully', [
                 'event' => 'webhook.processed',
@@ -103,6 +104,7 @@ class MidtransWebhookController extends Controller
                 'duration_ms' => round($duration * 1000, 2),
                 'trace' => $e->getTraceAsString(),
             ]);
+
             // Return 200 to prevent retries, we log the error for investigation
             return response()->json(['status' => 'ok', 'message' => 'Event received'], 200);
         }
@@ -115,7 +117,7 @@ class MidtransWebhookController extends Controller
      *
      * Midtrans signature is SHA512 hash of: order_id + status_code + gross_amount + server_key
      *
-     * @param array $payload Webhook payload
+     * @param  array  $payload  Webhook payload
      * @return bool True if signature is valid
      */
     private function validateSignature(array $payload): bool
@@ -123,12 +125,14 @@ class MidtransWebhookController extends Controller
         // If no server key configured, skip validation (development mode)
         if (empty($this->serverKey)) {
             Log::warning('Midtrans server key not configured, skipping signature validation');
+
             return true;
         }
 
         $signatureKey = $payload['signature_key'] ?? null;
-        if (!$signatureKey) {
+        if (! $signatureKey) {
             Log::warning('Midtrans webhook missing signature_key');
+
             return false;
         }
 
@@ -137,16 +141,16 @@ class MidtransWebhookController extends Controller
         $grossAmount = $payload['gross_amount'] ?? '';
 
         // Build the signature string
-        $signatureString = $orderId . $statusCode . $grossAmount . $this->serverKey;
+        $signatureString = $orderId.$statusCode.$grossAmount.$this->serverKey;
         $expectedSignature = hash('sha512', $signatureString);
 
         $isValid = hash_equals($expectedSignature, $signatureKey);
 
-        if (!$isValid) {
+        if (! $isValid) {
             Log::warning('Midtrans signature mismatch', [
                 'order_id' => $orderId,
-                'expected' => substr($expectedSignature, 0, 20) . '...',
-                'received' => substr($signatureKey, 0, 20) . '...',
+                'expected' => substr($expectedSignature, 0, 20).'...',
+                'received' => substr($signatureKey, 0, 20).'...',
             ]);
         }
 
@@ -156,8 +160,8 @@ class MidtransWebhookController extends Controller
     /**
      * Process payment notification based on transaction status.
      *
-     * @param QrisTransaction $transaction The QRIS transaction
-     * @param array $payload Webhook payload
+     * @param  QrisTransaction  $transaction  The QRIS transaction
+     * @param  array  $payload  Webhook payload
      */
     private function processPaymentNotification(QrisTransaction $transaction, array $payload): void
     {
@@ -178,6 +182,7 @@ class MidtransWebhookController extends Controller
                 'order_id' => $transaction->order_id,
                 'status' => $transaction->status,
             ]);
+
             return;
         }
 
@@ -230,10 +235,6 @@ class MidtransWebhookController extends Controller
 
     /**
      * Handle successful payment settlement.
-     *
-     * @param QrisTransaction $transaction
-     * @param string|null $midtransTransactionId
-     * @param array $payload
      */
     private function handleSettlement(QrisTransaction $transaction, ?string $midtransTransactionId, array $payload): void
     {
@@ -263,9 +264,6 @@ class MidtransWebhookController extends Controller
 
     /**
      * Handle payment cancellation.
-     *
-     * @param QrisTransaction $transaction
-     * @param array $payload
      */
     private function handleCancellation(QrisTransaction $transaction, array $payload): void
     {
@@ -286,9 +284,6 @@ class MidtransWebhookController extends Controller
 
     /**
      * Handle payment expiration.
-     *
-     * @param QrisTransaction $transaction
-     * @param array $payload
      */
     private function handleExpiration(QrisTransaction $transaction, array $payload): void
     {
@@ -310,8 +305,7 @@ class MidtransWebhookController extends Controller
     /**
      * Update linked Payment record status when QRIS transaction status changes.
      *
-     * @param QrisTransaction $transaction
-     * @param string $status The status to set ('failed' or 'expired')
+     * @param  string  $status  The status to set ('failed' or 'expired')
      */
     private function updateLinkedPaymentStatus(QrisTransaction $transaction, string $status): void
     {
@@ -339,9 +333,6 @@ class MidtransWebhookController extends Controller
      * - Payment notifications (first payment)
      * - Recurring notifications (subsequent payments)
      * - Pay account notifications (subscription status changes)
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function handleSubscriptionWebhook(Request $request): JsonResponse
     {
@@ -359,31 +350,33 @@ class MidtransWebhookController extends Controller
         ]);
 
         // Validate required fields
-        if (!isset($payload['order_id']) || !isset($payload['status_code'])) {
+        if (! isset($payload['order_id']) || ! isset($payload['status_code'])) {
             Log::warning('Midtrans subscription webhook missing required fields', [
                 'event' => 'webhook.validation_failed',
                 'webhook_type' => 'subscription',
                 'reason' => 'missing_required_fields',
                 'payload_keys' => array_keys($payload),
             ]);
+
             return response()->json(['status' => 'error', 'message' => 'Missing required fields'], 400);
         }
 
         // Validate signature
-        if (!$this->validateSignature($payload)) {
+        if (! $this->validateSignature($payload)) {
             Log::warning('Midtrans subscription webhook invalid signature', [
                 'event' => 'webhook.validation_failed',
                 'webhook_type' => 'subscription',
                 'reason' => 'invalid_signature',
                 'order_id' => $payload['order_id'],
             ]);
+
             return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
         }
 
         // Process the webhook based on event type
         try {
             $this->processSubscriptionWebhook($payload);
-            
+
             $duration = microtime(true) - $startTime;
             Log::info('Midtrans subscription webhook processed successfully', [
                 'event' => 'webhook.processed',
@@ -404,6 +397,7 @@ class MidtransWebhookController extends Controller
                 'duration_ms' => round($duration * 1000, 2),
                 'trace' => $e->getTraceAsString(),
             ]);
+
             // Return 200 to prevent retries, we log the error for investigation
             return response()->json(['status' => 'ok', 'message' => 'Event received'], 200);
         }
@@ -416,8 +410,7 @@ class MidtransWebhookController extends Controller
      *
      * Routes the webhook to the appropriate handler based on the event type.
      *
-     * @param array $payload Webhook payload
-     * @return void
+     * @param  array  $payload  Webhook payload
      */
     private function processSubscriptionWebhook(array $payload): void
     {
@@ -472,8 +465,7 @@ class MidtransWebhookController extends Controller
      *
      * Processes the initial subscription payment notification from Midtrans.
      *
-     * @param array $payload Webhook payload
-     * @return void
+     * @param  array  $payload  Webhook payload
      */
     private function handlePaymentNotification(array $payload): void
     {
@@ -493,6 +485,7 @@ class MidtransWebhookController extends Controller
         // Check idempotency
         if ($this->isWebhookProcessed($orderId, 'payment')) {
             Log::info('Payment notification already processed', ['order_id' => $orderId]);
+
             return;
         }
 
@@ -503,6 +496,7 @@ class MidtransWebhookController extends Controller
                 'fraud_status' => $fraudStatus,
             ]);
             $this->markWebhookProcessed($orderId, 'payment');
+
             return;
         }
 
@@ -537,8 +531,7 @@ class MidtransWebhookController extends Controller
     /**
      * Process successful subscription payment.
      *
-     * @param array $payload Webhook payload
-     * @return void
+     * @param  array  $payload  Webhook payload
      */
     private function processSubscriptionPaymentSuccess(array $payload): void
     {
@@ -558,15 +551,15 @@ class MidtransWebhookController extends Controller
         // Check if this is a subscription payment
         if ($duration && $userId && $planId) {
             $user = \App\Models\User::find($userId);
-            
+
             if ($user) {
                 // Get plan details
                 $plan = config("subscription.plans.{$planId}");
-                
+
                 if ($plan && isset($plan['durations'][$duration])) {
                     $durationDetails = $plan['durations'][$duration];
                     $months = $durationDetails['months'];
-                    
+
                     // Create or update subscription
                     $subscriptionData = [
                         'user_id' => $user->id,
@@ -590,7 +583,7 @@ class MidtransWebhookController extends Controller
                     ];
 
                     $subscription = $user->subscription;
-                    
+
                     if ($subscription) {
                         $subscription->update($subscriptionData);
                         Log::info('Subscription updated from Snap payment', [
@@ -612,20 +605,59 @@ class MidtransWebhookController extends Controller
                             'order_id' => $orderId,
                         ]);
                     }
-                    
+
+                    // Record payment in subscription_payments table for billing history
+                    try {
+                        SubscriptionPayment::updateOrCreate(
+                            ['order_id' => $orderId],
+                            [
+                                'subscription_id' => $subscription->id,
+                                'user_id' => $user->id,
+                                'transaction_id' => $transactionId,
+                                'plan_name' => $durationDetails['name'] ?? ($planId.' - '.$duration),
+                                'duration' => $duration,
+                                'gross_amount' => $payload['gross_amount'] ?? $durationDetails['price'],
+                                'currency' => $plan['currency'] ?? 'IDR',
+                                'payment_type' => $payload['payment_type'] ?? 'snap',
+                                'status' => SubscriptionPayment::STATUS_SETTLEMENT,
+                                'transaction_time' => now(),
+                                'metadata' => [
+                                    'months' => $months,
+                                    'price_per_month' => $durationDetails['price_per_month'] ?? null,
+                                    'payment_details' => $payload,
+                                ],
+                            ]
+                        );
+
+                        Log::info('Subscription payment recorded for billing history', [
+                            'order_id' => $orderId,
+                            'subscription_id' => $subscription->id,
+                            'user_id' => $user->id,
+                            'amount' => $payload['gross_amount'] ?? $durationDetails['price'],
+                        ]);
+                    } catch (\Exception $e) {
+                        Log::error('Failed to record subscription payment', [
+                            'order_id' => $orderId,
+                            'subscription_id' => $subscription->id ?? null,
+                            'user_id' => $user->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                        // Continue - billing history is not critical
+                    }
+
                     // Record promo code usage if promo code was used
                     // Extract promo code from item name (format: "Plan Name - Duration (Promo: CODE)")
                     $itemName = $payload['item_details'][0]['name'] ?? '';
                     if (preg_match('/\(Promo: ([A-Z0-9]+)\)/', $itemName, $matches)) {
                         $promoCode = $matches[1];
-                        
+
                         try {
                             $promoCodeModel = \App\Models\PromoCode::where('code', $promoCode)->first();
                             if ($promoCodeModel) {
                                 $originalAmount = $plan['durations'][$duration]['price'];
                                 $finalAmount = $payload['gross_amount'] ?? $originalAmount;
                                 $discountAmount = $originalAmount - $finalAmount;
-                                
+
                                 $promoCodeService = app(\App\Services\PromoCodeService::class);
                                 $promoCodeService->recordUsage(
                                     $promoCodeModel,
@@ -635,7 +667,7 @@ class MidtransWebhookController extends Controller
                                     $finalAmount,
                                     $subscription->id
                                 );
-                                
+
                                 Log::info('Promo code usage recorded', [
                                     'promo_code' => $promoCode,
                                     'user_id' => $user->id,
@@ -652,32 +684,32 @@ class MidtransWebhookController extends Controller
                             // Continue without recording promo usage
                         }
                     }
-                    
+
                     // Try to create recurring subscription via Subscription API
                     // This will enable auto-renewal and provide midtrans_subscription_id
                     try {
                         $midtransSubscriptionService = app(\App\Services\MidtransSubscriptionService::class);
-                        
+
                         Log::info('Attempting to create recurring subscription from Snap payment', [
                             'order_id' => $orderId,
                             'user_id' => $user->id,
                             'plan_id' => $planId,
                         ]);
-                        
+
                         $recurringSubscription = $midtransSubscriptionService->createSubscriptionFromSnapTransaction(
                             $user,
                             $orderId,
                             $planId,
                             $months
                         );
-                        
+
                         if ($recurringSubscription && isset($recurringSubscription['id'])) {
                             // Update subscription with Midtrans subscription ID
                             $subscription->update([
                                 'midtrans_subscription_id' => $recurringSubscription['id'],
                                 'midtrans_customer_id' => $recurringSubscription['customer_id'] ?? null,
                             ]);
-                            
+
                             Log::info('Recurring subscription created successfully', [
                                 'subscription_id' => $subscription->id,
                                 'midtrans_subscription_id' => $recurringSubscription['id'],
@@ -706,6 +738,65 @@ class MidtransWebhookController extends Controller
                         // Continue without recurring subscription
                         // User will need to renew manually
                     }
+
+                    // Send invoice to user's email via Midtrans Invoice API
+                    try {
+                        $invoiceService = app(\App\Services\MidtransInvoiceService::class);
+
+                        Log::info('Attempting to create and send invoice', [
+                            'order_id' => $orderId,
+                            'user_id' => $user->id,
+                            'user_email' => $user->email,
+                            'plan_name' => $plan['name'],
+                            'duration_name' => $durationDetails['name'],
+                            'amount' => $payload['gross_amount'] ?? $durationDetails['price'],
+                        ]);
+
+                        $invoice = $invoiceService->createSubscriptionInvoice(
+                            $user,
+                            $orderId,
+                            $plan['name'],
+                            $durationDetails['name'],
+                            $payload['gross_amount'] ?? $durationDetails['price'],
+                            $plan['currency'] ?? 'IDR'
+                        );
+
+                        if ($invoice !== null && isset($invoice['id'])) {
+                            // Update subscription payment with invoice details
+                            $subscriptionPayment = SubscriptionPayment::where('order_id', $orderId)->first();
+                            if ($subscriptionPayment) {
+                                $metadata = $subscriptionPayment->metadata ?? [];
+                                $metadata['invoice_id'] = $invoice['id'];
+                                $metadata['invoice_number'] = $invoice['invoice_number'] ?? null;
+                                $metadata['pdf_url'] = $invoice['pdf_url'] ?? null;
+                                $subscriptionPayment->update(['metadata' => $metadata]);
+                            }
+
+                            Log::info('Invoice created and sent successfully', [
+                                'order_id' => $orderId,
+                                'invoice_id' => $invoice['id'],
+                                'invoice_number' => $invoice['invoice_number'] ?? null,
+                                'pdf_url' => $invoice['pdf_url'] ?? null,
+                                'user_email' => $user->email,
+                            ]);
+                        } else {
+                            Log::warning('Failed to create invoice, will continue without invoice', [
+                                'order_id' => $orderId,
+                                'user_id' => $user->id,
+                                'reason' => 'Invoice creation returned null or missing ID',
+                            ]);
+                        }
+                    } catch (\Exception $e) {
+                        Log::error('Exception while creating invoice', [
+                            'order_id' => $orderId,
+                            'user_id' => $user->id,
+                            'user_email' => $user->email,
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
+                        ]);
+                        // Continue without invoice
+                        // Subscription is still active, invoice is non-critical
+                    }
                 } else {
                     Log::warning('Plan or duration not found for subscription payment', [
                         'plan_id' => $planId,
@@ -732,8 +823,7 @@ class MidtransWebhookController extends Controller
     /**
      * Process failed subscription payment.
      *
-     * @param array $payload Webhook payload
-     * @return void
+     * @param  array  $payload  Webhook payload
      */
     private function processSubscriptionPaymentFailed(array $payload): void
     {
@@ -758,8 +848,7 @@ class MidtransWebhookController extends Controller
      *
      * Processes recurring subscription payment notifications from Midtrans.
      *
-     * @param array $payload Webhook payload
-     * @return void
+     * @param  array  $payload  Webhook payload
      */
     private function handleRecurringNotification(array $payload): void
     {
@@ -782,6 +871,7 @@ class MidtransWebhookController extends Controller
                 'subscription_id' => $subscriptionId,
                 'order_id' => $orderId,
             ]);
+
             return;
         }
 
@@ -820,8 +910,7 @@ class MidtransWebhookController extends Controller
     /**
      * Process successful recurring payment.
      *
-     * @param array $payload Webhook payload
-     * @return void
+     * @param  array  $payload  Webhook payload
      */
     private function processRecurringPaymentSuccess(array $payload): void
     {
@@ -847,8 +936,7 @@ class MidtransWebhookController extends Controller
     /**
      * Process failed recurring payment.
      *
-     * @param array $payload Webhook payload
-     * @return void
+     * @param  array  $payload  Webhook payload
      */
     private function processRecurringPaymentFailed(array $payload): void
     {
@@ -876,8 +964,7 @@ class MidtransWebhookController extends Controller
      *
      * Processes subscription status change notifications from Midtrans.
      *
-     * @param array $payload Webhook payload
-     * @return void
+     * @param  array  $payload  Webhook payload
      */
     private function handlePayAccountNotification(array $payload): void
     {
@@ -899,6 +986,7 @@ class MidtransWebhookController extends Controller
                 'subscription_id' => $subscriptionId,
                 'order_id' => $orderId,
             ]);
+
             return;
         }
 
@@ -933,8 +1021,7 @@ class MidtransWebhookController extends Controller
     /**
      * Process subscription enabled notification.
      *
-     * @param array $payload Webhook payload
-     * @return void
+     * @param  array  $payload  Webhook payload
      */
     private function processSubscriptionEnabled(array $payload): void
     {
@@ -956,8 +1043,7 @@ class MidtransWebhookController extends Controller
     /**
      * Process subscription disabled notification.
      *
-     * @param array $payload Webhook payload
-     * @return void
+     * @param  array  $payload  Webhook payload
      */
     private function processSubscriptionDisabled(array $payload): void
     {
@@ -979,22 +1065,22 @@ class MidtransWebhookController extends Controller
     /**
      * Check if a webhook has already been processed (idempotency check).
      *
-     * @param string $orderId The order ID
-     * @param string $eventType The event type (payment, recurring, pay_account)
+     * @param  string  $orderId  The order ID
+     * @param  string  $eventType  The event type (payment, recurring, pay_account)
      * @return bool True if already processed
      */
     private function isWebhookProcessed(string $orderId, string $eventType): bool
     {
         $cacheKey = "midtrans_webhook_processed:{$eventType}:{$orderId}";
+
         return Cache::has($cacheKey);
     }
 
     /**
      * Mark a webhook as processed (idempotency tracking).
      *
-     * @param string $orderId The order ID
-     * @param string $eventType The event type (payment, recurring, pay_account)
-     * @return void
+     * @param  string  $orderId  The order ID
+     * @param  string  $eventType  The event type (payment, recurring, pay_account)
      */
     private function markWebhookProcessed(string $orderId, string $eventType): void
     {
