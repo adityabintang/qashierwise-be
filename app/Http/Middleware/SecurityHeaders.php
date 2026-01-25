@@ -56,6 +56,7 @@ class SecurityHeaders
                 'https://app.midtrans.com',
                 'https://app.sandbox.midtrans.com',
                 'https://connect.facebook.net',
+                'https://static.cloudflareinsights.com',
             ]),
 
             "style-src 'self' 'unsafe-inline' ".implode(' ', [
@@ -98,6 +99,9 @@ class SecurityHeaders
                 'https://sockjs-us2.pusher.com',
                 'https://sockjs-us3.pusher.com',
                 'https://sockjs-mt1.pusher.com',
+                // API endpoints
+                'https://api.qashierwise.com',
+                'https://qashierwise.com',
                 // Other services
                 'https://nominatim.openstreetmap.org',
                 'https://app.midtrans.com',
