@@ -61,7 +61,7 @@
     <!-- Preload critical fonts (non-blocking) -->
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"></noscript>
-    
+
     <!-- Preload Font Awesome with lower priority -->
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'" fetchpriority="low">
     <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"></noscript>
@@ -117,19 +117,75 @@
         @media(min-width:1024px){.lg\\:grid{display:grid}.lg\\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.lg\\:text-left{text-align:left}.lg\\:text-6xl{font-size:3.75rem;line-height:1}}
         [x-cloak]{display:none!important}
         body{font-family:'Inter',sans-serif}
-        
+
         /* Prevent layout shifts */
-        body { margin-bottom: 0; }
-        /* Reserve space for cookie consent banner */
-        body::after { content: ''; display: block; height: 0; }
+        body { margin-bottom: 0; overflow-x: hidden; }
+        /* Reserve space for elements */
+        img { max-width: 100%; height: auto; }
         /* Ensure consistent spacing */
-        .hero-gradient { min-height: 600px; }
+        .hero-gradient { min-height: 600px; contain: layout style; }
+        /* Navigation stability */
+        nav { height: 64px; contain: layout; }
+        /* Hero image container */
+        .hero-image-container { aspect-ratio: 665/444; min-height: 300px; }
+        /* Floating elements stability */
+        .floating-card { contain: layout style; will-change: transform; }
+        /* Font loading stability */
+        @font-face { font-display: swap; }
+        /* Additional critical CSS for less CLS */
+        .absolute{position:absolute}
+        .relative{position:relative}
+        .w-full{width:100%}
+        .grid{display:grid}
+        .gap-4{gap:1rem}
+        .gap-6{gap:1.5rem}
+        .gap-8{gap:2rem}
+        .py-12{padding-top:3rem;padding-bottom:3rem}
+        .py-20{padding-top:5rem;padding-bottom:5rem}
+        .px-6{padding-left:1.5rem;padding-right:1.5rem}
+        .px-8{padding-left:2rem;padding-right:2rem}
+        .mt-8{margin-top:2rem}
+        .mb-2{margin-bottom:.5rem}
+        .mb-3{margin-bottom:.75rem}
+        .mb-10{margin-bottom:2.5rem}
+        .mb-16{margin-bottom:4rem}
+        .text-sm{font-size:.875rem;line-height:1.25rem}
+        .text-base{font-size:1rem;line-height:1.5rem}
+        .text-lg{font-size:1.125rem;line-height:1.75rem}
+        .text-2xl{font-size:1.5rem;line-height:2rem}
+        .text-4xl{font-size:2.25rem;line-height:2.5rem}
+        .text-5xl{font-size:3rem;line-height:1}
+        .text-6xl{font-size:3.75rem;line-height:1}
+        .text-xs{font-size:.75rem;line-height:1rem}
+        .shadow-xl{box-shadow:0 20px 25px -5px rgba(0,0,0,.1),0 10px 10px -5px rgba(0,0,0,.04)}
+        .shadow-2xl{box-shadow:0 25px 50px -12px rgba(0,0,0,.25)}
+        .order-1{order:1}
+        .order-2{order:2}
+        .backdrop-blur-md{backdrop-filter:blur(12px)}
+        .transition{transition-property:all;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}
+        .hover\\:text-primary:hover{color:#4910ce}
+        .border-b{border-bottom-width:1px}
+        .border-gray-100{border-color:#f3f4f6}
+        .bg-gray-50{background-color:#f9fafb}
+        .bg-green-100{background-color:#dcfce7}
+        .bg-purple-100{background-color:#f3e8ff}
+        .text-green-600{color:#16a34a}
+        .text-gray-500{color:#6b7280}
+        .space-x-3>:not([hidden])~:not([hidden]){margin-left:.75rem}
+        .space-x-4>:not([hidden])~:not([hidden]){margin-left:1rem}
+        .space-x-8>:not([hidden])~:not([hidden]){margin-left:2rem}
+        .whitespace-nowrap{white-space:nowrap}
+        .flex-shrink-0{flex-shrink:0}
+        .max-w-md{max-width:28rem}
+        .max-w-2xl{max-width:42rem}
+        @media(min-width:640px){.sm\\:block{display:block}.sm\\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.sm\\:text-3xl{font-size:1.875rem;line-height:2.25rem}}
+        @media(min-width:1024px){.lg\\:max-w-none{max-width:none}.lg\\:gap-12{gap:3rem}.lg\\:mt-0{margin-top:0}.lg\\:order-1{order:1}.lg\\:order-2{order:2}}
     </style>
 
-    <!-- Tailwind CSS - Deferred loading -->
+    <!-- Tailwind CSS - Deferred loading with requestIdleCallback -->
     <script>
-        // Load Tailwind CSS asynchronously after critical content
-        (function() {
+        // Load Tailwind CSS when browser is idle
+        function loadTailwind() {
             var tw = document.createElement('script');
             tw.src = 'https://cdn.tailwindcss.com';
             tw.onload = function() {
@@ -144,7 +200,12 @@
                 }
             };
             document.head.appendChild(tw);
-        })();
+        }
+        if ('requestIdleCallback' in window) {
+            requestIdleCallback(loadTailwind);
+        } else {
+            setTimeout(loadTailwind, 1);
+        }
     </script>
 
     <!-- Alpine.js - Deferred -->
@@ -407,9 +468,21 @@
         .card-shadow {
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
+        /* Composited animations for better performance */
+        .feature-card {
+            will-change: transform;
+            transform: translateZ(0);
+        }
         .feature-card:hover {
-            transform: translateY(-4px);
+            transform: translateY(-4px) translateZ(0);
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        /* Reduce motion for accessibility */
+        @media (prefers-reduced-motion: reduce) {
+            .feature-card, .floating-card, .transition {
+                transition: none !important;
+                animation: none !important;
+            }
         }
     </style>
 
@@ -421,12 +494,12 @@
     <x-breadcrumb :items="App\Helpers\SeoHelper::getBreadcrumbItems(__('landing.meta_title'))" />
 
     <!-- Navigation -->
-    <nav x-data="{ menuOpen: false }" class="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
+    <nav x-data="{ menuOpen: false }" class="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100" style="height: 64px; contain: layout;">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <!-- Logo -->
                 <div class="flex items-center space-x-2">
-                    <img src="{{ asset('images/logo-48.png') }}" class="h-7 rounded-xl" alt="Logo" width="28" height="28" loading="eager">
+                    <img src="{{ asset('images/logo-48.png') }}" class="h-7 rounded-xl" alt="Logo" width="28" height="28" loading="eager" style="width: 28px; height: 28px;">
                     <span class="text-xl font-bold text-primary">QashierWise</span>
                 </div>
 
@@ -443,7 +516,7 @@
                 <div class="hidden md:flex items-center space-x-4">
                     <!-- Language Switcher -->
                     <x-language-switcher />
-                    
+
                     @if (Route::has('login'))
                         @auth
                             <a href="{{ url('/dashboard') }}" class="text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.dashboard') }}</a>
@@ -494,7 +567,7 @@
                     <div class="flex justify-center">
                         <x-language-switcher />
                     </div>
-                    
+
                     @if (Route::has('login'))
                         @auth
                             <a href="{{ url('/dashboard') }}" class="block py-3 px-4 text-center text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.dashboard') }}</a>
@@ -581,7 +654,7 @@
                 </div>
 
                 <!-- Right Content - Hero Image -->
-                <div class="relative order-2 w-full max-w-md lg:max-w-none mx-auto mt-8 lg:mt-0">
+                <div class="relative order-2 w-full max-w-md lg:max-w-none mx-auto mt-8 lg:mt-0" style="aspect-ratio: 665/444; min-height: 300px;">
                     <img
                         src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=665&q=75"
                         srcset="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=75 400w,
@@ -592,29 +665,30 @@
                         class="rounded-2xl shadow-2xl w-full"
                         width="665"
                         height="444"
+                        style="aspect-ratio: 665/444; object-fit: cover; width: 100%; height: auto;"
                         fetchpriority="high"
                         decoding="async"
                         loading="eager">
                     <!-- Floating Elements - Hidden on small mobile, visible on larger screens -->
-                    <div class="hidden sm:block absolute -bottom-4 md:-bottom-6 -left-2 md:-left-6 bg-white rounded-xl p-3 md:p-4 shadow-xl" style="contain: layout;">
+                    <div class="hidden sm:block absolute -bottom-4 md:-bottom-6 -left-2 md:-left-6 bg-white rounded-xl p-3 md:p-4 shadow-xl floating-card" style="contain: layout style; will-change: transform; width: 180px; height: 60px;">
                         <div class="flex items-center space-x-2 md:space-x-3">
-                            <div class="w-8 h-8 md:w-10 md:h-10 bg-green-100 rounded-full flex items-center justify-center">
+                            <div class="w-8 h-8 md:w-10 md:h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
                                 <i class="fab fa-whatsapp text-green-600 text-lg md:text-xl"></i>
                             </div>
-                            <div style="min-width: 120px;">
-                                <p class="text-xs md:text-sm font-semibold text-gray-900">{{ __('landing.hero.floating_messages') }}</p>
-                                <p class="text-xs text-gray-500">{{ __('landing.hero.floating_messages_count') }}</p>
+                            <div style="min-width: 100px;">
+                                <p class="text-xs md:text-sm font-semibold text-gray-900 whitespace-nowrap">{{ __('landing.hero.floating_messages') }}</p>
+                                <p class="text-xs text-gray-500 whitespace-nowrap">{{ __('landing.hero.floating_messages_count') }}</p>
                             </div>
                         </div>
                     </div>
-                    <div class="hidden sm:block absolute -top-2 md:-top-4 -right-2 md:-right-4 bg-white rounded-xl p-3 md:p-4 shadow-xl" style="contain: layout;">
+                    <div class="hidden sm:block absolute -top-2 md:-top-4 -right-2 md:-right-4 bg-white rounded-xl p-3 md:p-4 shadow-xl floating-card" style="contain: layout style; will-change: transform; width: 180px; height: 60px;">
                         <div class="flex items-center space-x-2 md:space-x-3">
-                            <div class="w-8 h-8 md:w-10 md:h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                            <div class="w-8 h-8 md:w-10 md:h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
                                 <i class="fas fa-chart-line text-primary text-lg md:text-xl"></i>
                             </div>
-                            <div style="min-width: 120px;">
-                                <p class="text-xs md:text-sm font-semibold text-gray-900">{{ __('landing.hero.floating_sales') }}</p>
-                                <p class="text-xs text-green-600">{{ __('landing.hero.floating_sales_trend') }}</p>
+                            <div style="min-width: 100px;">
+                                <p class="text-xs md:text-sm font-semibold text-gray-900 whitespace-nowrap">{{ __('landing.hero.floating_sales') }}</p>
+                                <p class="text-xs text-green-600 whitespace-nowrap">{{ __('landing.hero.floating_sales_trend') }}</p>
                             </div>
                         </div>
                     </div>
@@ -850,24 +924,24 @@
             <div class="text-center mb-10 md:mb-16">
                 <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 md:mb-4">{{ __('landing.pricing.title') }}</h2>
                 <p class="text-sm md:text-base text-gray-600 mb-6">{{ __('landing.pricing.subtitle') }}</p>
-                
+
                 <!-- Duration Toggle -->
                 <div class="inline-flex items-center bg-white rounded-full p-1 shadow-md">
-                    <button 
+                    <button
                         @click="selectedDuration = '1_month'"
                         :class="selectedDuration === '1_month' ? 'bg-primary text-white' : 'text-gray-600 hover:text-gray-900'"
                         class="px-4 md:px-6 py-2 rounded-full font-semibold transition-all text-xs md:text-sm"
                     >
                         1 Bulan
                     </button>
-                    <button 
+                    <button
                         @click="selectedDuration = '3_months'"
                         :class="selectedDuration === '3_months' ? 'bg-primary text-white' : 'text-gray-600 hover:text-gray-900'"
                         class="px-4 md:px-6 py-2 rounded-full font-semibold transition-all text-xs md:text-sm"
                     >
                         3 Bulan
                     </button>
-                    <button 
+                    <button
                         @click="selectedDuration = '1_year'"
                         :class="selectedDuration === '1_year' ? 'bg-primary text-white' : 'text-gray-600 hover:text-gray-900'"
                         class="px-4 md:px-6 py-2 rounded-full font-semibold transition-all text-xs md:text-sm relative"
@@ -885,15 +959,15 @@
                                 <i class="fas fa-tag mr-1"></i> Punya Kode Promo?
                             </label>
                             <div class="flex gap-2">
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     x-model="promoCode"
                                     @input="promoError = null; promoSuccess = null"
                                     placeholder="Masukkan kode promo"
                                     class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm uppercase"
                                     :disabled="promoValidating"
                                 >
-                                <button 
+                                <button
                                     @click="validatePromoCode()"
                                     :disabled="!promoCode || promoValidating"
                                     class="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
@@ -921,7 +995,7 @@
                                     <span class="text-purple-700"> - Hemat </span>
                                     <span class="font-semibold text-purple-900" x-text="'Rp' + formatPrice(appliedPromo?.discount || 0)"></span>
                                 </div>
-                                <button 
+                                <button
                                     @click="removePromoCode()"
                                     class="text-purple-600 hover:text-purple-800 text-xs"
                                 >
@@ -1209,7 +1283,7 @@
                 <!-- Company Info -->
                 <div>
                     <div class="flex items-center space-x-2 mb-4">
-                        <img src="{{ asset('images/logo-48.png') }}" class="h-7 rounded-xl" alt="Logo" width="28" height="28" loading="lazy">
+                        <img src="{{ asset('images/logo-48.png') }}" class="h-7 rounded-xl" alt="Logo" width="28" height="28" loading="lazy" style="width: 28px; height: 28px;">
                         <span class="text-xl font-bold text-primary">QashierWise</span>
                     </div>
                     <p class="text-sm text-gray-600 mb-4">
@@ -1275,14 +1349,14 @@
                 selectedDuration: '1_month', // Default to monthly
                 currentPlan: null,
                 token: null,
-                
+
                 // Promo code state
                 promoCode: '',
                 promoValidating: false,
                 promoError: null,
                 promoSuccess: null,
                 appliedPromo: null,
-                
+
                 // Pricing data from config
                 plans: {
                     pro: {
@@ -1308,7 +1382,7 @@
                         }
                     });
                 },
-                
+
                 getPrice(plan) {
                     const basePrice = this.plans[plan][this.selectedDuration].price;
                     // If promo is applied and matches this plan, show discounted price
@@ -1317,18 +1391,18 @@
                     }
                     return basePrice;
                 },
-                
+
                 getPricePerMonth(plan) {
                     const finalPrice = this.getPrice(plan);
-                    const months = this.selectedDuration === '1_month' ? 1 : 
+                    const months = this.selectedDuration === '1_month' ? 1 :
                                    this.selectedDuration === '3_months' ? 3 : 12;
                     return Math.round(finalPrice / months);
                 },
-                
+
                 getDiscount(plan) {
                     return this.plans[plan][this.selectedDuration].discount;
                 },
-                
+
                 formatPrice(amount) {
                     return new Intl.NumberFormat('id-ID').format(amount);
                 },
@@ -1439,7 +1513,7 @@
                     this.selectedPlan = planId;
 
                     try {
-                        const requestBody = { 
+                        const requestBody = {
                             plan_id: planId,
                             duration: this.selectedDuration
                         };
