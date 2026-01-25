@@ -3,7 +3,8 @@
 <div x-data="cookieConsent()"
      x-show="showBanner"
      x-cloak
-     class="fixed bottom-0 left-0 right-0 z-50 bg-gray-900/95 backdrop-blur-sm border-t border-gray-700">
+     class="fixed bottom-0 left-0 right-0 z-50 bg-gray-900/95 backdrop-blur-sm border-t border-gray-700"
+     style="contain: layout;">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div class="flex-1 text-gray-300 text-sm">
@@ -16,9 +17,9 @@
                 </p>
                 <a href="{{ route('privacy-policy') }}" class="text-blue-400 hover:text-blue-300 underline text-xs">
                     @if($locale === 'id')
-                        Pelajari lebih lanjut
+                        Baca Kebijakan Privasi
                     @else
-                        Learn more
+                        Read our Privacy Policy
                     @endif
                 </a>
             </div>

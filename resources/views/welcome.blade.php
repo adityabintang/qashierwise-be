@@ -61,6 +61,10 @@
     <!-- Preload critical fonts (non-blocking) -->
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"></noscript>
+    
+    <!-- Preload Font Awesome with lower priority -->
+    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'" fetchpriority="low">
+    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"></noscript>
 
     <!-- Additional SEO Meta -->
     <meta name="geo.region" content="ID-JT">
@@ -113,6 +117,13 @@
         @media(min-width:1024px){.lg\\:grid{display:grid}.lg\\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.lg\\:text-left{text-align:left}.lg\\:text-6xl{font-size:3.75rem;line-height:1}}
         [x-cloak]{display:none!important}
         body{font-family:'Inter',sans-serif}
+        
+        /* Prevent layout shifts */
+        body { margin-bottom: 0; }
+        /* Reserve space for cookie consent banner */
+        body::after { content: ''; display: block; height: 0; }
+        /* Ensure consistent spacing */
+        .hero-gradient { min-height: 600px; }
     </style>
 
     <!-- Tailwind CSS - Deferred loading -->
@@ -135,10 +146,6 @@
             document.head.appendChild(tw);
         })();
     </script>
-
-    <!-- Font Awesome - Deferred loading (non-critical icons) -->
-    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"></noscript>
 
     <!-- Alpine.js - Deferred -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -589,23 +596,23 @@
                         decoding="async"
                         loading="eager">
                     <!-- Floating Elements - Hidden on small mobile, visible on larger screens -->
-                    <div class="hidden sm:block absolute -bottom-4 md:-bottom-6 -left-2 md:-left-6 bg-white rounded-xl p-3 md:p-4 shadow-xl">
+                    <div class="hidden sm:block absolute -bottom-4 md:-bottom-6 -left-2 md:-left-6 bg-white rounded-xl p-3 md:p-4 shadow-xl" style="contain: layout;">
                         <div class="flex items-center space-x-2 md:space-x-3">
                             <div class="w-8 h-8 md:w-10 md:h-10 bg-green-100 rounded-full flex items-center justify-center">
                                 <i class="fab fa-whatsapp text-green-600 text-lg md:text-xl"></i>
                             </div>
-                            <div>
+                            <div style="min-width: 120px;">
                                 <p class="text-xs md:text-sm font-semibold text-gray-900">{{ __('landing.hero.floating_messages') }}</p>
                                 <p class="text-xs text-gray-500">{{ __('landing.hero.floating_messages_count') }}</p>
                             </div>
                         </div>
                     </div>
-                    <div class="hidden sm:block absolute -top-2 md:-top-4 -right-2 md:-right-4 bg-white rounded-xl p-3 md:p-4 shadow-xl">
+                    <div class="hidden sm:block absolute -top-2 md:-top-4 -right-2 md:-right-4 bg-white rounded-xl p-3 md:p-4 shadow-xl" style="contain: layout;">
                         <div class="flex items-center space-x-2 md:space-x-3">
                             <div class="w-8 h-8 md:w-10 md:h-10 bg-purple-100 rounded-full flex items-center justify-center">
                                 <i class="fas fa-chart-line text-primary text-lg md:text-xl"></i>
                             </div>
-                            <div>
+                            <div style="min-width: 120px;">
                                 <p class="text-xs md:text-sm font-semibold text-gray-900">{{ __('landing.hero.floating_sales') }}</p>
                                 <p class="text-xs text-green-600">{{ __('landing.hero.floating_sales_trend') }}</p>
                             </div>
