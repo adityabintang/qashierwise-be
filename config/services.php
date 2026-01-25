@@ -60,4 +60,8 @@ return [
         'flow_table_fee' => env('WHATSAPP_FLOW_TABLE_FEE', 100000),
     ],
 
+    'google_analytics' => [
+        'measurement_id' => env('GA_MEASUREMENT_ID'),
+    ],
+
 ];

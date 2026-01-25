@@ -34,8 +34,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('web', [
             \App\Http\Middleware\LocalizationMiddleware::class,
             \App\Http\Middleware\SetPostgresUserContext::class,
+            \App\Http\Middleware\SecurityHeaders::class,
         ]);
-        
+
         $middleware->appendToGroup('api', [
             \App\Http\Middleware\LocalizationMiddleware::class,
             \App\Http\Middleware\SetPostgresUserContext::class,

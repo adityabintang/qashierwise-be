@@ -134,7 +134,7 @@ return [
         'select_plan' => 'Select :plan',
         'active_plan' => 'Active Plan',
         'processing' => 'Processing...',
-        
+
         'plans' => [
             'basic' => [
                 'name' => 'Basic',
@@ -227,6 +227,8 @@ return [
         'console' => 'QashierWise Console',
         'chatbot' => 'WhatsApp Chatbot',
         'copyright' => '&copy; 2025 QashierWise by Aditya Bintang Fadila. All Rights Reserved.',
+        'follow_us' => 'Follow Us',
+        'follow_us_desc' => 'Get the latest updates, tips, and exclusive promotions.',
     ],
 
     // Call to Action

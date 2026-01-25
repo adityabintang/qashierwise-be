@@ -1,13 +1,13 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <!-- Primary Meta Tags -->
-    <title>QashierWise - AI Chatbot WhatsApp untuk Restoran | Reservasi & Order Otomatis</title>
-    <meta name="title" content="QashierWise - AI Chatbot WhatsApp untuk Restoran | Reservasi & Order Otomatis">
-    <meta name="description" content="Platform AI Chatbot WhatsApp untuk restoran dengan integrasi QRIS. Kelola reservasi, pesanan, delivery, dan pembayaran dalam satu dashboard. Coba gratis 14 hari!">
+    <title>QashierWise - AI Chatbot WhatsApp Restoran</title>
+    <meta name="title" content="QashierWise - AI Chatbot WhatsApp Restoran">
+    <meta name="description" content="Platform AI Chatbot WhatsApp untuk restoran dengan integrasi QRIS. Kelola reservasi, pesanan, dan pembayaran. Coba gratis 14 hari!">
     <meta name="keywords" content="chatbot whatsapp restoran, AI chatbot restoran, reservasi restoran otomatis, order whatsapp, QRIS restoran, POS restoran, manajemen restoran, WhatsApp Business API restoran">
     <meta name="author" content="Aditya Bintang Fadila">
     <meta name="robots" content="index, follow">
@@ -137,8 +137,8 @@
     </script>
 
     <!-- Font Awesome - Deferred loading (non-critical icons) -->
-    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
+    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"></noscript>
 
     <!-- Alpine.js - Deferred -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -261,12 +261,14 @@
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",
         "itemListElement": [
+            @foreach(App\Helpers\SeoHelper::getBreadcrumbItems(__('landing.meta_title')) as $index => $item)
             {
                 "@type": "ListItem",
-                "position": 1,
-                "name": "Home",
-                "item": "https://qashierwise.com"
-            }
+                "position": {{ $index + 1 }},
+                "name": "{{ $item['label'] }}",
+                "item": "{{ $item['url'] }}"
+            }{{ !$loop->last ? ',' : '' }}
+            @endforeach
         ]
     }
     </script>
@@ -403,8 +405,14 @@
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
     </style>
+
+    <!-- Google Analytics 4 -->
+    <x-google-analytics />
 </head>
 <body class="bg-white">
+    <!-- Breadcrumb Navigation -->
+    <x-breadcrumb :items="App\Helpers\SeoHelper::getBreadcrumbItems(__('landing.meta_title'))" />
+
     <!-- Navigation -->
     <nav x-data="{ menuOpen: false }" class="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -945,7 +953,7 @@
                             <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>Tanpa pembayaran online</li>
                             <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>1 user staf + Email support</li>
                         </ul>
-                        <a href="/register" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition text-sm">
+                        <a href="/register" onclick="trackSignup('cta_button')" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition text-sm">
                             Mulai Gratis
                         </a>
                     </div>
@@ -1027,7 +1035,7 @@
                         <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>Tanpa pembayaran online (bayar di tempat)</li>
                         <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>1 user staf + Email support (48hr)</li>
                     </ul>
-                    <a href="/register" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition">
+                    <a href="/register" onclick="trackSignup('cta_button')" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition">
                         Mulai Gratis
                     </a>
                 </div>
@@ -1227,15 +1235,22 @@
                     </ul>
                 </div>
 
-                <!-- Product -->
-                <div>
-                    <h3 class="text-gray-900 font-semibold mb-4 text-base">{{ __('landing.footer.product_title') }}</h3>
-                    <ul class="space-y-2 text-sm">
-                        <li><a href="#" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.console') }}</a></li>
-                        <li><a href="#" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.chatbot') }}</a></li>
-                    </ul>
-                </div>
-            </div>
+                 <!-- Product -->
+                 <div>
+                     <h3 class="text-gray-900 font-semibold mb-4 text-base">{{ __('landing.footer.product_title') }}</h3>
+                     <ul class="space-y-2 text-sm">
+                         <li><a href="#" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.console') }}</a></li>
+                         <li><a href="#" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.chatbot') }}</a></li>
+                     </ul>
+                 </div>
+
+                 <!-- Social Media -->
+                 <div>
+                     <h3 class="text-gray-900 font-semibold mb-4 text-base">{{ __('landing.footer.follow_us') }}</h3>
+                     <p class="text-sm text-gray-600 mb-4">{{ __('landing.footer.follow_us_desc') }}</p>
+                     <x-social-links :size="'md'" :showLabels="false" />
+                 </div>
+             </div>
 
             <div class="border-t border-gray-200 pt-8 text-center text-sm text-gray-600">
                 <p>{!! __('landing.footer.copyright') !!}</p>
@@ -1460,6 +1475,14 @@
                 }
             };
         }
+    </script>
+
+    <!-- Cookie Consent Banner -->
+    <x-cookie-consent />
+
+    <!-- LocalBusiness Schema for Google Business Profile -->
+    <script type="application/ld+json">
+{!! json_encode(App\Helpers\SeoHelper::getLocalBusinessStructuredData(), JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) !!}
     </script>
 </body>
 </html>
