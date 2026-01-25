@@ -1,5 +1,10 @@
 FROM php:8.2-fpm-alpine
 
+# Add community repository and update package index
+RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.19/main" > /etc/apk/repositories \
+    && echo "https://dl-cdn.alpinelinux.org/alpine/v3.19/community" >> /etc/apk/repositories \
+    && apk update --no-cache
+
 # Install system dependencies
 RUN apk add --no-cache \
     nginx \
@@ -14,9 +19,10 @@ RUN apk add --no-cache \
     git \
     oniguruma-dev \
     icu-dev \
-    nodejs \
-    npm \
     postgresql-dev
+
+# Install Node.js and npm separately
+RUN apk add --no-cache nodejs npm
 
 # Install PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
