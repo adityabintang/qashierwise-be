@@ -3,10 +3,10 @@
 @section('title', __('pos.categories.title') . ' - QashierWise POS')
 
 @section('content')
-<div x-data="categoriesApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="categoriesApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'pos-categories'])
 
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         @include('components.dashboard-header', ['title' => __('pos.categories.title'), 'description' => __('pos.categories.description')])
 
         <main class="flex-1 p-4 md:p-6">
@@ -240,7 +240,7 @@ function categoriesApp() {
             this.saving = true;
             try {
                 const token = localStorage.getItem('token');
-                const url = this.editingCategory 
+                const url = this.editingCategory
                     ? `${this.API_BASE_URL}/categories/${this.editingCategory.id}`
                     : `${this.API_BASE_URL}/categories`;
                 const method = this.editingCategory ? 'PUT' : 'POST';

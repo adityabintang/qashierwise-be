@@ -1,11 +1,11 @@
 @extends('layouts.app')
 @section('title', __('dashboard.messages_title'))
 @section('content')
-<div x-data="messagesApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="messagesApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     <!-- Sidebar -->
     @include('components.dashboard-sidebar', ['activePage' => 'messages'])
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         <!-- Header -->
         @include('components.dashboard-header', ['title' => __('whatsapp.messages_title'), 'description' => __('whatsapp.messages_subtitle')])
         <!-- Page Content -->
@@ -13,7 +13,7 @@
             <div class="max-w-7xl mx-auto h-[calc(100vh-10rem)]" x-data="messagesManager()">
                 <div class="card flex h-full overflow-hidden">
                     <!-- Contacts Sidebar -->
-                    <div 
+                    <div
                         class="border-r border-[hsl(var(--border))] flex flex-col transition-all duration-300"
                         :class="isMobileMessages ? (mobileView === 'contacts' ? 'w-full' : 'hidden') : 'w-80 md:w-60 lg:w-80'"
                         x-show="!isMobileMessages || mobileView === 'contacts'"
@@ -97,8 +97,8 @@
                         </div>
                     </div>
                     <!-- Chat Area -->
-                    <div 
-                        class="flex-1 flex flex-col" 
+                    <div
+                        class="flex-1 flex flex-col"
                         x-show="selectedContact && (!isMobileMessages || mobileView === 'chat')"
                         :class="isMobileMessages ? 'w-full' : ''"
                     >
@@ -106,9 +106,9 @@
                         <div class="h-14 md:h-16 px-3 md:px-4 border-b border-[hsl(var(--border))] flex items-center justify-between bg-[hsl(var(--muted)/0.3)]">
                             <div class="flex items-center gap-2 md:gap-3">
                                 <!-- Back Button (Mobile Only) - Requirements 4.2, 4.3 -->
-                                <button 
-                                    x-show="isMobileMessages" 
-                                    @click="backToContacts()" 
+                                <button
+                                    x-show="isMobileMessages"
+                                    @click="backToContacts()"
                                     class="btn btn-ghost btn-icon min-h-[44px] min-w-[44px]"
                                     title="Back to contacts"
                                 >
@@ -825,7 +825,7 @@ function messagesManager() {
         async init() {
             // Initialize mobile detection
             this.isMobileMessages = window.innerWidth < 768;
-            
+
             // Add resize listener for viewport detection
             let resizeTimeout;
             window.addEventListener('resize', () => {
@@ -839,7 +839,7 @@ function messagesManager() {
                     }
                 }, 150);
             });
-            
+
             await Promise.all([this.fetchContacts(), this.fetchTemplates()]);
             const urlParams = new URLSearchParams(window.location.search);
             const contactId = urlParams.get('contact');

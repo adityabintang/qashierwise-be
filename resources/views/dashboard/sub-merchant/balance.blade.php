@@ -3,10 +3,10 @@
 @section('title', __('submerchant.balance_title'))
 
 @section('content')
-<div x-data="balanceApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="balanceApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'sub-merchant-balance'])
 
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         @include('components.dashboard-header', ['title' => __('submerchant.balance'), 'description' => __('submerchant.balance_overview')])
 
         <main class="flex-1 p-4 md:p-6">
@@ -364,7 +364,7 @@ function balanceApp() {
 
         renderChart() {
             if (this.dailyEarnings.length === 0) return;
-            
+
             const chartEl = document.getElementById('earningsChart');
             if (!chartEl) return;
 

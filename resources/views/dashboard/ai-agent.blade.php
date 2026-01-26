@@ -3,12 +3,12 @@
 @section('title', __('dashboard.ai_agent_title'))
 
 @section('content')
-<div x-data="aiAgentApp()" x-init="init()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="aiAgentApp()" x-init="init()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     <!-- Sidebar -->
     @include('components.dashboard-sidebar', ['activePage' => 'ai-agent'])
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         <!-- Header -->
         @include('components.dashboard-header', ['title' => __('dashboard.menu_ai_agent'), 'description' => __('ai_agent.configure_assistant')])
 
@@ -431,8 +431,8 @@
                     Test AI Agent
                 </h3>
                 <div class="flex items-center gap-2">
-                    <button 
-                        @click="resetTestConversation()" 
+                    <button
+                        @click="resetTestConversation()"
                         class="btn btn-ghost btn-sm text-gray-600 hover:text-red-600 hover:bg-red-50 transition-colors"
                         title="Reset conversation"
                         :disabled="testMessages.length === 0"
@@ -458,7 +458,7 @@
                         Ketik pesan di bawah untuk mulai test AI Agent Anda
                     </p>
                 </div>
-                
+
                 <!-- Messages -->
                 <template x-for="(msg, index) in testMessages" :key="index">
                     <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
@@ -467,7 +467,7 @@
                         </div>
                     </div>
                 </template>
-                
+
                 <!-- Loading State -->
                 <div x-show="testLoading" class="flex justify-start">
                     <div class="bg-gray-100 rounded-lg px-4 py-2">
@@ -752,15 +752,15 @@ function aiAgentApp() {
             if (this.testMessages.length === 0) {
                 return;
             }
-            
+
             if (confirm('Apakah Anda yakin ingin mereset percakapan? Semua pesan akan dihapus.')) {
                 // Clear messages in UI
                 this.testMessages = [];
                 this.testInput = '';
-                
+
                 // Clear conversation in database
                 const token = localStorage.getItem('token');
-                
+
                 // Call API to clear conversation in database
                 fetch(`/api/ai-agent/conversations/test`, {
                     method: 'DELETE',

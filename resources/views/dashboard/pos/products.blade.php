@@ -3,10 +3,10 @@
 @section('title', __('pos.products.title') . ' - QashierWise POS')
 
 @section('content')
-<div x-data="productsApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="productsApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'pos-products'])
 
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         @include('components.dashboard-header', ['title' => __('pos.products.title'), 'description' => __('pos.products.description')])
 
         <main class="flex-1 p-4 md:p-6">
@@ -442,7 +442,7 @@ function productsApp() {
             this.saving = true;
             try {
                 const token = localStorage.getItem('token');
-                const url = this.editingProduct 
+                const url = this.editingProduct
                     ? `${this.API_BASE_URL}/products/${this.editingProduct.id}`
                     : `${this.API_BASE_URL}/products`;
                 const method = this.editingProduct ? 'PUT' : 'POST';

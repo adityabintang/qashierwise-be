@@ -3,10 +3,10 @@
 @section('title', __('submerchant.qris_title'))
 
 @section('content')
-<div x-data="qrisApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="qrisApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'sub-merchant-qris'])
 
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         @include('components.dashboard-header', ['title' => __('submerchant.generate_qris'), 'description' => __('submerchant.qris_generation')])
 
         <main class="flex-1 p-4 md:p-6">
@@ -40,12 +40,12 @@
                                     <!-- Amount -->
                                     <div>
                                         <label class="text-sm font-medium mb-1.5 block">Amount (Rp) <span class="text-red-500">*</span></label>
-                                        <input 
-                                            type="text" 
-                                            x-model="form.amount" 
+                                        <input
+                                            type="text"
+                                            x-model="form.amount"
                                             @input="formatAmount()"
-                                            required 
-                                            class="input w-full min-h-[44px]" 
+                                            required
+                                            class="input w-full min-h-[44px]"
                                             placeholder="Enter amount"
                                         >
                                         <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Min: Rp 1,000 - Max: Rp 100,000,000</p>
@@ -54,10 +54,10 @@
                                     <!-- Description -->
                                     <div>
                                         <label class="text-sm font-medium mb-1.5 block">Description</label>
-                                        <input 
-                                            type="text" 
-                                            x-model="form.description" 
-                                            class="input w-full min-h-[44px]" 
+                                        <input
+                                            type="text"
+                                            x-model="form.description"
+                                            class="input w-full min-h-[44px]"
                                             placeholder="e.g., Payment for order #123"
                                             maxlength="255"
                                         >
@@ -66,10 +66,10 @@
                                     <!-- Customer Name -->
                                     <div>
                                         <label class="text-sm font-medium mb-1.5 block">Customer Name</label>
-                                        <input 
-                                            type="text" 
-                                            x-model="form.customer_name" 
-                                            class="input w-full min-h-[44px]" 
+                                        <input
+                                            type="text"
+                                            x-model="form.customer_name"
+                                            class="input w-full min-h-[44px]"
                                             placeholder="Optional"
                                             maxlength="100"
                                         >
@@ -102,9 +102,9 @@
                                     </template>
 
                                     <!-- Submit Button -->
-                                    <button 
-                                        type="submit" 
-                                        :disabled="generating" 
+                                    <button
+                                        type="submit"
+                                        :disabled="generating"
                                         class="btn btn-primary btn-md w-full"
                                     >
                                         <i class="fas" :class="generating ? 'fa-spinner animate-spin' : 'fa-qrcode'"></i>
@@ -132,7 +132,7 @@
                                                 </div>
                                                 <p class="text-2xl font-bold mt-4" x-text="formatCurrency(generatedQris.amount)"></p>
                                                 <p class="text-sm text-[hsl(var(--muted-foreground))]" x-text="generatedQris.order_id"></p>
-                                                
+
                                                 <!-- Expiry Timer -->
                                                 <div class="mt-3" x-show="!generatedQris.is_expired">
                                                     <span class="badge bg-amber-100 text-amber-700">
@@ -151,13 +151,13 @@
                                             <!-- Share Options -->
                                             <div class="space-y-4">
                                                 <h3 class="font-semibold">Share Options</h3>
-                                                
+
                                                 <!-- Copy Link -->
                                                 <div class="flex gap-2">
-                                                    <input 
-                                                        type="text" 
-                                                        :value="generatedQris.shareable_link" 
-                                                        readonly 
+                                                    <input
+                                                        type="text"
+                                                        :value="generatedQris.shareable_link"
+                                                        readonly
                                                         class="input flex-1 text-sm"
                                                     >
                                                     <button @click="copyLink()" class="btn btn-outline btn-icon">
@@ -483,7 +483,7 @@ function qrisApp() {
 
         async cancelTransaction() {
             if (!confirm('Are you sure you want to cancel this QRIS?')) return;
-            
+
             this.cancelling = true;
             try {
                 const token = localStorage.getItem('token');

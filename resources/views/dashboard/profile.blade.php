@@ -3,12 +3,12 @@
 @section('title', __('dashboard.profile_title'))
 
 @section('content')
-<div x-data="profileApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="profileApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     <!-- Sidebar -->
     @include('components.dashboard-sidebar', ['activePage' => 'profile'])
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         <!-- Header -->
         @include('components.dashboard-header', ['title' => __('whatsapp.business_profile'), 'description' => __('dashboard.menu_business_profile')])
 
@@ -234,9 +234,9 @@
 <script>
 function profileApp() {
     return {
-        sidebarOpen: window.innerWidth >= 1024, 
+        sidebarOpen: window.innerWidth >= 1024,
         isMobile: window.innerWidth < 768,
-        user: null, 
+        user: null,
         notifications: [],
         init() {
             this.isMobile = window.innerWidth < 768;
@@ -377,7 +377,7 @@ function profileManager() {
                 const token = localStorage.getItem('token');
                 const cleanProfile = { ...this.profile, websites: this.profile.websites.filter(w => w?.trim()) };
                 if (!cleanProfile.websites.length) cleanProfile.websites = [];
-                
+
                 const res = await fetch(`${this.API_BASE_URL}/whatsapp/profile`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },

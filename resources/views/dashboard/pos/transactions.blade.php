@@ -3,10 +3,10 @@
 @section('title', __('dashboard.menu_transactions') . ' - QashierWise POS')
 
 @section('content')
-<div x-data="transactionsApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="transactionsApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'pos-transactions'])
 
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         @include('components.dashboard-header', ['title' => __('dashboard.menu_transactions'), 'description' => __('submerchant.transaction_history')])
 
         <main class="flex-1 p-4 md:p-6">

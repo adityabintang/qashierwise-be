@@ -3,10 +3,10 @@
 @section('title', __('submerchant.provider_settings_title'))
 
 @section('content')
-<div x-data="providerSettingsApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="providerSettingsApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'sub-merchant-provider-settings'])
 
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         @include('components.dashboard-header', ['title' => __('submerchant.provider_settings'), 'description' => __('submerchant.manage_provider_credentials')])
 
         <main class="flex-1 p-4 md:p-6">
@@ -320,7 +320,7 @@ function providerSettingsApp() {
         sidebarOpen: window.innerWidth >= 1024,
         isMobile: window.innerWidth < 768,
         user: null,
-        
+
         // Translations from server
         translations: {
             currentlyActive: @json(__('submerchant.currently_active')),
@@ -437,7 +437,7 @@ function providerSettingsApp() {
             this.errorMessage = '';
             this.successMessage = '';
             this.showPassword = false;
-            
+
             // Load existing credentials if editing
             const provider = this.getProvider(providerName);
             if (provider) {
@@ -565,10 +565,10 @@ function providerSettingsApp() {
             return date.toLocaleDateString(locale === 'id' ? 'id-ID' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         },
 
-        logout() { 
-            localStorage.removeItem('token'); 
-            localStorage.removeItem('user'); 
-            window.location.href = '/login'; 
+        logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
         }
     }
 }

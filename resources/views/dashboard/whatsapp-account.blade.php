@@ -3,12 +3,12 @@
 @section('title', __('dashboard.whatsapp_account_title'))
 
 @section('content')
-<div x-data="whatsAppAccountApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="whatsAppAccountApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     <!-- Sidebar -->
     @include('components.dashboard-sidebar', ['activePage' => 'whatsapp-account'])
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         <!-- Header -->
         @include('components.dashboard-header', ['title' => __('whatsapp.account_title'), 'description' => __('whatsapp.account_subtitle')])
 

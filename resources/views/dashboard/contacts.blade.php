@@ -3,12 +3,12 @@
 @section('title', __('dashboard.contacts_title'))
 
 @section('content')
-<div x-data="contactsApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="contactsApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     <!-- Sidebar -->
     @include('components.dashboard-sidebar', ['activePage' => 'contacts'])
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         <!-- Header -->
         @include('components.dashboard-header', ['title' => __('whatsapp.contacts_title'), 'description' => __('whatsapp.contacts_subtitle')])
 
@@ -71,14 +71,14 @@
                                 <div class="flex items-center gap-4 mb-4">
                                     <div class="relative">
                                         <!-- Avatar with name -->
-                                        <img 
+                                        <img
                                             x-show="contact.name && contact.name.trim()"
-                                            :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(contact.name || 'U')}&backgroundColor=a855f7`" 
+                                            :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(contact.name || 'U')}&backgroundColor=a855f7`"
                                             :alt="contact.name"
                                             class="avatar avatar-xl"
                                         >
                                         <!-- Avatar without name -->
-                                        <div 
+                                        <div
                                             x-show="!contact.name || !contact.name.trim()"
                                             class="avatar avatar-xl flex items-center justify-center text-white font-bold"
                                             style="background: linear-gradient(135deg, #a855f7, #9333ea); font-size: 1.25rem;"
@@ -138,20 +138,20 @@
                 <!-- Contact Details Modal -->
                 <div x-show="showModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <!-- Backdrop -->
-                    <div 
-                        x-show="showModal" 
+                    <div
+                        x-show="showModal"
                         x-transition:enter="transition ease-out duration-200"
                         x-transition:enter-start="opacity-0"
                         x-transition:enter-end="opacity-100"
                         x-transition:leave="transition ease-in duration-150"
                         x-transition:leave-start="opacity-100"
                         x-transition:leave-end="opacity-0"
-                        class="fixed inset-0 bg-black/50" 
+                        class="fixed inset-0 bg-black/50"
                         @click="closeModal"
                     ></div>
 
                     <!-- Modal -->
-                    <div 
+                    <div
                         x-show="showModal"
                         x-transition:enter="transition ease-out duration-200"
                         x-transition:enter-start="opacity-0 scale-95"
@@ -174,14 +174,14 @@
                             <!-- Avatar -->
                             <div class="flex justify-center mb-6">
                                 <!-- Avatar with name -->
-                                <img 
+                                <img
                                     x-show="selectedContact?.name && selectedContact.name.trim()"
-                                    :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(selectedContact?.name || 'U')}&backgroundColor=a855f7`" 
+                                    :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(selectedContact?.name || 'U')}&backgroundColor=a855f7`"
                                     :alt="selectedContact?.name"
                                     class="h-24 w-24 rounded-full"
                                 >
                                 <!-- Avatar without name -->
-                                <div 
+                                <div
                                     x-show="!selectedContact?.name || !selectedContact.name.trim()"
                                     class="h-24 w-24 rounded-full flex items-center justify-center text-white font-bold"
                                     style="background: linear-gradient(135deg, #a855f7, #9333ea); font-size: 2rem;"
@@ -254,12 +254,12 @@ function contactsApp() {
                 let savedState = localStorage.getItem('sidebarOpen');
                 if (savedState !== null) this.sidebarOpen = JSON.parse(savedState);
             }
-            
+
             // Watch sidebar state changes (only save on desktop)
             this.$watch('sidebarOpen', v => {
                 if (!this.isMobile) localStorage.setItem('sidebarOpen', JSON.stringify(v));
             });
-            
+
             // Handle resize events with debounce
             let resizeTimeout;
             window.addEventListener('resize', () => {
@@ -267,7 +267,7 @@ function contactsApp() {
                 resizeTimeout = setTimeout(() => {
                     const wasMobile = this.isMobile;
                     this.isMobile = window.innerWidth < 768;
-                    
+
                     if (wasMobile && !this.isMobile) {
                         let savedState = localStorage.getItem('sidebarOpen');
                         this.sidebarOpen = savedState !== null ? JSON.parse(savedState) : true;
@@ -279,7 +279,7 @@ function contactsApp() {
 
             let storedUser = localStorage.getItem('user');
             if (storedUser) {
-                try { this.user = JSON.parse(storedUser); } 
+                try { this.user = JSON.parse(storedUser); }
                 catch (e) { this.user = { name: 'User', email: 'user@example.com' }; }
             } else {
                 this.user = { name: 'User', email: 'user@example.com' };

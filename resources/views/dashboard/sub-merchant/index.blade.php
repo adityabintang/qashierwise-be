@@ -3,10 +3,10 @@
 @section('title', __('submerchant.dashboard_title'))
 
 @section('content')
-<div x-data="subMerchantDashboard()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="subMerchantDashboard()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'sub-merchant'])
 
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         @include('components.dashboard-header', ['title' => __('submerchant.dashboard'), 'description' => __('submerchant.welcome')])
 
         <main class="flex-1 p-4 md:p-6">

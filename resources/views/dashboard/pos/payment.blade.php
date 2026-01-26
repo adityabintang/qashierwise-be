@@ -3,10 +3,10 @@
 @section('title', __('pos.menu.payment') . ' - QashierWise POS')
 
 @section('content')
-<div x-data="paymentApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="paymentApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'pos-payment'])
 
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         @include('components.dashboard-header', ['title' => __('pos.menu.payment'), 'description' => __('dashboard.menu_payment')])
 
         <main class="flex-1 p-4 md:p-6">
@@ -40,7 +40,7 @@
                         <template x-if="!loading">
                             <div class="space-y-3">
                                 <template x-for="order in pendingOrders" :key="order.id">
-                                    <div class="card p-4 cursor-pointer hover:shadow-md transition-shadow" 
+                                    <div class="card p-4 cursor-pointer hover:shadow-md transition-shadow"
                                          :class="selectedOrder?.id === order.id ? 'ring-2 ring-[hsl(var(--primary))]' : ''"
                                          @click="selectOrder(order)">
                                         <div class="flex justify-between items-start mb-2">
@@ -70,7 +70,7 @@
                     <!-- Payment Panel -->
                     <div class="space-y-4">
                         <h2 class="text-lg font-semibold">Payment</h2>
-                        
+
                         <template x-if="!selectedOrder">
                             <div class="card p-8 text-center">
                                 <div class="text-[hsl(var(--muted-foreground))]">

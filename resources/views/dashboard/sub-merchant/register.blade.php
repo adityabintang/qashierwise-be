@@ -3,10 +3,10 @@
 @section('title', __('submerchant.register_title'))
 
 @section('content')
-<div x-data="subMerchantRegister()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="subMerchantRegister()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'sub-merchant'])
 
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         @include('components.dashboard-header', ['title' => __('submerchant.register_as_submerchant'), 'description' => __('submerchant.start_accepting_qris')])
 
         <main class="flex-1 p-4 md:p-6">
@@ -37,10 +37,10 @@
                             <!-- Business Name -->
                             <div>
                                 <label class="text-sm font-medium mb-1.5 block">Business Name <span class="text-[hsl(var(--muted-foreground))]">(optional)</span></label>
-                                <input 
-                                    type="text" 
-                                    x-model="form.business_name" 
-                                    class="input w-full min-h-[44px]" 
+                                <input
+                                    type="text"
+                                    x-model="form.business_name"
+                                    class="input w-full min-h-[44px]"
                                     placeholder="Enter your business name (leave empty to use your account name)"
                                     maxlength="255"
                                 >
@@ -75,9 +75,9 @@
                                 <a href="/dashboard/sub-merchant" class="btn btn-outline btn-md flex-1">
                                     Cancel
                                 </a>
-                                <button 
-                                    type="submit" 
-                                    :disabled="saving || !acceptTerms" 
+                                <button
+                                    type="submit"
+                                    :disabled="saving || !acceptTerms"
                                     class="btn btn-primary btn-md flex-1"
                                 >
                                     <i class="fas" :class="saving ? 'fa-spinner animate-spin' : 'fa-user-plus'"></i>

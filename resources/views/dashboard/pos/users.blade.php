@@ -3,10 +3,10 @@
 @section('title', __('pos.users.title') . ' - QashierWise')
 
 @section('content')
-<div x-data="posUsersApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="posUsersApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'pos-users'])
 
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         @include('components.dashboard-header', ['title' => __('pos.users.title'), 'description' => __('pos.users.description')])
 
         <main class="flex-1 p-4 md:p-6">
