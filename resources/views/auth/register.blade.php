@@ -111,7 +111,9 @@ function registerForm() {
                 if (response.ok && data.success) {
                     localStorage.setItem('token', data.data.access_token);
                     localStorage.setItem('user', JSON.stringify(data.data.user));
-                    window.location.href = '/dashboard';
+                    localStorage.setItem('verification_email', data.data.user.email);
+                    localStorage.setItem('just_registered', 'true');
+                    window.location.href = '/verify-email';
                 } else {
                     if (data.errors) {
                         this.errors = data.errors;

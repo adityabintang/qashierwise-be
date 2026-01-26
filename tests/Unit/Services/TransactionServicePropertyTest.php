@@ -82,7 +82,7 @@ class TransactionServicePropertyTest extends TestCase
             'store_id' => $this->store->id,
             'pos_user_id' => $this->posUser->id,
             'order_number' => $orderNumber,
-            'status' => Order::STATUS_COMPLETED,
+            'status' => Order::STATUS_PAID,
             'subtotal' => $total,
             'tax_amount' => 0,
             'discount_amount' => 0,

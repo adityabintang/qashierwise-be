@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\Pos\TransactionController;
 use App\Http\Controllers\Api\ProviderCredentialController;
 use App\Http\Controllers\Api\ProviderValidationController;
 use App\Http\Controllers\Api\QrisController;
+use App\Http\Controllers\Api\ResendWebhookController;
 use App\Http\Controllers\Api\ReservationController;
 use App\Http\Controllers\Api\SubMerchantController;
 use App\Http\Controllers\Api\SubscriptionController;
@@ -44,6 +45,13 @@ use Illuminate\Support\Facades\Route;
 // Public routes
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/send-otp', [AuthController::class, 'sendOtp'])
+    ->middleware('throttle:3,1');
+Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
+Route::post('/resend-otp', [AuthController::class, 'resendOtp'])
+    ->middleware('throttle:3,1');
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
 // WhatsApp Webhook (must be public for WhatsApp to access)
 Route::get('/whatsapp/webhook', [WhatsAppWebhookController::class, 'verify']);
@@ -64,6 +72,10 @@ Route::post('/webhooks/midtrans', [MidtransWebhookController::class, 'handleNoti
 Route::post('/webhooks/doku', [DokuWebhookController::class, 'handleNotification']);
 Route::post('/webhooks/xendit', [XenditWebhookController::class, 'handleNotification']);
 Route::post('/webhooks/duitku', [DuitkuWebhookController::class, 'handleNotification']);
+
+// Resend Email Webhook (must be public for Resend to access)
+Route::post('/webhooks/resend', [ResendWebhookController::class, 'handleNotification'])
+    ->middleware('throttle:60,1'); // Rate limit: 60 requests per minute
 
 // Subscription Webhook (must be public for Midtrans to access)
 Route::post('/webhooks/midtrans/subscription', [MidtransWebhookController::class, 'handleSubscriptionWebhook'])
@@ -223,7 +235,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/orders/{order}/items', [OrderController::class, 'addItem']);
         Route::delete('/orders/{order}/items/{item}', [OrderController::class, 'removeItem']);
         Route::post('/orders/{order}/discount', [OrderController::class, 'applyDiscount']);
-        Route::post('/orders/{order}/complete', [OrderController::class, 'complete']);
         Route::post('/orders/{order}/cancel', [OrderController::class, 'cancel']);
         Route::apiResource('orders', OrderController::class)->except(['update', 'destroy']);
 

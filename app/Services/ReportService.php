@@ -22,7 +22,7 @@ class ReportService
     public function dailySales(Carbon $date, ?int $storeId = null, ?int $userId = null): array
     {
         $query = Order::whereDate('created_at', $date->toDateString())
-            ->whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_PAID]);
+            ->where('status', Order::STATUS_PAID);
 
         if ($userId !== null) {
             $query->whereHas('store', fn($q) => $q->where('user_id', $userId));
@@ -69,7 +69,7 @@ class ReportService
     {
         $query = Order::whereDate('created_at', '>=', $start->toDateString())
             ->whereDate('created_at', '<=', $end->toDateString())
-            ->whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_PAID]);
+            ->where('status', Order::STATUS_PAID);
 
         if ($userId !== null) {
             $query->whereHas('store', fn($q) => $q->where('user_id', $userId));
@@ -139,7 +139,7 @@ class ReportService
 
         $query->whereDate('orders.created_at', '>=', $start->toDateString())
             ->whereDate('orders.created_at', '<=', $end->toDateString())
-            ->whereIn('orders.status', [Order::STATUS_COMPLETED, Order::STATUS_PAID]);
+            ->where('orders.status', Order::STATUS_PAID);
 
         if ($storeId !== null) {
             $query->where('orders.store_id', $storeId);
@@ -182,7 +182,7 @@ class ReportService
             ->join('orders', 'payments.order_id', '=', 'orders.id')
             ->whereDate('orders.created_at', '>=', $start->toDateString())
             ->whereDate('orders.created_at', '<=', $end->toDateString())
-            ->whereIn('orders.status', [Order::STATUS_COMPLETED, Order::STATUS_PAID]);
+            ->where('orders.status', Order::STATUS_PAID);
 
         if ($storeId !== null) {
             $query->where('orders.store_id', $storeId);
@@ -210,7 +210,7 @@ class ReportService
     public function hourlySales(Carbon $date, ?int $storeId = null): array
     {
         $query = Order::whereDate('created_at', $date->toDateString())
-            ->whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_PAID]);
+            ->where('status', Order::STATUS_PAID);
 
         if ($storeId !== null) {
             $query->where('store_id', $storeId);

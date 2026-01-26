@@ -250,7 +250,7 @@ function transactionsApp() {
         goToPage(page) { if (page >= 1 && page <= this.pagination.lastPage) { this.pagination.currentPage = page; this.fetchTransactions(); } },
         formatCurrency(a) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(a || 0); },
         formatDate(d) { return d ? new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'; },
-        getStatusClass(s) { return { 'pending': 'bg-amber-100 text-amber-700', 'completed': 'bg-blue-100 text-blue-700', 'paid': 'bg-emerald-100 text-emerald-700', 'cancelled': 'bg-red-100 text-red-700' }[s] || 'bg-gray-100 text-gray-700'; },
+        getStatusClass(s) { return { 'pending': 'bg-amber-100 text-amber-700', 'paid': 'bg-emerald-100 text-emerald-700', 'cancelled': 'bg-red-100 text-red-700' }[s] || 'bg-gray-100 text-gray-700'; },
 
         viewTransaction(tx) { this.selectedTx = tx; this.showModal = true; },
         closeModal() { this.showModal = false; this.selectedTx = null; },

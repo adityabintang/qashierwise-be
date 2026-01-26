@@ -217,27 +217,6 @@ class OrderController extends Controller
     }
 
     /**
-     * Complete the order.
-     */
-    public function complete(Order $order): JsonResponse
-    {
-        try {
-            $order = $this->orderService->complete($order);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Order completed successfully',
-                'data' => $order->load(['items.product', 'payments']),
-            ]);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 400);
-        }
-    }
-
-    /**
      * Cancel the order.
      */
     public function cancel(Order $order): JsonResponse

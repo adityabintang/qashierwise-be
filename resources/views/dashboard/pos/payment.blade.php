@@ -207,13 +207,13 @@ function paymentApp() {
             this.loading = true;
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${this.API_BASE_URL}/orders?status=completed`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
+                const res = await fetch(`${this.API_BASE_URL}/orders?status=pending`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
                 const data = await res.json();
                 if (data.success) { this.orders = data.data.data || data.data; }
             } catch (e) { console.error('Error:', e); } finally { this.loading = false; }
         },
 
-        get pendingOrders() { return this.orders.filter(o => o.status === 'completed' || o.status === 'pending'); },
+        get pendingOrders() { return this.orders.filter(o => o.status === 'pending'); },
         get quickAmounts() {
             if (!this.selectedOrder) return [];
             const total = parseFloat(this.selectedOrder.total);

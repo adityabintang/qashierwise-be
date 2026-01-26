@@ -223,7 +223,7 @@ class OrderService
             }
 
             // Update order status
-            $order->status = Order::STATUS_COMPLETED;
+            $order->status = Order::STATUS_PAID;
             $order->save();
 
             // Update table status if table is assigned
@@ -249,8 +249,8 @@ class OrderService
         }
 
         return DB::transaction(function () use ($order) {
-            // Restore inventory if order was completed
-            if ($order->status === Order::STATUS_COMPLETED) {
+            // Restore inventory if order was paid
+            if ($order->status === Order::STATUS_PAID) {
                 foreach ($order->items as $item) {
                     $product = $item->product;
                     $product->stock_quantity += $item->quantity;

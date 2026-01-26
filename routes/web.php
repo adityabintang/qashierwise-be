@@ -31,6 +31,18 @@ Route::get('/register', function () {
     return view('auth.register');
 })->name('register');
 
+Route::get('/verify-email', function () {
+    return view('auth.verify-email');
+})->name('verify-email');
+
+Route::get('/forgot-password', function () {
+    return view('auth.forgot-password');
+})->name('forgot-password');
+
+Route::get('/reset-password', function () {
+    return view('auth.reset-password');
+})->name('reset-password');
+
 // Legal pages
 Route::get('/privacy-policy', function () {
     return view('privacy-policy');

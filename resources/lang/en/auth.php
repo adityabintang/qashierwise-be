@@ -67,6 +67,7 @@ return [
     'user_not_authenticated' => 'User not authenticated',
     'token_expired' => 'Your session has expired. Please login again.',
     'token_invalid' => 'Invalid authentication token.',
+    'email_not_registered' => 'The email is not registered in the application',
 
     // Validation Messages (Auth-specific)
     'name_required' => 'Business name is required',
@@ -90,7 +91,20 @@ return [
 
     // Email Verification
     'verify_email' => 'Verify Email',
-    'verify_email_subtitle' => 'Please verify your email address to continue',
+    'verify_email_subtitle' => 'We sent a verification code to your email',
+    'verify_email_button' => 'Verify Email',
+    'enter_verification_code' => 'Enter Verification Code',
+    'verification_code_sent' => 'Verification code sent to your email',
+    'verification_code_resent' => 'Verification code resent successfully',
+    'email_verified_success' => 'Email verified successfully!',
+    'verification_failed' => 'Verification failed. Please check your code.',
+    'resend_failed' => 'Failed to resend code. Please try again.',
+    'didnt_receive_code' => "Didn't receive the code?",
+    'resend_code' => 'Resend Code',
+    'resend_in' => 'Resend in',
+    'sending' => 'Sending...',
+    'verifying' => 'Verifying...',
+    'back_to_login' => 'Back to login',
     'verification_sent' => 'Verification email has been sent',
     'resend_verification' => 'Resend Verification Email',
     'email_already_verified' => 'Email is already verified',

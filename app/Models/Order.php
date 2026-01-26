@@ -16,9 +16,8 @@ class Order extends Model
      * Order status constants.
      */
     const STATUS_PENDING = 'pending';
-    const STATUS_COMPLETED = 'completed';
-    const STATUS_CANCELLED = 'cancelled';
     const STATUS_PAID = 'paid';
+    const STATUS_CANCELLED = 'cancelled';
 
     /**
      * Order source constants.

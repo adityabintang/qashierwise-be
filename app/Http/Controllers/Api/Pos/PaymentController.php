@@ -47,7 +47,7 @@ class PaymentController extends Controller
 
         try {
             $order = Order::findOrFail($validated['order_id']);
-            $payment = $this->paymentService->processPayment($order, $validated);
+            $payment = $this->paymentService->processPayment($order, $validated, true);
 
             $change = 0;
             if ($validated['method'] === Payment::METHOD_CASH) {
@@ -92,7 +92,7 @@ class PaymentController extends Controller
 
         try {
             $order = Order::findOrFail($validated['order_id']);
-            $payments = $this->paymentService->splitPayment($order, $validated['payments']);
+            $payments = $this->paymentService->splitPayment($order, $validated['payments'], true);
 
             return response()->json([
                 'success' => true,

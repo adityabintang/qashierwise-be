@@ -17,6 +17,8 @@
         "polar-sh/sdk": "^0.7.0",
         "predis/predis": "^3.3",
         "pusher/pusher-php-server": "^7.2",
+        "resend/resend-laravel": "^1.1",
+        "resend/resend-php": "*",
         "sbsaga/toon": "*"
     },
     "require-dev": {

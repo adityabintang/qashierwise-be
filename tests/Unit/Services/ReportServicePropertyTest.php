@@ -113,7 +113,7 @@ class ReportServicePropertyTest extends TestCase
             'store_id' => $store->id,
             'pos_user_id' => $this->posUser->id,
             'order_number' => 'ORD-' . uniqid(),
-            'status' => Order::STATUS_COMPLETED,
+            'status' => Order::STATUS_PAID,
             'subtotal' => $total,
             'tax_amount' => 0,
             'discount_amount' => 0,

@@ -53,6 +53,9 @@
                         <i :class="showPassword ? 'fa-eye-slash' : 'fa-eye'" class="fas"></i>
                     </button>
                 </div>
+                <div class="mt-2 text-right">
+                    <a href="/forgot-password" class="text-sm text-[hsl(var(--primary))] hover:underline touch-target">{{ __('auth.forgot_password') }}</a>
+                </div>
             </div>
 
             <button type="submit" :disabled="loading" class="btn btn-primary w-full h-11 md:h-12 touch-target">

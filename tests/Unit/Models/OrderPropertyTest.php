@@ -29,9 +29,8 @@ class OrderPropertyTest extends TestCase
     {
         $statuses = [
             Order::STATUS_PENDING,
-            Order::STATUS_COMPLETED,
-            Order::STATUS_CANCELLED,
             Order::STATUS_PAID,
+            Order::STATUS_CANCELLED,
         ];
 
         $this

@@ -68,6 +68,7 @@ return [
     'user_not_authenticated' => 'Pengguna tidak terautentikasi',
     'token_expired' => 'Sesi Anda telah berakhir. Silakan login kembali.',
     'token_invalid' => 'Token autentikasi tidak valid.',
+    'email_not_registered' => 'Email yang disebutkan atau diinputkan tidak terdaftar di aplikasi',
 
     // Validation Messages (Auth-specific)
     'name_required' => 'Nama bisnis wajib diisi',
@@ -91,7 +92,20 @@ return [
 
     // Email Verification
     'verify_email' => 'Verifikasi Email',
-    'verify_email_subtitle' => 'Silakan verifikasi alamat email Anda untuk melanjutkan',
+    'verify_email_subtitle' => 'Kami telah mengirim kode verifikasi ke email Anda',
+    'verify_email_button' => 'Verifikasi Email',
+    'enter_verification_code' => 'Masukkan Kode Verifikasi',
+    'verification_code_sent' => 'Kode verifikasi telah dikirim ke email Anda',
+    'verification_code_resent' => 'Kode verifikasi berhasil dikirim ulang',
+    'email_verified_success' => 'Email berhasil diverifikasi!',
+    'verification_failed' => 'Verifikasi gagal. Periksa kembali kode Anda.',
+    'resend_failed' => 'Gagal mengirim ulang kode. Silakan coba lagi.',
+    'didnt_receive_code' => 'Tidak menerima kode?',
+    'resend_code' => 'Kirim Ulang Kode',
+    'resend_in' => 'Kirim ulang dalam',
+    'sending' => 'Mengirim...',
+    'verifying' => 'Memverifikasi...',
+    'back_to_login' => 'Kembali ke login',
     'verification_sent' => 'Email verifikasi telah dikirim',
     'resend_verification' => 'Kirim Ulang Email Verifikasi',
     'email_already_verified' => 'Email sudah diverifikasi',
