@@ -58,6 +58,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.session' => \App\Http\Middleware\AdminSessionValidation::class,
             'postgres.user.context' => \App\Http\Middleware\SetPostgresUserContext::class,
             'sanitize.provider.errors' => \App\Http\Middleware\SanitizeProviderErrors::class,
+            'pos.permission' => \App\Http\Middleware\CheckPosPermission::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

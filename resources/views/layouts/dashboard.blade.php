@@ -1,6 +1,54 @@
 @extends('layouts.app')
 
 @section('content')
+<script>
+    // Initialize Alpine permissions store BEFORE Alpine starts
+    document.addEventListener('alpine:init', () => {
+        Alpine.store('permissions', {
+            isAdmin: true,
+            userPermissions: ['*'],
+
+            async init() {
+                await this.fetchPermissions();
+            },
+
+            async fetchPermissions() {
+                try {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch(window.location.origin + '/api/user/permissions', {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Accept': 'application/json'
+                        }
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        this.isAdmin = data.data.is_admin || false;
+                        this.userPermissions = data.data.permissions || [];
+                    }
+                } catch (e) {
+                    console.error('Failed to fetch permissions:', e);
+                    // Default to admin if fetch fails (for main account owners)
+                    this.isAdmin = true;
+                    this.userPermissions = ['*'];
+                }
+            },
+
+            hasPermission(permission) {
+                // If admin, allow all
+                if (this.isAdmin || this.userPermissions.includes('*')) {
+                    return true;
+                }
+                // Check if user has specific permission
+                return this.userPermissions.includes(permission);
+            }
+        });
+
+        // Initialize permissions on page load
+        Alpine.store('permissions').init();
+    });
+</script>
+
 <div x-data="{
     sidebarOpen: true,
     user: null,
@@ -20,7 +68,7 @@
         }
 
         // Listen for new WhatsApp messages
-        window.addEventListener('whatsapp-message-received', (event) => {
+        window.addEventListener('new-whatsapp-message', (event) => {
             console.log('📩 Dashboard - New message notification:', event.detail);
             this.notifications.unshift({
                 id: Date.now(),
@@ -47,16 +95,16 @@
         const now = new Date();
         const diffMs = now - date;
         const diffMins = Math.floor(diffMs / 60000);
-        
+
         if (diffMins < 1) return 'Just now';
         if (diffMins < 60) return `${diffMins}m ago`;
-        
+
         const diffHours = Math.floor(diffMins / 60);
         if (diffHours < 24) return `${diffHours}h ago`;
-        
+
         const diffDays = Math.floor(diffHours / 24);
         if (diffDays < 7) return `${diffDays}d ago`;
-        
+
         return date.toLocaleDateString();
     },
 
@@ -74,10 +122,11 @@
             window.location.href = '/login';
         });
     }
- }" class="min-h-screen flex overflow-hidden">
+}" class="min-h-screen bg-gray-50">
     <!-- Sidebar -->
-    <aside :class="sidebarOpen ? 'w-64' : 'w-20'" class="bg-gradient-to-b from-green-600 to-green-700 text-white transition-all duration-300 flex flex-col overflow-hidden">
-        <!-- Logo -->
+    <aside :class="sidebarOpen ? 'w-64' : 'w-20'"
+           class="bg-gradient-to-b from-green-600 to-green-800 text-white fixed h-screen transition-all duration-300 flex flex-col shadow-xl z-50">
+        <!-- Header -->
         <div class="p-6 flex items-center justify-between border-b border-green-500">
             <div x-show="sidebarOpen" class="flex items-center space-x-3">
                 <i class="fab fa-whatsapp text-3xl"></i>

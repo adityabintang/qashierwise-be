@@ -97,7 +97,15 @@ class AuthController extends Controller
         $token = $user->createToken('auth_token', ['*'], $expiresAt)->plainTextToken;
 
         return ApiResponse::success([
-            'user' => $user,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'email_verified_at' => $user->email_verified_at,
+                'is_email_verified' => ! is_null($user->email_verified_at),
+                'created_at' => $user->created_at,
+                'updated_at' => $user->updated_at,
+            ],
             'access_token' => $token,
             'token_type' => 'Bearer',
             'expires_at' => $expiresAt->toIso8601String(),
@@ -140,6 +148,40 @@ class AuthController extends Controller
                 'is_email_verified' => ! is_null($user->email_verified_at),
                 'created_at' => $user->created_at,
                 'updated_at' => $user->updated_at,
+            ],
+        ]);
+    }
+
+    /**
+     * Get user permissions based on their role
+     */
+    public function getUserPermissions(Request $request)
+    {
+        $user = $request->user();
+
+        // Check if user has a POS user record with a role
+        $posUser = $user->posUsers()->with('role')->first();
+
+        // If no POS user or no role, return all permissions (admin)
+        if (!$posUser || !$posUser->role) {
+            return ApiResponse::success([
+                'is_admin' => true,
+                'permissions' => ['*'], // All permissions
+                'role' => null,
+            ]);
+        }
+
+        return ApiResponse::success([
+            'is_admin' => false,
+            'permissions' => $posUser->role->permissions ?? [],
+            'role' => [
+                'id' => $posUser->role->id,
+                'name' => $posUser->role->name,
+            ],
+        ]);
+    }
+
+    /**
             ],
         ]);
     }

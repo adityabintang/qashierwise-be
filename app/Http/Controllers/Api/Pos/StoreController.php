@@ -36,7 +36,9 @@ class StoreController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $stores,
+            'data' => [
+                'data' => $stores,
+            ],
         ]);
     }
 

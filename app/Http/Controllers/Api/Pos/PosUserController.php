@@ -4,11 +4,22 @@ namespace App\Http\Controllers\Api\Pos;
 
 use App\Http\Controllers\Controller;
 use App\Models\PosUser;
+use App\Models\User;
+use App\Services\OtpService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Hash;
 
 class PosUserController extends Controller
 {
+    protected OtpService $otpService;
+
+    public function __construct(OtpService $otpService)
+    {
+        $this->otpService = $otpService;
+    }
+
     /**
      * Display a listing of POS users.
      */
@@ -23,6 +34,148 @@ class PosUserController extends Controller
         return response()->json([
             'success' => true,
             'data' => $posUsers,
+        ]);
+    }
+
+    /**
+     * Create a new user with email verification.
+     */
+    public function createUser(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users',
+            'password' => 'required|string|min:8',
+        ]);
+
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'User created successfully',
+            'data' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'email_verified_at' => $user->email_verified_at,
+                'is_email_verified' => !is_null($user->email_verified_at),
+            ],
+        ], 201);
+    }
+
+    /**
+     * Send OTP for email verification.
+     */
+    public function sendOtp(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => 'required|email|exists:users',
+        ]);
+
+        $email = $validated['email'];
+        $type = 'email_verification';
+
+        if ($this->otpService->isRateLimited($email, $type)) {
+            $remainingTime = $this->otpService->getTimeUntilNextAttempt($email, $type);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Too many OTP requests. Please try again in '.$remainingTime.' seconds.',
+            ], 429);
+        }
+
+        $this->otpService->recordAttempt($email, $type);
+
+        $otp = $this->otpService->generate($email, $type);
+
+        $notifiable = new class($email)
+        {
+            use Notifiable;
+
+            public $email;
+
+            public function __construct($email)
+            {
+                $this->email = $email;
+            }
+
+            public function routeNotificationForMail($notification)
+            {
+                return $this->email;
+            }
+        };
+
+        $notifiable->notify(new \App\Notifications\SendOtpNotification($otp, $type, (int) config('otp.expiration_minutes')));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'OTP sent successfully',
+            'expires_in_minutes' => (int) config('otp.expiration_minutes'),
+        ]);
+    }
+
+    /**
+     * Verify OTP for email.
+     */
+    public function verifyOtp(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => 'required|email|exists:users',
+            'code' => 'required|string|size:6',
+        ]);
+
+        $email = $validated['email'];
+        $code = $validated['code'];
+        $type = 'email_verification';
+
+        $isValid = $this->otpService->verify($email, $code, $type);
+
+        if (!$isValid) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid or expired OTP code.',
+            ], 400);
+        }
+
+        $user = User::where('email', $email)->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Email verified successfully',
+            'data' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'email_verified_at' => $user->email_verified_at,
+                'is_email_verified' => !is_null($user->email_verified_at),
+            ],
+        ]);
+    }
+
+    /**
+     * Get available users (for assignment).
+     */
+    public function getAvailableUsers(Request $request): JsonResponse
+    {
+        $users = User::select('id', 'name', 'email', 'email_verified_at')
+            ->orderBy('name', 'asc')
+            ->get()
+            ->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'is_email_verified' => !is_null($user->email_verified_at),
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => $users,
         ]);
     }
 
@@ -117,6 +270,19 @@ class PosUserController extends Controller
             'success' => true,
             'message' => 'POS user activated successfully',
             'data' => $posUser->fresh()->load(['user', 'store', 'role']),
+        ]);
+    }
+
+    /**
+     * Remove the specified POS user.
+     */
+    public function destroy(PosUser $posUser): JsonResponse
+    {
+        $posUser->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'POS user deleted successfully',
         ]);
     }
 }

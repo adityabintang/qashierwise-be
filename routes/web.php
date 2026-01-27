@@ -154,6 +154,10 @@ Route::middleware(['web', 'check.web.auth'])->group(function () {
             return view('dashboard.pos.users');
         })->name('users');
 
+        Route::get('/roles', function () {
+            return view('dashboard.pos.roles');
+        })->name('roles');
+
         Route::get('/reports', function () {
             return view('dashboard.pos.reports');
         })->name('reports');

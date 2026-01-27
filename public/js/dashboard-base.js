@@ -1,4 +1,74 @@
 /**
+ * Initialize Alpine permissions store
+ */
+document.addEventListener('alpine:init', () => {
+    Alpine.store('permissions', {
+        isAdmin: true,
+        userPermissions: [],
+        loaded: false,
+        
+        async init() {
+            await this.fetchUserPermissions();
+            this.loaded = true;
+        },
+        
+        async fetchUserPermissions() {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    this.isAdmin = true;
+                    this.userPermissions = [];
+                    return;
+                }
+                
+                const res = await fetch(`${window.location.origin}/api/user/permissions`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success) {
+                        this.isAdmin = data.data.is_admin || false;
+                        this.userPermissions = data.data.permissions || [];
+                    } else {
+                        // API error, default to admin
+                        this.isAdmin = true;
+                        this.userPermissions = [];
+                    }
+                } else {
+                    // HTTP error, default to admin
+                    this.isAdmin = true;
+                    this.userPermissions = [];
+                }
+            } catch (e) {
+                console.error('Failed to fetch permissions:', e);
+                this.isAdmin = true;
+                this.userPermissions = [];
+            }
+        },
+        
+        hasPermission(permission) {
+            // If not loaded yet, show everything (default to admin)
+            if (!this.loaded) return true;
+            // Admin has all permissions
+            if (this.isAdmin) return true;
+            // Check for wildcard permission
+            if (this.userPermissions.includes('*')) return true;
+            // Check for specific permission
+            return this.userPermissions.includes(permission);
+        }
+    });
+});
+
+// Initialize permissions when Alpine starts
+document.addEventListener('alpine:initialized', () => {
+    Alpine.store('permissions').init();
+});
+
+/**
  * Base Alpine.js data for all dashboard pages
  * Provides common functionality like notifications, sidebar, and user management
  */
@@ -10,6 +80,10 @@ function dashboardBase() {
         
         // User data
         user: null,
+        
+        // Permissions
+        userPermissions: [],
+        isAdmin: true,
         
         // Notifications
         notifications: [],
@@ -72,6 +146,9 @@ function dashboardBase() {
                 }
             }
             
+            // Fetch user permissions
+            this.fetchUserPermissions();
+            
             // Listen for WhatsApp message events
             window.addEventListener('whatsapp-message-received', (e) => {
                 this.addNotification({
@@ -83,6 +160,54 @@ function dashboardBase() {
                     time: new Date().toISOString()
                 });
             });
+        },
+        
+        /**
+         * Fetch user permissions from API
+         */
+        async fetchUserPermissions() {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    this.isAdmin = true;
+                    this.userPermissions = [];
+                    return;
+                }
+                
+                const res = await fetch(`${window.location.origin}/api/user/permissions`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success) {
+                        this.isAdmin = data.data.is_admin || false;
+                        this.userPermissions = data.data.permissions || [];
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to fetch permissions:', e);
+                // Default to admin if fetch fails to avoid breaking UI
+                this.isAdmin = true;
+                this.userPermissions = [];
+            }
+        },
+        
+        /**
+         * Check if user has a specific permission
+         */
+        hasPermission(permission) {
+            // Admin has all permissions
+            if (this.isAdmin) return true;
+            
+            // Check for wildcard permission
+            if (this.userPermissions.includes('*')) return true;
+            
+            // Check for specific permission
+            return this.userPermissions.includes(permission);
         },
         
         /**

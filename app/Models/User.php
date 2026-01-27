@@ -137,4 +137,12 @@ class User extends Authenticatable
     {
         return $this->hasMany(CredentialAccessLog::class);
     }
+
+    /**
+     * Get the POS users associated with this user.
+     */
+    public function posUsers(): HasMany
+    {
+        return $this->hasMany(PosUser::class);
+    }
 }
