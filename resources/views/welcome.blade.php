@@ -358,10 +358,10 @@
         },
         "aggregateRating": {
             "@type": "AggregateRating",
-            "ratingValue": "4.8",
-            "reviewCount": "24",
-            "bestRating": "5",
-            "worstRating": "1"
+            "ratingValue": 4.8,
+            "reviewCount": 24,
+            "bestRating": 5,
+            "worstRating": 1
         },
         "review": [
             {
@@ -374,8 +374,8 @@
                 "reviewBody": "QashierWise sangat membantu restoran kami. Reservasi jadi lebih teratur dan otomatis, pelanggan puas dengan respons cepat.",
                 "reviewRating": {
                     "@type": "Rating",
-                    "ratingValue": "5",
-                    "bestRating": "5"
+                    "ratingValue": 5,
+                    "bestRating": 5
                 }
             },
             {
@@ -388,8 +388,8 @@
                 "reviewBody": "Fitur QRIS dan order via WhatsApp sangat praktis. Dashboard mudah digunakan dan laporan lengkap.",
                 "reviewRating": {
                     "@type": "Rating",
-                    "ratingValue": "5",
-                    "bestRating": "5"
+                    "ratingValue": 5,
+                    "bestRating": 5
                 }
             },
             {
@@ -402,14 +402,14 @@
                 "reviewBody": "Sistem yang bagus untuk restoran. AI chatbot cukup pintar dalam merespons pelanggan. Recommended!",
                 "reviewRating": {
                     "@type": "Rating",
-                    "ratingValue": "4",
-                    "bestRating": "5"
+                    "ratingValue": 4,
+                    "bestRating": 5
                 }
             }
         ],
         "offers": {
             "@type": "Offer",
-            "price": "249000",
+            "price": 249000,
             "priceCurrency": "IDR",
             "priceValidUntil": "2025-12-31",
             "availability": "https://schema.org/InStock",
@@ -418,7 +418,7 @@
                 "@type": "OfferShippingDetails",
                 "shippingRate": {
                     "@type": "MonetaryAmount",
-                    "value": "0",
+                    "value": 0,
                     "currency": "IDR"
                 },
                 "shippingDestination": {
@@ -429,14 +429,14 @@
                     "@type": "ShippingDeliveryTime",
                     "handlingTime": {
                         "@type": "QuantitativeValue",
-                        "minValue": "0",
-                        "maxValue": "1",
+                        "minValue": 0,
+                        "maxValue": 1,
                         "unitCode": "DAY"
                     },
                     "transitTime": {
                         "@type": "QuantitativeValue",
-                        "minValue": "0",
-                        "maxValue": "0",
+                        "minValue": 0,
+                        "maxValue": 0,
                         "unitCode": "DAY"
                     }
                 }
