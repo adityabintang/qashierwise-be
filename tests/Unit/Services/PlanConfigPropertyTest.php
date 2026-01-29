@@ -11,7 +11,7 @@ use Tests\TestCase;
 
 /**
  * Property-based tests for PlanConfig service
- * 
+ *
  * Feature: polar-subscription
  */
 class PlanConfigPropertyTest extends TestCase
@@ -23,13 +23,13 @@ class PlanConfigPropertyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->planConfig = new PlanConfig();
+        $this->planConfig = new PlanConfig;
     }
 
     /**
      * Feature: polar-subscription, Property 1: Plan Configuration Mapping Consistency
      * Validates: Requirements 2.1, 2.2
-     * 
+     *
      * For any valid plan identifier (free_trial, standard, pro), the PlanConfig
      * SHALL return a non-null PlanDetails object containing a valid Polar.sh product ID.
      */
@@ -67,13 +67,13 @@ class PlanConfigPropertyTest extends TestCase
                 $this->assertEquals(
                     $planId,
                     $planDetails->id,
-                    "Returned plan ID should match requested plan ID"
+                    'Returned plan ID should match requested plan ID'
                 );
 
                 // Property: Polar product ID must be a string (can be empty for free_trial)
                 $this->assertIsString(
                     $planDetails->polarProductId,
-                    "polarProductId should be a string"
+                    'polarProductId should be a string'
                 );
 
                 // Property: getPolarProductId should return consistent value
@@ -81,7 +81,7 @@ class PlanConfigPropertyTest extends TestCase
                 $this->assertEquals(
                     $polarProductId ?? '',
                     $planDetails->polarProductId,
-                    "getPolarProductId should return the same value as in PlanDetails"
+                    'getPolarProductId should return the same value as in PlanDetails'
                 );
             });
     }
@@ -89,7 +89,7 @@ class PlanConfigPropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 1: Plan Configuration Mapping Consistency (Invalid Plans)
      * Validates: Requirements 2.3
-     * 
+     *
      * For any invalid plan identifier, the PlanConfig SHALL return null without throwing an exception.
      */
     #[Test]
@@ -125,7 +125,7 @@ class PlanConfigPropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 2: Plan Details Completeness
      * Validates: Requirements 2.2
-     * 
+     *
      * For any valid plan identifier, the returned PlanDetails SHALL contain all required fields:
      * id, name, priceMonthly, polarProductId, features array, and tier.
      */
@@ -172,7 +172,7 @@ class PlanConfigPropertyTest extends TestCase
                 $this->assertContains(
                     $planDetails->tier,
                     $validTiers,
-                    "tier must be one of: " . implode(', ', $validTiers)
+                    'tier must be one of: '.implode(', ', $validTiers)
                 );
             });
     }
@@ -180,7 +180,7 @@ class PlanConfigPropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 2: Plan Details Completeness (Features Non-Empty)
      * Validates: Requirements 2.2
-     * 
+     *
      * For any valid plan identifier, the features array SHALL contain at least one feature.
      */
     #[Test]
@@ -226,7 +226,7 @@ class PlanConfigPropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 1: Plan Configuration Mapping Consistency (getAllPlans)
      * Validates: Requirements 2.1, 2.2
-     * 
+     *
      * getAllPlans SHALL return all valid plans with consistent data.
      */
     #[Test]
@@ -266,7 +266,7 @@ class PlanConfigPropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 1: Plan Configuration Mapping Consistency (getFeaturesByTier)
      * Validates: Requirements 2.1, 2.2
-     * 
+     *
      * getFeaturesByTier SHALL return features consistent with the corresponding plan.
      */
     #[Test]
@@ -306,7 +306,7 @@ class PlanConfigPropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 1: Plan Configuration Mapping Consistency (Invalid Tier)
      * Validates: Requirements 2.3
-     * 
+     *
      * getFeaturesByTier SHALL return empty array for invalid tiers.
      */
     #[Test]

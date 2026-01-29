@@ -24,7 +24,7 @@ return new class extends Migration
             $table->timestamp('expires_at')->nullable();
             $table->timestamp('settled_at')->nullable();
             $table->timestamps();
-            
+
             // Indexes
             $table->index(['sub_merchant_id', 'status', 'created_at'], 'idx_merchant_transactions');
             $table->index('order_id', 'idx_order_lookup');

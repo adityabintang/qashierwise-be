@@ -104,7 +104,7 @@ return [
         'to' => 'sampai',
         'of' => 'dari',
         'orders_count' => 'pesanan',
-        
+
         // Status
         'pending' => 'Menunggu',
         'completed' => 'Selesai',
@@ -132,7 +132,7 @@ return [
         'number_placeholder' => 'mis., 1, A1',
         'capacity_placeholder' => 'Jumlah kursi',
         'delete_confirmation' => 'Hapus meja ini?',
-        
+
         // Status
         'available' => 'Tersedia',
         'occupied' => 'Terisi',
@@ -162,7 +162,7 @@ return [
         'select_role' => 'Pilih peran...',
         'no_role' => 'Tanpa peran',
         'no_store' => 'Tanpa toko',
-        
+
         // Roles
         'admin' => 'Admin',
         'cashier' => 'Kasir',
@@ -207,17 +207,17 @@ return [
         'date' => 'Tanggal',
         'start_date' => 'Tanggal Mulai',
         'end_date' => 'Tanggal Akhir',
-        
+
         // Summary cards
         'total_sales' => 'Total Penjualan',
         'total_orders' => 'Total Pesanan',
         'avg_order' => 'Rata-rata Pesanan',
         'items_sold' => 'Item Terjual',
-        
+
         // Charts
         'sales_overview' => 'Ringkasan Penjualan',
         'top_selling_products' => 'Produk Terlaris',
-        
+
         // Tables
         'product_performance' => 'Performa Produk',
         'product' => 'Produk',

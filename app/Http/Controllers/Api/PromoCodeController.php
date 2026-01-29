@@ -16,9 +16,6 @@ class PromoCodeController extends Controller
 
     /**
      * Validate a promo code.
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function validate(Request $request): JsonResponse
     {
@@ -46,7 +43,7 @@ class PromoCodeController extends Controller
 
         // Get plan price
         $plan = config("subscription.plans.{$planId}");
-        if (!$plan || !isset($plan['durations'][$duration])) {
+        if (! $plan || ! isset($plan['durations'][$duration])) {
             return response()->json([
                 'success' => false,
                 'error' => [
@@ -61,7 +58,7 @@ class PromoCodeController extends Controller
         // Validate promo code
         $result = $this->promoCodeService->validateAndApply($code, $planId, $originalAmount, $user);
 
-        if (!$result['valid']) {
+        if (! $result['valid']) {
             return response()->json([
                 'success' => false,
                 'error' => [

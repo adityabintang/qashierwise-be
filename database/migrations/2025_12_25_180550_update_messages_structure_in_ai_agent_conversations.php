@@ -20,8 +20,8 @@ return new class extends Migration
 
         foreach ($conversations as $conversation) {
             $messages = json_decode($conversation->messages, true);
-            
-            if (!is_array($messages)) {
+
+            if (! is_array($messages)) {
                 continue;
             }
 
@@ -30,11 +30,12 @@ return new class extends Migration
                 // Skip if already using 'type'
                 if (isset($message['type'])) {
                     $updatedMessages[] = $message;
+
                     continue;
                 }
 
                 // Map 'role' to 'type'
-                $type = match($message['role'] ?? 'user') {
+                $type = match ($message['role'] ?? 'user') {
                     'user' => 'human',
                     'assistant' => 'ai',
                     default => 'human'
@@ -69,8 +70,8 @@ return new class extends Migration
 
         foreach ($conversations as $conversation) {
             $messages = json_decode($conversation->messages, true);
-            
-            if (!is_array($messages)) {
+
+            if (! is_array($messages)) {
                 continue;
             }
 
@@ -79,11 +80,12 @@ return new class extends Migration
                 // Skip if already using 'role'
                 if (isset($message['role'])) {
                     $updatedMessages[] = $message;
+
                     continue;
                 }
 
                 // Map 'type' to 'role'
-                $role = match($message['type'] ?? 'human') {
+                $role = match ($message['type'] ?? 'human') {
                     'human' => 'user',
                     'ai' => 'assistant',
                     default => 'user'

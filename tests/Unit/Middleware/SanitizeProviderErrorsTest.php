@@ -17,7 +17,7 @@ use Tests\TestCase;
 
 /**
  * Test suite for SanitizeProviderErrors middleware.
- * 
+ *
  * Tests error handling and sanitization for:
  * - Encryption errors (Requirement 12.2)
  * - RLS violations (Requirement 12.5)
@@ -29,13 +29,14 @@ class SanitizeProviderErrorsTest extends TestCase
     use RefreshDatabase;
 
     private SanitizeProviderErrors $middleware;
+
     private User $user;
 
     protected function setUp(): void
     {
         parent::setUp();
-        
-        $this->middleware = new SanitizeProviderErrors();
+
+        $this->middleware = new SanitizeProviderErrors;
         $this->user = User::factory()->create();
     }
 
@@ -50,7 +51,7 @@ class SanitizeProviderErrorsTest extends TestCase
             ->with('Encryption error occurred', \Mockery::type('array'));
 
         $request = Request::create('/api/test', 'POST');
-        $request->setUserResolver(fn() => $this->user);
+        $request->setUserResolver(fn () => $this->user);
 
         $exception = new EncryptionException('AES-256-CBC encryption failed with key derivation error');
 
@@ -59,11 +60,11 @@ class SanitizeProviderErrorsTest extends TestCase
         });
 
         $this->assertEquals(500, $response->getStatusCode());
-        
+
         $data = json_decode($response->getContent(), true);
         $this->assertFalse($data['success']);
         $this->assertEquals('ENCRYPTION_ERROR', $data['error']['code']);
-        
+
         // Verify technical details are not exposed
         $this->assertStringNotContainsString('AES-256-CBC', $data['error']['message']);
         $this->assertStringNotContainsString('key derivation', $data['error']['message']);
@@ -81,7 +82,7 @@ class SanitizeProviderErrorsTest extends TestCase
             ->with('RLS violation detected', \Mockery::type('array'));
 
         $request = Request::create('/api/test', 'GET');
-        $request->setUserResolver(fn() => $this->user);
+        $request->setUserResolver(fn () => $this->user);
 
         $exception = new RLSViolationException('Row level security policy violation on table payment_provider_credentials');
 
@@ -90,11 +91,11 @@ class SanitizeProviderErrorsTest extends TestCase
         });
 
         $this->assertEquals(403, $response->getStatusCode());
-        
+
         $data = json_decode($response->getContent(), true);
         $this->assertFalse($data['success']);
         $this->assertEquals('ACCESS_DENIED', $data['error']['code']);
-        
+
         // Verify no technical details are exposed
         $this->assertStringNotContainsString('policy', $data['error']['message']);
         $this->assertStringNotContainsString('payment_provider_credentials', $data['error']['message']);
@@ -112,7 +113,7 @@ class SanitizeProviderErrorsTest extends TestCase
             ->with('Provider error occurred', \Mockery::type('array'));
 
         $request = Request::create('/api/test', 'POST');
-        $request->setUserResolver(fn() => $this->user);
+        $request->setUserResolver(fn () => $this->user);
 
         $exception = ProviderException::networkError('xendit');
 
@@ -121,7 +122,7 @@ class SanitizeProviderErrorsTest extends TestCase
         });
 
         $this->assertEquals(503, $response->getStatusCode());
-        
+
         $data = json_decode($response->getContent(), true);
         $this->assertFalse($data['success']);
         $this->assertEquals('PROVIDER_NETWORK_ERROR', $data['error']['code']);
@@ -141,7 +142,7 @@ class SanitizeProviderErrorsTest extends TestCase
             ->with('Provider error occurred', \Mockery::type('array'));
 
         $request = Request::create('/api/test', 'POST');
-        $request->setUserResolver(fn() => $this->user);
+        $request->setUserResolver(fn () => $this->user);
 
         $exception = ProviderException::credentialError('doku', 'Invalid client_id or secret_key', 'AUTH_FAILED');
 
@@ -150,7 +151,7 @@ class SanitizeProviderErrorsTest extends TestCase
         });
 
         $this->assertEquals(401, $response->getStatusCode());
-        
+
         $data = json_decode($response->getContent(), true);
         $this->assertFalse($data['success']);
         $this->assertEquals('PROVIDER_CREDENTIAL_ERROR', $data['error']['code']);
@@ -170,7 +171,7 @@ class SanitizeProviderErrorsTest extends TestCase
             ->with('Provider error occurred', \Mockery::type('array'));
 
         $request = Request::create('/api/test', 'POST');
-        $request->setUserResolver(fn() => $this->user);
+        $request->setUserResolver(fn () => $this->user);
 
         $exception = ProviderException::providerError('midtrans', 'Transaction amount exceeds limit', 'AMOUNT_LIMIT');
 
@@ -179,7 +180,7 @@ class SanitizeProviderErrorsTest extends TestCase
         });
 
         $this->assertEquals(400, $response->getStatusCode());
-        
+
         $data = json_decode($response->getContent(), true);
         $this->assertFalse($data['success']);
         $this->assertEquals('PROVIDER_ERROR', $data['error']['code']);
@@ -199,16 +200,16 @@ class SanitizeProviderErrorsTest extends TestCase
             ->with('No active provider configured', \Mockery::type('array'));
 
         $request = Request::create('/api/test', 'POST');
-        $request->setUserResolver(fn() => $this->user);
+        $request->setUserResolver(fn () => $this->user);
 
-        $exception = new NoActiveProviderException();
+        $exception = new NoActiveProviderException;
 
         $response = $this->middleware->handle($request, function () use ($exception) {
             throw $exception;
         });
 
         $this->assertEquals(400, $response->getStatusCode());
-        
+
         $data = json_decode($response->getContent(), true);
         $this->assertFalse($data['success']);
         $this->assertEquals('NO_ACTIVE_PROVIDER', $data['error']['code']);
@@ -226,7 +227,7 @@ class SanitizeProviderErrorsTest extends TestCase
             ->with('Unsupported provider requested', \Mockery::type('array'));
 
         $request = Request::create('/api/test', 'POST');
-        $request->setUserResolver(fn() => $this->user);
+        $request->setUserResolver(fn () => $this->user);
 
         $exception = new UnsupportedProviderException('stripe');
 
@@ -235,7 +236,7 @@ class SanitizeProviderErrorsTest extends TestCase
         });
 
         $this->assertEquals(400, $response->getStatusCode());
-        
+
         $data = json_decode($response->getContent(), true);
         $this->assertFalse($data['success']);
         $this->assertEquals('UNSUPPORTED_PROVIDER', $data['error']['code']);
@@ -257,7 +258,7 @@ class SanitizeProviderErrorsTest extends TestCase
             ->with('RLS violation detected', \Mockery::type('array'));
 
         $request = Request::create('/api/test', 'GET');
-        $request->setUserResolver(fn() => $this->user);
+        $request->setUserResolver(fn () => $this->user);
 
         // Simulate PostgreSQL RLS violation
         $pdoException = new \PDOException('SQLSTATE[42501]: Insufficient privilege: row level security policy violation');
@@ -273,7 +274,7 @@ class SanitizeProviderErrorsTest extends TestCase
         });
 
         $this->assertEquals(403, $response->getStatusCode());
-        
+
         $data = json_decode($response->getContent(), true);
         $this->assertFalse($data['success']);
         $this->assertEquals('ACCESS_DENIED', $data['error']['code']);
@@ -290,7 +291,7 @@ class SanitizeProviderErrorsTest extends TestCase
             ->with('Network error detected', \Mockery::type('array'));
 
         $request = Request::create('/api/test', 'POST');
-        $request->setUserResolver(fn() => $this->user);
+        $request->setUserResolver(fn () => $this->user);
 
         $exception = new \Exception('Connection timed out after 30 seconds');
 
@@ -299,7 +300,7 @@ class SanitizeProviderErrorsTest extends TestCase
         });
 
         $this->assertEquals(503, $response->getStatusCode());
-        
+
         $data = json_decode($response->getContent(), true);
         $this->assertFalse($data['success']);
         $this->assertEquals('NETWORK_ERROR', $data['error']['code']);
@@ -317,7 +318,7 @@ class SanitizeProviderErrorsTest extends TestCase
             ->with('Credential error detected', \Mockery::type('array'));
 
         $request = Request::create('/api/test', 'POST');
-        $request->setUserResolver(fn() => $this->user);
+        $request->setUserResolver(fn () => $this->user);
 
         $exception = new \Exception('401 Unauthorized: Invalid API key provided');
 
@@ -326,7 +327,7 @@ class SanitizeProviderErrorsTest extends TestCase
         });
 
         $this->assertEquals(401, $response->getStatusCode());
-        
+
         $data = json_decode($response->getContent(), true);
         $this->assertFalse($data['success']);
         $this->assertEquals('CREDENTIAL_ERROR', $data['error']['code']);
@@ -344,7 +345,7 @@ class SanitizeProviderErrorsTest extends TestCase
             ->with('Unknown error occurred', \Mockery::type('array'));
 
         $request = Request::create('/api/test', 'POST');
-        $request->setUserResolver(fn() => $this->user);
+        $request->setUserResolver(fn () => $this->user);
 
         $exception = new \Exception('Some internal application error');
 
@@ -353,11 +354,11 @@ class SanitizeProviderErrorsTest extends TestCase
         });
 
         $this->assertEquals(500, $response->getStatusCode());
-        
+
         $data = json_decode($response->getContent(), true);
         $this->assertFalse($data['success']);
         $this->assertEquals('INTERNAL_ERROR', $data['error']['code']);
-        
+
         // Verify internal error details are not exposed
         $this->assertStringNotContainsString('internal application error', $data['error']['message']);
         $this->assertStringContainsString('try again later', $data['error']['message']);
@@ -369,14 +370,14 @@ class SanitizeProviderErrorsTest extends TestCase
     public function test_successful_request_passes_through(): void
     {
         $request = Request::create('/api/test', 'GET');
-        $request->setUserResolver(fn() => $this->user);
+        $request->setUserResolver(fn () => $this->user);
 
         $response = $this->middleware->handle($request, function ($req) {
             return response()->json(['success' => true, 'data' => 'test']);
         });
 
         $this->assertEquals(200, $response->getStatusCode());
-        
+
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
         $this->assertEquals('test', $data['data']);

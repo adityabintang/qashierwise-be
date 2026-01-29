@@ -17,9 +17,13 @@ class XenditWebhookControllerTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private SubMerchant $subMerchant;
+
     private QrisTransaction $transaction;
+
     private PaymentProviderCredential $credential;
+
     private EncryptionService $encryptionService;
 
     protected function setUp(): void
@@ -30,11 +34,11 @@ class XenditWebhookControllerTest extends TestCase
 
         // Create user and sub-merchant
         $this->user = User::factory()->create();
-        
+
         // Create encryption key for user
         UserEncryptionKey::create([
             'user_id' => $this->user->id,
-            'encryption_key_encrypted' => encrypt('test-encryption-key-' . $this->user->id),
+            'encryption_key_encrypted' => encrypt('test-encryption-key-'.$this->user->id),
             'key_version' => 1,
         ]);
 
@@ -74,7 +78,7 @@ class XenditWebhookControllerTest extends TestCase
         // Create a pending transaction
         $this->transaction = QrisTransaction::create([
             'sub_merchant_id' => $this->subMerchant->id,
-            'order_id' => 'QRIS-' . now()->format('YmdHis') . '-TEST1234',
+            'order_id' => 'QRIS-'.now()->format('YmdHis').'-TEST1234',
             'amount' => 100000,
             'platform_fee' => 2500,
             'net_amount' => 97500,
@@ -96,7 +100,7 @@ class XenditWebhookControllerTest extends TestCase
         $response->assertStatus(422)
             ->assertJson([
                 'error' => 'Missing required field: external_id',
-                'code' => 'VALIDATION_ERROR'
+                'code' => 'VALIDATION_ERROR',
             ]);
     }
 
@@ -112,7 +116,7 @@ class XenditWebhookControllerTest extends TestCase
         $response->assertStatus(401)
             ->assertJson([
                 'error' => 'Invalid webhook signature',
-                'code' => 'UNAUTHORIZED'
+                'code' => 'UNAUTHORIZED',
             ]);
     }
 
@@ -213,7 +217,7 @@ class XenditWebhookControllerTest extends TestCase
     private function buildWebhookPayload(string $orderId, string $status): array
     {
         $payload = [
-            'id' => 'qr_' . uniqid(),
+            'id' => 'qr_'.uniqid(),
             'external_id' => $orderId,
             'amount' => 100000,
             'status' => $status,

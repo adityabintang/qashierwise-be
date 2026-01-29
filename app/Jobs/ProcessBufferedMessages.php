@@ -12,12 +12,12 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Process Buffered Messages Job
- * 
+ *
  * This job is dispatched after the debounce period to:
  * 1. Collect all buffered messages for a user
  * 2. Merge/deduplicate them
  * 3. Send single request to AI Agent
- * 
+ *
  * This prevents multiple AI responses when user sends rapid messages.
  */
 class ProcessBufferedMessages implements ShouldQueue
@@ -48,7 +48,7 @@ class ProcessBufferedMessages implements ShouldQueue
     public function handle(MessageBuffer $messageBuffer, AiAgentService $aiAgentService): void
     {
         $phoneNumber = $this->contact->wa_id;
-        
+
         try {
             Log::info('Processing buffered messages', [
                 'phone_number' => $phoneNumber,
@@ -56,46 +56,48 @@ class ProcessBufferedMessages implements ShouldQueue
                 'account_id' => $this->account->id,
                 'buffer_size_before_flush' => $messageBuffer->getBufferSize($phoneNumber),
             ]);
-            
+
             // Flush all buffered messages
             $messages = $messageBuffer->flush($phoneNumber);
-            
+
             if (empty($messages)) {
                 Log::warning('No messages in buffer - possible race condition or stale job', [
                     'phone_number' => $phoneNumber,
                     'hint' => 'This can happen if buffer was flushed by another process or job was delayed too long',
                 ]);
+
                 return;
             }
-            
+
             // Merge messages (deduplicate and combine)
             $mergedMessage = $messageBuffer->mergeMessages($messages);
-            
+
             if (empty($mergedMessage)) {
                 Log::info('Merged message is empty, skipping', [
                     'phone_number' => $phoneNumber,
                 ]);
+
                 return;
             }
-            
+
             Log::info('Sending merged message to AI Agent', [
                 'phone_number' => $phoneNumber,
                 'original_count' => count($messages),
                 'merged_message' => $mergedMessage,
             ]);
-            
+
             // Process the merged message through AI Agent
             $aiAgentService->processMessage(
                 $this->account,
                 $this->contact,
                 $mergedMessage
             );
-            
+
             Log::info('Buffered messages processed successfully', [
                 'phone_number' => $phoneNumber,
                 'message_count' => count($messages),
             ]);
-            
+
         } catch (\Exception $e) {
             Log::error('ProcessBufferedMessages job failed', [
                 'phone_number' => $phoneNumber,
@@ -104,7 +106,7 @@ class ProcessBufferedMessages implements ShouldQueue
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            
+
             throw $e; // Re-throw to trigger retry
         }
     }

@@ -17,8 +17,8 @@ class KeyManagementServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
-        $this->keyManagementService = new KeyManagementService();
+
+        $this->keyManagementService = new KeyManagementService;
     }
 
     public function test_can_generate_user_key(): void
@@ -114,7 +114,7 @@ class KeyManagementServiceTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Encryption key must be exactly 32 bytes');
-        
+
         $this->keyManagementService->storeUserKey($user, 'short_key');
     }
 
@@ -124,7 +124,7 @@ class KeyManagementServiceTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Encryption key cannot be empty');
-        
+
         $this->keyManagementService->storeUserKey($user, '');
     }
 }

@@ -13,21 +13,22 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Doku payment provider implementation.
- * 
+ *
  * Implements QRIS generation using Doku SNAP API.
  * Documentation: https://developers.doku.com
  */
 class DokuProvider implements PaymentProviderInterface
 {
     private const BASE_URL_PRODUCTION = 'https://api.doku.com';
+
     private const BASE_URL_SANDBOX = 'https://api-sandbox.doku.com';
-    
+
     private string $baseUrl;
 
     public function __construct()
     {
-        $this->baseUrl = config('app.env') === 'production' 
-            ? self::BASE_URL_PRODUCTION 
+        $this->baseUrl = config('app.env') === 'production'
+            ? self::BASE_URL_PRODUCTION
             : self::BASE_URL_SANDBOX;
     }
 
@@ -54,7 +55,7 @@ class DokuProvider implements PaymentProviderInterface
     {
         try {
             // Validate required fields
-            if (!isset($credentials['client_id']) || !isset($credentials['secret_key'])) {
+            if (! isset($credentials['client_id']) || ! isset($credentials['secret_key'])) {
                 return ValidationResult::failure(
                     'Missing required credentials: client_id and secret_key',
                     'MISSING_CREDENTIALS'
@@ -72,7 +73,7 @@ class DokuProvider implements PaymentProviderInterface
 
             if ($response->successful()) {
                 $data = $response->json();
-                
+
                 if (isset($data['accessToken'])) {
                     return ValidationResult::success([
                         'token_type' => $data['tokenType'] ?? 'Bearer',
@@ -81,10 +82,10 @@ class DokuProvider implements PaymentProviderInterface
                 }
             }
 
-            $errorMessage = $response->json('responseMessage') 
-                ?? $response->json('message') 
+            $errorMessage = $response->json('responseMessage')
+                ?? $response->json('message')
                 ?? 'Invalid credentials';
-            
+
             return ValidationResult::failure(
                 $errorMessage,
                 $response->json('responseCode') ?? 'VALIDATION_FAILED',
@@ -120,8 +121,8 @@ class DokuProvider implements PaymentProviderInterface
                 'grantType' => 'client_credentials',
             ]);
 
-            if (!$tokenResponse->successful()) {
-                throw new \Exception('Failed to obtain access token: ' . $tokenResponse->body());
+            if (! $tokenResponse->successful()) {
+                throw new \Exception('Failed to obtain access token: '.$tokenResponse->body());
             }
 
             $accessToken = $tokenResponse->json('accessToken');
@@ -143,11 +144,11 @@ class DokuProvider implements PaymentProviderInterface
                 'merchantId' => $credentials['client_id'],
                 'storeLabel' => $request->description ?? 'QRIS Payment',
                 'terminalLabel' => 'WEB',
-                'validityPeriod' => $expiryMinutes . 'm',
+                'validityPeriod' => $expiryMinutes.'m',
             ]);
 
-            if (!$qrisResponse->successful()) {
-                throw new \Exception('Failed to generate QRIS: ' . $qrisResponse->body());
+            if (! $qrisResponse->successful()) {
+                throw new \Exception('Failed to generate QRIS: '.$qrisResponse->body());
             }
 
             $data = $qrisResponse->json();
@@ -190,7 +191,7 @@ class DokuProvider implements PaymentProviderInterface
                 'grantType' => 'client_credentials',
             ]);
 
-            if (!$tokenResponse->successful()) {
+            if (! $tokenResponse->successful()) {
                 throw new \Exception('Failed to obtain access token');
             }
 
@@ -205,7 +206,7 @@ class DokuProvider implements PaymentProviderInterface
                 'originalPartnerReferenceNo' => $transactionId,
             ]);
 
-            if (!$statusResponse->successful()) {
+            if (! $statusResponse->successful()) {
                 throw new \Exception('Failed to check transaction status');
             }
 
@@ -256,17 +257,17 @@ class DokuProvider implements PaymentProviderInterface
         try {
             // Doku uses HMAC-SHA256 for webhook verification
             $secretKey = $credentials['secret_key'] ?? '';
-            
+
             // Construct the signature string (adjust based on Doku's documentation)
             $signatureString = json_encode($payload);
             $computedSignature = hash_hmac('sha256', $signatureString, $secretKey);
-            
+
             return hash_equals($computedSignature, $signature);
         } catch (\Exception $e) {
             Log::error('Doku webhook verification error', [
                 'error' => $e->getMessage(),
             ]);
-            
+
             return false;
         }
     }
@@ -277,7 +278,7 @@ class DokuProvider implements PaymentProviderInterface
     public function parseWebhookPayload(array $payload): WebhookTransaction
     {
         $status = $this->mapDokuStatus($payload['transactionStatusCode'] ?? $payload['latestTransactionStatus'] ?? 'pending');
-        
+
         $paidAt = null;
         if ($status === TransactionStatus::STATUS_SETTLEMENT && isset($payload['transactionDate'])) {
             $paidAt = $payload['transactionDate'];

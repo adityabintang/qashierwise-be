@@ -16,13 +16,16 @@ class Order extends Model
      * Order status constants.
      */
     const STATUS_PENDING = 'pending';
+
     const STATUS_PAID = 'paid';
+
     const STATUS_CANCELLED = 'cancelled';
 
     /**
      * Order source constants.
      */
     const SOURCE_POS = 'pos';
+
     const SOURCE_WHATSAPP_AI = 'whatsapp_ai';
 
     /**

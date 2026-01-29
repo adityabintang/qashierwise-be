@@ -2,9 +2,8 @@
 
 namespace Tests\Unit\Helpers;
 
-use Tests\TestCase;
 use App\Helpers\SeoHelper;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class SeoHelperTest extends TestCase
 {
@@ -14,9 +13,9 @@ class SeoHelperTest extends TestCase
     public function test_get_meta_tags_returns_correct_structure(): void
     {
         app()->setLocale('en');
-        
+
         $metaTags = SeoHelper::getMetaTags('landing');
-        
+
         $this->assertIsArray($metaTags);
         $this->assertArrayHasKey('title', $metaTags);
         $this->assertArrayHasKey('description', $metaTags);
@@ -37,7 +36,7 @@ class SeoHelperTest extends TestCase
         $enMetaTags = SeoHelper::getMetaTags('landing');
         $this->assertStringContainsString('AI WhatsApp Chatbot', $enMetaTags['title']);
         $this->assertEquals('en_US', $enMetaTags['og_locale']);
-        
+
         // Test Indonesian
         app()->setLocale('id');
         $idMetaTags = SeoHelper::getMetaTags('landing');
@@ -51,10 +50,10 @@ class SeoHelperTest extends TestCase
     public function test_get_hreflang_tags_returns_all_locales(): void
     {
         $hreflangTags = SeoHelper::getHreflangTags();
-        
+
         $this->assertIsArray($hreflangTags);
         $this->assertGreaterThanOrEqual(3, count($hreflangTags)); // en, id, x-default
-        
+
         $locales = array_column($hreflangTags, 'locale');
         $this->assertContains('en', $locales);
         $this->assertContains('id', $locales);
@@ -67,7 +66,7 @@ class SeoHelperTest extends TestCase
     public function test_hreflang_tags_have_valid_urls(): void
     {
         $hreflangTags = SeoHelper::getHreflangTags();
-        
+
         foreach ($hreflangTags as $tag) {
             $this->assertArrayHasKey('locale', $tag);
             $this->assertArrayHasKey('url', $tag);
@@ -82,9 +81,9 @@ class SeoHelperTest extends TestCase
     public function test_get_organization_structured_data(): void
     {
         app()->setLocale('en');
-        
+
         $data = SeoHelper::getOrganizationStructuredData();
-        
+
         $this->assertIsArray($data);
         $this->assertEquals('https://schema.org', $data['@context']);
         $this->assertEquals('Organization', $data['@type']);
@@ -99,9 +98,9 @@ class SeoHelperTest extends TestCase
     public function test_get_website_structured_data(): void
     {
         app()->setLocale('en');
-        
+
         $data = SeoHelper::getWebsiteStructuredData();
-        
+
         $this->assertIsArray($data);
         $this->assertEquals('https://schema.org', $data['@context']);
         $this->assertEquals('WebSite', $data['@type']);
@@ -115,9 +114,9 @@ class SeoHelperTest extends TestCase
     public function test_get_faq_structured_data(): void
     {
         app()->setLocale('en');
-        
+
         $data = SeoHelper::getFaqStructuredData();
-        
+
         $this->assertIsArray($data);
         $this->assertEquals('https://schema.org', $data['@context']);
         $this->assertEquals('FAQPage', $data['@type']);
@@ -136,7 +135,7 @@ class SeoHelperTest extends TestCase
         $enData = SeoHelper::getFaqStructuredData();
         $firstQuestion = $enData['mainEntity'][0]['name'];
         $this->assertStringContainsString('What is QashierWise', $firstQuestion);
-        
+
         // Test Indonesian
         app()->setLocale('id');
         $idData = SeoHelper::getFaqStructuredData();
@@ -150,10 +149,10 @@ class SeoHelperTest extends TestCase
     public function test_render_meta_tags_as_html(): void
     {
         app()->setLocale('en');
-        
+
         $metaTags = SeoHelper::getMetaTags('landing');
         $html = SeoHelper::renderMetaTags($metaTags);
-        
+
         $this->assertIsString($html);
         $this->assertStringContainsString('<title>', $html);
         $this->assertStringContainsString('<meta name="description"', $html);
@@ -168,7 +167,7 @@ class SeoHelperTest extends TestCase
     {
         $hreflangTags = SeoHelper::getHreflangTags();
         $html = SeoHelper::renderHreflangTags($hreflangTags);
-        
+
         $this->assertIsString($html);
         $this->assertStringContainsString('<link rel="alternate" hreflang="en"', $html);
         $this->assertStringContainsString('<link rel="alternate" hreflang="id"', $html);
@@ -182,7 +181,7 @@ class SeoHelperTest extends TestCase
     {
         $data = SeoHelper::getOrganizationStructuredData();
         $html = SeoHelper::renderStructuredData($data);
-        
+
         $this->assertIsString($html);
         $this->assertStringContainsString('<script type="application/ld+json">', $html);
         $this->assertStringContainsString('"@context"', $html);

@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -18,7 +18,7 @@ return new class extends Migration
             $table->text('encryption_key_encrypted');
             $table->integer('key_version')->default(1);
             $table->timestamps();
-            
+
             // Index for performance
             $table->index('user_id', 'idx_user_key_lookup');
         });
@@ -26,7 +26,7 @@ return new class extends Migration
         // Enable Row Level Security for PostgreSQL
         if (DB::connection()->getDriverName() === 'pgsql') {
             DB::statement('ALTER TABLE user_encryption_keys ENABLE ROW LEVEL SECURITY');
-            
+
             // Policy: Users can only access their own encryption key
             DB::statement("
                 CREATE POLICY user_keys_access ON user_encryption_keys
@@ -45,7 +45,7 @@ return new class extends Migration
         if (DB::connection()->getDriverName() === 'pgsql') {
             DB::statement('DROP POLICY IF EXISTS user_keys_access ON user_encryption_keys');
         }
-        
+
         Schema::dropIfExists('user_encryption_keys');
     }
 };

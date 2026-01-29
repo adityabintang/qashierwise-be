@@ -45,7 +45,7 @@ return new class extends Migration
             $table->string('bank_name', 100)->nullable()->after('user_id');
             $table->string('account_number', 255)->nullable()->after('bank_name');
             $table->string('account_holder_name', 100)->nullable()->after('account_number');
-            
+
             // Drop business_name
             $table->dropColumn('business_name');
         });

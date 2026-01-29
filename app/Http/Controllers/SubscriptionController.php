@@ -11,7 +11,7 @@ use Illuminate\View\View;
 
 /**
  * Controller for Midtrans subscription management (web routes).
- * 
+ *
  * Handles subscription pricing page, checkout flow, and subscription management.
  */
 class SubscriptionController extends Controller
@@ -23,46 +23,46 @@ class SubscriptionController extends Controller
 
     /**
      * Show payment page with Midtrans Snap.
-     * 
-     * @return View|RedirectResponse
      */
     public function payment(): View|RedirectResponse
     {
         $user = auth()->user();
-        
+
         // Explicit authentication check
         if ($user === null) {
             return redirect()->route('login')->with('error', 'Please login to continue.');
         }
-        
+
         // Check if snap token exists in session
         $snapToken = session('snap_token');
         $planId = session('selected_plan_id');
         $duration = session('selected_duration');
-        
+
         if (empty($snapToken) || empty($planId) || empty($duration)) {
             Log::warning('Payment page accessed without snap token', [
                 'userId' => $user->id,
-                'hasSnapToken' => !empty($snapToken),
-                'hasPlanId' => !empty($planId),
-                'hasDuration' => !empty($duration),
+                'hasSnapToken' => ! empty($snapToken),
+                'hasPlanId' => ! empty($planId),
+                'hasDuration' => ! empty($duration),
             ]);
+
             return redirect()->route('subscription.pricing')->with('error', 'Please select a plan first.');
         }
-        
+
         $plan = config("subscription.plans.{$planId}");
-        
-        if ($plan === null || !isset($plan['durations'][$duration])) {
+
+        if ($plan === null || ! isset($plan['durations'][$duration])) {
             Log::error('Invalid plan or duration in session', [
                 'userId' => $user->id,
                 'planId' => $planId,
                 'duration' => $duration,
             ]);
+
             return redirect()->route('subscription.pricing')->with('error', 'Invalid plan selected.');
         }
-        
+
         $durationDetails = $plan['durations'][$duration];
-        
+
         return view('subscription.payment', [
             'snapToken' => $snapToken,
             'plan' => $plan,
@@ -75,13 +75,11 @@ class SubscriptionController extends Controller
 
     /**
      * Show pricing page with available subscription plans.
-     * 
-     * @return View
      */
     public function index(): View
     {
         $plans = config('subscription.plans', []);
-        
+
         return view('subscription.pricing', [
             'plans' => $plans,
         ]);
@@ -89,12 +87,9 @@ class SubscriptionController extends Controller
 
     /**
      * Create checkout session and redirect to Midtrans payment page.
-     * 
+     *
      * Handles null subscription safely by checking existence before accessing properties.
      * Allows users without subscriptions or with cancelled subscriptions to proceed.
-     * 
-     * @param Request $request
-     * @return RedirectResponse
      */
     public function createCheckout(Request $request): RedirectResponse
     {
@@ -104,25 +99,27 @@ class SubscriptionController extends Controller
         ]);
 
         $user = $request->user();
-        
+
         // Explicit authentication check (defense in depth)
         if ($user === null) {
             Log::warning('Unauthenticated checkout attempt', [
                 'event' => 'checkout.unauthenticated',
                 'ip' => $request->ip(),
             ]);
+
             return redirect()->route('login')->with('error', 'Please login to subscribe.');
         }
-        
+
         $planId = $request->input('plan_id');
         $duration = $request->input('duration');
 
         // Check if Midtrans service is configured
-        if (!$this->midtransService->isConfigured()) {
+        if (! $this->midtransService->isConfigured()) {
             Log::warning('Midtrans not configured', [
                 'event' => 'checkout.config_missing',
                 'userId' => $user->id,
             ]);
+
             return redirect()->back()->with('error', 'Subscription service is not configured. Please contact support.');
         }
 
@@ -134,6 +131,7 @@ class SubscriptionController extends Controller
                 'userId' => $user->id,
                 'subscriptionId' => $existingSubscription->id,
             ]);
+
             return redirect()->route('subscription.manage')->with('info', 'You already have an active subscription.');
         }
 
@@ -147,10 +145,10 @@ class SubscriptionController extends Controller
                 'hasExistingSubscription' => $existingSubscription !== null,
                 'existingStatus' => $existingSubscription?->status,
             ]);
-            
+
             // Create Midtrans Snap token
             $snapData = app(\App\Services\MidtransSnapService::class)->createSubscriptionSnapToken($user, $planId, $duration);
-            
+
             if ($snapData === null || empty($snapData['snap_token'])) {
                 Log::error('Failed to create Snap token', [
                     'event' => 'checkout.snap_token_failed',
@@ -158,23 +156,24 @@ class SubscriptionController extends Controller
                     'planId' => $planId,
                     'duration' => $duration,
                 ]);
+
                 return redirect()->back()->with('error', 'Failed to create payment session. Please try again.');
             }
-            
+
             // Store snap token in session and redirect to payment page
             session([
                 'selected_plan_id' => $planId,
                 'selected_duration' => $duration,
                 'snap_token' => $snapData['snap_token'],
             ]);
-            
+
             Log::info('Snap token created, redirecting to payment', [
                 'event' => 'checkout.snap_token_created',
                 'userId' => $user->id,
                 'planId' => $planId,
                 'duration' => $duration,
             ]);
-            
+
             // Redirect to payment page
             return redirect()->route('subscription.payment');
         } catch (\Exception $e) {
@@ -186,32 +185,30 @@ class SubscriptionController extends Controller
                 'duration' => $duration,
                 'trace' => $e->getTraceAsString(),
             ]);
-            
+
             return redirect()->back()->with('error', 'Failed to create checkout session. Please try again.');
         }
     }
 
     /**
      * Handle successful payment callback from Midtrans.
-     * 
+     *
      * No subscription property access - safe from null pointer errors.
-     * 
-     * @param Request $request
-     * @return RedirectResponse
      */
     public function success(Request $request): RedirectResponse
     {
         $user = $request->user();
-        
+
         // Explicit authentication check
         if ($user === null) {
             Log::warning('Unauthenticated success callback', [
                 'event' => 'checkout.success_unauthenticated',
                 'ip' => $request->ip(),
             ]);
+
             return redirect()->route('login')->with('info', 'Please login to view your subscription.');
         }
-        
+
         Log::info('Subscription payment success callback', [
             'event' => 'checkout.success_callback',
             'userId' => $user->id,
@@ -220,31 +217,29 @@ class SubscriptionController extends Controller
 
         // The actual subscription creation/update will be handled by webhook
         // Redirect to dashboard with refresh parameter to force subscription reload
-        
+
         return redirect()->route('dashboard')->with('success', 'Payment successful! Your subscription is now active.');
     }
 
     /**
      * Handle cancelled payment callback from Midtrans.
-     * 
+     *
      * No subscription property access - safe from null pointer errors.
-     * 
-     * @param Request $request
-     * @return RedirectResponse
      */
     public function cancel(Request $request): RedirectResponse
     {
         $user = $request->user();
-        
+
         // Explicit authentication check
         if ($user === null) {
             Log::warning('Unauthenticated cancel callback', [
                 'event' => 'checkout.cancel_unauthenticated',
                 'ip' => $request->ip(),
             ]);
+
             return redirect()->route('login')->with('info', 'Please login to try again.');
         }
-        
+
         Log::info('Subscription payment cancelled', [
             'event' => 'checkout.cancel_callback',
             'userId' => $user->id,
@@ -256,25 +251,23 @@ class SubscriptionController extends Controller
 
     /**
      * Handle payment error callback from Midtrans.
-     * 
+     *
      * No subscription property access - safe from null pointer errors.
-     * 
-     * @param Request $request
-     * @return RedirectResponse
      */
     public function error(Request $request): RedirectResponse
     {
         $user = $request->user();
-        
+
         // Explicit authentication check
         if ($user === null) {
             Log::warning('Unauthenticated error callback', [
                 'event' => 'checkout.error_unauthenticated',
                 'ip' => $request->ip(),
             ]);
+
             return redirect()->route('login')->with('error', 'Please login to try again.');
         }
-        
+
         Log::error('Subscription payment error', [
             'event' => 'checkout.error_callback',
             'userId' => $user->id,
@@ -286,35 +279,35 @@ class SubscriptionController extends Controller
 
     /**
      * Show subscription management page.
-     * 
+     *
      * Handles null subscriptions safely by using null-safe operator.
-     * 
+     *
      * @return View
      */
     public function manage(): View|RedirectResponse
     {
         $user = auth()->user();
-        
+
         // Explicit authentication check (defense in depth)
         if ($user === null) {
             return redirect()->route('login')->with('error', 'Please login to view your subscription.');
         }
-        
+
         // Use null-safe operator to prevent errors
         $subscription = $user->subscription;
-        
+
         // Get subscription status (handles null subscriptions)
         $subscriptionStatus = $this->subscriptionService->getUserSubscriptionStatus($user);
-        
+
         // Get available plans
         $plans = config('subscription.plans', []);
-        
+
         Log::debug('Subscription management page accessed', [
             'userId' => $user->id,
             'hasSubscription' => $subscription !== null,
             'subscriptionStatus' => $subscriptionStatus->status,
         ]);
-        
+
         return view('subscription.manage', [
             'subscription' => $subscription,
             'subscriptionStatus' => $subscriptionStatus,
@@ -324,22 +317,20 @@ class SubscriptionController extends Controller
 
     /**
      * Cancel user's subscription.
-     * 
+     *
      * Handles null subscriptions with explicit checks and clear error messages.
-     * 
-     * @param Request $request
-     * @return RedirectResponse
      */
     public function cancelSubscription(Request $request): RedirectResponse
     {
         $user = $request->user();
-        
+
         // Explicit authentication check (defense in depth)
         if ($user === null) {
             Log::warning('Unauthenticated cancel attempt', [
                 'event' => 'subscription.cancel_unauthenticated',
                 'ip' => $request->ip(),
             ]);
+
             return redirect()->route('login')->with('error', 'Please login to manage your subscription.');
         }
 
@@ -351,6 +342,7 @@ class SubscriptionController extends Controller
                 'event' => 'subscription.cancel_no_subscription',
                 'userId' => $user->id,
             ]);
+
             return redirect()->back()->with('error', 'No active subscription found.');
         }
 
@@ -361,12 +353,13 @@ class SubscriptionController extends Controller
                 'userId' => $user->id,
                 'subscriptionId' => $subscription->id,
             ]);
+
             return redirect()->back()->with('info', 'Subscription is already cancelled.');
         }
 
         try {
             // If subscription has Midtrans ID, cancel through Midtrans API
-            if ($subscription->provider === 'midtrans' && !empty($subscription->midtrans_subscription_id)) {
+            if ($subscription->provider === 'midtrans' && ! empty($subscription->midtrans_subscription_id)) {
                 Log::info('Cancelling Midtrans subscription via API', [
                     'event' => 'subscription.cancel_via_api',
                     'userId' => $user->id,
@@ -377,12 +370,13 @@ class SubscriptionController extends Controller
                 // Cancel subscription in Midtrans
                 $success = $this->midtransService->cancelSubscription($subscription->midtrans_subscription_id);
 
-                if (!$success) {
+                if (! $success) {
                     Log::error('Midtrans cancellation failed', [
                         'event' => 'subscription.midtrans_cancel_failed',
                         'userId' => $user->id,
                         'subscriptionId' => $subscription->id,
                     ]);
+
                     return redirect()->back()->with('error', 'Failed to cancel subscription. Please try again or contact support.');
                 }
             } else {
@@ -392,7 +386,7 @@ class SubscriptionController extends Controller
                     'userId' => $user->id,
                     'subscriptionId' => $subscription->id,
                     'provider' => $subscription->provider,
-                    'hasMidtransId' => !empty($subscription->midtrans_subscription_id),
+                    'hasMidtransId' => ! empty($subscription->midtrans_subscription_id),
                 ]);
             }
 

@@ -20,7 +20,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamp('verified_at')->nullable();
             $table->timestamps();
-            
+
             // Indexes
             $table->unique('user_id', 'unique_user_merchant');
             $table->index(['is_active', 'verified_at'], 'idx_active_merchants');

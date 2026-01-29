@@ -2,12 +2,12 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\User;
 use App\Models\Subscription;
+use App\Models\User;
 use App\Services\SubscriptionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
+use Tests\TestCase;
 
 class BackwardCompatibilityVerificationTest extends TestCase
 {
@@ -37,7 +37,7 @@ class BackwardCompatibilityVerificationTest extends TestCase
     public function polar_subscriptions_can_be_created_and_retrieved()
     {
         $user = User::factory()->create();
-        
+
         $subscription = Subscription::create([
             'user_id' => $user->id,
             'polar_subscription_id' => 'polar_sub_123',
@@ -64,7 +64,7 @@ class BackwardCompatibilityVerificationTest extends TestCase
     public function midtrans_subscriptions_can_be_created_and_retrieved()
     {
         $user = User::factory()->create();
-        
+
         $subscription = Subscription::create([
             'user_id' => $user->id,
             'midtrans_subscription_id' => 'midtrans_sub_123',
@@ -91,7 +91,7 @@ class BackwardCompatibilityVerificationTest extends TestCase
     public function subscription_service_works_with_polar_subscriptions()
     {
         $user = User::factory()->create();
-        
+
         Subscription::create([
             'user_id' => $user->id,
             'polar_subscription_id' => 'polar_sub_123',
@@ -113,7 +113,7 @@ class BackwardCompatibilityVerificationTest extends TestCase
     public function subscription_service_works_with_midtrans_subscriptions()
     {
         $user = User::factory()->create();
-        
+
         Subscription::create([
             'user_id' => $user->id,
             'midtrans_subscription_id' => 'midtrans_sub_123',
@@ -135,7 +135,7 @@ class BackwardCompatibilityVerificationTest extends TestCase
     public function feature_access_works_for_polar_users()
     {
         $user = User::factory()->create();
-        
+
         Subscription::create([
             'user_id' => $user->id,
             'polar_subscription_id' => 'polar_sub_123',
@@ -154,7 +154,7 @@ class BackwardCompatibilityVerificationTest extends TestCase
     public function feature_access_works_for_midtrans_users()
     {
         $user = User::factory()->create();
-        
+
         Subscription::create([
             'user_id' => $user->id,
             'midtrans_subscription_id' => 'midtrans_sub_123',
@@ -173,7 +173,7 @@ class BackwardCompatibilityVerificationTest extends TestCase
     public function user_relationship_works_with_polar_subscriptions()
     {
         $user = User::factory()->create();
-        
+
         $subscription = Subscription::create([
             'user_id' => $user->id,
             'polar_subscription_id' => 'polar_sub_123',
@@ -193,7 +193,7 @@ class BackwardCompatibilityVerificationTest extends TestCase
     public function user_relationship_works_with_midtrans_subscriptions()
     {
         $user = User::factory()->create();
-        
+
         $subscription = Subscription::create([
             'user_id' => $user->id,
             'midtrans_subscription_id' => 'midtrans_sub_123',
@@ -214,7 +214,7 @@ class BackwardCompatibilityVerificationTest extends TestCase
     {
         $polarUser = User::factory()->create();
         $midtransUser = User::factory()->create();
-        
+
         Subscription::create([
             'user_id' => $polarUser->id,
             'polar_subscription_id' => 'polar_sub_123',
@@ -245,7 +245,7 @@ class BackwardCompatibilityVerificationTest extends TestCase
     {
         $user1 = User::factory()->create();
         $user2 = User::factory()->create();
-        
+
         Subscription::create([
             'user_id' => $user1->id,
             'polar_subscription_id' => 'polar_sub_123',
@@ -279,7 +279,7 @@ class BackwardCompatibilityVerificationTest extends TestCase
     public function metadata_column_works_for_both_providers()
     {
         $user = User::factory()->create();
-        
+
         $polarSub = Subscription::create([
             'user_id' => $user->id,
             'polar_subscription_id' => 'polar_sub_123',
@@ -311,7 +311,7 @@ class BackwardCompatibilityVerificationTest extends TestCase
     public function cancelled_polar_subscriptions_remain_accessible()
     {
         $user = User::factory()->create();
-        
+
         $subscription = Subscription::create([
             'user_id' => $user->id,
             'polar_subscription_id' => 'polar_sub_123',
@@ -334,7 +334,7 @@ class BackwardCompatibilityVerificationTest extends TestCase
     public function expired_polar_subscriptions_are_handled_correctly()
     {
         $user = User::factory()->create();
-        
+
         Subscription::create([
             'user_id' => $user->id,
             'polar_subscription_id' => 'polar_sub_123',

@@ -159,11 +159,28 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
-        // Check if user has a POS user record with a role
-        $posUser = $user->posUsers()->with('role')->first();
+        // CRITICAL: Force load roles and permissions for Spatie
+        // Sanctum doesn't eager load these by default, causing empty permissions
+        $user->load('roles.permissions');
 
-        // If no POS user or no role, return all permissions (admin)
-        if (!$posUser || !$posUser->role) {
+        \Log::info('=== getUserPermissions DEBUG ===');
+        \Log::info('User ID: ' . $user->id);
+        \Log::info('User Email: ' . $user->email);
+
+        // Direct test: Call getAllPermissions right here
+        $testPerms = $user->getAllPermissions();
+        \Log::info('getAllPermissions() count: ' . $testPerms->count());
+        \Log::info('getAllPermissions() dump: ' . json_encode($testPerms->pluck('name')));
+
+        $testPermsSanctum = $user->getAllPermissions('sanctum');
+        \Log::info('getAllPermissions(sanctum) count: ' . $testPermsSanctum->count());
+        \Log::info('getAllPermissions(sanctum) dump: ' . json_encode($testPermsSanctum->pluck('name')));
+
+        // Check if user has a POS user record
+        $posUser = $user->posUsers()->first();
+
+        // If no POS user, return all permissions (admin)
+        if (!$posUser) {
             return ApiResponse::success([
                 'is_admin' => true,
                 'permissions' => ['*'], // All permissions
@@ -171,20 +188,45 @@ class AuthController extends Controller
             ]);
         }
 
+        // Get user permissions via Spatie (guard auto-detected from User model)
+        $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+        $roles = $user->getRoleNames();
+
+        \Log::info('Final permissions array: ' . json_encode($permissions));
+        \Log::info('Final roles: ' . json_encode($roles));
+
         return ApiResponse::success([
-            'is_admin' => false,
-            'permissions' => $posUser->role->permissions ?? [],
-            'role' => [
-                'id' => $posUser->role->id,
-                'name' => $posUser->role->name,
-            ],
+            'is_admin' => $user->isMasterAdmin(),
+            'permissions' => $permissions,
+            'roles' => $roles,
+        ]);
+    }
+
+    /**
+     * Check if user has a specific permission
+     */
+    public function checkPermission(Request $request)
+    {
+        $request->validate([
+            'permission' => 'required|string',
+        ]);
+
+        $user = $request->user();
+        $permission = $request->input('permission');
+
+        // Force load roles and permissions
+        $user->load('roles.permissions');
+
+        $hasPermission = $user->hasPermissionTo($permission, 'sanctum');
+
+        return ApiResponse::success([
+            'has_permission' => $hasPermission,
+            'permission' => $permission,
         ]);
     }
 
     /**
             ],
-        ]);
-    }
 
     /**
      * Send OTP for email verification or password reset

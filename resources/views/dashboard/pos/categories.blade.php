@@ -3,7 +3,7 @@
 @section('title', __('pos.categories.title') . ' - QashierWise POS')
 
 @section('content')
-<div x-data="categoriesApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
+<div x-data="categoriesApp()" x-init="initDashboard()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'pos-categories'])
 
     <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
@@ -17,10 +17,12 @@
                         <h2 class="text-lg font-semibold">Product Categories</h2>
                         <p class="text-sm text-[hsl(var(--muted-foreground))] hidden sm:block">Organize and manage product categories</p>
                     </div>
-                    <button @click="openCreateModal()" class="btn btn-primary btn-md">
-                        <i class="fas fa-plus"></i>
-                        <span>Add Category</span>
-                    </button>
+                    <template x-if="hasPermission('create_categories') || hasPermission('manage_categories')">
+                        <button @click="openCreateModal()" class="btn btn-primary btn-md">
+                            <i class="fas fa-plus"></i>
+                            <span>Add Category</span>
+                        </button>
+                    </template>
                 </div>
 
                 <!-- Categories Grid -->
@@ -63,12 +65,16 @@
                                             <span x-text="(category.products_count || 0) + ' products'"></span>
                                         </div>
                                         <div class="flex items-center gap-2">
-                                            <button @click="openEditModal(category)" class="btn btn-ghost btn-sm">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <button @click="openDeleteModal(category)" class="btn btn-ghost btn-sm text-red-600 hover:bg-red-50">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
+                                            <template x-if="hasPermission('edit_categories') || hasPermission('manage_categories')">
+                                                <button @click="openEditModal(category)" class="btn btn-ghost btn-sm">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                            </template>
+                                            <template x-if="hasPermission('delete_categories') || hasPermission('manage_categories')">
+                                                <button @click="openDeleteModal(category)" class="btn btn-ghost btn-sm text-red-600 hover:bg-red-50">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </template>
                                         </div>
                                     </div>
                                 </div>
@@ -85,9 +91,11 @@
                         </div>
                         <h3 class="font-semibold mt-4">No categories found</h3>
                         <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">Create your first category to organize products.</p>
-                        <button @click="openCreateModal()" class="btn btn-primary btn-md mt-4">
-                            <i class="fas fa-plus"></i> Add Category
-                        </button>
+                        <template x-if="hasPermission('create_categories') || hasPermission('manage_categories')">
+                            <button @click="openCreateModal()" class="btn btn-primary btn-md mt-4">
+                                <i class="fas fa-plus"></i> Add Category
+                            </button>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -169,13 +177,17 @@ function categoriesApp() {
         isMobile: window.innerWidth < 768,
         user: null,
         notifications: [],
+        // Permissions
+        userPermissions: [],
+        isAdmin: true,
 
         async init() {
-            this.initSidebar();
+            this.initDashboard();
+            await this.fetchUserPermissions();
             await this.fetchCategories();
         },
 
-        initSidebar() {
+        initDashboard() {
             this.isMobile = window.innerWidth < 768;
             if (this.isMobile) {
                 this.sidebarOpen = false;
@@ -199,9 +211,40 @@ function categoriesApp() {
             let storedUser = localStorage.getItem('user');
             if (storedUser) { try { this.user = JSON.parse(storedUser); } catch (e) { this.user = { name: 'User' }; } }
             else { this.user = { name: 'User' }; }
+            this.fetchUserPermissions();
+        },
+
+        async fetchUserPermissions() {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) { this.isAdmin = true; this.userPermissions = []; return; }
+                const res = await fetch(`${window.location.origin}/api/user/permissions`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success) {
+                        this.isAdmin = data.data.is_admin || false;
+                        this.userPermissions = data.data.permissions || [];
+                    }
+                }
+            } catch (e) { console.error('Failed to fetch permissions:', e); }
+        },
+
+        hasPermission(permission) {
+            if (this.isAdmin) return true;
+            if (this.userPermissions.includes('*')) return true;
+            return this.userPermissions.includes(permission);
         },
 
         async fetchCategories() {
+            // Check permission first
+            if (!this.hasPermission('view_categories') && !this.hasPermission('manage_categories')) {
+                this.categories = [];
+                this.loading = false;
+                return;
+            }
+
             this.loading = true;
             try {
                 const token = localStorage.getItem('token');
@@ -237,6 +280,14 @@ function categoriesApp() {
         },
 
         async saveCategory() {
+            // Check permission before saving
+            const canCreate = this.hasPermission('create_categories') || this.hasPermission('manage_categories');
+            const canEdit = this.hasPermission('edit_categories') || this.hasPermission('manage_categories');
+            if ((!this.editingCategory && !canCreate) || (this.editingCategory && !canEdit)) {
+                alert('You do not have permission to perform this action');
+                return;
+            }
+
             this.saving = true;
             try {
                 const token = localStorage.getItem('token');
@@ -276,6 +327,12 @@ function categoriesApp() {
         },
 
         async deleteCategory() {
+            // Check permission before deleting
+            if (!this.hasPermission('delete_categories') && !this.hasPermission('manage_categories')) {
+                alert('You do not have permission to delete categories');
+                return;
+            }
+
             if (this.deletingCategory?.products_count > 0) return;
             this.deleting = true;
             try {

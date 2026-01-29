@@ -11,7 +11,7 @@ use InvalidArgumentException;
 
 /**
  * Controller for sub-merchant registration and management API endpoints.
- * 
+ *
  * Handles sub-merchant registration and profile management.
  */
 class SubMerchantController extends Controller
@@ -22,9 +22,6 @@ class SubMerchantController extends Controller
 
     /**
      * Get the current user's sub-merchant status and profile.
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function status(Request $request): JsonResponse
     {
@@ -67,16 +64,13 @@ class SubMerchantController extends Controller
 
     /**
      * Register the current user as a sub-merchant.
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function register(Request $request): JsonResponse
     {
         $user = $request->user();
 
         // Check if user can become a sub-merchant
-        if (!$this->subMerchantService->canBecomeSubMerchant($user)) {
+        if (! $this->subMerchantService->canBecomeSubMerchant($user)) {
             return response()->json([
                 'success' => false,
                 'error' => [
@@ -122,9 +116,6 @@ class SubMerchantController extends Controller
 
     /**
      * Get the full sub-merchant profile with balance details.
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function profile(Request $request): JsonResponse
     {
@@ -169,9 +160,6 @@ class SubMerchantController extends Controller
 
     /**
      * Deactivate the current sub-merchant account.
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function deactivate(Request $request): JsonResponse
     {
@@ -188,7 +176,7 @@ class SubMerchantController extends Controller
             ], 404);
         }
 
-        if (!$subMerchant->is_active) {
+        if (! $subMerchant->is_active) {
             return response()->json([
                 'success' => false,
                 'error' => [
@@ -213,9 +201,6 @@ class SubMerchantController extends Controller
 
     /**
      * Reactivate the current sub-merchant account.
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function activate(Request $request): JsonResponse
     {

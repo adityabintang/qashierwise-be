@@ -8,9 +8,13 @@ namespace App\DTOs;
 class TransactionStatus
 {
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_SETTLEMENT = 'settlement';
+
     public const STATUS_EXPIRE = 'expire';
+
     public const STATUS_CANCEL = 'cancel';
+
     public const STATUS_FAILED = 'failed';
 
     public function __construct(

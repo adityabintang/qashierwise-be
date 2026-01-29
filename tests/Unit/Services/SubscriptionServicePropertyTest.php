@@ -2,7 +2,6 @@
 
 namespace Tests\Unit\Services;
 
-use App\DTOs\SubscriptionStatus;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\PlanConfig;
@@ -16,28 +15,29 @@ use Tests\TestCase;
 
 /**
  * Property-based tests for SubscriptionService
- * 
+ *
  * Feature: polar-subscription
  */
 class SubscriptionServicePropertyTest extends TestCase
 {
-    use TestTrait;
     use RefreshDatabase;
+    use TestTrait;
 
     private SubscriptionService $subscriptionService;
+
     private PlanConfig $planConfig;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->planConfig = new PlanConfig();
+        $this->planConfig = new PlanConfig;
         $this->subscriptionService = new SubscriptionService($this->planConfig);
     }
 
     /**
      * Feature: polar-subscription, Property 8: Default Trial Status for New Users
      * Validates: Requirements 5.2
-     * 
+     *
      * For any user without a subscription record and registered within 14 days,
      * getUserSubscriptionStatus SHALL return status 'trial' with planName 'free_trial'.
      */
@@ -75,7 +75,7 @@ class SubscriptionServicePropertyTest extends TestCase
                 $this->assertGreaterThan(
                     0,
                     $status->trialDaysRemaining,
-                    "User within trial period should have positive trial days remaining"
+                    'User within trial period should have positive trial days remaining'
                 );
 
                 // Cleanup
@@ -83,11 +83,10 @@ class SubscriptionServicePropertyTest extends TestCase
             });
     }
 
-
     /**
      * Feature: polar-subscription, Property 9: Trial Expiration Detection
      * Validates: Requirements 5.3
-     * 
+     *
      * For any user without a subscription record and registered more than 14 days ago,
      * getUserSubscriptionStatus SHALL return status 'trial_expired'.
      */
@@ -125,7 +124,7 @@ class SubscriptionServicePropertyTest extends TestCase
                 $this->assertEquals(
                     0,
                     $status->trialDaysRemaining,
-                    "User past trial period should have 0 trial days remaining"
+                    'User past trial period should have 0 trial days remaining'
                 );
 
                 // Cleanup
@@ -136,7 +135,7 @@ class SubscriptionServicePropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 12: Trial Days Calculation
      * Validates: Requirements 6.2
-     * 
+     *
      * For any user registration date within the trial period,
      * calculateTrialDaysRemaining SHALL return a value between 0 and 14
      * that equals (14 - days_since_registration).
@@ -178,7 +177,7 @@ class SubscriptionServicePropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 12: Trial Days Calculation (Expired)
      * Validates: Requirements 6.2
-     * 
+     *
      * For any user registration date past the trial period,
      * calculateTrialDaysRemaining SHALL return 0.
      */
@@ -211,11 +210,10 @@ class SubscriptionServicePropertyTest extends TestCase
             });
     }
 
-
     /**
      * Feature: polar-subscription, Property 10: Active Subscription Status
      * Validates: Requirements 5.4
-     * 
+     *
      * For any user with an active subscription, getUserSubscriptionStatus
      * SHALL return the correct plan name and a non-null period end date.
      */
@@ -236,8 +234,8 @@ class SubscriptionServicePropertyTest extends TestCase
                 // Create an active subscription
                 $subscription = Subscription::create([
                     'user_id' => $user->id,
-                    'polar_subscription_id' => 'sub_' . uniqid(),
-                    'polar_customer_id' => 'cus_' . uniqid(),
+                    'polar_subscription_id' => 'sub_'.uniqid(),
+                    'polar_customer_id' => 'cus_'.uniqid(),
                     'plan_name' => $planName,
                     'status' => 'active',
                     'current_period_start' => Carbon::now()->subDays(5),
@@ -260,19 +258,19 @@ class SubscriptionServicePropertyTest extends TestCase
                 $this->assertEquals(
                     $planName,
                     $status->planName,
-                    "Status plan name should match subscription plan name"
+                    'Status plan name should match subscription plan name'
                 );
 
                 // Property: Period end must not be null
                 $this->assertNotNull(
                     $status->periodEnd,
-                    "Active subscription should have a non-null period end date"
+                    'Active subscription should have a non-null period end date'
                 );
 
                 // Property: Trial days remaining should be null for active subscriptions
                 $this->assertNull(
                     $status->trialDaysRemaining,
-                    "Active subscription should have null trial days remaining"
+                    'Active subscription should have null trial days remaining'
                 );
 
                 // Cleanup
@@ -284,7 +282,7 @@ class SubscriptionServicePropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 11: Cancelled But Active Subscription
      * Validates: Requirements 5.5
-     * 
+     *
      * For any subscription that is cancelled but where current date is before period_end,
      * the subscription SHALL be considered active until the period end date.
      */
@@ -306,8 +304,8 @@ class SubscriptionServicePropertyTest extends TestCase
                 $cancelledAt = Carbon::now()->subDays(2);
                 $subscription = Subscription::create([
                     'user_id' => $user->id,
-                    'polar_subscription_id' => 'sub_' . uniqid(),
-                    'polar_customer_id' => 'cus_' . uniqid(),
+                    'polar_subscription_id' => 'sub_'.uniqid(),
+                    'polar_customer_id' => 'cus_'.uniqid(),
                     'plan_name' => $planName,
                     'status' => 'active', // Status remains active until period end
                     'current_period_start' => Carbon::now()->subDays(10),
@@ -331,26 +329,26 @@ class SubscriptionServicePropertyTest extends TestCase
                 $this->assertEquals(
                     $planName,
                     $status->planName,
-                    "Status plan name should match subscription plan name"
+                    'Status plan name should match subscription plan name'
                 );
 
                 // Property: Period end must not be null
                 $this->assertNotNull(
                     $status->periodEnd,
-                    "Cancelled subscription should have a non-null period end date"
+                    'Cancelled subscription should have a non-null period end date'
                 );
 
                 // Property: Cancelled at must not be null
                 $this->assertNotNull(
                     $status->cancelledAt,
-                    "Cancelled subscription should have a non-null cancelled_at date"
+                    'Cancelled subscription should have a non-null cancelled_at date'
                 );
 
                 // Property: User should still have access to their tier features
-                $tier = $planName === PlanConfig::PLAN_PRO 
-                    ? PlanConfig::TIER_PRO 
+                $tier = $planName === PlanConfig::PLAN_PRO
+                    ? PlanConfig::TIER_PRO
                     : PlanConfig::TIER_STANDARD;
-                
+
                 $canAccess = $this->subscriptionService->canAccessFeature($user, $tier);
                 $this->assertTrue(
                     $canAccess,
@@ -366,7 +364,7 @@ class SubscriptionServicePropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 5: Subscription Created Event Processing
      * Validates: Requirements 4.2
-     * 
+     *
      * For any valid subscription.created webhook event, processing SHALL result
      * in a subscription record with status 'active' and the correct plan name.
      */
@@ -385,8 +383,8 @@ class SubscriptionServicePropertyTest extends TestCase
             ->then(function (string $planName, int $subscriptionIdSuffix, int $customerIdSuffix) {
                 $user = User::factory()->create();
 
-                $subscriptionId = 'sub_' . $subscriptionIdSuffix . '_' . uniqid();
-                $customerId = 'cus_' . $customerIdSuffix . '_' . uniqid();
+                $subscriptionId = 'sub_'.$subscriptionIdSuffix.'_'.uniqid();
+                $customerId = 'cus_'.$customerIdSuffix.'_'.uniqid();
 
                 // Build webhook event - use metadata for plan_id since product_id may not be configured
                 $event = [
@@ -413,7 +411,7 @@ class SubscriptionServicePropertyTest extends TestCase
                 // Property: Subscription must exist
                 $this->assertNotNull(
                     $user->subscription,
-                    "Subscription should be created after subscription.created event"
+                    'Subscription should be created after subscription.created event'
                 );
 
                 // Property: Status must be 'active'
@@ -427,21 +425,21 @@ class SubscriptionServicePropertyTest extends TestCase
                 $this->assertEquals(
                     $planName,
                     $user->subscription->plan_name,
-                    "Subscription plan name should match the event plan"
+                    'Subscription plan name should match the event plan'
                 );
 
                 // Property: Polar subscription ID must match
                 $this->assertEquals(
                     $subscriptionId,
                     $user->subscription->polar_subscription_id,
-                    "Polar subscription ID should match the event data"
+                    'Polar subscription ID should match the event data'
                 );
 
                 // Property: Polar customer ID must match
                 $this->assertEquals(
                     $customerId,
                     $user->subscription->polar_customer_id,
-                    "Polar customer ID should match the event data"
+                    'Polar customer ID should match the event data'
                 );
 
                 // Cleanup
@@ -453,7 +451,7 @@ class SubscriptionServicePropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 6: Subscription Updated Event Processing
      * Validates: Requirements 4.3
-     * 
+     *
      * For any valid subscription.updated webhook event, processing SHALL update
      * the subscription record to reflect the new status and plan from the event.
      */
@@ -474,8 +472,8 @@ class SubscriptionServicePropertyTest extends TestCase
             ->then(function (string $initialPlan, string $updatedPlan, string $updatedStatus, int $idSuffix) {
                 $user = User::factory()->create();
 
-                $subscriptionId = 'sub_' . $idSuffix . '_' . uniqid();
-                $customerId = 'cus_' . $idSuffix . '_' . uniqid();
+                $subscriptionId = 'sub_'.$idSuffix.'_'.uniqid();
+                $customerId = 'cus_'.$idSuffix.'_'.uniqid();
 
                 // Create initial subscription
                 $subscription = Subscription::create([
@@ -533,7 +531,7 @@ class SubscriptionServicePropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 7: Subscription Cancelled Event Processing
      * Validates: Requirements 4.4
-     * 
+     *
      * For any valid subscription.cancelled webhook event, processing SHALL mark
      * the subscription as cancelled and record a non-null cancellation timestamp.
      */
@@ -551,8 +549,8 @@ class SubscriptionServicePropertyTest extends TestCase
             ->then(function (string $planName, int $daysUntilPeriodEnd) {
                 $user = User::factory()->create();
 
-                $subscriptionId = 'sub_' . uniqid();
-                $customerId = 'cus_' . uniqid();
+                $subscriptionId = 'sub_'.uniqid();
+                $customerId = 'cus_'.uniqid();
 
                 // Create active subscription
                 $subscription = Subscription::create([
@@ -589,19 +587,19 @@ class SubscriptionServicePropertyTest extends TestCase
                 // Property: Subscription must be marked as cancelled
                 $this->assertTrue(
                     $subscription->isCancelled(),
-                    "Subscription should be marked as cancelled after subscription.cancelled event"
+                    'Subscription should be marked as cancelled after subscription.cancelled event'
                 );
 
                 // Property: Cancelled_at must not be null
                 $this->assertNotNull(
                     $subscription->cancelled_at,
-                    "Subscription cancelled_at should not be null after cancellation"
+                    'Subscription cancelled_at should not be null after cancellation'
                 );
 
                 // Property: Cancelled_at should be close to the event timestamp
                 $this->assertTrue(
                     $subscription->cancelled_at->diffInSeconds($cancelledAt) < 5,
-                    "Subscription cancelled_at should match the event timestamp"
+                    'Subscription cancelled_at should match the event timestamp'
                 );
 
                 // Cleanup
@@ -613,7 +611,7 @@ class SubscriptionServicePropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 15: Standard Tier Feature Access
      * Validates: Requirements 9.1
-     * 
+     *
      * For any user with an active Standard or Pro subscription,
      * canAccessFeature('standard') SHALL return true.
      */
@@ -634,8 +632,8 @@ class SubscriptionServicePropertyTest extends TestCase
                 // Create an active subscription
                 $subscription = Subscription::create([
                     'user_id' => $user->id,
-                    'polar_subscription_id' => 'sub_' . uniqid(),
-                    'polar_customer_id' => 'cus_' . uniqid(),
+                    'polar_subscription_id' => 'sub_'.uniqid(),
+                    'polar_customer_id' => 'cus_'.uniqid(),
                     'plan_name' => $planName,
                     'status' => 'active',
                     'current_period_start' => Carbon::now()->subDays(5),
@@ -668,7 +666,7 @@ class SubscriptionServicePropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 16: Pro Tier Feature Access
      * Validates: Requirements 9.2
-     * 
+     *
      * For any user with an active Pro subscription, canAccessFeature('pro') SHALL return true,
      * and for users without Pro subscription, it SHALL return false.
      */
@@ -685,8 +683,8 @@ class SubscriptionServicePropertyTest extends TestCase
                 $proUser = User::factory()->create();
                 $proSubscription = Subscription::create([
                     'user_id' => $proUser->id,
-                    'polar_subscription_id' => 'sub_pro_' . uniqid(),
-                    'polar_customer_id' => 'cus_pro_' . uniqid(),
+                    'polar_subscription_id' => 'sub_pro_'.uniqid(),
+                    'polar_customer_id' => 'cus_pro_'.uniqid(),
                     'plan_name' => PlanConfig::PLAN_PRO,
                     'status' => 'active',
                     'current_period_start' => Carbon::now()->subDays(5),
@@ -697,15 +695,15 @@ class SubscriptionServicePropertyTest extends TestCase
                 $proCanAccessPro = $this->subscriptionService->canAccessFeature($proUser, PlanConfig::TIER_PRO);
                 $this->assertTrue(
                     $proCanAccessPro,
-                    "User with Pro subscription should be able to access pro tier features"
+                    'User with Pro subscription should be able to access pro tier features'
                 );
 
                 // Test Standard user CANNOT access pro features
                 $standardUser = User::factory()->create();
                 $standardSubscription = Subscription::create([
                     'user_id' => $standardUser->id,
-                    'polar_subscription_id' => 'sub_std_' . uniqid(),
-                    'polar_customer_id' => 'cus_std_' . uniqid(),
+                    'polar_subscription_id' => 'sub_std_'.uniqid(),
+                    'polar_customer_id' => 'cus_std_'.uniqid(),
                     'plan_name' => PlanConfig::PLAN_STANDARD,
                     'status' => 'active',
                     'current_period_start' => Carbon::now()->subDays(5),
@@ -716,7 +714,7 @@ class SubscriptionServicePropertyTest extends TestCase
                 $standardCanAccessPro = $this->subscriptionService->canAccessFeature($standardUser, PlanConfig::TIER_PRO);
                 $this->assertFalse(
                     $standardCanAccessPro,
-                    "User with Standard subscription should NOT be able to access pro tier features"
+                    'User with Standard subscription should NOT be able to access pro tier features'
                 );
 
                 // Cleanup
@@ -730,7 +728,7 @@ class SubscriptionServicePropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 17: Trial User Feature Access Restriction
      * Validates: Requirements 9.4
-     * 
+     *
      * For any user on free trial, canAccessFeature SHALL return true only for 'basic' tier
      * features and false for 'standard' and 'pro' tier features.
      */
@@ -752,21 +750,21 @@ class SubscriptionServicePropertyTest extends TestCase
                 $canAccessBasic = $this->subscriptionService->canAccessFeature($user, PlanConfig::TIER_BASIC);
                 $this->assertTrue(
                     $canAccessBasic,
-                    "Trial user should be able to access basic tier features"
+                    'Trial user should be able to access basic tier features'
                 );
 
                 // Property: Trial user CANNOT access standard features
                 $canAccessStandard = $this->subscriptionService->canAccessFeature($user, PlanConfig::TIER_STANDARD);
                 $this->assertFalse(
                     $canAccessStandard,
-                    "Trial user should NOT be able to access standard tier features"
+                    'Trial user should NOT be able to access standard tier features'
                 );
 
                 // Property: Trial user CANNOT access pro features
                 $canAccessPro = $this->subscriptionService->canAccessFeature($user, PlanConfig::TIER_PRO);
                 $this->assertFalse(
                     $canAccessPro,
-                    "Trial user should NOT be able to access pro tier features"
+                    'Trial user should NOT be able to access pro tier features'
                 );
 
                 // Cleanup
@@ -777,7 +775,7 @@ class SubscriptionServicePropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 17: Trial User Feature Access Restriction (Expired Trial)
      * Validates: Requirements 9.4
-     * 
+     *
      * For any user with expired trial, canAccessFeature SHALL return true only for 'basic' tier
      * features and false for 'standard' and 'pro' tier features.
      */
@@ -799,21 +797,21 @@ class SubscriptionServicePropertyTest extends TestCase
                 $canAccessBasic = $this->subscriptionService->canAccessFeature($user, PlanConfig::TIER_BASIC);
                 $this->assertTrue(
                     $canAccessBasic,
-                    "Expired trial user should be able to access basic tier features"
+                    'Expired trial user should be able to access basic tier features'
                 );
 
                 // Property: Expired trial user CANNOT access standard features
                 $canAccessStandard = $this->subscriptionService->canAccessFeature($user, PlanConfig::TIER_STANDARD);
                 $this->assertFalse(
                     $canAccessStandard,
-                    "Expired trial user should NOT be able to access standard tier features"
+                    'Expired trial user should NOT be able to access standard tier features'
                 );
 
                 // Property: Expired trial user CANNOT access pro features
                 $canAccessPro = $this->subscriptionService->canAccessFeature($user, PlanConfig::TIER_PRO);
                 $this->assertFalse(
                     $canAccessPro,
-                    "Expired trial user should NOT be able to access pro tier features"
+                    'Expired trial user should NOT be able to access pro tier features'
                 );
 
                 // Cleanup

@@ -13,13 +13,13 @@ use Tests\TestCase;
 
 /**
  * Property-based tests for EmbeddedSignupController
- * 
+ *
  * Feature: whatsapp-embedded-signup
  */
 class EmbeddedSignupControllerPropertyTest extends TestCase
 {
-    use TestTrait;
     use RefreshDatabase;
+    use TestTrait;
 
     /**
      * Generate a valid phone number ID (numeric string).
@@ -47,6 +47,7 @@ class EmbeddedSignupControllerPropertyTest extends TestCase
         for ($i = 0; $i < 100; $i++) {
             $token .= $chars[rand(0, strlen($chars) - 1)];
         }
+
         return $token;
     }
 
@@ -55,7 +56,7 @@ class EmbeddedSignupControllerPropertyTest extends TestCase
      */
     private function generateDisplayPhoneNumber(): string
     {
-        return '+1' . rand(1000000000, 9999999999);
+        return '+1'.rand(1000000000, 9999999999);
     }
 
     /**
@@ -64,7 +65,8 @@ class EmbeddedSignupControllerPropertyTest extends TestCase
     private function generateBusinessName(): string
     {
         $names = ['Acme Corp', 'Tech Solutions', 'Global Services', 'Digital Hub', 'Smart Business'];
-        return $names[array_rand($names)] . ' ' . rand(1, 999);
+
+        return $names[array_rand($names)].' '.rand(1, 999);
     }
 
     /**
@@ -73,15 +75,16 @@ class EmbeddedSignupControllerPropertyTest extends TestCase
     private function generateQualityRating(): string
     {
         $ratings = ['GREEN', 'YELLOW', 'RED'];
+
         return $ratings[array_rand($ratings)];
     }
 
     /**
      * Feature: whatsapp-embedded-signup, Property 7: Account Status Completeness
      * Validates: Requirements 4.1, 4.3
-     * 
-     * For any user with a connected WhatsApp account, retrieving account status 
-     * SHALL return phone_number, display_name, verified_name, quality_rating, 
+     *
+     * For any user with a connected WhatsApp account, retrieving account status
+     * SHALL return phone_number, display_name, verified_name, quality_rating,
      * is_active, and coexistence_enabled fields.
      */
     #[Test]
@@ -94,7 +97,7 @@ class EmbeddedSignupControllerPropertyTest extends TestCase
                 Generators::elements('GREEN', 'YELLOW', 'RED') // quality_rating
             )
             ->then(function (bool $coexistenceEnabled, string $qualityRating) {
-                $service = new WhatsAppAccountService();
+                $service = new WhatsAppAccountService;
                 $user = User::factory()->create();
 
                 $phoneNumber = $this->generateDisplayPhoneNumber();
@@ -120,7 +123,7 @@ class EmbeddedSignupControllerPropertyTest extends TestCase
 
                 // Property: Status must contain all required fields
                 $this->assertNotNull($status, 'Status should not be null for connected account');
-                
+
                 // Check all required fields exist
                 $this->assertArrayHasKey('phone_number', $status, 'Status must contain phone_number');
                 $this->assertArrayHasKey('display_name', $status, 'Status must contain display_name');
@@ -146,8 +149,8 @@ class EmbeddedSignupControllerPropertyTest extends TestCase
     /**
      * Feature: whatsapp-embedded-signup, Property 8: Disconnect Deactivates Account
      * Validates: Requirements 4.2
-     * 
-     * For any connected WhatsApp account, calling disconnect SHALL set is_active 
+     *
+     * For any connected WhatsApp account, calling disconnect SHALL set is_active
      * to false and the account SHALL no longer be used for messaging.
      */
     #[Test]
@@ -159,7 +162,7 @@ class EmbeddedSignupControllerPropertyTest extends TestCase
                 Generators::choose(1, 5) // Number of users to test
             )
             ->then(function (int $userCount) {
-                $service = new WhatsAppAccountService();
+                $service = new WhatsAppAccountService;
                 $users = [];
                 $accounts = [];
 
@@ -229,8 +232,8 @@ class EmbeddedSignupControllerPropertyTest extends TestCase
     /**
      * Feature: whatsapp-embedded-signup, Property 13: Coexistence Flag Persistence
      * Validates: Requirements 8.2, 8.3
-     * 
-     * For any WhatsApp account connected via Embedded Signup v4, the coexistence_enabled 
+     *
+     * For any WhatsApp account connected via Embedded Signup v4, the coexistence_enabled
      * flag SHALL be stored as true and SHALL be included in account status responses.
      */
     #[Test]
@@ -242,7 +245,7 @@ class EmbeddedSignupControllerPropertyTest extends TestCase
                 Generators::bool() // coexistence_enabled value
             )
             ->then(function (bool $coexistenceEnabled) {
-                $service = new WhatsAppAccountService();
+                $service = new WhatsAppAccountService;
                 $user = User::factory()->create();
 
                 // Create account with specific coexistence flag
@@ -290,7 +293,7 @@ class EmbeddedSignupControllerPropertyTest extends TestCase
     /**
      * Feature: whatsapp-embedded-signup, Property 7: Account Status Completeness
      * Validates: Requirements 4.1, 4.3
-     * 
+     *
      * Test that account status returns null for users without accounts.
      */
     #[Test]
@@ -302,7 +305,7 @@ class EmbeddedSignupControllerPropertyTest extends TestCase
                 Generators::choose(1, 5) // Number of users to test
             )
             ->then(function (int $userCount) {
-                $service = new WhatsAppAccountService();
+                $service = new WhatsAppAccountService;
                 $users = [];
 
                 // Create users WITHOUT WhatsApp accounts
@@ -329,7 +332,7 @@ class EmbeddedSignupControllerPropertyTest extends TestCase
     /**
      * Feature: whatsapp-embedded-signup, Property 8: Disconnect Deactivates Account
      * Validates: Requirements 4.2
-     * 
+     *
      * Test that disconnect returns false for users without accounts.
      */
     #[Test]
@@ -341,7 +344,7 @@ class EmbeddedSignupControllerPropertyTest extends TestCase
                 Generators::choose(1, 5) // Number of users to test
             )
             ->then(function (int $userCount) {
-                $service = new WhatsAppAccountService();
+                $service = new WhatsAppAccountService;
                 $users = [];
 
                 // Create users WITHOUT WhatsApp accounts

@@ -4,7 +4,6 @@ namespace Tests\Unit\Services;
 
 use App\Models\Category;
 use App\Models\Order;
-use App\Models\OrderItem;
 use App\Models\PosUser;
 use App\Models\Product;
 use App\Models\Role;
@@ -20,30 +19,33 @@ use Tests\TestCase;
 
 /**
  * Property-based tests for OrderService
- * 
+ *
  * Feature: point-of-sale
  */
 class OrderServicePropertyTest extends TestCase
 {
-    use TestTrait;
     use RefreshDatabase;
+    use TestTrait;
 
     protected OrderService $orderService;
+
     protected Store $store;
+
     protected PosUser $posUser;
+
     protected Category $category;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->orderService = new OrderService();
-        
+        $this->orderService = new OrderService;
+
         $uniqueId = uniqid();
-        
+
         // Create required entities for testing
         $this->store = Store::create([
             'name' => 'Test Store',
-            'code' => 'TST-' . $uniqueId,
+            'code' => 'TST-'.$uniqueId,
             'address' => 'Test Address',
             'is_active' => true,
         ]);
@@ -54,10 +56,14 @@ class OrderServicePropertyTest extends TestCase
             'password' => bcrypt('password'),
         ]);
 
-        $role = Role::create([
-            'name' => 'Cashier-' . $uniqueId,
-            'permissions' => ['orders.create', 'orders.update'],
-        ]);
+        // Get or create Spatie role
+        $role = \Spatie\Permission\Models\Role::firstOrCreate(
+            ['name' => 'Cashier', 'guard_name' => 'sanctum'],
+            []
+        );
+
+        // Assign role to user
+        $user->syncRoles([$role->name]);
 
         $this->posUser = PosUser::create([
             'user_id' => $user->id,
@@ -68,11 +74,10 @@ class OrderServicePropertyTest extends TestCase
 
         $this->category = Category::create([
             'name' => 'Test Category',
-            'slug' => 'test-category-' . $uniqueId,
+            'slug' => 'test-category-'.$uniqueId,
             'is_active' => true,
         ]);
     }
-
 
     /**
      * Helper to create a product with given price and stock
@@ -81,11 +86,11 @@ class OrderServicePropertyTest extends TestCase
     {
         static $counter = 0;
         $counter++;
-        
+
         return Product::create([
             'category_id' => $this->category->id,
             'name' => "Product {$counter}",
-            'sku' => "SKU-{$counter}-" . uniqid(),
+            'sku' => "SKU-{$counter}-".uniqid(),
             'price' => $price,
             'stock_quantity' => $stock,
             'is_active' => true,
@@ -95,8 +100,8 @@ class OrderServicePropertyTest extends TestCase
     /**
      * Feature: point-of-sale, Property 3: Order Total Invariant
      * Validates: Requirements 3.2, 3.3, 3.4
-     * 
-     * For any Order with items, the total SHALL always equal 
+     *
+     * For any Order with items, the total SHALL always equal
      * (sum of all item subtotals) + tax_amount - discount_amount.
      */
     #[Test]
@@ -123,10 +128,10 @@ class OrderServicePropertyTest extends TestCase
                     // Random price between 1000 and 100000 (in cents, then convert)
                     $price = rand(1000, 100000) / 100;
                     $quantity = rand(1, 5);
-                    
+
                     $product = $this->createProduct($price, 1000);
                     $this->orderService->addItem($order, $product, $quantity);
-                    
+
                     $expectedSubtotal += $price * $quantity;
                 }
 
@@ -147,19 +152,19 @@ class OrderServicePropertyTest extends TestCase
 
                 // Property: total = subtotal + tax_amount - discount_amount
                 $actualTotal = (float) $order->subtotal + (float) $order->tax_amount - (float) $order->discount_amount;
-                
+
                 $this->assertEqualsWithDelta(
                     $expectedTotal,
                     (float) $order->total,
                     0.01,
-                    "Order total should equal subtotal + tax - discount"
+                    'Order total should equal subtotal + tax - discount'
                 );
 
                 $this->assertEqualsWithDelta(
                     $actualTotal,
                     (float) $order->total,
                     0.01,
-                    "Order total invariant: total = subtotal + tax_amount - discount_amount"
+                    'Order total invariant: total = subtotal + tax_amount - discount_amount'
                 );
             });
     }
@@ -167,8 +172,8 @@ class OrderServicePropertyTest extends TestCase
     /**
      * Feature: point-of-sale, Property 5: Inventory Consistency on Order Completion
      * Validates: Requirements 3.5
-     * 
-     * For any completed Order, the stock_quantity of each product SHALL be 
+     *
+     * For any completed Order, the stock_quantity of each product SHALL be
      * decreased by the ordered quantity.
      */
     #[Test]
@@ -198,11 +203,11 @@ class OrderServicePropertyTest extends TestCase
                     $price = rand(1000, 50000) / 100;
                     $initialStock = 1000; // Ensure enough stock
                     $quantity = $baseQuantity + $i; // Vary quantity slightly
-                    
+
                     $product = $this->createProduct($price, $initialStock);
                     $stockBefore[$product->id] = $initialStock;
                     $orderedQuantities[$product->id] = $quantity;
-                    
+
                     $this->orderService->addItem($order, $product, $quantity);
                 }
 
@@ -213,7 +218,7 @@ class OrderServicePropertyTest extends TestCase
                 foreach ($orderedQuantities as $productId => $orderedQty) {
                     $product = Product::find($productId);
                     $expectedStock = $stockBefore[$productId] - $orderedQty;
-                    
+
                     $this->assertEquals(
                         $expectedStock,
                         $product->stock_quantity,
@@ -226,8 +231,8 @@ class OrderServicePropertyTest extends TestCase
     /**
      * Feature: point-of-sale, Property 6: Inventory Restoration on Order Cancellation
      * Validates: Requirements 3.6
-     * 
-     * For any cancelled Order that was previously completed, the stock_quantity 
+     *
+     * For any cancelled Order that was previously completed, the stock_quantity
      * of each product SHALL be restored to the pre-completion value.
      */
     #[Test]
@@ -257,11 +262,11 @@ class OrderServicePropertyTest extends TestCase
                     $price = rand(1000, 50000) / 100;
                     $stock = 1000;
                     $quantity = $baseQuantity + $i;
-                    
+
                     $product = $this->createProduct($price, $stock);
                     $initialStock[$product->id] = $stock;
                     $orderedQuantities[$product->id] = $quantity;
-                    
+
                     $this->orderService->addItem($order, $product, $quantity);
                 }
 
@@ -274,7 +279,7 @@ class OrderServicePropertyTest extends TestCase
                     $this->assertEquals(
                         $initialStock[$productId] - $orderedQty,
                         $product->stock_quantity,
-                        "Stock should be reduced after completion"
+                        'Stock should be reduced after completion'
                     );
                 }
 
@@ -285,7 +290,7 @@ class OrderServicePropertyTest extends TestCase
                 // Property: stock should be restored to initial value
                 foreach ($initialStock as $productId => $originalStock) {
                     $product = Product::find($productId);
-                    
+
                     $this->assertEquals(
                         $originalStock,
                         $product->stock_quantity,
@@ -302,7 +307,7 @@ class OrderServicePropertyTest extends TestCase
     {
         static $tableCounter = 0;
         $tableCounter++;
-        
+
         return Table::create([
             'store_id' => $this->store->id,
             'number' => "T{$tableCounter}",
@@ -314,8 +319,8 @@ class OrderServicePropertyTest extends TestCase
     /**
      * Feature: point-of-sale, Property 12: Table Status State Transition
      * Validates: Requirements 6.2, 6.3
-     * 
-     * For any Table, assigning an Order SHALL change status to 'occupied', 
+     *
+     * For any Table, assigning an Order SHALL change status to 'occupied',
      * and completing/cancelling that Order SHALL change status back to 'available'.
      */
     #[Test]
@@ -330,12 +335,12 @@ class OrderServicePropertyTest extends TestCase
             ->then(function (bool $shouldComplete) {
                 // Create a table
                 $table = $this->createTable();
-                
+
                 // Verify initial status is available
                 $this->assertEquals(
                     Table::STATUS_AVAILABLE,
                     $table->status,
-                    "Table should start as available"
+                    'Table should start as available'
                 );
 
                 // Create order with table assignment
@@ -350,7 +355,7 @@ class OrderServicePropertyTest extends TestCase
                 $this->assertEquals(
                     Table::STATUS_OCCUPIED,
                     $table->status,
-                    "Table should be occupied after order is assigned"
+                    'Table should be occupied after order is assigned'
                 );
 
                 // Add an item to the order
@@ -370,7 +375,7 @@ class OrderServicePropertyTest extends TestCase
                 $this->assertEquals(
                     Table::STATUS_AVAILABLE,
                     $table->status,
-                    "Table should be available after order is " . ($shouldComplete ? "completed" : "cancelled")
+                    'Table should be available after order is '.($shouldComplete ? 'completed' : 'cancelled')
                 );
             });
     }

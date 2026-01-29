@@ -9,7 +9,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Middleware for monitoring subscription-related request performance.
- * 
+ *
  * Tracks request duration, logs slow requests, and collects performance metrics.
  */
 class SubscriptionPerformanceMonitoring
@@ -43,7 +43,7 @@ class SubscriptionPerformanceMonitoring
 
         // Add performance headers in debug mode
         if (config('app.debug')) {
-            $response->headers->set('X-Response-Time', round($duration, 2) . 'ms');
+            $response->headers->set('X-Response-Time', round($duration, 2).'ms');
             $response->headers->set('X-Memory-Usage', $this->formatBytes($memoryUsed));
         }
 
@@ -53,12 +53,9 @@ class SubscriptionPerformanceMonitoring
     /**
      * Log performance metrics for the request.
      *
-     * @param Request $request
-     * @param Response $response
-     * @param float $duration Duration in milliseconds
-     * @param int $memoryUsed Memory used in bytes
-     * @param int $memoryPeak Peak memory usage in bytes
-     * @return void
+     * @param  float  $duration  Duration in milliseconds
+     * @param  int  $memoryUsed  Memory used in bytes
+     * @param  int  $memoryPeak  Peak memory usage in bytes
      */
     private function logPerformanceMetrics(
         Request $request,
@@ -68,7 +65,7 @@ class SubscriptionPerformanceMonitoring
         int $memoryPeak
     ): void {
         // Only log if performance monitoring is enabled
-        if (!config('monitoring.performance.enabled', true)) {
+        if (! config('monitoring.performance.enabled', true)) {
             return;
         }
 
@@ -94,10 +91,8 @@ class SubscriptionPerformanceMonitoring
     /**
      * Alert on slow request.
      *
-     * @param Request $request
-     * @param float $duration Duration in milliseconds
-     * @param float $threshold Threshold in milliseconds
-     * @return void
+     * @param  float  $duration  Duration in milliseconds
+     * @param  float  $threshold  Threshold in milliseconds
      */
     private function alertSlowRequest(Request $request, float $duration, float $threshold): void
     {
@@ -114,9 +109,6 @@ class SubscriptionPerformanceMonitoring
 
     /**
      * Format bytes to human-readable format.
-     *
-     * @param int $bytes
-     * @return string
      */
     private function formatBytes(int $bytes): string
     {
@@ -126,6 +118,6 @@ class SubscriptionPerformanceMonitoring
         $pow = min($pow, count($units) - 1);
         $bytes /= (1 << (10 * $pow));
 
-        return round($bytes, 2) . ' ' . $units[$pow];
+        return round($bytes, 2).' '.$units[$pow];
     }
 }

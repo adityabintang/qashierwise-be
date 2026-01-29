@@ -6,12 +6,12 @@ document.addEventListener('alpine:init', () => {
         isAdmin: true,
         userPermissions: [],
         loaded: false,
-        
+
         async init() {
             await this.fetchUserPermissions();
             this.loaded = true;
         },
-        
+
         async fetchUserPermissions() {
             try {
                 const token = localStorage.getItem('token');
@@ -20,14 +20,14 @@ document.addEventListener('alpine:init', () => {
                     this.userPermissions = [];
                     return;
                 }
-                
+
                 const res = await fetch(`${window.location.origin}/api/user/permissions`, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Accept': 'application/json'
                     }
                 });
-                
+
                 if (res.ok) {
                     const data = await res.json();
                     if (data.success) {
@@ -49,7 +49,7 @@ document.addEventListener('alpine:init', () => {
                 this.userPermissions = [];
             }
         },
-        
+
         hasPermission(permission) {
             // If not loaded yet, show everything (default to admin)
             if (!this.loaded) return true;
@@ -77,17 +77,17 @@ function dashboardBase() {
         // Sidebar state
         sidebarOpen: true,
         isMobile: window.innerWidth < 768,
-        
+
         // User data
         user: null,
-        
+
         // Permissions
         userPermissions: [],
         isAdmin: true,
-        
+
         // Notifications
         notifications: [],
-        
+
         /**
          * Initialize dashboard base functionality
          */
@@ -100,12 +100,12 @@ function dashboardBase() {
                 this.sidebarOpen = true;
                 localStorage.setItem('sidebarOpen', 'true');
             }
-            
+
             // Watch sidebar state changes (only save on desktop)
             this.$watch('sidebarOpen', v => {
                 if (!this.isMobile) localStorage.setItem('sidebarOpen', JSON.stringify(v));
             });
-            
+
             // Handle resize events with debounce
             let resizeTimeout;
             window.addEventListener('resize', () => {
@@ -113,7 +113,7 @@ function dashboardBase() {
                 resizeTimeout = setTimeout(() => {
                     const wasMobile = this.isMobile;
                     this.isMobile = window.innerWidth < 768;
-                    
+
                     // Auto-adjust sidebar when crossing breakpoint
                     if (wasMobile && !this.isMobile) {
                         let savedState = localStorage.getItem('sidebarOpen');
@@ -123,7 +123,7 @@ function dashboardBase() {
                     }
                 }, 150);
             });
-            
+
             // Load user info
             let storedUser = localStorage.getItem('user');
             if (storedUser) {
@@ -135,7 +135,7 @@ function dashboardBase() {
             } else {
                 this.user = { name: 'User', email: 'user@example.com' };
             }
-            
+
             // Load saved notifications
             let savedNotifs = localStorage.getItem('notifications');
             if (savedNotifs) {
@@ -145,10 +145,10 @@ function dashboardBase() {
                     this.notifications = [];
                 }
             }
-            
+
             // Fetch user permissions
             this.fetchUserPermissions();
-            
+
             // Listen for WhatsApp message events
             window.addEventListener('whatsapp-message-received', (e) => {
                 this.addNotification({
@@ -161,7 +161,7 @@ function dashboardBase() {
                 });
             });
         },
-        
+
         /**
          * Fetch user permissions from API
          */
@@ -173,14 +173,14 @@ function dashboardBase() {
                     this.userPermissions = [];
                     return;
                 }
-                
+
                 const res = await fetch(`${window.location.origin}/api/user/permissions`, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Accept': 'application/json'
                     }
                 });
-                
+
                 if (res.ok) {
                     const data = await res.json();
                     if (data.success) {
@@ -195,36 +195,36 @@ function dashboardBase() {
                 this.userPermissions = [];
             }
         },
-        
+
         /**
          * Check if user has a specific permission
          */
         hasPermission(permission) {
             // Admin has all permissions
             if (this.isAdmin) return true;
-            
+
             // Check for wildcard permission
             if (this.userPermissions.includes('*')) return true;
-            
+
             // Check for specific permission
             return this.userPermissions.includes(permission);
         },
-        
+
         /**
          * Add a new notification
          */
         addNotification(notif) {
             notif.id = Date.now() + Math.random();
             this.notifications.unshift(notif);
-            
+
             // Keep only last 50 notifications
             if (this.notifications.length > 50) {
                 this.notifications = this.notifications.slice(0, 50);
             }
-            
+
             localStorage.setItem('notifications', JSON.stringify(this.notifications));
         },
-        
+
         /**
          * Clear all notifications
          */
@@ -232,7 +232,7 @@ function dashboardBase() {
             this.notifications = [];
             localStorage.removeItem('notifications');
         },
-        
+
         /**
          * Remove a specific notification by ID
          */
@@ -240,32 +240,32 @@ function dashboardBase() {
             this.notifications = this.notifications.filter(n => n.id !== id);
             localStorage.setItem('notifications', JSON.stringify(this.notifications));
         },
-        
+
         /**
          * Format notification timestamp to relative time
          */
         formatNotificationTime(timestamp) {
             if (!timestamp) return '';
-            
+
             const date = new Date(timestamp);
             const now = new Date();
             const diffMs = now - date;
             const diffSecs = Math.floor(diffMs / 1000);
-            
+
             if (diffSecs < 60) return 'Just now';
-            
+
             const diffMins = Math.floor(diffSecs / 60);
             if (diffMins < 60) return `${diffMins}m ago`;
-            
+
             const diffHours = Math.floor(diffMins / 60);
             if (diffHours < 24) return `${diffHours}h ago`;
-            
+
             const diffDays = Math.floor(diffHours / 24);
             if (diffDays < 7) return `${diffDays}d ago`;
-            
+
             return date.toLocaleDateString();
         },
-        
+
         /**
          * Logout user
          */
@@ -283,7 +283,7 @@ function dashboardBase() {
                 this.clearAndRedirect();
             }
         },
-        
+
         /**
          * Clear local storage and redirect to login
          */

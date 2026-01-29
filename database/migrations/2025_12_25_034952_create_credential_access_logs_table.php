@@ -21,7 +21,7 @@ return new class extends Migration
             $table->boolean('success')->default(true);
             $table->text('error_message')->nullable();
             $table->timestamp('created_at')->useCurrent();
-            
+
             // Indexes for audit queries
             $table->index(['user_id', 'action', 'created_at'], 'idx_user_action');
             $table->index(['credential_id', 'created_at'], 'idx_credential_access');

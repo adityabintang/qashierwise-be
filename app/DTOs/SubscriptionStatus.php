@@ -6,7 +6,7 @@ use Carbon\Carbon;
 
 /**
  * Data Transfer Object for user subscription status.
- * 
+ *
  * Contains the current state of a user's subscription including
  * status, plan information, and relevant dates.
  */
@@ -15,11 +15,11 @@ class SubscriptionStatus
     /**
      * Create a new SubscriptionStatus instance.
      *
-     * @param string $status Current subscription status ('trial', 'trial_expired', 'active', 'cancelled', 'expired')
-     * @param string $planName Current plan name ('free_trial', 'standard', 'pro')
-     * @param int|null $trialDaysRemaining Days remaining in trial period (null if not on trial)
-     * @param Carbon|null $periodEnd End date of current billing period
-     * @param Carbon|null $cancelledAt Date when subscription was cancelled
+     * @param  string  $status  Current subscription status ('trial', 'trial_expired', 'active', 'cancelled', 'expired')
+     * @param  string  $planName  Current plan name ('free_trial', 'standard', 'pro')
+     * @param  int|null  $trialDaysRemaining  Days remaining in trial period (null if not on trial)
+     * @param  Carbon|null  $periodEnd  End date of current billing period
+     * @param  Carbon|null  $cancelledAt  Date when subscription was cancelled
      */
     public function __construct(
         public readonly string $status,
@@ -48,8 +48,7 @@ class SubscriptionStatus
     /**
      * Create a SubscriptionStatus instance from an array.
      *
-     * @param array<string, mixed> $data
-     * @return self
+     * @param  array<string, mixed>  $data
      */
     public static function fromArray(array $data): self
     {

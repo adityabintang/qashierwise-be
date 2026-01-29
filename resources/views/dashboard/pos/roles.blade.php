@@ -3,7 +3,7 @@
 @section('title', 'Roles Management - QashierWise')
 
 @section('content')
-<div x-data="rolesApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
+<div x-data="rolesApp()" x-init="initDashboard()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'pos-roles'])
 
     <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
@@ -17,10 +17,12 @@
                         <h2 class="text-lg font-semibold">Roles & Permissions</h2>
                         <p class="text-sm text-[hsl(var(--muted-foreground))] hidden sm:block">Define roles and assign permissions for user access control</p>
                     </div>
-                    <button @click="openCreateModal()" class="btn btn-primary btn-md">
-                        <i class="fas fa-plus"></i>
-                        <span>Add Role</span>
-                    </button>
+                    <template x-if="hasPermission('create_roles') || hasPermission('manage_roles')">
+                        <button @click="openCreateModal()" class="btn btn-primary btn-md">
+                            <i class="fas fa-plus"></i>
+                            <span>Add Role</span>
+                        </button>
+                    </template>
                 </div>
 
                 <!-- Roles List -->
@@ -59,8 +61,12 @@
                                     </div>
                                 </div>
                                 <div class="flex gap-2 mt-3 pt-3 border-t border-[hsl(var(--border))]">
-                                    <button @click="openEditModal(role)" class="btn btn-outline btn-sm flex-1"><i class="fas fa-edit"></i> Edit</button>
-                                    <button @click="openDeleteModal(role)" class="btn btn-outline btn-sm text-red-600 hover:bg-red-50"><i class="fas fa-trash"></i></button>
+                                    <template x-if="hasPermission('edit_roles') || hasPermission('manage_roles')">
+                                        <button @click="openEditModal(role)" class="btn btn-outline btn-sm flex-1"><i class="fas fa-edit"></i> Edit</button>
+                                    </template>
+                                    <template x-if="hasPermission('delete_roles') || hasPermission('manage_roles')">
+                                        <button @click="openDeleteModal(role)" class="btn btn-outline btn-sm text-red-600 hover:bg-red-50"><i class="fas fa-trash"></i></button>
+                                    </template>
                                 </div>
                             </div>
                         </template>
@@ -115,8 +121,12 @@
                                             </td>
                                             <td class="p-4 text-right">
                                                 <div class="flex items-center justify-end gap-2">
-                                                    <button @click="openEditModal(role)" class="btn btn-ghost btn-sm"><i class="fas fa-edit"></i></button>
-                                                    <button @click="openDeleteModal(role)" class="btn btn-ghost btn-sm text-red-600 hover:bg-red-50"><i class="fas fa-trash"></i></button>
+                                                    <template x-if="hasPermission('edit_roles') || hasPermission('manage_roles')">
+                                                        <button @click="openEditModal(role)" class="btn btn-ghost btn-sm"><i class="fas fa-edit"></i></button>
+                                                    </template>
+                                                    <template x-if="hasPermission('delete_roles') || hasPermission('manage_roles')">
+                                                        <button @click="openDeleteModal(role)" class="btn btn-ghost btn-sm text-red-600 hover:bg-red-50"><i class="fas fa-trash"></i></button>
+                                                    </template>
                                                 </div>
                                             </td>
                                         </tr>
@@ -133,7 +143,9 @@
                         <div class="empty-state-icon"><i class="fas fa-shield-alt text-2xl"></i></div>
                         <h3 class="font-semibold mt-4">No roles found</h3>
                         <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">Create roles to manage user permissions.</p>
-                        <button @click="openCreateModal()" class="btn btn-primary btn-md mt-4"><i class="fas fa-plus"></i> Add Role</button>
+                        <template x-if="hasPermission('create_roles') || hasPermission('manage_roles')">
+                            <button @click="openCreateModal()" class="btn btn-primary btn-md mt-4"><i class="fas fa-plus"></i> Add Role</button>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -216,13 +228,15 @@ function rolesApp() {
         isMobile: window.innerWidth < 768,
         user: null,
         notifications: [],
+        userPermissions: [], isAdmin: true,
 
         async init() {
-            this.initSidebar();
+            this.initDashboard();
+            await this.fetchUserPermissions();
             await Promise.all([this.fetchRoles(), this.fetchPermissions()]);
         },
 
-        initSidebar() {
+        initDashboard() {
             this.isMobile = window.innerWidth < 768;
             if (this.isMobile) { this.sidebarOpen = false; }
             else { let s = localStorage.getItem('sidebarOpen'); if (s !== null) this.sidebarOpen = JSON.parse(s); }
@@ -233,9 +247,34 @@ function rolesApp() {
                 else if (!was && this.isMobile) { this.sidebarOpen = false; }
             });
             let u = localStorage.getItem('user'); if (u) { try { this.user = JSON.parse(u); } catch (e) { this.user = { name: 'User' }; } } else { this.user = { name: 'User' }; }
+            this.fetchUserPermissions();
+        },
+
+        async fetchUserPermissions() {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) { this.isAdmin = true; this.userPermissions = []; return; }
+                const res = await fetch(`${window.location.origin}/api/user/permissions`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success) { this.isAdmin = data.data.is_admin || false; this.userPermissions = data.data.permissions || []; }
+                }
+            } catch (e) { console.error('Failed to fetch permissions:', e); }
+        },
+
+        hasPermission(permission) {
+            if (this.isAdmin) return true;
+            if (this.userPermissions.includes('*')) return true;
+            return this.userPermissions.includes(permission);
         },
 
         async fetchRoles() {
+            // Check permission first
+            if (!this.hasPermission('view_roles') && !this.hasPermission('manage_roles')) {
+                this.roles = []; this.loading = false; return;
+            }
             this.loading = true;
             try {
                 const token = localStorage.getItem('token');
@@ -263,6 +302,13 @@ function rolesApp() {
         closeModal() { this.showModal = false; this.editingRole = null; },
 
         async saveRole() {
+            // Check permission before saving
+            const canCreate = this.hasPermission('create_roles') || this.hasPermission('manage_roles');
+            const canEdit = this.hasPermission('edit_roles') || this.hasPermission('manage_roles');
+            if ((!this.editingRole && !canCreate) || (this.editingRole && !canEdit)) {
+                alert('You do not have permission to perform this action');
+                return;
+            }
             if (!this.form.name.trim()) { alert('Role name is required'); return; }
             this.saving = true;
             try {
@@ -279,6 +325,11 @@ function rolesApp() {
         closeDeleteModal() { this.showDeleteModal = false; this.deletingRole = null; },
 
         async deleteRole() {
+            // Check permission before deleting
+            if (!this.hasPermission('delete_roles') && !this.hasPermission('manage_roles')) {
+                alert('You do not have permission to delete roles');
+                return;
+            }
             this.deleting = true;
             try {
                 const token = localStorage.getItem('token');

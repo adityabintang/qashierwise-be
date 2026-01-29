@@ -4,12 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Services\SubscriptionMonitoringService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
  * Controller for subscription monitoring dashboard.
- * 
+ *
  * Provides endpoints for viewing metrics, health status, and alerts.
  */
 class MonitoringDashboardController extends Controller
@@ -20,8 +19,6 @@ class MonitoringDashboardController extends Controller
 
     /**
      * Show monitoring dashboard.
-     *
-     * @return View
      */
     public function index(): View
     {
@@ -36,8 +33,6 @@ class MonitoringDashboardController extends Controller
 
     /**
      * Get metrics as JSON (for AJAX updates).
-     *
-     * @return JsonResponse
      */
     public function metrics(): JsonResponse
     {
@@ -52,8 +47,6 @@ class MonitoringDashboardController extends Controller
 
     /**
      * Get health status as JSON.
-     *
-     * @return JsonResponse
      */
     public function health(): JsonResponse
     {
@@ -66,8 +59,6 @@ class MonitoringDashboardController extends Controller
 
     /**
      * Get subscription system status (simple endpoint for uptime monitoring).
-     *
-     * @return JsonResponse
      */
     public function status(): JsonResponse
     {

@@ -19,7 +19,7 @@ class BladeDirectivesTest extends TestCase
 
         // Compile the Blade directive
         $compiled = Blade::compileString("@trans('test.message')");
-        
+
         // The directive should compile to PHP code that calls __()
         $this->assertStringContainsString("<?php echo __('test.message'); ?>", $compiled);
     }
@@ -36,7 +36,7 @@ class BladeDirectivesTest extends TestCase
 
         // Compile the Blade directive with parameters
         $compiled = Blade::compileString("@trans('test.greeting', ['name' => 'John'])");
-        
+
         // The directive should compile to PHP code
         $this->assertStringContainsString("<?php echo __('test.greeting', ['name' => 'John']); ?>", $compiled);
     }
@@ -48,12 +48,12 @@ class BladeDirectivesTest extends TestCase
     {
         // Set locale to English
         app()->setLocale('en');
-        
+
         // Compile the Blade directive
-        $compiled = Blade::compileString("@locale");
-        
+        $compiled = Blade::compileString('@locale');
+
         // The directive should compile to PHP code that calls app()->getLocale()
-        $this->assertStringContainsString("<?php echo app()->getLocale(); ?>", $compiled);
+        $this->assertStringContainsString('<?php echo app()->getLocale(); ?>', $compiled);
     }
 
     /**
@@ -63,13 +63,13 @@ class BladeDirectivesTest extends TestCase
     {
         // Test with English
         app()->setLocale('en');
-        $compiled = Blade::compileString("Current locale: @locale");
-        $this->assertStringContainsString("<?php echo app()->getLocale(); ?>", $compiled);
-        
+        $compiled = Blade::compileString('Current locale: @locale');
+        $this->assertStringContainsString('<?php echo app()->getLocale(); ?>', $compiled);
+
         // Test with Indonesian
         app()->setLocale('id');
-        $compiled = Blade::compileString("Current locale: @locale");
-        $this->assertStringContainsString("<?php echo app()->getLocale(); ?>", $compiled);
+        $compiled = Blade::compileString('Current locale: @locale');
+        $this->assertStringContainsString('<?php echo app()->getLocale(); ?>', $compiled);
     }
 
     /**
@@ -79,7 +79,7 @@ class BladeDirectivesTest extends TestCase
     {
         // Compile directive with non-existent key
         $compiled = Blade::compileString("@trans('nonexistent.key')");
-        
+
         // Should still compile correctly
         $this->assertStringContainsString("<?php echo __('nonexistent.key'); ?>", $compiled);
     }

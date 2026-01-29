@@ -13,10 +13,10 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Controller for handling Xendit webhook notifications.
- * 
+ *
  * Receives and processes QR code payment status updates from Xendit
  * including successful payments, expirations, and failures.
- * 
+ *
  * Webhook verification is handled by QrisService using the provider's
  * verifyWebhook implementation.
  */
@@ -31,24 +31,24 @@ class XenditWebhookController extends Controller
 
     /**
      * Handle incoming Xendit webhook notification.
-     * 
+     *
      * Xendit sends webhook notifications for QR code payment events:
      * - QR code payment completed
      * - QR code expired
      * - QR code status changes
-     * 
+     *
      * The webhook signature is verified using the x-callback-token header.
-     * 
+     *
      * Note: API version 2022-07-31 uses 'reference_id' instead of 'external_id'.
      * We support both for backward compatibility.
      *
-     * @param Request $request The webhook request
+     * @param  Request  $request  The webhook request
      * @return JsonResponse Response to Xendit
      */
     public function handleNotification(Request $request): JsonResponse
     {
         $payload = $request->all();
-        
+
         // Get webhook signature from header
         $signature = $request->header('x-callback-token', '');
 
@@ -58,20 +58,20 @@ class XenditWebhookController extends Controller
         Log::info('Xendit webhook received', [
             'reference_id' => $referenceId,
             'status' => $payload['status'] ?? null,
-            'has_signature' => !empty($signature),
+            'has_signature' => ! empty($signature),
         ]);
 
         // Validate required fields - support both reference_id and external_id
-        if (!$referenceId) {
+        if (! $referenceId) {
             Log::warning('Xendit webhook missing reference_id/external_id', [
                 'payload_keys' => array_keys($payload),
             ]);
-            
+
             $errorResponse = ErrorResponse::validationError(
                 'Missing required field: reference_id or external_id',
                 ['required_fields' => ['reference_id']]
             );
-            
+
             return response()->json($errorResponse->toArray(), $errorResponse->statusCode);
         }
 
@@ -96,6 +96,7 @@ class XenditWebhookController extends Controller
             ]);
 
             $errorResponse = ErrorResponse::unauthorized('Invalid webhook signature');
+
             return response()->json($errorResponse->toArray(), $errorResponse->statusCode);
 
         } catch (NoActiveProviderException $e) {

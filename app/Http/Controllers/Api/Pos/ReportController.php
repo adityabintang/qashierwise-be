@@ -19,9 +19,9 @@ class ReportController extends Controller
      */
     public function dailySales(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
-        if (!$userId) {
+        if (! $userId) {
             return response()->json([
                 'success' => false,
                 'message' => 'Authentication required',
@@ -52,9 +52,9 @@ class ReportController extends Controller
      */
     public function salesByRange(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
-        if (!$userId) {
+        if (! $userId) {
             return response()->json([
                 'success' => false,
                 'message' => 'Authentication required',
@@ -102,9 +102,9 @@ class ReportController extends Controller
         $limit = $validated['limit'] ?? 10;
         $storeId = $validated['store_id'] ?? null;
 
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
-        if (!$userId) {
+        if (! $userId) {
             return response()->json([
                 'success' => false,
                 'message' => 'Authentication required',
@@ -129,6 +129,15 @@ class ReportController extends Controller
      */
     public function salesByPaymentMethod(Request $request): JsonResponse
     {
+        $userId = auth()->user()->getEffectiveUserId();
+
+        if (! $userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
         $validated = $request->validate([
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
@@ -145,7 +154,7 @@ class ReportController extends Controller
 
         $storeId = $validated['store_id'] ?? null;
 
-        $report = $this->reportService->salesByPaymentMethod($start, $end, $storeId);
+        $report = $this->reportService->salesByPaymentMethod($start, $end, $storeId, $userId);
 
         return response()->json([
             'success' => true,
@@ -163,6 +172,15 @@ class ReportController extends Controller
      */
     public function hourlySales(Request $request): JsonResponse
     {
+        $userId = auth()->user()->getEffectiveUserId();
+
+        if (! $userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
         $validated = $request->validate([
             'date' => 'nullable|date',
             'store_id' => 'nullable|exists:stores,id',
@@ -174,7 +192,7 @@ class ReportController extends Controller
 
         $storeId = $validated['store_id'] ?? null;
 
-        $report = $this->reportService->hourlySales($date, $storeId);
+        $report = $this->reportService->hourlySales($date, $storeId, $userId);
 
         return response()->json([
             'success' => true,

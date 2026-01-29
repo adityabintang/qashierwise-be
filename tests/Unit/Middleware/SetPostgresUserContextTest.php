@@ -11,7 +11,7 @@ use Tests\TestCase;
 
 /**
  * Test suite for SetPostgresUserContext middleware.
- * 
+ *
  * Validates Requirements 3.1, 3.2, 3.3:
  * - Setting PostgreSQL session variable for authenticated users
  * - Proper cleanup after request completion
@@ -24,7 +24,7 @@ class SetPostgresUserContextTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Skip tests if not using PostgreSQL
         if (DB::getDriverName() !== 'pgsql') {
             $this->markTestSkipped('This test requires PostgreSQL database');
@@ -33,8 +33,6 @@ class SetPostgresUserContextTest extends TestCase
 
     /**
      * Test that middleware sets PostgreSQL session variable for authenticated user.
-     * 
-     * @return void
      */
     public function test_sets_postgres_session_variable_for_authenticated_user(): void
     {
@@ -48,16 +46,16 @@ class SetPostgresUserContextTest extends TestCase
         });
 
         // Create middleware instance
-        $middleware = new SetPostgresUserContext();
+        $middleware = new SetPostgresUserContext;
 
         // Execute middleware
         $response = $middleware->handle($request, function ($req) use ($user) {
             // Inside the request, verify the session variable is set
             $result = DB::selectOne("SELECT current_setting('app.current_user_id', true) as user_id");
-            
+
             // Assert the session variable is set to the user's ID
-            $this->assertEquals((string)$user->id, $result->user_id);
-            
+            $this->assertEquals((string) $user->id, $result->user_id);
+
             return response('OK');
         });
 
@@ -67,8 +65,6 @@ class SetPostgresUserContextTest extends TestCase
 
     /**
      * Test that middleware does not set session variable for unauthenticated request.
-     * 
-     * @return void
      */
     public function test_does_not_set_session_variable_for_unauthenticated_request(): void
     {
@@ -79,16 +75,16 @@ class SetPostgresUserContextTest extends TestCase
         });
 
         // Create middleware instance
-        $middleware = new SetPostgresUserContext();
+        $middleware = new SetPostgresUserContext;
 
         // Execute middleware
         $response = $middleware->handle($request, function ($req) {
             // Inside the request, verify the session variable is not set
             $result = DB::selectOne("SELECT current_setting('app.current_user_id', true) as user_id");
-            
+
             // Assert the session variable is empty or null
             $this->assertTrue(empty($result->user_id) || $result->user_id === '');
-            
+
             return response('OK');
         });
 
@@ -98,8 +94,6 @@ class SetPostgresUserContextTest extends TestCase
 
     /**
      * Test that terminate method resets the session variable.
-     * 
-     * @return void
      */
     public function test_terminate_resets_session_variable(): void
     {
@@ -113,7 +107,7 @@ class SetPostgresUserContextTest extends TestCase
         });
 
         // Create middleware instance
-        $middleware = new SetPostgresUserContext();
+        $middleware = new SetPostgresUserContext;
 
         // Execute middleware
         $response = $middleware->handle($request, function ($req) {
@@ -130,8 +124,6 @@ class SetPostgresUserContextTest extends TestCase
 
     /**
      * Test that middleware works correctly with multiple sequential requests.
-     * 
-     * @return void
      */
     public function test_handles_multiple_sequential_requests(): void
     {
@@ -139,7 +131,7 @@ class SetPostgresUserContextTest extends TestCase
         $user1 = User::factory()->create();
         $user2 = User::factory()->create();
 
-        $middleware = new SetPostgresUserContext();
+        $middleware = new SetPostgresUserContext;
 
         // First request with user1
         $request1 = Request::create('/test', 'GET');
@@ -149,7 +141,8 @@ class SetPostgresUserContextTest extends TestCase
 
         $response1 = $middleware->handle($request1, function ($req) use ($user1) {
             $result = DB::selectOne("SELECT current_setting('app.current_user_id', true) as user_id");
-            $this->assertEquals((string)$user1->id, $result->user_id);
+            $this->assertEquals((string) $user1->id, $result->user_id);
+
             return response('OK');
         });
 
@@ -163,7 +156,8 @@ class SetPostgresUserContextTest extends TestCase
 
         $response2 = $middleware->handle($request2, function ($req) use ($user2) {
             $result = DB::selectOne("SELECT current_setting('app.current_user_id', true) as user_id");
-            $this->assertEquals((string)$user2->id, $result->user_id);
+            $this->assertEquals((string) $user2->id, $result->user_id);
+
             return response('OK');
         });
 

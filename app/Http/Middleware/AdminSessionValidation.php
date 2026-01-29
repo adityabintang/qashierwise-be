@@ -9,7 +9,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Session validation middleware for admin approval actions.
- * 
+ *
  * Validates admin session and ensures proper authorization for withdrawal approvals.
  * Requirement 9.4: Create session validation for admin approval actions
  */
@@ -50,7 +50,7 @@ class AdminSessionValidation
         }
 
         // Check if user has admin privileges
-        if (!$this->isAdmin($user)) {
+        if (! $this->isAdmin($user)) {
             Log::warning('Non-admin user attempted admin action', [
                 'user_id' => $user->id,
                 'email' => $user->email,
@@ -67,7 +67,7 @@ class AdminSessionValidation
         }
 
         // Validate admin session
-        if (!$this->hasValidAdminSession($user->id)) {
+        if (! $this->hasValidAdminSession($user->id)) {
             // For API requests, we'll auto-validate the session if the user is authenticated
             // In a production environment, you might want additional verification
             $this->validateAdminSession($user->id);
@@ -77,7 +77,7 @@ class AdminSessionValidation
         Log::info('Admin action performed', [
             'admin_id' => $user->id,
             'admin_email' => $user->email,
-            'action' => $request->method() . ' ' . $request->path(),
+            'action' => $request->method().' '.$request->path(),
             'ip' => $request->ip(),
         ]);
 
@@ -86,7 +86,7 @@ class AdminSessionValidation
 
     /**
      * Check if the user has admin privileges.
-     * 
+     *
      * This checks for admin status using multiple methods:
      * 1. Check if user has 'is_admin' attribute
      * 2. Check if user email is in admin list (configurable)
@@ -136,7 +136,7 @@ class AdminSessionValidation
         }
 
         $expiresAt = $validatedAt + self::SESSION_TIMEOUT;
-        
+
         return time() < $expiresAt;
     }
 

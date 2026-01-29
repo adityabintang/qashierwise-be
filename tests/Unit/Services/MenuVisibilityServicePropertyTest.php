@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Property-based tests for MenuVisibilityService
- * 
+ *
  * Feature: point-of-sale
  */
 class MenuVisibilityServicePropertyTest extends TestCase
@@ -22,13 +22,13 @@ class MenuVisibilityServicePropertyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new MenuVisibilityService();
+        $this->service = new MenuVisibilityService;
     }
 
     /**
      * Feature: point-of-sale, Property 19: Permission-Based Menu Visibility
      * Validates: Requirements 10.3
-     * 
+     *
      * For any user with a specific role, the visible menu items SHALL only include
      * items authorized by that role's permissions.
      */
@@ -36,7 +36,7 @@ class MenuVisibilityServicePropertyTest extends TestCase
     public function visible_menu_items_only_include_authorized_items(): void
     {
         $allPermissions = MenuVisibilityService::getAllPosPermissions();
-        
+
         $this
             ->limitTo(100)
             ->forAll(
@@ -55,12 +55,12 @@ class MenuVisibilityServicePropertyTest extends TestCase
 
                 foreach ($visibleItems as $menuKey) {
                     $menuConfig = MenuVisibilityService::MENU_ITEMS[$menuKey] ?? null;
-                    
+
                     // Menu item must exist in configuration
                     $this->assertNotNull($menuConfig, "Menu item '$menuKey' must exist in configuration");
-                    
+
                     $requiredPermission = $menuConfig['permission'];
-                    
+
                     if ($requiredPermission !== null) {
                         // If permission is required, user must have it
                         $this->assertContains(
@@ -76,7 +76,7 @@ class MenuVisibilityServicePropertyTest extends TestCase
     /**
      * Feature: point-of-sale, Property 19: Permission-Based Menu Visibility (Inverse)
      * Validates: Requirements 10.3
-     * 
+     *
      * For any user with specific permissions, all menu items requiring those permissions
      * SHALL be visible.
      */
@@ -84,7 +84,7 @@ class MenuVisibilityServicePropertyTest extends TestCase
     public function all_authorized_menu_items_are_visible(): void
     {
         $allPermissions = MenuVisibilityService::getAllPosPermissions();
-        
+
         $this
             ->limitTo(100)
             ->forAll(
@@ -103,7 +103,7 @@ class MenuVisibilityServicePropertyTest extends TestCase
                 // Check that all menu items the user should have access to are visible
                 foreach (MenuVisibilityService::MENU_ITEMS as $menuKey => $menuConfig) {
                     $requiredPermission = $menuConfig['permission'];
-                    
+
                     if ($requiredPermission === null) {
                         // Items without permission requirements should always be visible
                         $this->assertContains(
@@ -133,7 +133,7 @@ class MenuVisibilityServicePropertyTest extends TestCase
     /**
      * Feature: point-of-sale, Property 19: Permission-Based Menu Visibility (Empty Permissions)
      * Validates: Requirements 10.3
-     * 
+     *
      * For any user with no permissions, only menu items without permission requirements
      * SHALL be visible.
      */
@@ -141,19 +141,19 @@ class MenuVisibilityServicePropertyTest extends TestCase
     public function empty_permissions_only_show_unrestricted_items(): void
     {
         $visibleItems = $this->service->getVisibleMenuItems([]);
-        
+
         // Count expected unrestricted items
         $expectedUnrestrictedItems = array_filter(
             MenuVisibilityService::MENU_ITEMS,
-            fn($config) => $config['permission'] === null
+            fn ($config) => $config['permission'] === null
         );
-        
+
         $this->assertCount(
             count($expectedUnrestrictedItems),
             $visibleItems,
             'Only unrestricted menu items should be visible with empty permissions'
         );
-        
+
         foreach ($visibleItems as $menuKey) {
             $this->assertNull(
                 MenuVisibilityService::MENU_ITEMS[$menuKey]['permission'],
@@ -165,7 +165,7 @@ class MenuVisibilityServicePropertyTest extends TestCase
     /**
      * Feature: point-of-sale, Property 19: Permission-Based Menu Visibility (Full Permissions)
      * Validates: Requirements 10.3
-     * 
+     *
      * For any user with all permissions, all menu items SHALL be visible.
      */
     #[Test]
@@ -173,7 +173,7 @@ class MenuVisibilityServicePropertyTest extends TestCase
     {
         $allPermissions = MenuVisibilityService::getAllPosPermissions();
         $visibleItems = $this->service->getVisibleMenuItems($allPermissions);
-        
+
         $this->assertCount(
             count(MenuVisibilityService::MENU_ITEMS),
             $visibleItems,
@@ -189,14 +189,14 @@ class MenuVisibilityServicePropertyTest extends TestCase
         if ($count === 0) {
             return [];
         }
-        
+
         if ($count >= count($allPermissions)) {
             return $allPermissions;
         }
-        
+
         $shuffled = $allPermissions;
         shuffle($shuffled);
-        
+
         return array_slice($shuffled, 0, $count);
     }
 }

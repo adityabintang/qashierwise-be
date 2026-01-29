@@ -14,17 +14,24 @@ class Payment extends Model
      * Payment method constants.
      */
     const METHOD_CASH = 'cash';
+
     const METHOD_CARD = 'card';
+
     const METHOD_TRANSFER = 'transfer';
+
     const METHOD_QRIS = 'qris';
+
     const METHOD_OTHER = 'other';
 
     /**
      * Payment status constants.
      */
     const STATUS_PENDING = 'pending';
+
     const STATUS_PAID = 'paid';
+
     const STATUS_FAILED = 'failed';
+
     const STATUS_EXPIRED = 'expired';
 
     /**

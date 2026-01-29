@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Crypt;
 
 class PaymentProviderCredential extends Model
@@ -17,15 +17,20 @@ class PaymentProviderCredential extends Model
      * Provider constants
      */
     const PROVIDER_DOKU = 'doku';
+
     const PROVIDER_XENDIT = 'xendit';
+
     const PROVIDER_MIDTRANS = 'midtrans';
+
     const PROVIDER_DUITKU = 'duitku';
 
     /**
      * Connection status constants
      */
     const STATUS_PENDING = 'pending';
+
     const STATUS_VALID = 'valid';
+
     const STATUS_INVALID = 'invalid';
 
     /**
@@ -72,8 +77,6 @@ class PaymentProviderCredential extends Model
     /**
      * Get the decrypted API key.
      * This accessor extracts the api_key from the encrypted credentials JSON.
-     *
-     * @return string|null
      */
     public function getApiKeyAttribute(): ?string
     {
@@ -83,6 +86,7 @@ class PaymentProviderCredential extends Model
 
         try {
             $credentials = json_decode(Crypt::decryptString($this->credentials_encrypted), true);
+
             return $credentials['api_key'] ?? null;
         } catch (\Exception $e) {
             return null;
@@ -92,8 +96,6 @@ class PaymentProviderCredential extends Model
     /**
      * Get the decrypted secret key.
      * This accessor extracts the secret_key from the encrypted credentials JSON.
-     *
-     * @return string|null
      */
     public function getSecretKeyAttribute(): ?string
     {
@@ -103,6 +105,7 @@ class PaymentProviderCredential extends Model
 
         try {
             $credentials = json_decode(Crypt::decryptString($this->credentials_encrypted), true);
+
             return $credentials['secret_key'] ?? null;
         } catch (\Exception $e) {
             return null;
@@ -112,9 +115,6 @@ class PaymentProviderCredential extends Model
     /**
      * Set the API key by encrypting it into the credentials JSON.
      * This mutator updates the api_key in the encrypted credentials.
-     *
-     * @param string $value
-     * @return void
      */
     public function setApiKeyAttribute(string $value): void
     {
@@ -126,9 +126,6 @@ class PaymentProviderCredential extends Model
     /**
      * Set the secret key by encrypting it into the credentials JSON.
      * This mutator updates the secret_key in the encrypted credentials.
-     *
-     * @param string $value
-     * @return void
      */
     public function setSecretKeyAttribute(string $value): void
     {
@@ -139,8 +136,6 @@ class PaymentProviderCredential extends Model
 
     /**
      * Get all decrypted credentials as an array.
-     *
-     * @return array
      */
     private function getDecryptedCredentials(): array
     {
@@ -157,9 +152,6 @@ class PaymentProviderCredential extends Model
 
     /**
      * Scope a query to only include active credentials.
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeActive(Builder $query): Builder
     {
@@ -168,8 +160,6 @@ class PaymentProviderCredential extends Model
 
     /**
      * Check if the credential is valid.
-     *
-     * @return bool
      */
     public function isValid(): bool
     {
@@ -179,8 +169,6 @@ class PaymentProviderCredential extends Model
     /**
      * Check if the credential needs revalidation.
      * Credentials need revalidation if they haven't been validated in the last 24 hours.
-     *
-     * @return bool
      */
     public function needsRevalidation(): bool
     {
@@ -213,9 +201,6 @@ class PaymentProviderCredential extends Model
 
     /**
      * Check if a provider is valid.
-     *
-     * @param string $provider
-     * @return bool
      */
     public static function isValidProvider(string $provider): bool
     {

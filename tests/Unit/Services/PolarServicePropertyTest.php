@@ -11,7 +11,7 @@ use Tests\TestCase;
 
 /**
  * Property-based tests for PolarService
- * 
+ *
  * Feature: polar-subscription
  */
 class PolarServicePropertyTest extends TestCase
@@ -23,13 +23,13 @@ class PolarServicePropertyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->polarService = new PolarService(new PlanConfig());
+        $this->polarService = new PolarService(new PlanConfig);
     }
 
     /**
      * Feature: polar-subscription, Property 4: Webhook Signature Validation Correctness
      * Validates: Requirements 4.1
-     * 
+     *
      * For any webhook payload and signature pair, the signature validation SHALL return true
      * only when the signature is cryptographically valid for the given payload and secret.
      */
@@ -48,21 +48,21 @@ class PolarServicePropertyTest extends TestCase
             ->then(function (string $payloadContent, int $timestamp) {
                 // Create a valid payload
                 $payload = json_encode(['data' => $payloadContent, 'type' => 'test.event']);
-                
+
                 // Compute valid signature using the same algorithm as PolarService
                 $secret = config('polar.webhook_secret');
-                $signedPayload = $timestamp . '.' . $payload;
+                $signedPayload = $timestamp.'.'.$payload;
                 $validSignature = hash_hmac('sha256', $signedPayload, $secret);
-                
+
                 // Format signature header as Polar does: t=timestamp,v1=signature
                 $signatureHeader = "t={$timestamp},v1={$validSignature}";
 
                 // Property: Valid signatures must be accepted
                 $result = $this->polarService->validateWebhookSignature($payload, $signatureHeader);
-                
+
                 $this->assertTrue(
                     $result,
-                    "Valid webhook signature should be accepted"
+                    'Valid webhook signature should be accepted'
                 );
             });
     }
@@ -70,7 +70,7 @@ class PolarServicePropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 4: Webhook Signature Validation Correctness
      * Validates: Requirements 4.1
-     * 
+     *
      * For any webhook payload with an invalid signature, validation SHALL return false.
      */
     #[Test]
@@ -90,22 +90,23 @@ class PolarServicePropertyTest extends TestCase
                 // Ensure the invalid signature is not accidentally valid
                 $payload = json_encode(['data' => $payloadContent, 'type' => 'test.event']);
                 $secret = config('polar.webhook_secret');
-                $signedPayload = $timestamp . '.' . $payload;
+                $signedPayload = $timestamp.'.'.$payload;
                 $validSignature = hash_hmac('sha256', $signedPayload, $secret);
+
                 return $invalidSig !== $validSignature;
             })
             ->then(function (string $payloadContent, int $timestamp, string $invalidSig) {
                 $payload = json_encode(['data' => $payloadContent, 'type' => 'test.event']);
-                
+
                 // Format signature header with invalid signature
                 $signatureHeader = "t={$timestamp},v1={$invalidSig}";
 
                 // Property: Invalid signatures must be rejected
                 $result = $this->polarService->validateWebhookSignature($payload, $signatureHeader);
-                
+
                 $this->assertFalse(
                     $result,
-                    "Invalid webhook signature should be rejected"
+                    'Invalid webhook signature should be rejected'
                 );
             });
     }
@@ -113,7 +114,7 @@ class PolarServicePropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 4: Webhook Signature Validation Correctness
      * Validates: Requirements 4.1
-     * 
+     *
      * Tampered payloads with valid signatures for original payload SHALL be rejected.
      */
     #[Test]
@@ -137,7 +138,7 @@ class PolarServicePropertyTest extends TestCase
                 // Create original payload and compute its valid signature
                 $originalPayload = json_encode(['data' => $original, 'type' => 'test.event']);
                 $secret = config('polar.webhook_secret');
-                $signedPayload = $timestamp . '.' . $originalPayload;
+                $signedPayload = $timestamp.'.'.$originalPayload;
                 $validSignature = hash_hmac('sha256', $signedPayload, $secret);
                 $signatureHeader = "t={$timestamp},v1={$validSignature}";
 
@@ -146,10 +147,10 @@ class PolarServicePropertyTest extends TestCase
 
                 // Property: Tampered payloads must be rejected even with signature from original
                 $result = $this->polarService->validateWebhookSignature($tamperedPayload, $signatureHeader);
-                
+
                 $this->assertFalse(
                     $result,
-                    "Tampered payload should be rejected even with valid signature from original"
+                    'Tampered payload should be rejected even with valid signature from original'
                 );
             });
     }
@@ -157,7 +158,7 @@ class PolarServicePropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 4: Webhook Signature Validation Correctness
      * Validates: Requirements 4.1
-     * 
+     *
      * Empty payloads or signatures SHALL be rejected.
      */
     #[Test]
@@ -167,21 +168,21 @@ class PolarServicePropertyTest extends TestCase
 
         // Test empty payload
         $result = $this->polarService->validateWebhookSignature('', 't=123,v1=abc');
-        $this->assertFalse($result, "Empty payload should be rejected");
+        $this->assertFalse($result, 'Empty payload should be rejected');
 
         // Test empty signature
         $result = $this->polarService->validateWebhookSignature('{"test": "data"}', '');
-        $this->assertFalse($result, "Empty signature should be rejected");
+        $this->assertFalse($result, 'Empty signature should be rejected');
 
         // Test both empty
         $result = $this->polarService->validateWebhookSignature('', '');
-        $this->assertFalse($result, "Both empty should be rejected");
+        $this->assertFalse($result, 'Both empty should be rejected');
     }
 
     /**
      * Feature: polar-subscription, Property 4: Webhook Signature Validation Correctness
      * Validates: Requirements 4.1
-     * 
+     *
      * Malformed signature headers SHALL be rejected.
      */
     #[Test]
@@ -212,7 +213,7 @@ class PolarServicePropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 4: Webhook Signature Validation Correctness
      * Validates: Requirements 4.1
-     * 
+     *
      * Missing webhook secret configuration SHALL cause rejection.
      */
     #[Test]
@@ -226,21 +227,21 @@ class PolarServicePropertyTest extends TestCase
         $signatureHeader = "t={$timestamp},v1=somesignature";
 
         $result = $this->polarService->validateWebhookSignature($payload, $signatureHeader);
-        
+
         $this->assertFalse(
             $result,
-            "Missing webhook secret should cause rejection"
+            'Missing webhook secret should cause rejection'
         );
     }
 
     /**
      * Feature: polar-subscription, Property 3: Checkout Session Data Integrity
      * Validates: Requirements 3.4
-     * 
+     *
      * For any checkout session creation request with a valid user and plan,
      * the resulting CheckoutSession SHALL contain the user's email and valid
      * success/cancel callback URLs.
-     * 
+     *
      * Note: This test validates the CheckoutSession DTO construction logic
      * without making actual API calls. The actual API integration is tested
      * separately with mocked responses.
@@ -252,9 +253,9 @@ class PolarServicePropertyTest extends TestCase
             ->limitTo(100)
             ->forAll(
                 Generators::suchThat(
-                    fn($email) => filter_var($email, FILTER_VALIDATE_EMAIL) !== false,
+                    fn ($email) => filter_var($email, FILTER_VALIDATE_EMAIL) !== false,
                     Generators::map(
-                        fn($parts) => $parts[0] . '@' . $parts[1] . '.com',
+                        fn ($parts) => $parts[0].'@'.$parts[1].'.com',
                         Generators::tuple(
                             Generators::elements(['user', 'test', 'john', 'jane', 'admin']),
                             Generators::elements(['example', 'test', 'domain', 'company'])
@@ -267,9 +268,9 @@ class PolarServicePropertyTest extends TestCase
             )
             ->then(function (string $email, string $planId, string $checkoutId, string $checkoutUrl) {
                 // Set up config for success/cancel URLs
-                $successUrl = 'https://example.com/success?checkout_id=' . $checkoutId;
+                $successUrl = 'https://example.com/success?checkout_id='.$checkoutId;
                 $cancelUrl = 'https://example.com/cancel';
-                
+
                 config([
                     'polar.urls.success' => $successUrl,
                     'polar.urls.cancel' => $cancelUrl,
@@ -296,41 +297,41 @@ class PolarServicePropertyTest extends TestCase
                 $this->assertEquals(
                     $planId,
                     $checkoutSession->planId,
-                    "CheckoutSession must contain the plan ID"
+                    'CheckoutSession must contain the plan ID'
                 );
 
                 // Property: CheckoutSession must contain a valid success URL
                 $this->assertNotEmpty(
                     $checkoutSession->successUrl,
-                    "CheckoutSession must contain a success URL"
+                    'CheckoutSession must contain a success URL'
                 );
                 $this->assertIsString(
                     $checkoutSession->successUrl,
-                    "Success URL must be a string"
+                    'Success URL must be a string'
                 );
 
                 // Property: CheckoutSession must contain a valid cancel URL
                 $this->assertNotEmpty(
                     $checkoutSession->cancelUrl,
-                    "CheckoutSession must contain a cancel URL"
+                    'CheckoutSession must contain a cancel URL'
                 );
                 $this->assertIsString(
                     $checkoutSession->cancelUrl,
-                    "Cancel URL must be a string"
+                    'Cancel URL must be a string'
                 );
 
                 // Property: CheckoutSession must have an ID
                 $this->assertEquals(
                     $checkoutId,
                     $checkoutSession->id,
-                    "CheckoutSession must have the correct ID"
+                    'CheckoutSession must have the correct ID'
                 );
 
                 // Property: CheckoutSession must have a URL
                 $this->assertEquals(
                     $checkoutUrl,
                     $checkoutSession->url,
-                    "CheckoutSession must have the correct URL"
+                    'CheckoutSession must have the correct URL'
                 );
             });
     }
@@ -338,7 +339,7 @@ class PolarServicePropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 3: Checkout Session Data Integrity
      * Validates: Requirements 3.4
-     * 
+     *
      * CheckoutSession URLs must be properly configured from environment.
      */
     #[Test]
@@ -372,13 +373,13 @@ class PolarServicePropertyTest extends TestCase
                 $this->assertEquals(
                     $successUrl,
                     config('polar.urls.success'),
-                    "Success URL should be properly configured"
+                    'Success URL should be properly configured'
                 );
 
                 $this->assertEquals(
                     $cancelUrl,
                     config('polar.urls.cancel'),
-                    "Cancel URL should be properly configured"
+                    'Cancel URL should be properly configured'
                 );
 
                 // Create a CheckoutSession with these URLs
@@ -395,13 +396,13 @@ class PolarServicePropertyTest extends TestCase
                 $this->assertEquals(
                     $successUrl,
                     $checkoutSession->successUrl,
-                    "CheckoutSession success URL must match configuration"
+                    'CheckoutSession success URL must match configuration'
                 );
 
                 $this->assertEquals(
                     $cancelUrl,
                     $checkoutSession->cancelUrl,
-                    "CheckoutSession cancel URL must match configuration"
+                    'CheckoutSession cancel URL must match configuration'
                 );
             });
     }
@@ -409,7 +410,7 @@ class PolarServicePropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 3: Checkout Session Data Integrity
      * Validates: Requirements 3.4
-     * 
+     *
      * CheckoutSession must preserve all data immutably (readonly properties).
      */
     #[Test]
@@ -422,9 +423,9 @@ class PolarServicePropertyTest extends TestCase
                 Generators::string(),
                 Generators::elements(['standard', 'pro']),
                 Generators::suchThat(
-                    fn($email) => filter_var($email, FILTER_VALIDATE_EMAIL) !== false,
+                    fn ($email) => filter_var($email, FILTER_VALIDATE_EMAIL) !== false,
                     Generators::map(
-                        fn($parts) => $parts[0] . '@' . $parts[1] . '.com',
+                        fn ($parts) => $parts[0].'@'.$parts[1].'.com',
                         Generators::tuple(
                             Generators::elements(['user', 'test', 'john']),
                             Generators::elements(['example', 'test'])

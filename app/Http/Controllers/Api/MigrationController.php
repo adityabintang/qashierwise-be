@@ -27,7 +27,7 @@ class MigrationController extends Controller
         $user = $request->user();
 
         // Check if user has sub-merchant account
-        if (!$user->subMerchant) {
+        if (! $user->subMerchant) {
             return response()->json([
                 'needs_migration' => false,
                 'reason' => 'not_sub_merchant',
@@ -80,7 +80,7 @@ class MigrationController extends Controller
         $user = $request->user();
 
         // Verify user needs migration
-        if (!$user->subMerchant) {
+        if (! $user->subMerchant) {
             return response()->json([
                 'success' => false,
                 'message' => 'You are not registered as a sub-merchant.',
@@ -115,11 +115,12 @@ class MigrationController extends Controller
             // Validate credentials
             $validationResult = $this->validationService->validateCredentials($credential);
 
-            if (!$validationResult->isValid) {
+            if (! $validationResult->isValid) {
                 DB::rollBack();
+
                 return response()->json([
                     'success' => false,
-                    'message' => 'Credential validation failed: ' . $validationResult->errorMessage,
+                    'message' => 'Credential validation failed: '.$validationResult->errorMessage,
                     'validation_error' => $validationResult->errorMessage,
                 ], 422);
             }
@@ -145,7 +146,7 @@ class MigrationController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             Log::error('Migration failed', [
                 'user_id' => $user->id,
                 'error' => $e->getMessage(),
@@ -165,7 +166,7 @@ class MigrationController extends Controller
     {
         // In a real implementation, you might want to track when users skip
         // and how many times, to avoid annoying them too much
-        
+
         return response()->json([
             'success' => true,
             'message' => 'Migration skipped. You can migrate later from provider settings.',
@@ -179,7 +180,7 @@ class MigrationController extends Controller
     {
         $subMerchant = $user->subMerchant;
 
-        if (!$subMerchant) {
+        if (! $subMerchant) {
             return 0;
         }
 

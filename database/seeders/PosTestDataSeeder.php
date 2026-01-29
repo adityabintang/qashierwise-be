@@ -5,11 +5,11 @@ namespace Database\Seeders;
 use App\Models\Category;
 use App\Models\PosUser;
 use App\Models\Product;
-use App\Models\Role;
 use App\Models\Store;
 use App\Models\Table;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Spatie\Permission\Models\Role;
 
 class PosTestDataSeeder extends Seeder
 {
@@ -18,16 +18,15 @@ class PosTestDataSeeder extends Seeder
      */
     public function run(): void
     {
-        // Create a role
-        $role = Role::firstOrCreate(
-            ['name' => 'Cashier'],
-            ['permissions' => ['orders.create', 'orders.view', 'payments.process']]
-        );
+        // Get Spatie roles (should already exist from RoleSeeder)
+        $role = Role::where('name', 'Cashier')->where('guard_name', 'sanctum')->first();
+        $managerRole = Role::where('name', 'Manager')->where('guard_name', 'sanctum')->first();
 
-        $managerRole = Role::firstOrCreate(
-            ['name' => 'Manager'],
-            ['permissions' => ['orders.create', 'orders.view', 'orders.cancel', 'payments.process', 'reports.view', 'products.manage']]
-        );
+        if (! $role || ! $managerRole) {
+            $this->command->error('Roles not found! Please run RoleSeeder first.');
+
+            return;
+        }
 
         // Create a store
         $store = Store::firstOrCreate(
@@ -53,7 +52,7 @@ class PosTestDataSeeder extends Seeder
 
         // Get or create a user
         $user = User::first();
-        if (!$user) {
+        if (! $user) {
             $user = User::create([
                 'name' => 'Test User',
                 'email' => 'test@example.com',
@@ -69,6 +68,9 @@ class PosTestDataSeeder extends Seeder
                 'is_active' => true,
             ]
         );
+
+        // Assign role to user via Spatie
+        $user->syncRoles([$managerRole->name]);
 
         // Create categories
         $categories = [
@@ -110,8 +112,8 @@ class PosTestDataSeeder extends Seeder
         $this->command->info('POS test data seeded successfully!');
         $this->command->info("Store ID: {$store->id}");
         $this->command->info("POS User ID: {$posUser->id}");
-        $this->command->info("Tables: " . Table::where('store_id', $store->id)->count());
-        $this->command->info("Categories: " . Category::count());
-        $this->command->info("Products: " . Product::count());
+        $this->command->info('Tables: '.Table::where('store_id', $store->id)->count());
+        $this->command->info('Categories: '.Category::count());
+        $this->command->info('Products: '.Product::count());
     }
 }

@@ -18,13 +18,13 @@ class ProviderFactoryTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->factory = new ProviderFactory();
+        $this->factory = new ProviderFactory;
     }
 
     public function test_creates_doku_provider(): void
     {
         $provider = $this->factory->make('doku');
-        
+
         $this->assertInstanceOf(PaymentProviderInterface::class, $provider);
         $this->assertInstanceOf(DokuProvider::class, $provider);
         $this->assertEquals('doku', $provider->getProviderName());
@@ -33,7 +33,7 @@ class ProviderFactoryTest extends TestCase
     public function test_creates_xendit_provider(): void
     {
         $provider = $this->factory->make('xendit');
-        
+
         $this->assertInstanceOf(PaymentProviderInterface::class, $provider);
         $this->assertInstanceOf(XenditProvider::class, $provider);
         $this->assertEquals('xendit', $provider->getProviderName());
@@ -42,7 +42,7 @@ class ProviderFactoryTest extends TestCase
     public function test_creates_midtrans_provider(): void
     {
         $provider = $this->factory->make('midtrans');
-        
+
         $this->assertInstanceOf(PaymentProviderInterface::class, $provider);
         $this->assertInstanceOf(MidtransProvider::class, $provider);
         $this->assertEquals('midtrans', $provider->getProviderName());
@@ -51,7 +51,7 @@ class ProviderFactoryTest extends TestCase
     public function test_creates_duitku_provider(): void
     {
         $provider = $this->factory->make('duitku');
-        
+
         $this->assertInstanceOf(PaymentProviderInterface::class, $provider);
         $this->assertInstanceOf(DuitkuProvider::class, $provider);
         $this->assertEquals('duitku', $provider->getProviderName());
@@ -61,7 +61,7 @@ class ProviderFactoryTest extends TestCase
     {
         $this->expectException(UnsupportedProviderException::class);
         $this->expectExceptionMessage('Unsupported payment provider: invalid');
-        
+
         $this->factory->make('invalid');
     }
 
@@ -70,7 +70,7 @@ class ProviderFactoryTest extends TestCase
         $provider1 = $this->factory->make('DOKU');
         $provider2 = $this->factory->make('Doku');
         $provider3 = $this->factory->make('doku');
-        
+
         $this->assertInstanceOf(DokuProvider::class, $provider1);
         $this->assertInstanceOf(DokuProvider::class, $provider2);
         $this->assertInstanceOf(DokuProvider::class, $provider3);
@@ -79,7 +79,7 @@ class ProviderFactoryTest extends TestCase
     public function test_get_supported_providers_returns_all_providers(): void
     {
         $providers = $this->factory->getSupportedProviders();
-        
+
         $this->assertIsArray($providers);
         $this->assertCount(4, $providers);
         $this->assertContains('doku', $providers);
@@ -108,7 +108,7 @@ class ProviderFactoryTest extends TestCase
     {
         foreach ($this->factory->getSupportedProviders() as $providerName) {
             $provider = $this->factory->make($providerName);
-            
+
             $this->assertInstanceOf(PaymentProviderInterface::class, $provider);
             $this->assertEquals($providerName, $provider->getProviderName());
             $this->assertIsArray($provider->getRequiredCredentialFields());
@@ -120,7 +120,7 @@ class ProviderFactoryTest extends TestCase
     {
         $provider = $this->factory->make('doku');
         $fields = $provider->getRequiredCredentialFields();
-        
+
         $this->assertCount(2, $fields);
         $this->assertContains('client_id', $fields);
         $this->assertContains('secret_key', $fields);
@@ -130,7 +130,7 @@ class ProviderFactoryTest extends TestCase
     {
         $provider = $this->factory->make('xendit');
         $fields = $provider->getRequiredCredentialFields();
-        
+
         $this->assertCount(2, $fields);
         $this->assertContains('api_key', $fields);
         $this->assertContains('webhook_token', $fields);
@@ -140,7 +140,7 @@ class ProviderFactoryTest extends TestCase
     {
         $provider = $this->factory->make('midtrans');
         $fields = $provider->getRequiredCredentialFields();
-        
+
         $this->assertCount(2, $fields);
         $this->assertContains('server_key', $fields);
         $this->assertContains('client_key', $fields);
@@ -150,7 +150,7 @@ class ProviderFactoryTest extends TestCase
     {
         $provider = $this->factory->make('duitku');
         $fields = $provider->getRequiredCredentialFields();
-        
+
         $this->assertCount(2, $fields);
         $this->assertContains('merchant_code', $fields);
         $this->assertContains('api_key', $fields);

@@ -13,9 +13,9 @@ use App\Http\Controllers\Api\Pos\CategoryController;
 use App\Http\Controllers\Api\Pos\OrderController;
 use App\Http\Controllers\Api\Pos\PaymentController;
 use App\Http\Controllers\Api\Pos\PosUserController;
-use App\Http\Controllers\Api\Pos\RoleController;
 use App\Http\Controllers\Api\Pos\ProductController;
 use App\Http\Controllers\Api\Pos\ReportController;
+use App\Http\Controllers\Api\Pos\RoleController;
 use App\Http\Controllers\Api\Pos\StoreController;
 use App\Http\Controllers\Api\Pos\TableController;
 use App\Http\Controllers\Api\Pos\TransactionController;
@@ -96,6 +96,26 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::get('/user', [AuthController::class, 'me']); // Alias for /me
     Route::get('/user/permissions', [AuthController::class, 'getUserPermissions']);
+    Route::post('/user/check-permission', [AuthController::class, 'checkPermission']);
+
+    // DEBUG: Direct permission test
+    Route::get('/user/permissions/debug', function(\Illuminate\Http\Request $request) {
+        $user = $request->user();
+        $user->load('roles.permissions');
+
+        $perms = $user->getAllPermissions()->pluck('name')->toArray();
+        $roles = $user->getRoleNames()->toArray();
+
+        return response()->json([
+            'DEBUG' => true,
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'permissions_count' => count($perms),
+            'permissions' => $perms,
+            'roles' => $roles,
+            'guard' => $user->guardName(),
+        ]);
+    });
 
     // Subscription routes
     Route::prefix('subscription')->group(function () {
@@ -226,35 +246,29 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // POS (Point of Sale) API routes
     Route::prefix('pos')->group(function () {
-        // Products
-        Route::get('/products/search', [ProductController::class, 'search'])->middleware('pos.permission:view_products');
-        Route::apiResource('products', ProductController::class)->middleware([
-            'index' => 'pos.permission:view_products',
-            'show' => 'pos.permission:view_products',
-            'store' => 'pos.permission:manage_products',
-            'update' => 'pos.permission:manage_products',
-            'destroy' => 'pos.permission:manage_products',
-        ]);
+        // Products - index/show accepts view_products OR manage_products
+        Route::get('/products/search', [ProductController::class, 'search'])->middleware('pos.permission:view_products|manage_products');
+        Route::get('/products', [ProductController::class, 'index'])->middleware('pos.permission:view_products|manage_products');
+        Route::post('/products', [ProductController::class, 'store'])->middleware('pos.permission:manage_products');
+        Route::get('/products/{product}', [ProductController::class, 'show'])->middleware('pos.permission:view_products|manage_products');
+        Route::put('/products/{product}', [ProductController::class, 'update'])->middleware('pos.permission:manage_products');
+        Route::delete('/products/{product}', [ProductController::class, 'destroy'])->middleware('pos.permission:manage_products');
 
-        // Categories
-        Route::apiResource('categories', CategoryController::class)->middleware([
-            'index' => 'pos.permission:view_categories',
-            'show' => 'pos.permission:view_categories',
-            'store' => 'pos.permission:manage_categories',
-            'update' => 'pos.permission:manage_categories',
-            'destroy' => 'pos.permission:manage_categories',
-        ]);
+        // Categories - index/show accepts view_categories OR manage_categories
+        Route::get('/categories', [CategoryController::class, 'index'])->middleware('pos.permission:view_categories|manage_categories');
+        Route::post('/categories', [CategoryController::class, 'store'])->middleware('pos.permission:manage_categories');
+        Route::get('/categories/{category}', [CategoryController::class, 'show'])->middleware('pos.permission:view_categories|manage_categories');
+        Route::put('/categories/{category}', [CategoryController::class, 'update'])->middleware('pos.permission:manage_categories');
+        Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->middleware('pos.permission:manage_categories');
 
         // Orders
         Route::post('/orders/{order}/items', [OrderController::class, 'addItem'])->middleware('pos.permission:manage_orders');
         Route::delete('/orders/{order}/items/{item}', [OrderController::class, 'removeItem'])->middleware('pos.permission:manage_orders');
         Route::post('/orders/{order}/discount', [OrderController::class, 'applyDiscount'])->middleware('pos.permission:manage_orders');
         Route::post('/orders/{order}/cancel', [OrderController::class, 'cancel'])->middleware('pos.permission:manage_orders');
-        Route::apiResource('orders', OrderController::class)->except(['update', 'destroy'])->middleware([
-            'index' => 'pos.permission:view_orders',
-            'show' => 'pos.permission:view_orders',
-            'store' => 'pos.permission:manage_orders',
-        ]);
+        Route::get('/orders', [OrderController::class, 'index'])->middleware('pos.permission:view_orders|manage_orders');
+        Route::post('/orders', [OrderController::class, 'store'])->middleware('pos.permission:manage_orders');
+        Route::get('/orders/{order}', [OrderController::class, 'show'])->middleware('pos.permission:view_orders|manage_orders');
 
         // Payments
         Route::get('/payments/methods', [PaymentController::class, 'methods'])->middleware('pos.permission:process_payment');
@@ -265,63 +279,55 @@ Route::middleware('auth:sanctum')->group(function () {
         // Stores
         Route::post('/stores/{store}/deactivate', [StoreController::class, 'deactivate'])->middleware('pos.permission:manage_stores');
         Route::post('/stores/{store}/activate', [StoreController::class, 'activate'])->middleware('pos.permission:manage_stores');
-        Route::apiResource('stores', StoreController::class)->except(['destroy'])->middleware([
-            'index' => 'pos.permission:view_stores',
-            'show' => 'pos.permission:view_stores',
-            'store' => 'pos.permission:manage_stores',
-            'update' => 'pos.permission:manage_stores',
-        ]);
+        Route::get('/stores', [StoreController::class, 'index'])->middleware('pos.permission:view_stores|manage_stores');
+        Route::post('/stores', [StoreController::class, 'store'])->middleware('pos.permission:manage_stores');
+        Route::get('/stores/{store}', [StoreController::class, 'show'])->middleware('pos.permission:view_stores|manage_stores');
+        Route::put('/stores/{store}', [StoreController::class, 'update'])->middleware('pos.permission:manage_stores');
 
         // Tables
-        Route::apiResource('tables', TableController::class)->middleware([
-            'index' => 'pos.permission:view_tables',
-            'show' => 'pos.permission:view_tables',
-            'store' => 'pos.permission:manage_tables',
-            'update' => 'pos.permission:manage_tables',
-            'destroy' => 'pos.permission:manage_tables',
-        ]);
+        Route::get('/tables', [TableController::class, 'index'])->middleware('pos.permission:view_tables|manage_tables');
+        Route::post('/tables', [TableController::class, 'store'])->middleware('pos.permission:manage_tables');
+        Route::get('/tables/{table}', [TableController::class, 'show'])->middleware('pos.permission:view_tables|manage_tables');
+        Route::put('/tables/{table}', [TableController::class, 'update'])->middleware('pos.permission:manage_tables');
+        Route::delete('/tables/{table}', [TableController::class, 'destroy'])->middleware('pos.permission:manage_tables');
 
         // POS Users
         Route::post('/users/create-user', [PosUserController::class, 'createUser'])->middleware('pos.permission:manage_users');
         Route::post('/users/send-otp', [PosUserController::class, 'sendOtp'])->middleware('pos.permission:manage_users');
         Route::post('/users/verify-otp', [PosUserController::class, 'verifyOtp'])->middleware('pos.permission:manage_users');
-        Route::get('/users/available', [PosUserController::class, 'getAvailableUsers'])->middleware('pos.permission:view_users');
-        Route::get('/users', [PosUserController::class, 'index'])->middleware('pos.permission:view_users');
+        Route::get('/users/available', [PosUserController::class, 'getAvailableUsers'])->middleware('pos.permission:view_users|manage_users');
+        Route::get('/users', [PosUserController::class, 'index'])->middleware('pos.permission:view_users|manage_users');
         Route::post('/users', [PosUserController::class, 'store'])->middleware('pos.permission:manage_users');
         Route::put('/users/{posUser}', [PosUserController::class, 'update'])->middleware('pos.permission:manage_users');
         Route::delete('/users/{posUser}', [PosUserController::class, 'destroy'])->middleware('pos.permission:manage_users');
         Route::post('/pos-users/{posUser}/deactivate', [PosUserController::class, 'deactivate'])->middleware('pos.permission:manage_users');
         Route::post('/pos-users/{posUser}/activate', [PosUserController::class, 'activate'])->middleware('pos.permission:manage_users');
-        Route::apiResource('pos-users', PosUserController::class)->except(['destroy'])->middleware([
-            'index' => 'pos.permission:view_users',
-            'show' => 'pos.permission:view_users',
-            'store' => 'pos.permission:manage_users',
-            'update' => 'pos.permission:manage_users',
-        ]);
+        Route::get('/pos-users', [PosUserController::class, 'index'])->middleware('pos.permission:view_users|manage_users');
+        Route::post('/pos-users', [PosUserController::class, 'store'])->middleware('pos.permission:manage_users');
+        Route::get('/pos-users/{pos_user}', [PosUserController::class, 'show'])->middleware('pos.permission:view_users|manage_users');
+        Route::put('/pos-users/{pos_user}', [PosUserController::class, 'update'])->middleware('pos.permission:manage_users');
 
         // Roles
-        Route::get('/roles/permissions', [RoleController::class, 'permissions'])->middleware('pos.permission:view_roles');
-        Route::apiResource('roles', RoleController::class)->middleware([
-            'index' => 'pos.permission:view_roles',
-            'show' => 'pos.permission:view_roles',
-            'store' => 'pos.permission:manage_roles',
-            'update' => 'pos.permission:manage_roles',
-            'destroy' => 'pos.permission:manage_roles',
-        ]);
+        Route::get('/roles/permissions', [RoleController::class, 'permissions'])->middleware('pos.permission:view_roles|manage_roles');
+        Route::get('/roles', [RoleController::class, 'index'])->middleware('pos.permission:view_roles|manage_roles');
+        Route::post('/roles', [RoleController::class, 'store'])->middleware('pos.permission:manage_roles');
+        Route::get('/roles/{role}', [RoleController::class, 'show'])->middleware('pos.permission:view_roles|manage_roles');
+        Route::put('/roles/{role}', [RoleController::class, 'update'])->middleware('pos.permission:manage_roles');
+        Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->middleware('pos.permission:manage_roles');
 
         // Reports
-        Route::get('/reports/daily', [ReportController::class, 'dailySales'])->middleware('pos.permission:view_reports');
-        Route::get('/reports/range', [ReportController::class, 'salesByRange'])->middleware('pos.permission:view_reports');
-        Route::get('/reports/top-products', [ReportController::class, 'topProducts'])->middleware('pos.permission:view_reports');
-        Route::get('/reports/payment-methods', [ReportController::class, 'salesByPaymentMethod'])->middleware('pos.permission:view_reports');
-        Route::get('/reports/hourly', [ReportController::class, 'hourlySales'])->middleware('pos.permission:view_reports');
+        Route::get('/reports/daily', [ReportController::class, 'dailySales'])->middleware('pos.permission:view_reports|manage_reports');
+        Route::get('/reports/range', [ReportController::class, 'salesByRange'])->middleware('pos.permission:view_reports|manage_reports');
+        Route::get('/reports/top-products', [ReportController::class, 'topProducts'])->middleware('pos.permission:view_reports|manage_reports');
+        Route::get('/reports/payment-methods', [ReportController::class, 'salesByPaymentMethod'])->middleware('pos.permission:view_reports|manage_reports');
+        Route::get('/reports/hourly', [ReportController::class, 'hourlySales'])->middleware('pos.permission:view_reports|manage_reports');
 
         // Transactions
-        Route::get('/transactions/search', [TransactionController::class, 'search'])->middleware('pos.permission:view_transactions');
-        Route::get('/transactions/filter-by-date', [TransactionController::class, 'filterByDate'])->middleware('pos.permission:view_transactions');
-        Route::get('/transactions/filter-by-date-range', [TransactionController::class, 'filterByDateRange'])->middleware('pos.permission:view_transactions');
-        Route::get('/transactions', [TransactionController::class, 'index'])->middleware('pos.permission:view_transactions');
-        Route::get('/transactions/{id}', [TransactionController::class, 'show'])->middleware('pos.permission:view_transactions');
+        Route::get('/transactions/search', [TransactionController::class, 'search'])->middleware('pos.permission:view_transactions|manage_transactions');
+        Route::get('/transactions/filter-by-date', [TransactionController::class, 'filterByDate'])->middleware('pos.permission:view_transactions|manage_transactions');
+        Route::get('/transactions/filter-by-date-range', [TransactionController::class, 'filterByDateRange'])->middleware('pos.permission:view_transactions|manage_transactions');
+        Route::get('/transactions', [TransactionController::class, 'index'])->middleware('pos.permission:view_transactions|manage_transactions');
+        Route::get('/transactions/{id}', [TransactionController::class, 'show'])->middleware('pos.permission:view_transactions|manage_transactions');
     });
 
     // Sub-Merchant QRIS routes

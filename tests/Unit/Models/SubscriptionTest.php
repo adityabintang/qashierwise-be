@@ -10,7 +10,7 @@ use ReflectionClass;
 
 /**
  * Unit tests for Subscription model methods
- * 
+ *
  * Feature: polar-subscription
  * Validates: Requirements 5.4, 5.5
  */
@@ -22,22 +22,22 @@ class SubscriptionTest extends TestCase
      */
     private function createSubscription(array $attributes): Subscription
     {
-        $subscription = new Subscription();
-        
+        $subscription = new Subscription;
+
         // Use reflection to set attributes directly without triggering casts
         $reflection = new ReflectionClass($subscription);
         $attributesProperty = $reflection->getProperty('attributes');
         $attributesProperty->setAccessible(true);
-        
+
         $attrs = [
             'status' => $attributes['status'] ?? 'active',
             'current_period_start' => $attributes['current_period_start'] ?? Carbon::now(),
             'current_period_end' => $attributes['current_period_end'] ?? Carbon::now()->addDays(30),
             'cancelled_at' => $attributes['cancelled_at'] ?? null,
         ];
-        
+
         $attributesProperty->setValue($subscription, $attrs);
-        
+
         return $subscription;
     }
 

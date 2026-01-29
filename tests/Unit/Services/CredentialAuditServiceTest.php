@@ -16,25 +16,27 @@ class CredentialAuditServiceTest extends TestCase
     use RefreshDatabase;
 
     protected CredentialAuditService $auditService;
+
     protected User $user;
+
     protected PaymentProviderCredential $credential;
 
     protected function setUp(): void
     {
         parent::setUp();
-        
-        $this->auditService = new CredentialAuditService();
-        
+
+        $this->auditService = new CredentialAuditService;
+
         // Create test user
         $this->user = User::factory()->create();
-        
+
         // Create user encryption key
         UserEncryptionKey::create([
             'user_id' => $this->user->id,
-            'encryption_key_encrypted' => encrypt('test-key-' . $this->user->id),
+            'encryption_key_encrypted' => encrypt('test-key-'.$this->user->id),
             'key_version' => 1,
         ]);
-        
+
         // Create test credential
         $this->credential = PaymentProviderCredential::create([
             'user_id' => $this->user->id,
@@ -260,7 +262,7 @@ class CredentialAuditServiceTest extends TestCase
         $decryptLogs = $this->auditService->getLogsForUser($this->user, CredentialAccessLog::ACTION_DECRYPT);
 
         $this->assertCount(2, $decryptLogs);
-        $this->assertTrue($decryptLogs->every(fn($log) => $log->action === CredentialAccessLog::ACTION_DECRYPT));
+        $this->assertTrue($decryptLogs->every(fn ($log) => $log->action === CredentialAccessLog::ACTION_DECRYPT));
     }
 
     public function test_gets_logs_for_user_with_limit(): void
@@ -298,7 +300,7 @@ class CredentialAuditServiceTest extends TestCase
         $failedLogs = $this->auditService->getFailedAttempts();
 
         $this->assertCount(2, $failedLogs);
-        $this->assertTrue($failedLogs->every(fn($log) => $log->success === false));
+        $this->assertTrue($failedLogs->every(fn ($log) => $log->success === false));
     }
 
     public function test_gets_failed_attempts_for_specific_user(): void
@@ -332,7 +334,7 @@ class CredentialAuditServiceTest extends TestCase
         $violations = $this->auditService->getRLSViolations();
 
         $this->assertCount(2, $violations);
-        $this->assertTrue($violations->every(fn($log) => str_contains($log->error_message, 'RLS Violation:')));
+        $this->assertTrue($violations->every(fn ($log) => str_contains($log->error_message, 'RLS Violation:')));
     }
 
     public function test_gets_decryption_logs(): void
@@ -346,7 +348,7 @@ class CredentialAuditServiceTest extends TestCase
         $decryptLogs = $this->auditService->getDecryptionLogs($this->user);
 
         $this->assertCount(2, $decryptLogs);
-        $this->assertTrue($decryptLogs->every(fn($log) => $log->action === CredentialAccessLog::ACTION_DECRYPT));
+        $this->assertTrue($decryptLogs->every(fn ($log) => $log->action === CredentialAccessLog::ACTION_DECRYPT));
     }
 
     public function test_gets_user_audit_summary(): void

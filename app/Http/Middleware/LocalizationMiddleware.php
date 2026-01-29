@@ -18,13 +18,13 @@ class LocalizationMiddleware
         $locale = $this->detectLocale($request);
 
         // Validate locale is supported
-        if (!in_array($locale, config('app.supported_locales'))) {
+        if (! in_array($locale, config('app.supported_locales'))) {
             $locale = config('app.locale');
         }
 
         // Set application locale
         app()->setLocale($locale);
-        
+
         // Store locale in session for persistence
         session(['locale' => $locale]);
 
@@ -34,9 +34,6 @@ class LocalizationMiddleware
     /**
      * Detect the user's preferred locale from multiple sources.
      * Priority: user preference → session → Accept-Language header → default
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return string
      */
     private function detectLocale(Request $request): string
     {
@@ -64,14 +61,11 @@ class LocalizationMiddleware
 
     /**
      * Parse Accept-Language header and return the first supported locale.
-     *
-     * @param  string  $header
-     * @return string|null
      */
     private function parseAcceptLanguage(string $header): ?string
     {
         $locales = [];
-        
+
         // Parse Accept-Language header
         // Format: "en-US,en;q=0.9,id;q=0.8"
         foreach (explode(',', $header) as $locale) {
@@ -83,7 +77,7 @@ class LocalizationMiddleware
         foreach ($locales as $locale) {
             // Extract language code (e.g., "en" from "en-US")
             $lang = explode('-', $locale)[0];
-            
+
             if (in_array($lang, config('app.supported_locales'))) {
                 return $lang;
             }

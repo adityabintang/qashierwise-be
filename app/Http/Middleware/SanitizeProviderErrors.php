@@ -16,13 +16,13 @@ use Throwable;
 
 /**
  * Middleware to sanitize and handle errors from the multi-provider QRIS system.
- * 
+ *
  * This middleware:
  * - Sanitizes encryption errors to prevent technical detail exposure
  * - Handles RLS violations with generic security messages
  * - Classifies provider errors (network vs credential vs provider)
  * - Maps errors to user-friendly messages
- * 
+ *
  * Requirements: 12.1, 12.2, 12.3, 12.5
  */
 class SanitizeProviderErrors
@@ -288,7 +288,7 @@ class SanitizeProviderErrors
      */
     private function isRLSViolation(Throwable $e): bool
     {
-        if (!($e instanceof QueryException)) {
+        if (! ($e instanceof QueryException)) {
             return false;
         }
 

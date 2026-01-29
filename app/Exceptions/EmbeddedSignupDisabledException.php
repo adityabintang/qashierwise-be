@@ -17,10 +17,6 @@ class EmbeddedSignupDisabledException extends Exception
 
     /**
      * Create a new exception instance.
-     *
-     * @param string $message
-     * @param int $code
-     * @param \Throwable|null $previous
      */
     public function __construct(
         string $message = 'Embedded Signup feature is disabled. Please contact the administrator.',

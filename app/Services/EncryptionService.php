@@ -15,8 +15,6 @@ class EncryptionService
 
     /**
      * Create a new encryption service instance.
-     *
-     * @param KeyManagementService $keyManager
      */
     public function __construct(KeyManagementService $keyManager)
     {
@@ -26,9 +24,10 @@ class EncryptionService
     /**
      * Encrypt credentials using AES-256-CBC with user-specific keys.
      *
-     * @param User $user The user whose credentials are being encrypted
-     * @param array $credentials The credentials to encrypt
+     * @param  User  $user  The user whose credentials are being encrypted
+     * @param  array  $credentials  The credentials to encrypt
      * @return string The encrypted credentials with IV prepended
+     *
      * @throws InvalidArgumentException If credentials are invalid
      * @throws RuntimeException If encryption fails
      */
@@ -62,25 +61,26 @@ class EncryptionService
             );
 
             if ($encrypted === false) {
-                throw new RuntimeException('Encryption failed: ' . openssl_error_string());
+                throw new RuntimeException('Encryption failed: '.openssl_error_string());
             }
 
             // Prepend IV to encrypted data and base64 encode the result
             // Format: base64(iv + encrypted_data)
-            return base64_encode($iv . $encrypted);
+            return base64_encode($iv.$encrypted);
         } catch (InvalidArgumentException $e) {
             throw $e;
         } catch (\Exception $e) {
-            throw new RuntimeException('Failed to encrypt credentials: ' . $e->getMessage());
+            throw new RuntimeException('Failed to encrypt credentials: '.$e->getMessage());
         }
     }
 
     /**
      * Decrypt credentials with proper IV handling.
      *
-     * @param User $user The user whose credentials are being decrypted
-     * @param string $encryptedData The encrypted credentials with IV prepended
+     * @param  User  $user  The user whose credentials are being decrypted
+     * @param  string  $encryptedData  The encrypted credentials with IV prepended
      * @return array The decrypted credentials
+     *
      * @throws InvalidArgumentException If encrypted data is invalid
      * @throws RuntimeException If decryption fails
      */
@@ -120,21 +120,21 @@ class EncryptionService
             );
 
             if ($decrypted === false) {
-                throw new RuntimeException('Decryption failed: ' . openssl_error_string());
+                throw new RuntimeException('Decryption failed: '.openssl_error_string());
             }
 
             // Decode JSON back to array
             $credentials = json_decode($decrypted, true);
 
             if ($credentials === null && json_last_error() !== JSON_ERROR_NONE) {
-                throw new RuntimeException('Failed to decode decrypted credentials: ' . json_last_error_msg());
+                throw new RuntimeException('Failed to decode decrypted credentials: '.json_last_error_msg());
             }
 
             return $credentials;
         } catch (InvalidArgumentException $e) {
             throw $e;
         } catch (\Exception $e) {
-            throw new RuntimeException('Failed to decrypt credentials: ' . $e->getMessage());
+            throw new RuntimeException('Failed to decrypt credentials: '.$e->getMessage());
         }
     }
 
@@ -142,8 +142,9 @@ class EncryptionService
      * Rotate a user's encryption key and re-encrypt all their credentials.
      * This method should be called by a service that manages credentials.
      *
-     * @param User $user The user whose key is being rotated
+     * @param  User  $user  The user whose key is being rotated
      * @return string The new encryption key
+     *
      * @throws RuntimeException If key rotation fails
      */
     public function rotateUserKey(User $user): string
@@ -157,7 +158,7 @@ class EncryptionService
 
             return $newKey;
         } catch (\Exception $e) {
-            throw new RuntimeException('Failed to rotate user key: ' . $e->getMessage());
+            throw new RuntimeException('Failed to rotate user key: '.$e->getMessage());
         }
     }
 
@@ -165,6 +166,7 @@ class EncryptionService
      * Generate a secure random IV for AES-256-CBC.
      *
      * @return string The generated IV (16 bytes)
+     *
      * @throws RuntimeException If IV generation fails
      */
     private function generateIV(): string
@@ -172,7 +174,7 @@ class EncryptionService
         // AES-256-CBC requires a 16-byte IV
         $iv = openssl_random_pseudo_bytes(16, $strong);
 
-        if ($iv === false || !$strong) {
+        if ($iv === false || ! $strong) {
             throw new RuntimeException('Failed to generate secure IV');
         }
 
@@ -183,7 +185,7 @@ class EncryptionService
      * Derive a user-specific key from the user's data.
      * This is used internally by the encryption process.
      *
-     * @param User $user The user to derive the key from
+     * @param  User  $user  The user to derive the key from
      * @return string The derived key
      */
     private function deriveUserKey(User $user): string

@@ -8,11 +8,10 @@ use App\Services\ProviderValidationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Validator;
 
 /**
  * Controller for payment provider credential validation API endpoints.
- * 
+ *
  * Handles credential validation, manual revalidation, and connection status retrieval.
  * Requirements: 5.1, 5.2, 5.4
  */
@@ -24,23 +23,19 @@ class ProviderValidationController extends Controller
 
     /**
      * Validate provider credentials.
-     * 
+     *
      * Requirement 5.1: Validate credentials by making a test API call to the provider
      * Requirement 5.2: Display connection status as "valid" or "invalid"
-     * 
-     * @param Request $request
-     * @param int $id
-     * @return JsonResponse
      */
     public function validate(Request $request, int $id): JsonResponse
     {
         $user = $request->user();
-        
+
         $credential = PaymentProviderCredential::where('id', $id)
             ->where('user_id', $user->id)
             ->first();
 
-        if (!$credential) {
+        if (! $credential) {
             return response()->json([
                 'success' => false,
                 'error' => [
@@ -90,22 +85,18 @@ class ProviderValidationController extends Controller
 
     /**
      * Manually revalidate provider credentials.
-     * 
+     *
      * Requirement 5.4: Allow users to manually re-validate credentials at any time
-     * 
-     * @param Request $request
-     * @param int $id
-     * @return JsonResponse
      */
     public function revalidate(Request $request, int $id): JsonResponse
     {
         $user = $request->user();
-        
+
         $credential = PaymentProviderCredential::where('id', $id)
             ->where('user_id', $user->id)
             ->first();
 
-        if (!$credential) {
+        if (! $credential) {
             return response()->json([
                 'success' => false,
                 'error' => [
@@ -164,22 +155,18 @@ class ProviderValidationController extends Controller
 
     /**
      * Get connection status for a specific provider credential.
-     * 
+     *
      * Requirement 5.2: Display connection status as "valid" or "invalid"
-     * 
-     * @param Request $request
-     * @param int $id
-     * @return JsonResponse
      */
     public function status(Request $request, int $id): JsonResponse
     {
         $user = $request->user();
-        
+
         $credential = PaymentProviderCredential::where('id', $id)
             ->where('user_id', $user->id)
             ->first();
 
-        if (!$credential) {
+        if (! $credential) {
             return response()->json([
                 'success' => false,
                 'error' => [
@@ -204,14 +191,11 @@ class ProviderValidationController extends Controller
 
     /**
      * Get connection status for all configured providers.
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function statusAll(Request $request): JsonResponse
     {
         $user = $request->user();
-        
+
         $credentials = PaymentProviderCredential::where('user_id', $user->id)
             ->orderBy('provider')
             ->get();

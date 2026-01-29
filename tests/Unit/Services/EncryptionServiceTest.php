@@ -13,13 +13,14 @@ class EncryptionServiceTest extends TestCase
     use RefreshDatabase;
 
     protected EncryptionService $encryptionService;
+
     protected KeyManagementService $keyManagementService;
 
     protected function setUp(): void
     {
         parent::setUp();
-        
-        $this->keyManagementService = new KeyManagementService();
+
+        $this->keyManagementService = new KeyManagementService;
         $this->encryptionService = new EncryptionService($this->keyManagementService);
     }
 
@@ -95,7 +96,7 @@ class EncryptionServiceTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Credentials cannot be empty');
-        
+
         $this->encryptionService->encryptCredentials($user, []);
     }
 
@@ -105,7 +106,7 @@ class EncryptionServiceTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Encrypted data cannot be empty');
-        
+
         $this->encryptionService->decryptCredentials($user, '');
     }
 }

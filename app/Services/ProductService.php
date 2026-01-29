@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Models\Product;
 use App\Models\Category;
+use App\Models\Product;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
 
@@ -12,8 +12,7 @@ class ProductService
     /**
      * Create a new product with auto-generated SKU
      *
-     * @param array $data Product data (name, category_id, price, stock_quantity, description, is_active)
-     * @return Product
+     * @param  array  $data  Product data (name, category_id, price, stock_quantity, description, is_active)
      */
     public function create(array $data): Product
     {
@@ -32,50 +31,51 @@ class ProductService
     /**
      * Update an existing product
      *
-     * @param Product $product Product to update
-     * @param array $data Updated data
-     * @return Product
+     * @param  Product  $product  Product to update
+     * @param  array  $data  Updated data
      */
     public function update(Product $product, array $data): Product
     {
         $product->update($data);
+
         return $product->fresh();
     }
 
     /**
      * Soft delete a product
      *
-     * @param Product $product Product to delete
-     * @return bool
+     * @param  Product  $product  Product to delete
      */
     public function delete(Product $product): bool
     {
         return $product->delete();
     }
 
-
     /**
      * Search products by name or SKU
      *
-     * @param string $query Search query
-     * @return Collection
+     * @param  string  $query  Search query
      */
-    public function search(string $query): Collection
+    public function search(string $query, int $userId, bool $activeOnly = true): Collection
     {
-        return Product::where(function ($q) use ($query) {
-            $q->where('name', 'like', "%{$query}%")
-              ->orWhere('sku', 'like', "%{$query}%");
-        })
-        ->where('is_active', true)
-        ->get();
+        $queryBuilder = Product::where('user_id', $userId)
+            ->where(function ($q) use ($query) {
+                $q->where('name', 'like', "%{$query}%")
+                    ->orWhere('sku', 'like', "%{$query}%");
+            });
+
+        if ($activeOnly) {
+            $queryBuilder->where('is_active', true);
+        }
+
+        return $queryBuilder->get();
     }
 
     /**
      * Generate a unique SKU for a product
      *
-     * @param string $name Product name
-     * @param int|null $categoryId Category ID (optional)
-     * @return string
+     * @param  string  $name  Product name
+     * @param  int|null  $categoryId  Category ID (optional)
      */
     public function generateSku(string $name, ?int $categoryId = null): string
     {
@@ -113,57 +113,70 @@ class ProductService
     /**
      * Find a product by ID
      *
-     * @param int $id Product ID
-     * @return Product|null
+     * @param  int  $id  Product ID
      */
-    public function find(int $id): ?Product
+    public function find(int $id, ?int $userId = null): ?Product
     {
-        return Product::find($id);
+        $query = Product::where('id', $id);
+
+        if ($userId !== null) {
+            $query->where('user_id', $userId);
+        }
+
+        return $query->first();
     }
 
     /**
      * Get all active products
-     *
-     * @return Collection
      */
-    public function getActive(): Collection
+    public function getActive(?int $userId = null): Collection
     {
-        return Product::where('is_active', true)->get();
+        $query = Product::where('is_active', true);
+
+        if ($userId !== null) {
+            $query->where('user_id', $userId);
+        }
+
+        return $query->get();
     }
 
     /**
      * Get products by category
      *
-     * @param int $categoryId Category ID
-     * @return Collection
+     * @param  int  $categoryId  Category ID
      */
-    public function getByCategory(int $categoryId): Collection
+    public function getByCategory(int $categoryId, ?int $userId = null): Collection
     {
-        return Product::where('category_id', $categoryId)
-            ->where('is_active', true)
-            ->get();
+        $query = Product::where('category_id', $categoryId)
+            ->where('is_active', true);
+
+        if ($userId !== null) {
+            $query->where('user_id', $userId);
+        }
+
+        return $query->get();
     }
 
     /**
      * Update product stock quantity
      *
-     * @param Product $product Product to update
-     * @param int $quantity New quantity (can be negative for reduction)
-     * @return Product
+     * @param  Product  $product  Product to update
+     * @param  int  $quantity  New quantity (can be negative for reduction)
      */
     public function updateStock(Product $product, int $quantity): Product
     {
         $product->stock_quantity = $quantity;
         $product->save();
+
         return $product->fresh();
     }
 
     /**
      * Reduce product stock by a given amount
      *
-     * @param Product $product Product to update
-     * @param int $amount Amount to reduce
-     * @return Product
+     * @param  Product  $product  Product to update
+     * @param  int  $amount  Amount to reduce
+     *
      * @throws \InvalidArgumentException If insufficient stock
      */
     public function reduceStock(Product $product, int $amount): Product
@@ -174,20 +187,21 @@ class ProductService
 
         $product->stock_quantity -= $amount;
         $product->save();
+
         return $product->fresh();
     }
 
     /**
      * Increase product stock by a given amount
      *
-     * @param Product $product Product to update
-     * @param int $amount Amount to increase
-     * @return Product
+     * @param  Product  $product  Product to update
+     * @param  int  $amount  Amount to increase
      */
     public function increaseStock(Product $product, int $amount): Product
     {
         $product->stock_quantity += $amount;
         $product->save();
+
         return $product->fresh();
     }
 }

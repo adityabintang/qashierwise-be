@@ -15,7 +15,9 @@ use Illuminate\Support\Facades\Log;
 class MidtransSubscriptionService
 {
     private string $baseUrl;
+
     private string $serverKey;
+
     private bool $isProduction;
 
     public function __construct()
@@ -34,21 +36,23 @@ class MidtransSubscriptionService
     /**
      * Create a new subscription.
      *
-     * @param User $user The user creating the subscription
-     * @param string $planId The plan identifier (standard, pro)
-     * @param string $paymentToken The payment token from Midtrans
+     * @param  User  $user  The user creating the subscription
+     * @param  string  $planId  The plan identifier (standard, pro)
+     * @param  string  $paymentToken  The payment token from Midtrans
      * @return array|null Subscription data or null on failure
      */
     public function createSubscription(User $user, string $planId, string $paymentToken): ?array
     {
         if (empty($this->serverKey)) {
             Log::error('Cannot create subscription: Midtrans server key not configured');
+
             return null;
         }
 
         $plan = config("subscription.plans.{$planId}");
         if ($plan === null) {
             Log::error('Invalid plan ID', ['planId' => $planId]);
+
             return null;
         }
 
@@ -77,7 +81,7 @@ class MidtransSubscriptionService
 
         try {
             $startTime = microtime(true);
-            
+
             Log::info('Creating Midtrans subscription', [
                 'event' => 'subscription.create.started',
                 'userId' => $user->id,
@@ -93,7 +97,7 @@ class MidtransSubscriptionService
 
             $duration = microtime(true) - $startTime;
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 Log::error('Failed to create Midtrans subscription', [
                     'event' => 'subscription.create.failed',
                     'status' => $response->status(),
@@ -102,6 +106,7 @@ class MidtransSubscriptionService
                     'planId' => $planId,
                     'duration_ms' => round($duration * 1000, 2),
                 ]);
+
                 return null;
             }
 
@@ -122,26 +127,28 @@ class MidtransSubscriptionService
                 'userId' => $user->id,
                 'planId' => $planId,
             ]);
+
             return null;
         }
     }
 
     /**
      * Create subscription from Snap transaction.
-     * 
+     *
      * This method creates a recurring subscription after a successful Snap payment.
      * It extracts the payment token from the transaction and creates a subscription.
      *
-     * @param User $user The user
-     * @param string $orderId The Snap order ID
-     * @param string $planId The plan identifier
-     * @param int $months Number of months for the subscription
+     * @param  User  $user  The user
+     * @param  string  $orderId  The Snap order ID
+     * @param  string  $planId  The plan identifier
+     * @param  int  $months  Number of months for the subscription
      * @return array|null Subscription data or null on failure
      */
     public function createSubscriptionFromSnapTransaction(User $user, string $orderId, string $planId, int $months = 1): ?array
     {
         if (empty($this->serverKey)) {
             Log::error('Cannot create subscription: Midtrans server key not configured');
+
             return null;
         }
 
@@ -156,16 +163,17 @@ class MidtransSubscriptionService
             $transactionResponse = Http::withBasicAuth($this->serverKey, '')
                 ->get("{$this->baseUrl}/{$orderId}/status");
 
-            if (!$transactionResponse->successful()) {
+            if (! $transactionResponse->successful()) {
                 Log::error('Failed to fetch transaction details', [
                     'orderId' => $orderId,
                     'status' => $transactionResponse->status(),
                 ]);
+
                 return null;
             }
 
             $transaction = $transactionResponse->json();
-            
+
             // Extract saved token if available
             $savedTokenId = $transaction['saved_token_id'] ?? null;
             $savedTokenIdExpiry = $transaction['saved_token_id_expired_at'] ?? null;
@@ -175,6 +183,7 @@ class MidtransSubscriptionService
                     'orderId' => $orderId,
                     'userId' => $user->id,
                 ]);
+
                 // Cannot create subscription without token
                 // This is expected for non-card payments
                 return null;
@@ -183,7 +192,7 @@ class MidtransSubscriptionService
             Log::info('Found saved token, creating subscription', [
                 'orderId' => $orderId,
                 'userId' => $user->id,
-                'tokenId' => substr($savedTokenId, 0, 10) . '...',
+                'tokenId' => substr($savedTokenId, 0, 10).'...',
             ]);
 
             // Now create subscription with the token
@@ -196,6 +205,7 @@ class MidtransSubscriptionService
                 'userId' => $user->id,
                 'trace' => $e->getTraceAsString(),
             ]);
+
             return null;
         }
     }
@@ -203,13 +213,14 @@ class MidtransSubscriptionService
     /**
      * Get subscription details.
      *
-     * @param string $subscriptionId The Midtrans subscription ID
+     * @param  string  $subscriptionId  The Midtrans subscription ID
      * @return array|null Subscription data or null on failure
      */
     public function getSubscription(string $subscriptionId): ?array
     {
         if (empty($this->serverKey)) {
             Log::error('Cannot get subscription: Midtrans server key not configured');
+
             return null;
         }
 
@@ -221,12 +232,13 @@ class MidtransSubscriptionService
             $response = Http::withBasicAuth($this->serverKey, '')
                 ->get("{$this->baseUrl}/subscriptions/{$subscriptionId}");
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 Log::error('Failed to get Midtrans subscription', [
                     'status' => $response->status(),
                     'body' => $response->body(),
                     'subscriptionId' => $subscriptionId,
                 ]);
+
                 return null;
             }
 
@@ -236,6 +248,7 @@ class MidtransSubscriptionService
                 'error' => $e->getMessage(),
                 'subscriptionId' => $subscriptionId,
             ]);
+
             return null;
         }
     }
@@ -243,19 +256,20 @@ class MidtransSubscriptionService
     /**
      * Cancel/disable subscription.
      *
-     * @param string $subscriptionId The Midtrans subscription ID
+     * @param  string  $subscriptionId  The Midtrans subscription ID
      * @return bool True on success, false on failure
      */
     public function cancelSubscription(string $subscriptionId): bool
     {
         if (empty($this->serverKey)) {
             Log::error('Cannot cancel subscription: Midtrans server key not configured');
+
             return false;
         }
 
         try {
             $startTime = microtime(true);
-            
+
             Log::info('Cancelling Midtrans subscription', [
                 'event' => 'subscription.cancel.started',
                 'subscriptionId' => $subscriptionId,
@@ -266,7 +280,7 @@ class MidtransSubscriptionService
 
             $duration = microtime(true) - $startTime;
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 Log::error('Failed to cancel Midtrans subscription', [
                     'event' => 'subscription.cancel.failed',
                     'status' => $response->status(),
@@ -274,6 +288,7 @@ class MidtransSubscriptionService
                     'subscriptionId' => $subscriptionId,
                     'duration_ms' => round($duration * 1000, 2),
                 ]);
+
                 return false;
             }
 
@@ -289,6 +304,7 @@ class MidtransSubscriptionService
                 'error' => $e->getMessage(),
                 'subscriptionId' => $subscriptionId,
             ]);
+
             return false;
         }
     }
@@ -296,14 +312,15 @@ class MidtransSubscriptionService
     /**
      * Update subscription.
      *
-     * @param string $subscriptionId The Midtrans subscription ID
-     * @param array $data Update data
+     * @param  string  $subscriptionId  The Midtrans subscription ID
+     * @param  array  $data  Update data
      * @return array|null Updated subscription data or null on failure
      */
     public function updateSubscription(string $subscriptionId, array $data): ?array
     {
         if (empty($this->serverKey)) {
             Log::error('Cannot update subscription: Midtrans server key not configured');
+
             return null;
         }
 
@@ -317,12 +334,13 @@ class MidtransSubscriptionService
                 ->withHeaders(['Content-Type' => 'application/json'])
                 ->patch("{$this->baseUrl}/subscriptions/{$subscriptionId}", $data);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 Log::error('Failed to update Midtrans subscription', [
                     'status' => $response->status(),
                     'body' => $response->body(),
                     'subscriptionId' => $subscriptionId,
                 ]);
+
                 return null;
             }
 
@@ -337,6 +355,7 @@ class MidtransSubscriptionService
                 'error' => $e->getMessage(),
                 'subscriptionId' => $subscriptionId,
             ]);
+
             return null;
         }
     }
@@ -344,13 +363,14 @@ class MidtransSubscriptionService
     /**
      * Enable subscription.
      *
-     * @param string $subscriptionId The Midtrans subscription ID
+     * @param  string  $subscriptionId  The Midtrans subscription ID
      * @return bool True on success, false on failure
      */
     public function enableSubscription(string $subscriptionId): bool
     {
         if (empty($this->serverKey)) {
             Log::error('Cannot enable subscription: Midtrans server key not configured');
+
             return false;
         }
 
@@ -362,12 +382,13 @@ class MidtransSubscriptionService
             $response = Http::withBasicAuth($this->serverKey, '')
                 ->post("{$this->baseUrl}/subscriptions/{$subscriptionId}/enable");
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 Log::error('Failed to enable Midtrans subscription', [
                     'status' => $response->status(),
                     'body' => $response->body(),
                     'subscriptionId' => $subscriptionId,
                 ]);
+
                 return false;
             }
 
@@ -381,17 +402,16 @@ class MidtransSubscriptionService
                 'error' => $e->getMessage(),
                 'subscriptionId' => $subscriptionId,
             ]);
+
             return false;
         }
     }
 
     /**
      * Check if the Midtrans service is properly configured.
-     *
-     * @return bool
      */
     public function isConfigured(): bool
     {
-        return !empty($this->serverKey);
+        return ! empty($this->serverKey);
     }
 }

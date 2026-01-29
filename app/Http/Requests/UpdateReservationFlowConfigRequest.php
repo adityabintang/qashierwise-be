@@ -30,14 +30,14 @@ class UpdateReservationFlowConfigRequest extends FormRequest
             if (is_string($blockedTimes)) {
                 $blockedTimes = $blockedTimes ? explode(',', $blockedTimes) : [];
             }
-            if (!is_array($blockedTimes)) {
+            if (! is_array($blockedTimes)) {
                 $blockedTimes = [];
             }
             // Trim each time to H:i format
-            $data['blocked_times'] = array_map(fn($t) => substr(trim($t), 0, 5), $blockedTimes);
+            $data['blocked_times'] = array_map(fn ($t) => substr(trim($t), 0, 5), $blockedTimes);
         }
 
-        if (!empty($data)) {
+        if (! empty($data)) {
             $this->merge($data);
         }
     }

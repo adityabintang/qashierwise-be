@@ -22,6 +22,7 @@ class CredentialAuditService
     public function setRequest(?Request $request): self
     {
         $this->request = $request;
+
         return $this;
     }
 
@@ -35,7 +36,7 @@ class CredentialAuditService
         bool $success = true,
         ?string $errorMessage = null
     ): CredentialAccessLog {
-        if (!CredentialAccessLog::isValidAction($action)) {
+        if (! CredentialAccessLog::isValidAction($action)) {
             throw new \InvalidArgumentException("Invalid action: {$action}");
         }
 
@@ -213,7 +214,7 @@ class CredentialAuditService
             'successful_actions' => $logs->where('success', true)->count(),
             'failed_actions' => $logs->where('success', false)->count(),
             'rls_violations' => $logs->where('success', false)
-                ->filter(fn($log) => str_contains($log->error_message ?? '', 'RLS Violation'))
+                ->filter(fn ($log) => str_contains($log->error_message ?? '', 'RLS Violation'))
                 ->count(),
         ];
     }

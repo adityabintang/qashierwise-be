@@ -9,11 +9,28 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, HasRoles, Notifiable;
+
+    /**
+     * The guard name for Spatie Permission.
+     *
+     * @var string
+     */
+    protected $guard_name = 'sanctum';
+
+    /**
+     * Get the default guard name for the model.
+     * Required for Spatie Permission to work with Sanctum.
+     */
+    public function guardName(): string
+    {
+        return 'sanctum';
+    }
 
     /**
      * The attributes that are mass assignable.
@@ -25,6 +42,7 @@ class User extends Authenticatable
         'email',
         'password',
         'language_preference',
+        'is_master_admin',
     ];
 
     /**
@@ -47,6 +65,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_master_admin' => 'boolean',
         ];
     }
 
@@ -144,5 +163,65 @@ class User extends Authenticatable
     public function posUsers(): HasMany
     {
         return $this->hasMany(PosUser::class);
+    }
+
+    /**
+     * Check if the user is a master admin.
+     */
+    public function isMasterAdmin(): bool
+    {
+        return $this->is_master_admin === true;
+    }
+
+    /**
+     * Get the master admin for this user.
+     * If user is master admin, returns self.
+     * If user is sub-account (POS user), returns their master admin via store ownership.
+     */
+    public function getMasterAdmin(): ?User
+    {
+        if ($this->isMasterAdmin()) {
+            return $this;
+        }
+
+        // Sub-account: get master admin via POS user's store
+        $posUser = $this->posUsers()->with('store')->first();
+
+        if ($posUser && $posUser->store) {
+            return User::find($posUser->store->user_id);
+        }
+
+        return null;
+    }
+
+    /**
+     * Get effective subscription.
+     * Sub-accounts inherit their master admin's subscription.
+     */
+    public function getEffectiveSubscription()
+    {
+        if ($this->isMasterAdmin()) {
+            return $this->subscription;
+        }
+
+        // Sub-account: get master admin's subscription
+        $masterAdmin = $this->getMasterAdmin();
+
+        return $masterAdmin ? $masterAdmin->subscription : null;
+    }
+
+    /**
+     * Get effective user ID for data ownership.
+     * Sub-accounts use their master admin's ID for data queries.
+     */
+    public function getEffectiveUserId(): int
+    {
+        if ($this->isMasterAdmin()) {
+            return $this->id;
+        }
+
+        $masterAdmin = $this->getMasterAdmin();
+
+        return $masterAdmin ? $masterAdmin->id : $this->id;
     }
 }

@@ -19,7 +19,7 @@ use Tests\TestCase;
 
 /**
  * End-to-end integration tests for Conversation Summarization feature.
- * 
+ *
  * Tests the complete flow from message processing through summarization
  * to context usage in subsequent LLM calls.
  */
@@ -28,10 +28,15 @@ class ConversationSummarizationIntegrationTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private WhatsAppAccount $whatsappAccount;
+
     private WhatsAppContact $whatsappContact;
+
     private AiAgent $aiAgent;
+
     private AiAgentService $aiAgentService;
+
     private ConversationSummarizer $summarizer;
 
     protected function setUp(): void
@@ -76,33 +81,33 @@ class ConversationSummarizationIntegrationTest extends TestCase
                 ->push([
                     'choices' => [[
                         'message' => [
-                            'content' => 'Halo! Selamat datang di restoran kami. Ada yang bisa saya bantu?'
-                        ]
-                    ]]
+                            'content' => 'Halo! Selamat datang di restoran kami. Ada yang bisa saya bantu?',
+                        ],
+                    ]],
                 ])
                 // Response 2: Menu inquiry
                 ->push([
                     'choices' => [[
                         'message' => [
-                            'content' => 'Kami punya menu ayam goreng, nasi goreng, dan mie goreng. Mau pesan yang mana?'
-                        ]
-                    ]]
+                            'content' => 'Kami punya menu ayam goreng, nasi goreng, dan mie goreng. Mau pesan yang mana?',
+                        ],
+                    ]],
                 ])
                 // Response 3-6: More conversation
                 ->push([
                     'choices' => [[
-                        'message' => ['content' => 'Ayam goreng kami sangat enak! Berapa porsi yang Anda inginkan?']
-                    ]]
+                        'message' => ['content' => 'Ayam goreng kami sangat enak! Berapa porsi yang Anda inginkan?'],
+                    ]],
                 ])
                 ->push([
                     'choices' => [[
-                        'message' => ['content' => 'Baik, 2 porsi ayam goreng. Ada yang lain?']
-                    ]]
+                        'message' => ['content' => 'Baik, 2 porsi ayam goreng. Ada yang lain?'],
+                    ]],
                 ])
                 ->push([
                     'choices' => [[
-                        'message' => ['content' => 'Oke, jadi 2 ayam goreng dan 1 nasi goreng. Total Rp 75.000. Mau pesan sekarang?']
-                    ]]
+                        'message' => ['content' => 'Oke, jadi 2 ayam goreng dan 1 nasi goreng. Total Rp 75.000. Mau pesan sekarang?'],
+                    ]],
                 ])
                 // Response: Summarization call
                 ->push([
@@ -115,23 +120,23 @@ class ConversationSummarizationIntegrationTest extends TestCase
                                     'products' => ['ayam goreng', 'nasi goreng'],
                                     'order_items' => [
                                         ['product' => 'ayam goreng', 'quantity' => 2, 'price' => 25000],
-                                        ['product' => 'nasi goreng', 'quantity' => 1, 'price' => 25000]
+                                        ['product' => 'nasi goreng', 'quantity' => 1, 'price' => 25000],
                                     ],
                                     'total_estimate' => 75000,
                                     'reservation_date' => null,
                                     'reservation_time' => null,
-                                    'people_count' => null
+                                    'people_count' => null,
                                 ],
-                                'missing_information' => []
-                            ])
-                        ]
-                    ]]
+                                'missing_information' => [],
+                            ]),
+                        ],
+                    ]],
                 ])
                 // Response: After summarization
                 ->push([
                     'choices' => [[
-                        'message' => ['content' => 'Pesanan Anda sudah dikonfirmasi! Silakan lakukan pembayaran.']
-                    ]]
+                        'message' => ['content' => 'Pesanan Anda sudah dikonfirmasi! Silakan lakukan pembayaran.'],
+                    ]],
                 ]),
         ]);
 
@@ -191,7 +196,7 @@ class ConversationSummarizationIntegrationTest extends TestCase
             }
 
             // Get AI response (simulated)
-            $aiResponse = 'Response ' . ($index + 1);
+            $aiResponse = 'Response '.($index + 1);
             $currentMessages[] = [
                 'type' => 'ai',
                 'content' => $aiResponse,
@@ -213,7 +218,7 @@ class ConversationSummarizationIntegrationTest extends TestCase
      */
     public function test_token_savings_in_production_scenario(): void
     {
-        $tokenEstimator = new TokenEstimator();
+        $tokenEstimator = new TokenEstimator;
 
         // Create a long conversation (simulating real WhatsApp chat)
         $longConversation = [
@@ -238,7 +243,7 @@ class ConversationSummarizationIntegrationTest extends TestCase
                 'products' => ['ayam goreng', 'nasi goreng'],
                 'order_items' => [
                     ['product' => 'ayam goreng', 'quantity' => 2, 'price' => 25000],
-                    ['product' => 'nasi goreng', 'quantity' => 1, 'price' => 25000]
+                    ['product' => 'nasi goreng', 'quantity' => 1, 'price' => 25000],
                 ],
                 'total_estimate' => 75000,
             ],
@@ -281,12 +286,12 @@ class ConversationSummarizationIntegrationTest extends TestCase
                                 'reservation_time' => '19:00',
                                 'people_count' => 4,
                                 'order_items' => [],
-                                'total_estimate' => null
+                                'total_estimate' => null,
                             ],
-                            'missing_information' => ['contact_name', 'phone_number']
-                        ])
-                    ]
-                ]]
+                            'missing_information' => ['contact_name', 'phone_number'],
+                        ]),
+                    ],
+                ]],
             ]),
         ]);
 
@@ -316,7 +321,7 @@ class ConversationSummarizationIntegrationTest extends TestCase
      */
     public function test_intent_change_detection_triggers_summarization(): void
     {
-        $intentTracker = new IntentTracker();
+        $intentTracker = new IntentTracker;
 
         $conversation = AiAgentConversation::create([
             'ai_agent_id' => $this->aiAgent->id,
@@ -353,9 +358,9 @@ class ConversationSummarizationIntegrationTest extends TestCase
             '*/chat/completions' => Http::response([
                 'choices' => [[
                     'message' => [
-                        'content' => 'This is not valid JSON at all!'
-                    ]
-                ]]
+                        'content' => 'This is not valid JSON at all!',
+                    ],
+                ]],
             ]),
         ]);
 
@@ -434,7 +439,7 @@ class ConversationSummarizationIntegrationTest extends TestCase
                 'summary' => [
                     'summary' => 'Old summary',
                     'intent' => 'browse_menu',
-                ]
+                ],
             ],
             'expires_at' => now()->subHour(), // Expired 1 hour ago
         ]);
@@ -480,7 +485,7 @@ class ConversationSummarizationIntegrationTest extends TestCase
      */
     public function test_summary_validator_validates_correctly(): void
     {
-        $validator = new SummaryValidator();
+        $validator = new SummaryValidator;
 
         // Valid summary
         $validSummary = [

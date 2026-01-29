@@ -22,7 +22,7 @@ class WhatsAppMedia extends Model
         'local_path',
         'type',
         'sha256',
-        'downloaded_at'
+        'downloaded_at',
     ];
 
     protected $casts = [

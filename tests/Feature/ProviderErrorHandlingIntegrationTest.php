@@ -8,7 +8,7 @@ use Tests\TestCase;
 
 /**
  * Integration test for provider error handling middleware.
- * 
+ *
  * Verifies that the SanitizeProviderErrors middleware properly
  * handles errors in real API endpoints.
  */
@@ -21,7 +21,7 @@ class ProviderErrorHandlingIntegrationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         $this->user = User::factory()->create();
     }
 

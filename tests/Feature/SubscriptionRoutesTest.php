@@ -33,7 +33,7 @@ class SubscriptionRoutesTest extends TestCase
         // We test the manage route which should redirect to login
         $response = $this->get(route('subscription.manage'));
         $response->assertRedirect(route('login'));
-        
+
         // Test cancel subscription route requires auth
         $response = $this->post(route('subscription.cancel.post'));
         $response->assertRedirect(route('login'));
@@ -49,7 +49,7 @@ class SubscriptionRoutesTest extends TestCase
             'status_code' => '200',
             'gross_amount' => '99000.00',
         ]);
-        
+
         // Should not redirect to login, should process the webhook
         // Even if signature is invalid, it should return 200 or 400, not 401/302
         $this->assertNotEquals(302, $response->status());
@@ -67,7 +67,7 @@ class SubscriptionRoutesTest extends TestCase
             'status_code' => '200',
             'gross_amount' => '99000.00',
         ]);
-        
+
         // Should not return 419 (CSRF token mismatch)
         $this->assertNotEquals(419, $response->status());
     }
@@ -85,7 +85,7 @@ class SubscriptionRoutesTest extends TestCase
             'status_code' => '200',
             'gross_amount' => '99000.00',
         ]);
-        
+
         // Should process the request (not return 429 on first request)
         $this->assertNotEquals(429, $response->status());
     }
@@ -96,10 +96,10 @@ class SubscriptionRoutesTest extends TestCase
     public function test_subscription_routes_use_correct_http_methods(): void
     {
         $user = User::factory()->create();
-        
+
         // GET routes should work
         $this->actingAs($user)->get(route('subscription.pricing'))->assertSuccessful();
-        
+
         // POST routes should not accept GET (405 Method Not Allowed)
         $this->actingAs($user)->get(route('subscription.checkout'))->assertStatus(405);
     }
@@ -110,7 +110,7 @@ class SubscriptionRoutesTest extends TestCase
     public function test_authenticated_users_can_access_subscription_routes(): void
     {
         $user = User::factory()->create();
-        
+
         // Pricing page should be accessible
         $response = $this->actingAs($user)->get(route('subscription.pricing'));
         $response->assertSuccessful();

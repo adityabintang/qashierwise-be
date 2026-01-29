@@ -2,21 +2,21 @@
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use App\Models\User;
 use App\Models\PaymentProviderCredential;
+use App\Models\User;
+use App\Services\EncryptionService;
 use App\Services\ProviderCredentialService;
 use App\Services\ProviderValidationService;
-use App\Services\EncryptionService;
-use App\Services\KeyManagementService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
+use Tests\TestCase;
 
 class ProviderCredentialServiceTest extends TestCase
 {
     use RefreshDatabase;
 
     protected ProviderCredentialService $service;
+
     protected User $user;
 
     protected function setUp(): void
@@ -24,7 +24,7 @@ class ProviderCredentialServiceTest extends TestCase
         parent::setUp();
 
         $this->user = User::factory()->create();
-        
+
         // Mock the validation service to avoid actual API calls
         $mockValidation = Mockery::mock(ProviderValidationService::class);
         $mockValidation->shouldReceive('validateCredentials')->andReturn(
@@ -77,7 +77,7 @@ class ProviderCredentialServiceTest extends TestCase
         $result = $this->service->updateCredentials($credential, $newCredentials);
 
         $this->assertTrue($result);
-        
+
         $credential->refresh();
         $this->assertNotEmpty($credential->credentials_encrypted);
     }

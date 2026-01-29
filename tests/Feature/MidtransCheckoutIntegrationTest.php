@@ -18,7 +18,7 @@ class MidtransCheckoutIntegrationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         $this->user = User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
@@ -183,6 +183,7 @@ class MidtransCheckoutIntegrationTest extends TestCase
         // Verify correct amount was sent to Midtrans
         Http::assertSent(function ($request) {
             $body = json_decode($request->body(), true);
+
             return $body['transaction_details']['gross_amount'] === 199000;
         });
     }
@@ -204,6 +205,7 @@ class MidtransCheckoutIntegrationTest extends TestCase
 
         Http::assertSent(function ($request) {
             $body = json_decode($request->body(), true);
+
             return $body['customer_details']['first_name'] === 'Test User'
                 && $body['customer_details']['email'] === 'test@example.com'
                 && $body['custom_field3'] === (string) $this->user->id;

@@ -25,10 +25,10 @@ class SubscriptionFactory extends Factory
             'provider' => 'midtrans',
             'plan_name' => 'standard',
             'status' => 'active',
-            'polar_subscription_id' => 'polar_' . $this->faker->uuid(), // Required by schema
-            'polar_customer_id' => 'polar_cust_' . $this->faker->uuid(), // Required by schema
-            'midtrans_subscription_id' => 'sub_' . $this->faker->uuid(),
-            'midtrans_customer_id' => 'cust_' . $this->faker->uuid(),
+            'polar_subscription_id' => 'polar_'.$this->faker->uuid(), // Required by schema
+            'polar_customer_id' => 'polar_cust_'.$this->faker->uuid(), // Required by schema
+            'midtrans_subscription_id' => 'sub_'.$this->faker->uuid(),
+            'midtrans_customer_id' => 'cust_'.$this->faker->uuid(),
             'current_period_start' => now(),
             'current_period_end' => now()->addMonth(),
             'metadata' => null,
@@ -88,10 +88,10 @@ class SubscriptionFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'provider' => 'polar',
-            'polar_subscription_id' => 'polar_sub_' . $this->faker->uuid(),
-            'polar_customer_id' => 'polar_cust_' . $this->faker->uuid(),
-            'midtrans_subscription_id' => 'mid_' . $this->faker->uuid(), // Required by schema
-            'midtrans_customer_id' => 'mid_cust_' . $this->faker->uuid(), // Required by schema
+            'polar_subscription_id' => 'polar_sub_'.$this->faker->uuid(),
+            'polar_customer_id' => 'polar_cust_'.$this->faker->uuid(),
+            'midtrans_subscription_id' => 'mid_'.$this->faker->uuid(), // Required by schema
+            'midtrans_customer_id' => 'mid_cust_'.$this->faker->uuid(), // Required by schema
         ]);
     }
 
@@ -102,10 +102,10 @@ class SubscriptionFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'provider' => 'midtrans',
-            'polar_subscription_id' => 'polar_' . $this->faker->uuid(), // Required by schema
-            'polar_customer_id' => 'polar_cust_' . $this->faker->uuid(), // Required by schema
-            'midtrans_subscription_id' => 'sub_' . $this->faker->uuid(),
-            'midtrans_customer_id' => 'cust_' . $this->faker->uuid(),
+            'polar_subscription_id' => 'polar_'.$this->faker->uuid(), // Required by schema
+            'polar_customer_id' => 'polar_cust_'.$this->faker->uuid(), // Required by schema
+            'midtrans_subscription_id' => 'sub_'.$this->faker->uuid(),
+            'midtrans_customer_id' => 'cust_'.$this->faker->uuid(),
         ]);
     }
 }

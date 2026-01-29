@@ -46,7 +46,7 @@ class PromoCode extends Model
      */
     public function isValid(): bool
     {
-        if (!$this->is_active) {
+        if (! $this->is_active) {
             return false;
         }
 
@@ -73,7 +73,7 @@ class PromoCode extends Model
      */
     public function isApplicableToPlan(string $planId): bool
     {
-        if (!$this->applicable_plans) {
+        if (! $this->applicable_plans) {
             return true; // Applicable to all plans
         }
 
@@ -99,6 +99,7 @@ class PromoCode extends Model
     public function calculateFinalAmount(float $amount): float
     {
         $discount = $this->calculateDiscount($amount);
+
         return max(0, $amount - $discount);
     }
 

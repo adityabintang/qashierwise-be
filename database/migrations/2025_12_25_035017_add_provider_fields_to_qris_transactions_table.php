@@ -14,10 +14,10 @@ return new class extends Migration
         Schema::table('qris_transactions', function (Blueprint $table) {
             // Add provider field after sub_merchant_id
             $table->string('provider', 20)->nullable()->after('sub_merchant_id');
-            
+
             // Add provider_transaction_id after midtrans_transaction_id
             $table->string('provider_transaction_id', 100)->nullable()->after('midtrans_transaction_id');
-            
+
             // Add index for provider-based queries
             $table->index(['provider', 'status', 'created_at'], 'idx_provider_transactions');
         });

@@ -21,20 +21,20 @@ return [
     'account_active' => 'Akun Anda aktif dan siap mengirim pesan',
     'account_not_connected' => 'Tidak Ada Akun WhatsApp Terhubung',
     'account_connect_description' => 'Hubungkan akun WhatsApp Business Anda untuk mulai mengirim dan menerima pesan melalui QashierWise.',
-    
+
     // Connection Actions
     'connect_with_facebook' => 'Hubungkan dengan Facebook',
     'connecting' => 'Menghubungkan...',
     'disconnect' => 'Putuskan Koneksi',
     'disconnecting' => 'Memutuskan Koneksi...',
     'reconnect' => 'Hubungkan Kembali',
-    
+
     // Connection Status
     'loading_account_status' => 'Memuat status akun...',
     'loading_timeout' => 'Waktu muat habis. Silakan muat ulang halaman.',
     'redirect_notice' => 'Anda akan diarahkan ke Facebook untuk mengotorisasi akun WhatsApp Business Anda',
     'sdk_loading' => 'Memuat...',
-    
+
     // Account Details
     'phone_number' => 'Nomor Telepon',
     'business_name' => 'Nama Bisnis',
@@ -48,14 +48,14 @@ return [
     'enabled' => 'Aktif',
     'disabled' => 'Nonaktif',
     'unknown' => 'Tidak Diketahui',
-    
+
     // Disconnect Confirmation
     'disconnect_account' => 'Putuskan Koneksi Akun',
     'disconnect_description' => 'Hapus akun WhatsApp ini dari QashierWise',
     'disconnect_confirm_title' => 'Putuskan Koneksi Akun WhatsApp?',
     'disconnect_confirm_message' => 'Apakah Anda yakin ingin memutuskan koneksi akun WhatsApp Business Anda? Anda tidak akan dapat mengirim atau menerima pesan sampai Anda menghubungkan kembali.',
     'yes_disconnect' => 'Ya, Putuskan Koneksi',
-    
+
     // Account Info
     'about_integration' => 'Tentang Integrasi WhatsApp Business',
     'integration_feature_1' => 'Kirim dan terima pesan WhatsApp langsung dari QashierWise',
@@ -74,7 +74,7 @@ return [
     'status_queued' => 'Dalam Antrian',
     'status_accepted' => 'Diterima',
     'status_deleted' => 'Dihapus',
-    
+
     // ========================================
     // Contact Management
     // ========================================
@@ -83,21 +83,21 @@ return [
     'contact_details' => 'Detail Kontak',
     'contact_card' => 'Kartu Kontak',
     'contact_shared' => 'Kontak dibagikan',
-    
+
     // Contact Information
     'name' => 'Nama',
     'profile_name' => 'Profil WhatsApp',
     'last_activity' => 'Aktivitas Terakhir',
     'messages_count' => 'Pesan',
     'messages' => 'pesan',
-    
+
     // Contact Actions
     'send_message' => 'Kirim Pesan',
     'message' => 'Pesan',
     'view_contact' => 'Lihat Kontak',
     'manage_contacts' => 'Kelola Kontak',
     'view_and_organize' => 'Lihat dan atur',
-    
+
     // Contact Search & Filter
     'search_contacts' => 'Cari kontak...',
     'sort_by' => 'Urutkan berdasarkan',
@@ -105,11 +105,11 @@ return [
     'name_desc' => 'Nama (Z-A)',
     'recently_added' => 'Baru Ditambahkan',
     'oldest_first' => 'Terlama Dulu',
-    
+
     // Contact Empty States
     'no_contacts_found' => 'Tidak ada kontak ditemukan',
     'contacts_will_appear' => 'Kontak akan muncul di sini ketika Anda menerima atau mengirim pesan.',
-    
+
     // ========================================
     // Messages & Chat
     // ========================================
@@ -121,7 +121,7 @@ return [
     'type_message' => 'Ketik pesan...',
     'send' => 'Kirim',
     'sending' => 'Mengirim...',
-    
+
     // Message Types
     'text_message' => 'Pesan teks',
     'image' => 'Gambar',
@@ -133,18 +133,18 @@ return [
     'template_message' => 'Template',
     'interactive_message' => 'Pesan interaktif',
     'reaction' => 'Reaksi',
-    
+
     // Message Actions
     'download' => 'Unduh',
     'open_in_maps' => 'Buka di Maps',
     'view_options' => 'Lihat Opsi',
-    
+
     // Chat Interface
     'back_to_contacts' => 'Kembali ke kontak',
     'refresh_messages' => 'Muat ulang pesan',
     'attach' => 'Lampirkan',
     'cancel_template' => 'Batalkan template',
-    
+
     // Attachment Menu
     'attach_template' => 'Template',
     'attach_image' => 'Gambar',
@@ -154,12 +154,12 @@ return [
     'attach_location' => 'Lokasi',
     'attach_buttons' => 'Tombol',
     'attach_list' => 'Daftar',
-    
+
     // Message Indicators
     'template_indicator' => 'Template:',
     'caption' => 'Keterangan',
     'filename' => 'Nama file',
-    
+
     // ========================================
     // Templates
     // ========================================
@@ -168,7 +168,7 @@ return [
     'message_templates' => 'Template Pesan',
     'create_manage_templates' => 'Buat dan kelola template pesan WhatsApp Anda',
     'manage_templates' => 'Kelola template',
-    
+
     // Template Actions
     'create_template' => 'Buat Template',
     'create_new_template' => 'Buat Template Baru',
@@ -179,20 +179,20 @@ return [
     'sync_from_meta' => 'Sinkronkan dari Meta',
     'syncing' => 'Menyinkronkan...',
     'sync' => 'Sinkronkan',
-    
+
     // Template Status
     'approved' => 'Disetujui',
     'pending' => 'Menunggu',
     'rejected' => 'Ditolak',
     'all_statuses' => 'Semua Status',
-    
+
     // Template Categories
     'category' => 'Kategori',
     'marketing' => 'Pemasaran',
     'utility' => 'Utilitas',
     'authentication' => 'Autentikasi',
     'all_categories' => 'Semua Kategori',
-    
+
     // Template Components
     'header' => 'Header',
     'body' => 'Isi',
@@ -203,7 +203,7 @@ return [
     'image_header' => 'Gambar',
     'video_header' => 'Video',
     'document_header' => 'Dokumen',
-    
+
     // Template Form
     'template_name' => 'Nama Template',
     'template_name_placeholder' => 'contoh: konfirmasi_pesanan',
@@ -214,25 +214,25 @@ return [
     'basic_information' => 'Informasi Dasar',
     'template_content' => 'Konten Template',
     'template_preview' => 'Pratinjau',
-    
+
     // Template Search & Filter
     'search_templates' => 'Cari template...',
     'filter_by_status' => 'Filter berdasarkan status',
     'filter_by_category' => 'Filter berdasarkan kategori',
-    
+
     // Template Details
     'template_details' => 'Detail Template',
     'template' => 'Template',
-    
+
     // Template Empty States
     'no_templates_found' => 'Tidak ada template ditemukan',
     'templates_will_appear' => 'Template pesan Anda akan muncul di sini.',
-    
+
     // Template Sending
     'select_contact' => 'Pilih Kontak',
     'choose_contact' => 'Pilih kontak...',
     'creating_template' => 'Membuat template...',
-    
+
     // ========================================
     // Business Profile
     // ========================================
@@ -244,7 +244,7 @@ return [
     'business_website' => 'Website Bisnis',
     'business_category' => 'Kategori Bisnis',
     'business_hours' => 'Jam Operasional',
-    
+
     // ========================================
     // Notifications & Messages
     // ========================================
@@ -255,7 +255,7 @@ return [
     'success_template_updated' => 'Template berhasil diperbarui',
     'success_template_deleted' => 'Template berhasil dihapus',
     'success_synced' => 'Template berhasil disinkronkan',
-    
+
     // Error Messages
     'error_connection_failed' => 'Gagal menghubungkan akun WhatsApp',
     'error_disconnection_failed' => 'Gagal memutuskan koneksi akun WhatsApp',
@@ -273,13 +273,13 @@ return [
     'error_token_expired' => 'Token WhatsApp kedaluwarsa. Silakan hubungkan kembali.',
     'error_token_invalid' => 'Token WhatsApp tidak valid. Silakan hubungkan kembali.',
     'error_config_unavailable' => 'Konfigurasi WhatsApp tidak tersedia. Silakan muat ulang halaman dan coba lagi.',
-    
+
     // Warning Messages
     'warning_no_contacts' => 'Tidak ada kontak tersedia',
     'warning_no_templates' => 'Tidak ada template tersedia',
     'warning_template_pending' => 'Template ini menunggu persetujuan',
     'warning_template_rejected' => 'Template ini ditolak',
-    
+
     // ========================================
     // Common Actions
     // ========================================
@@ -294,7 +294,7 @@ return [
     'loading' => 'Memuat...',
     'processing' => 'Memproses...',
     'please_wait' => 'Mohon tunggu...',
-    
+
     // ========================================
     // Time & Date
     // ========================================
@@ -304,7 +304,7 @@ return [
     'days_ago' => ':count hari yang lalu',
     'hours_ago' => ':count jam yang lalu',
     'minutes_ago' => ':count menit yang lalu',
-    
+
     // ========================================
     // Validation
     // ========================================
@@ -316,7 +316,6 @@ return [
     'language_required' => 'Bahasa wajib diisi',
     'body_required' => 'Isi pesan wajib diisi',
     'contact_required' => 'Silakan pilih kontak',
-    
 
     // ========================================
     // Profile

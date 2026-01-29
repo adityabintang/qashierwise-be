@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Models\PaymentProviderCredential;
 use App\Models\QrisTransaction;
-use App\Models\SubMerchant;
 use App\Models\User;
 use App\Services\EncryptionService;
 use App\Services\KeyManagementService;
@@ -55,6 +54,7 @@ class MigrateToBYOK extends Command
 
         if ($eligibleUsers->isEmpty()) {
             $this->info('✅ No users need migration. All users are already on BYOK system.');
+
             return 0;
         }
 
@@ -80,6 +80,7 @@ class MigrateToBYOK extends Command
         // Dry run mode
         if ($this->option('dry-run')) {
             $this->warn('🔍 DRY RUN MODE - No changes will be made');
+
             return 0;
         }
 
@@ -88,8 +89,9 @@ class MigrateToBYOK extends Command
             $userId = (int) $this->option('user-id');
             $user = $eligibleUsers->firstWhere('id', $userId);
 
-            if (!$user) {
+            if (! $user) {
                 $this->error("❌ User ID {$userId} not found or not eligible for migration");
+
                 return 1;
             }
 
@@ -99,9 +101,10 @@ class MigrateToBYOK extends Command
         // Migrate all users
         if ($this->option('all')) {
             $this->warn('⚠️  This will migrate ALL eligible users. Each user will need to provide their Midtrans credentials.');
-            
-            if (!$this->confirm('Do you want to continue?')) {
+
+            if (! $this->confirm('Do you want to continue?')) {
                 $this->info('Migration cancelled.');
+
                 return 0;
             }
 
@@ -110,7 +113,7 @@ class MigrateToBYOK extends Command
 
             foreach ($eligibleUsers as $user) {
                 $result = $this->migrateUser($user, $credentialService, $validationService);
-                
+
                 if ($result === 0) {
                     $successCount++;
                 } else {
@@ -121,11 +124,13 @@ class MigrateToBYOK extends Command
             }
 
             $this->info("✅ Migration complete: {$successCount} successful, {$failCount} failed");
+
             return $failCount > 0 ? 1 : 0;
         }
 
         // Interactive mode - prompt user to select
         $this->info('💡 Use --user-id=<ID> to migrate a specific user, or --all to migrate all users');
+
         return 0;
     }
 
@@ -146,7 +151,7 @@ class MigrateToBYOK extends Command
                 $query->where('provider', PaymentProviderCredential::PROVIDER_MIDTRANS);
             })
             ->withCount([
-                'subMerchant.transactions as transactions_count'
+                'subMerchant.transactions as transactions_count',
             ])
             ->with('subMerchant')
             ->get();
@@ -169,16 +174,18 @@ class MigrateToBYOK extends Command
         $this->newLine();
 
         $serverKey = $this->secret('Enter Midtrans Server Key');
-        
+
         if (empty($serverKey)) {
             $this->error('❌ Server Key is required. Migration cancelled.');
+
             return 1;
         }
 
         $clientKey = $this->ask('Enter Midtrans Client Key');
-        
+
         if (empty($clientKey)) {
             $this->error('❌ Client Key is required. Migration cancelled.');
+
             return 1;
         }
 
@@ -201,10 +208,11 @@ class MigrateToBYOK extends Command
             // Validate credentials
             $validationResult = $validationService->validateCredentials($credential);
 
-            if (!$validationResult->isValid) {
+            if (! $validationResult->isValid) {
                 DB::rollBack();
-                $this->error('❌ Credential validation failed: ' . $validationResult->errorMessage);
+                $this->error('❌ Credential validation failed: '.$validationResult->errorMessage);
                 $this->error('Please check your credentials and try again.');
+
                 return 1;
             }
 
@@ -218,7 +226,7 @@ class MigrateToBYOK extends Command
 
             DB::commit();
 
-            $this->info('✅ Migration completed successfully for ' . $user->name);
+            $this->info('✅ Migration completed successfully for '.$user->name);
             $this->info('   - Credentials stored and encrypted');
             $this->info('   - Midtrans set as active provider');
             $this->info('   - Transaction history preserved');
@@ -227,8 +235,9 @@ class MigrateToBYOK extends Command
 
         } catch (\Exception $e) {
             DB::rollBack();
-            $this->error('❌ Migration failed: ' . $e->getMessage());
+            $this->error('❌ Migration failed: '.$e->getMessage());
             $this->error('   All changes have been rolled back.');
+
             return 1;
         }
     }
@@ -240,7 +249,7 @@ class MigrateToBYOK extends Command
     {
         $subMerchant = $user->subMerchant;
 
-        if (!$subMerchant) {
+        if (! $subMerchant) {
             return;
         }
 
@@ -267,13 +276,15 @@ class MigrateToBYOK extends Command
 
         $user = User::find($userId);
 
-        if (!$user) {
+        if (! $user) {
             $this->error("❌ User ID {$userId} not found");
+
             return 1;
         }
 
-        if (!$this->confirm("Are you sure you want to rollback migration for {$user->name}?")) {
+        if (! $this->confirm("Are you sure you want to rollback migration for {$user->name}?")) {
             $this->info('Rollback cancelled.');
+
             return 0;
         }
 
@@ -287,19 +298,20 @@ class MigrateToBYOK extends Command
 
             // Optionally clear provider field from transactions
             // (keeping it for historical purposes by default)
-            
+
             DB::commit();
 
-            $this->info("✅ Rollback completed");
+            $this->info('✅ Rollback completed');
             $this->info("   - Deleted {$deleted} credential record(s)");
-            $this->info("   - Transaction history preserved");
-            $this->warn("   Note: User will need to reconfigure credentials to use QRIS");
+            $this->info('   - Transaction history preserved');
+            $this->warn('   Note: User will need to reconfigure credentials to use QRIS');
 
             return 0;
 
         } catch (\Exception $e) {
             DB::rollBack();
-            $this->error('❌ Rollback failed: ' . $e->getMessage());
+            $this->error('❌ Rollback failed: '.$e->getMessage());
+
             return 1;
         }
     }

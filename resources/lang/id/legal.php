@@ -19,7 +19,7 @@ return [
         'title' => 'Kebijakan Privasi',
         'meta_title' => 'Kebijakan Privasi - QashierWise',
         'last_updated_date' => '27 November 2025',
-        
+
         'section_1' => [
             'title' => 'Informasi yang Kami Kumpulkan',
             'intro' => 'QashierWise mengumpulkan informasi yang Anda berikan kepada kami ketika menggunakan layanan kami, termasuk:',
@@ -115,7 +115,7 @@ return [
         'title' => 'Ketentuan Layanan',
         'meta_title' => 'Ketentuan Layanan - QashierWise',
         'last_updated_date' => '10 Februari 2025',
-        
+
         'intro' => [
             'title' => 'Syarat dan Ketentuan Penggunaan Produk QashierWise',
             'paragraph_1' => 'Terima kasih atas kepercayaan Anda menggunakan produk QashierWise. Dengan menggunakan layanan dan/atau produk yang disediakan oleh "QashierWise", Anda, perusahaan dan/atau bisnis yang telah memberikan izin atau otorisasi untuk mewakili Anda ("Pengguna") setuju dengan Syarat dan Ketentuan Penggunaan Produk QashierWise berikut ini serta syarat, kebijakan dan dokumentasi terkait lainnya yang disediakan oleh QashierWise dari waktu ke waktu ("Syarat dan Ketentuan").',
@@ -125,7 +125,7 @@ return [
         'section_1' => [
             'title' => 'Ketentuan Umum',
             'intro' => 'Ketentuan Umum ini berlaku untuk semua Pengguna yang menggunakan Produk (sebagaimana didefinisikan di bawah) yang disediakan oleh QashierWise.',
-            
+
             'subsection_a' => [
                 'title' => 'Definisi Umum',
                 'items' => [
@@ -195,7 +195,7 @@ return [
         'title' => 'Kebijakan Pengembalian Dana',
         'meta_title' => 'Kebijakan Pengembalian Dana - QashierWise',
         'last_updated_date' => '23 Januari 2026',
-        
+
         'intro' => 'Di QashierWise, kami berkomitmen untuk memberikan layanan terbaik kepada pelanggan kami. Kebijakan pengembalian dana ini menjelaskan hak Anda terkait pengembalian dana untuk layanan berlangganan QashierWise.',
 
         'section_1' => [

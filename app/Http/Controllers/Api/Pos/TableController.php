@@ -14,16 +14,19 @@ class TableController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $user = $request->user();
 
-        if (! $userId) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
                 'message' => 'Authentication required',
             ], 401);
         }
 
-        $tables = Table::where('user_id', $userId)
+        // Use effective user ID (master admin ID for sub-accounts)
+        $effectiveUserId = $user->getEffectiveUserId();
+
+        $tables = Table::where('user_id', $effectiveUserId)
             ->with('store')
             ->when($request->input('store_id'), fn ($q, $storeId) => $q->where('store_id', $storeId))
             ->when($request->input('status'), fn ($q, $status) => $q->where('status', $status))
@@ -42,7 +45,7 @@ class TableController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
         if (! $userId) {
             return response()->json([
@@ -75,7 +78,7 @@ class TableController extends Controller
      */
     public function show(Table $table): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
         if (! $userId) {
             return response()->json([
@@ -102,7 +105,7 @@ class TableController extends Controller
      */
     public function update(Request $request, Table $table): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
         if (! $userId) {
             return response()->json([
@@ -139,7 +142,7 @@ class TableController extends Controller
      */
     public function destroy(Table $table): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
         if (! $userId) {
             return response()->json([

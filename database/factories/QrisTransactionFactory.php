@@ -24,7 +24,7 @@ class QrisTransactionFactory extends Factory
             'net_amount' => $netAmount,
             'status' => QrisTransaction::STATUS_PENDING,
             'provider' => 'midtrans',
-            'provider_transaction_id' => 'test-' . fake()->uuid(),
+            'provider_transaction_id' => 'test-'.fake()->uuid(),
             'qr_code_url' => fake()->url(),
             'expires_at' => now()->addMinutes(30),
         ];
@@ -64,7 +64,7 @@ class QrisTransactionFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'provider' => 'midtrans',
-            'midtrans_transaction_id' => 'midtrans-' . fake()->uuid(),
+            'midtrans_transaction_id' => 'midtrans-'.fake()->uuid(),
         ]);
     }
 }

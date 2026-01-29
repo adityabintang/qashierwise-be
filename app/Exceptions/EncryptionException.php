@@ -6,7 +6,7 @@ use Exception;
 
 /**
  * Exception thrown when encryption or decryption operations fail.
- * 
+ *
  * This exception is used to wrap encryption-related errors and provide
  * sanitized error messages to users without exposing technical details.
  */

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Role extends Model
@@ -16,6 +17,7 @@ class Role extends Model
      * @var array<int, string>
      */
     protected $fillable = [
+        'user_id',
         'name',
         'permissions',
     ];
@@ -38,5 +40,13 @@ class Role extends Model
     public function posUsers(): HasMany
     {
         return $this->hasMany(PosUser::class);
+    }
+
+    /**
+     * Get the user (master admin) that owns this role.
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 }

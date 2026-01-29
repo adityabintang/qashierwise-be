@@ -17,22 +17,23 @@ use Tests\TestCase;
 
 /**
  * Property-based tests for StoreService
- * 
+ *
  * Feature: point-of-sale
  */
 class StoreServicePropertyTest extends TestCase
 {
-    use TestTrait;
     use RefreshDatabase;
+    use TestTrait;
 
     protected StoreService $storeService;
+
     protected OrderService $orderService;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->storeService = new StoreService();
-        $this->orderService = new OrderService();
+        $this->storeService = new StoreService;
+        $this->orderService = new OrderService;
     }
 
     /**
@@ -41,17 +42,21 @@ class StoreServicePropertyTest extends TestCase
     protected function createPosUser(Store $store): PosUser
     {
         $uniqueId = uniqid();
-        
+
         $user = User::create([
             'name' => 'Test User',
             'email' => "test-{$uniqueId}@example.com",
             'password' => bcrypt('password'),
         ]);
 
-        $role = Role::create([
-            'name' => 'Cashier-' . $uniqueId,
-            'permissions' => ['orders.create', 'orders.update'],
-        ]);
+        // Get or create Spatie role
+        $role = \Spatie\Permission\Models\Role::firstOrCreate(
+            ['name' => 'Cashier', 'guard_name' => 'sanctum'],
+            []
+        );
+
+        // Assign role to user
+        $user->syncRoles([$role->name]);
 
         return PosUser::create([
             'user_id' => $user->id,
@@ -64,8 +69,8 @@ class StoreServicePropertyTest extends TestCase
     /**
      * Feature: point-of-sale, Property 11: Inactive Store Order Rejection
      * Validates: Requirements 5.3
-     * 
-     * For any Store with is_active = false, attempting to create a new Order 
+     *
+     * For any Store with is_active = false, attempting to create a new Order
      * SHALL be rejected.
      */
     #[Test]
@@ -76,7 +81,7 @@ class StoreServicePropertyTest extends TestCase
             ->forAll(
                 // Store name (non-empty string)
                 Generators::suchThat(
-                    fn($s) => strlen(trim($s)) > 0 && strlen($s) <= 100,
+                    fn ($s) => strlen(trim($s)) > 0 && strlen($s) <= 100,
                     Generators::string()
                 ),
                 // Store address
@@ -100,13 +105,13 @@ class StoreServicePropertyTest extends TestCase
                 // Property: Store should be inactive
                 $this->assertFalse(
                     $store->is_active,
-                    "Store should be inactive after deactivation"
+                    'Store should be inactive after deactivation'
                 );
 
                 // Property: canAcceptOrders should return false
                 $this->assertFalse(
                     $this->storeService->canAcceptOrders($store),
-                    "Inactive store should not accept orders"
+                    'Inactive store should not accept orders'
                 );
 
                 // Property: validateForOrderCreation should throw exception
@@ -122,7 +127,7 @@ class StoreServicePropertyTest extends TestCase
                 }
                 $this->assertTrue(
                     $exceptionThrown,
-                    "validateForOrderCreation should throw exception for inactive store"
+                    'validateForOrderCreation should throw exception for inactive store'
                 );
 
                 // Property: OrderService.create should throw exception for inactive store
@@ -141,7 +146,7 @@ class StoreServicePropertyTest extends TestCase
                 }
                 $this->assertTrue(
                     $orderExceptionThrown,
-                    "OrderService.create should throw exception for inactive store"
+                    'OrderService.create should throw exception for inactive store'
                 );
             });
     }
@@ -158,7 +163,7 @@ class StoreServicePropertyTest extends TestCase
             ->forAll(
                 // Store name (non-empty string)
                 Generators::suchThat(
-                    fn($s) => strlen(trim($s)) > 0 && strlen($s) <= 100,
+                    fn ($s) => strlen(trim($s)) > 0 && strlen($s) <= 100,
                     Generators::string()
                 ),
                 // Store address
@@ -178,18 +183,18 @@ class StoreServicePropertyTest extends TestCase
                 // Property: Store should be active
                 $this->assertTrue(
                     $store->is_active,
-                    "Store should be active"
+                    'Store should be active'
                 );
 
                 // Property: canAcceptOrders should return true
                 $this->assertTrue(
                     $this->storeService->canAcceptOrders($store),
-                    "Active store should accept orders"
+                    'Active store should accept orders'
                 );
 
                 // Property: validateForOrderCreation should not throw exception
                 $result = $this->storeService->validateForOrderCreation($store);
-                $this->assertTrue($result, "validateForOrderCreation should return true for active store");
+                $this->assertTrue($result, 'validateForOrderCreation should return true for active store');
 
                 // Property: OrderService.create should succeed for active store
                 $order = $this->orderService->create([
@@ -197,8 +202,8 @@ class StoreServicePropertyTest extends TestCase
                     'pos_user_id' => $posUser->id,
                 ]);
 
-                $this->assertNotNull($order, "Order should be created for active store");
-                $this->assertEquals($store->id, $order->store_id, "Order should belong to the store");
+                $this->assertNotNull($order, 'Order should be created for active store');
+                $this->assertEquals($store->id, $order->store_id, 'Order should belong to the store');
             });
     }
 }

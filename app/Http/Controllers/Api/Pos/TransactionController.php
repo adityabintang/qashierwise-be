@@ -19,7 +19,7 @@ class TransactionController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
         $validated = $request->validate([
             'per_page' => 'nullable|integer|min:1|max:100',
@@ -42,7 +42,7 @@ class TransactionController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
         $transaction = $this->transactionService->find($id, $userId);
 
@@ -64,7 +64,7 @@ class TransactionController extends Controller
      */
     public function search(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
         $validated = $request->validate([
             'order_number' => 'required|string|min:1',
@@ -90,7 +90,7 @@ class TransactionController extends Controller
      */
     public function filterByDate(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
         $validated = $request->validate([
             'date' => 'required|date',
@@ -113,7 +113,7 @@ class TransactionController extends Controller
      */
     public function filterByDateRange(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
         $validated = $request->validate([
             'start_date' => 'required|date',

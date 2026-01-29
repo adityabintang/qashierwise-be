@@ -6,7 +6,7 @@ use Exception;
 
 /**
  * Exception thrown when Row Level Security policies are violated.
- * 
+ *
  * This exception is used to handle unauthorized access attempts to
  * data protected by RLS policies, providing generic error messages
  * to prevent information disclosure.

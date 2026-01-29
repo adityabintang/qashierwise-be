@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Property-based tests for PlanDetails DTO
- * 
+ *
  * Feature: polar-subscription
  */
 class PlanDetailsPropertyTest extends TestCase
@@ -20,7 +20,7 @@ class PlanDetailsPropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 14: Subscription Serialization Round-Trip (adapted for PlanDetails)
      * Validates: Requirements 7.4
-     * 
+     *
      * For any valid PlanDetails object, serializing to array and deserializing back
      * SHALL produce an equivalent PlanDetails object.
      */
@@ -35,12 +35,12 @@ class PlanDetailsPropertyTest extends TestCase
             ->forAll(
                 Generators::elements($planIds),
                 Generators::suchThat(
-                    fn($s) => strlen($s) > 0 && strlen($s) <= 100,
+                    fn ($s) => strlen($s) > 0 && strlen($s) <= 100,
                     Generators::string()
                 ),
                 Generators::choose(0, 100000000), // price in cents
                 Generators::suchThat(
-                    fn($s) => strlen($s) > 0 && strlen($s) <= 50,
+                    fn ($s) => strlen($s) > 0 && strlen($s) <= 50,
                     Generators::string()
                 ),
                 Generators::elements($tiers)
@@ -78,7 +78,7 @@ class PlanDetailsPropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 14: Subscription Serialization Round-Trip (JSON variant)
      * Validates: Requirements 7.4
-     * 
+     *
      * For any valid PlanDetails object, serializing to JSON and deserializing back
      * SHALL produce an equivalent PlanDetails object.
      */
@@ -93,12 +93,12 @@ class PlanDetailsPropertyTest extends TestCase
             ->forAll(
                 Generators::elements($planIds),
                 Generators::suchThat(
-                    fn($s) => strlen($s) > 0 && strlen($s) <= 100,
+                    fn ($s) => strlen($s) > 0 && strlen($s) <= 100,
                     Generators::string()
                 ),
                 Generators::choose(0, 100000000),
                 Generators::suchThat(
-                    fn($s) => strlen($s) > 0 && strlen($s) <= 50,
+                    fn ($s) => strlen($s) > 0 && strlen($s) <= 50,
                     Generators::string()
                 ),
                 Generators::elements($tiers)

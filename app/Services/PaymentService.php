@@ -4,9 +4,8 @@ namespace App\Services;
 
 use App\Models\Order;
 use App\Models\Payment;
-use App\Models\SubMerchant;
-use App\Models\QrisTransaction;
 use App\Models\PlatformFee;
+use App\Models\QrisTransaction;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -223,9 +222,8 @@ class PaymentService
     /**
      * Create QRIS transaction for payment made via POS.
      *
-     * @param Order $order The order
-     * @param Payment $payment The payment record
-     * @return void
+     * @param  Order  $order  The order
+     * @param  Payment  $payment  The payment record
      */
     protected function createQrisTransactionForPayment(Order $order, Payment $payment): void
     {
@@ -237,11 +235,12 @@ class PaymentService
             // Find sub-merchant for this user
             $subMerchant = $this->subMerchantService->findByUserId($user->id);
 
-            if (!$subMerchant) {
+            if (! $subMerchant) {
                 Log::info('No sub-merchant found for user, skipping QRIS transaction creation', [
                     'order_id' => $order->id,
                     'user_id' => $user->id,
                 ]);
+
                 return;
             }
 

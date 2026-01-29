@@ -47,7 +47,6 @@ class MessageDeduplicator
      *
      * @param  string  $phoneNumber  User's WhatsApp phone number
      * @param  string  $messageContent  The message text content
-     * @return void
      */
     public function markAsSeen(string $phoneNumber, string $messageContent): void
     {

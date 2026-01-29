@@ -14,10 +14,10 @@ return new class extends Migration
         Schema::table('qris_transactions', function (Blueprint $table) {
             // Add reference_id column after provider_transaction_id
             $table->string('reference_id', 255)->nullable()->after('provider_transaction_id');
-            
+
             // Add paid_at column after settled_at
             $table->timestamp('paid_at')->nullable()->after('settled_at');
-            
+
             // Add index for reference_id lookups
             $table->index('reference_id', 'idx_reference_id_lookup');
         });

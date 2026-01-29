@@ -13,21 +13,22 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Duitku payment provider implementation.
- * 
+ *
  * Implements QRIS generation using Duitku Invoice Creation API.
  * Documentation: https://docs.duitku.com
  */
 class DuitkuProvider implements PaymentProviderInterface
 {
     private const BASE_URL_PRODUCTION = 'https://passport.duitku.com';
+
     private const BASE_URL_SANDBOX = 'https://sandbox.duitku.com';
-    
+
     private string $baseUrl;
 
     public function __construct()
     {
-        $this->baseUrl = config('app.env') === 'production' 
-            ? self::BASE_URL_PRODUCTION 
+        $this->baseUrl = config('app.env') === 'production'
+            ? self::BASE_URL_PRODUCTION
             : self::BASE_URL_SANDBOX;
     }
 
@@ -54,7 +55,7 @@ class DuitkuProvider implements PaymentProviderInterface
     {
         try {
             // Validate required fields
-            if (!isset($credentials['merchant_code']) || !isset($credentials['api_key'])) {
+            if (! isset($credentials['merchant_code']) || ! isset($credentials['api_key'])) {
                 return ValidationResult::failure(
                     'Missing required credentials: merchant_code and api_key',
                     'MISSING_CREDENTIALS'
@@ -63,7 +64,7 @@ class DuitkuProvider implements PaymentProviderInterface
 
             // Test API call to inquiry endpoint
             $timestamp = time();
-            $signature = md5($credentials['merchant_code'] . $timestamp . $credentials['api_key']);
+            $signature = md5($credentials['merchant_code'].$timestamp.$credentials['api_key']);
 
             $response = Http::withHeaders([
                 'Content-Type' => 'application/json',
@@ -75,14 +76,14 @@ class DuitkuProvider implements PaymentProviderInterface
 
             if ($response->successful()) {
                 $data = $response->json();
-                
+
                 // Check if response indicates success
                 if (isset($data['statusCode']) && $data['statusCode'] === '00') {
                     return ValidationResult::success([
                         'merchant_code' => $credentials['merchant_code'],
                     ]);
                 }
-                
+
                 // Even if inquiry returns no data, valid auth means credentials work
                 if (isset($data['merchantCode'])) {
                     return ValidationResult::success([
@@ -91,10 +92,10 @@ class DuitkuProvider implements PaymentProviderInterface
                 }
             }
 
-            $errorMessage = $response->json('statusMessage') 
-                ?? $response->json('message') 
+            $errorMessage = $response->json('statusMessage')
+                ?? $response->json('message')
                 ?? 'Invalid credentials';
-            
+
             return ValidationResult::failure(
                 $errorMessage,
                 $response->json('statusCode') ?? 'VALIDATION_FAILED',
@@ -132,15 +133,15 @@ class DuitkuProvider implements PaymentProviderInterface
             $productDetails = $request->description ?? 'QRIS Payment';
             $email = 'customer@example.com'; // Default email
             $paymentMethod = 'SP'; // QRIS payment method code in Duitku
-            $returnUrl = config('app.url') . '/api/webhooks/duitku/return';
-            $callbackUrl = config('app.url') . '/api/webhooks/duitku/callback';
+            $returnUrl = config('app.url').'/api/webhooks/duitku/return';
+            $callbackUrl = config('app.url').'/api/webhooks/duitku/callback';
             $expiryPeriod = $expiryMinutes;
 
             // Generate signature
             $signature = md5(
-                $merchantCode . 
-                $merchantOrderId . 
-                $paymentAmount . 
+                $merchantCode.
+                $merchantOrderId.
+                $paymentAmount.
                 $apiKey
             );
 
@@ -161,17 +162,17 @@ class DuitkuProvider implements PaymentProviderInterface
                 'expiryPeriod' => $expiryPeriod,
             ]);
 
-            if (!$response->successful()) {
-                $errorMessage = $response->json('statusMessage') 
-                    ?? $response->json('message') 
+            if (! $response->successful()) {
+                $errorMessage = $response->json('statusMessage')
+                    ?? $response->json('message')
                     ?? 'Failed to generate QRIS';
-                throw new \Exception($errorMessage . ': ' . $response->body());
+                throw new \Exception($errorMessage.': '.$response->body());
             }
 
             $data = $response->json();
 
             // Check if invoice creation was successful
-            if (!isset($data['statusCode']) || $data['statusCode'] !== '00') {
+            if (! isset($data['statusCode']) || $data['statusCode'] !== '00') {
                 throw new \Exception($data['statusMessage'] ?? 'Failed to create invoice');
             }
 
@@ -209,7 +210,7 @@ class DuitkuProvider implements PaymentProviderInterface
             $apiKey = $credentials['api_key'];
 
             // Generate signature for status check
-            $signature = md5($merchantCode . $transactionId . $apiKey);
+            $signature = md5($merchantCode.$transactionId.$apiKey);
 
             // Check transaction status
             $response = Http::withHeaders([
@@ -220,12 +221,12 @@ class DuitkuProvider implements PaymentProviderInterface
                 'signature' => $signature,
             ]);
 
-            if (!$response->successful()) {
-                throw new \Exception('Failed to check transaction status: ' . $response->body());
+            if (! $response->successful()) {
+                throw new \Exception('Failed to check transaction status: '.$response->body());
             }
 
             $data = $response->json();
-            
+
             // Map Duitku status
             $statusCode = $data['statusCode'] ?? '';
             $status = $this->mapDuitkuStatus($statusCode);
@@ -285,20 +286,20 @@ class DuitkuProvider implements PaymentProviderInterface
             // Duitku uses MD5 signature for webhook verification
             $merchantCode = $credentials['merchant_code'] ?? '';
             $apiKey = $credentials['api_key'] ?? '';
-            
+
             // Construct signature string based on Duitku's documentation
             // Format: merchantCode + amount + merchantOrderId + apiKey
             $amount = $payload['amount'] ?? '';
             $merchantOrderId = $payload['merchantOrderId'] ?? '';
-            
-            $computedSignature = md5($merchantCode . $amount . $merchantOrderId . $apiKey);
-            
+
+            $computedSignature = md5($merchantCode.$amount.$merchantOrderId.$apiKey);
+
             return hash_equals($computedSignature, $signature);
         } catch (\Exception $e) {
             Log::error('Duitku webhook verification error', [
                 'error' => $e->getMessage(),
             ]);
-            
+
             return false;
         }
     }
@@ -309,7 +310,7 @@ class DuitkuProvider implements PaymentProviderInterface
     public function parseWebhookPayload(array $payload): WebhookTransaction
     {
         $status = $this->mapDuitkuStatus($payload['resultCode'] ?? $payload['statusCode'] ?? '01');
-        
+
         $paidAt = null;
         if ($status === TransactionStatus::STATUS_SETTLEMENT && isset($payload['settlementDate'])) {
             $paidAt = $payload['settlementDate'];

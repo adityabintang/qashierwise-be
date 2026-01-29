@@ -3,7 +3,7 @@
 @section('title', __('dashboard.menu_transactions') . ' - QashierWise POS')
 
 @section('content')
-<div x-data="transactionsApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
+<div x-data="transactionsApp()" x-init="initDashboard()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'pos-transactions'])
 
     <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
@@ -213,10 +213,11 @@ function transactionsApp() {
         search: '', startDate: '', endDate: '',
         pagination: { currentPage: 1, lastPage: 1, from: 0, to: 0, total: 0 },
         sidebarOpen: window.innerWidth >= 1024, isMobile: window.innerWidth < 768, user: null, notifications: [],
+        userPermissions: [], isAdmin: true,
 
-        async init() { this.initSidebar(); await this.fetchTransactions(); },
+        async init() { this.initDashboard(); await this.fetchUserPermissions(); await this.fetchTransactions(); },
 
-        initSidebar() {
+        initDashboard() {
             this.isMobile = window.innerWidth < 768;
             if (this.isMobile) { this.sidebarOpen = false; }
             else { let s = localStorage.getItem('sidebarOpen'); if (s !== null) this.sidebarOpen = JSON.parse(s); }
@@ -227,9 +228,34 @@ function transactionsApp() {
                 else if (!was && this.isMobile) { this.sidebarOpen = false; }
             });
             let u = localStorage.getItem('user'); if (u) { try { this.user = JSON.parse(u); } catch (e) { this.user = { name: 'User' }; } } else { this.user = { name: 'User' }; }
+            this.fetchUserPermissions();
+        },
+
+        async fetchUserPermissions() {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) { this.isAdmin = true; this.userPermissions = []; return; }
+                const res = await fetch(`${window.location.origin}/api/user/permissions`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success) { this.isAdmin = data.data.is_admin || false; this.userPermissions = data.data.permissions || []; }
+                }
+            } catch (e) { console.error('Failed to fetch permissions:', e); }
+        },
+
+        hasPermission(permission) {
+            if (this.isAdmin) return true;
+            if (this.userPermissions.includes('*')) return true;
+            return this.userPermissions.includes(permission);
         },
 
         async fetchTransactions() {
+            // Check permission first
+            if (!this.hasPermission('view_transactions') && !this.hasPermission('manage_transactions')) {
+                this.transactions = []; this.loading = false; return;
+            }
             this.loading = true;
             try {
                 const token = localStorage.getItem('token');

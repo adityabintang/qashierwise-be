@@ -2,13 +2,13 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 /**
  * Service for monitoring subscription events and alerting on errors.
- * 
+ *
  * Provides centralized error alerting, metrics tracking, and health monitoring
  * for the subscription system.
  */
@@ -18,17 +18,18 @@ class SubscriptionMonitoringService
      * Alert thresholds for error rates.
      */
     private const ERROR_RATE_THRESHOLD = 0.1; // 10% error rate
+
     private const WEBHOOK_FAILURE_THRESHOLD = 5; // 5 consecutive failures
+
     private const API_TIMEOUT_THRESHOLD = 5000; // 5 seconds
 
     /**
      * Alert on subscription creation failure.
      *
-     * @param string $userId User ID
-     * @param string $planId Plan ID
-     * @param string $error Error message
-     * @param array $context Additional context
-     * @return void
+     * @param  string  $userId  User ID
+     * @param  string  $planId  Plan ID
+     * @param  string  $error  Error message
+     * @param  array  $context  Additional context
      */
     public function alertSubscriptionCreationFailed(
         string $userId,
@@ -59,11 +60,10 @@ class SubscriptionMonitoringService
     /**
      * Alert on webhook processing failure.
      *
-     * @param string $webhookType Webhook type (payment, recurring, pay_account)
-     * @param string $orderId Order ID
-     * @param string $error Error message
-     * @param array $context Additional context
-     * @return void
+     * @param  string  $webhookType  Webhook type (payment, recurring, pay_account)
+     * @param  string  $orderId  Order ID
+     * @param  string  $error  Error message
+     * @param  array  $context  Additional context
      */
     public function alertWebhookProcessingFailed(
         string $webhookType,
@@ -96,10 +96,9 @@ class SubscriptionMonitoringService
     /**
      * Alert on Midtrans API timeout.
      *
-     * @param string $endpoint API endpoint
-     * @param float $duration Duration in milliseconds
-     * @param array $context Additional context
-     * @return void
+     * @param  string  $endpoint  API endpoint
+     * @param  float  $duration  Duration in milliseconds
+     * @param  array  $context  Additional context
      */
     public function alertApiTimeout(
         string $endpoint,
@@ -122,10 +121,9 @@ class SubscriptionMonitoringService
     /**
      * Alert on subscription cancellation failure.
      *
-     * @param string $subscriptionId Subscription ID
-     * @param string $error Error message
-     * @param array $context Additional context
-     * @return void
+     * @param  string  $subscriptionId  Subscription ID
+     * @param  string  $error  Error message
+     * @param  array  $context  Additional context
      */
     public function alertSubscriptionCancellationFailed(
         string $subscriptionId,
@@ -145,11 +143,10 @@ class SubscriptionMonitoringService
     /**
      * Alert on payment failure.
      *
-     * @param string $subscriptionId Subscription ID
-     * @param string $orderId Order ID
-     * @param string $reason Failure reason
-     * @param array $context Additional context
-     * @return void
+     * @param  string  $subscriptionId  Subscription ID
+     * @param  string  $orderId  Order ID
+     * @param  string  $reason  Failure reason
+     * @param  array  $context  Additional context
      */
     public function alertPaymentFailed(
         string $subscriptionId,
@@ -180,10 +177,9 @@ class SubscriptionMonitoringService
     /**
      * Alert on webhook signature validation failure.
      *
-     * @param string $orderId Order ID
-     * @param string $ipAddress IP address
-     * @param array $context Additional context
-     * @return void
+     * @param  string  $orderId  Order ID
+     * @param  string  $ipAddress  IP address
+     * @param  array  $context  Additional context
      */
     public function alertWebhookSignatureInvalid(
         string $orderId,
@@ -214,8 +210,7 @@ class SubscriptionMonitoringService
     /**
      * Record successful operation (for error rate calculation).
      *
-     * @param string $operation Operation name
-     * @return void
+     * @param  string  $operation  Operation name
      */
     public function recordSuccess(string $operation): void
     {
@@ -226,31 +221,33 @@ class SubscriptionMonitoringService
     /**
      * Increment error counter.
      *
-     * @param string $key Counter key
+     * @param  string  $key  Counter key
      * @return int Current count
      */
     private function incrementErrorCounter(string $key): int
     {
-        $cacheKey = "monitoring:errors:{$key}:" . now()->format('Y-m-d-H');
+        $cacheKey = "monitoring:errors:{$key}:".now()->format('Y-m-d-H');
+
         return Cache::increment($cacheKey, 1);
     }
 
     /**
      * Increment success counter.
      *
-     * @param string $key Counter key
+     * @param  string  $key  Counter key
      * @return int Current count
      */
     private function incrementSuccessCounter(string $key): int
     {
-        $cacheKey = "monitoring:success:{$key}:" . now()->format('Y-m-d-H');
+        $cacheKey = "monitoring:success:{$key}:".now()->format('Y-m-d-H');
+
         return Cache::increment($cacheKey, 1);
     }
 
     /**
      * Increment consecutive failures counter.
      *
-     * @param string $key Counter key
+     * @param  string  $key  Counter key
      * @return int Current count
      */
     private function incrementConsecutiveFailures(string $key): int
@@ -258,14 +255,14 @@ class SubscriptionMonitoringService
         $cacheKey = "monitoring:consecutive_failures:{$key}";
         $count = Cache::get($cacheKey, 0) + 1;
         Cache::put($cacheKey, $count, now()->addHour());
+
         return $count;
     }
 
     /**
      * Reset consecutive failures counter.
      *
-     * @param string $key Counter key
-     * @return void
+     * @param  string  $key  Counter key
      */
     private function resetConsecutiveFailures(string $key): void
     {
@@ -276,33 +273,34 @@ class SubscriptionMonitoringService
     /**
      * Increment invalid signature attempts for an IP.
      *
-     * @param string $ipAddress IP address
+     * @param  string  $ipAddress  IP address
      * @return int Current count
      */
     private function incrementInvalidSignatureAttempts(string $ipAddress): int
     {
-        $cacheKey = "monitoring:invalid_signature:" . md5($ipAddress);
+        $cacheKey = 'monitoring:invalid_signature:'.md5($ipAddress);
         $count = Cache::get($cacheKey, 0) + 1;
         Cache::put($cacheKey, $count, now()->addHour());
+
         return $count;
     }
 
     /**
      * Check if error rate exceeds threshold.
      *
-     * @param string $operation Operation name
-     * @return bool
+     * @param  string  $operation  Operation name
      */
     private function isErrorRateExceeded(string $operation): bool
     {
         $errorRate = $this->getErrorRate($operation);
+
         return $errorRate > self::ERROR_RATE_THRESHOLD;
     }
 
     /**
      * Get error rate for an operation.
      *
-     * @param string $operation Operation name
+     * @param  string  $operation  Operation name
      * @return float Error rate (0.0 to 1.0)
      */
     private function getErrorRate(string $operation): float
@@ -310,7 +308,7 @@ class SubscriptionMonitoringService
         $hour = now()->format('Y-m-d-H');
         $errors = Cache::get("monitoring:errors:{$operation}:{$hour}", 0);
         $successes = Cache::get("monitoring:success:{$operation}:{$hour}", 0);
-        
+
         $total = $errors + $successes;
         if ($total === 0) {
             return 0.0;
@@ -322,22 +320,21 @@ class SubscriptionMonitoringService
     /**
      * Get recent errors for an operation.
      *
-     * @param string $operation Operation name
-     * @param int $limit Number of recent errors to retrieve
-     * @return array
+     * @param  string  $operation  Operation name
+     * @param  int  $limit  Number of recent errors to retrieve
      */
     private function getRecentErrors(string $operation, int $limit = 10): array
     {
         $cacheKey = "monitoring:recent_errors:{$operation}";
+
         return Cache::get($cacheKey, []);
     }
 
     /**
      * Send critical alert.
      *
-     * @param string $title Alert title
-     * @param array $data Alert data
-     * @return void
+     * @param  string  $title  Alert title
+     * @param  array  $data  Alert data
      */
     private function sendCriticalAlert(string $title, array $data): void
     {
@@ -349,7 +346,7 @@ class SubscriptionMonitoringService
 
         // In production, this would send email/SMS/Slack notification
         // For now, we just log it
-        
+
         // Example: Send email to admin
         // Mail::to(config('monitoring.alert_email'))
         //     ->send(new CriticalAlertMail($title, $data));
@@ -361,8 +358,6 @@ class SubscriptionMonitoringService
 
     /**
      * Get monitoring metrics for dashboard.
-     *
-     * @return array
      */
     public function getMetrics(): array
     {
@@ -394,8 +389,6 @@ class SubscriptionMonitoringService
 
     /**
      * Check system health.
-     *
-     * @return array
      */
     public function checkHealth(): array
     {
@@ -426,7 +419,7 @@ class SubscriptionMonitoringService
         $totalWebhookErrors = $metrics['webhook_processing']['payment_errors'] +
                              $metrics['webhook_processing']['recurring_errors'] +
                              $metrics['webhook_processing']['pay_account_errors'];
-        
+
         if ($totalWebhookErrors > 10) {
             $issues[] = [
                 'type' => 'high_webhook_errors',

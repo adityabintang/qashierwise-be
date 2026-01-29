@@ -21,20 +21,20 @@ return [
     'account_active' => 'Your account is active and ready to send messages',
     'account_not_connected' => 'No WhatsApp Account Connected',
     'account_connect_description' => 'Connect your WhatsApp Business account to start sending and receiving messages through QashierWise.',
-    
+
     // Connection Actions
     'connect_with_facebook' => 'Connect with Facebook',
     'connecting' => 'Connecting...',
     'disconnect' => 'Disconnect',
     'disconnecting' => 'Disconnecting...',
     'reconnect' => 'Reconnect',
-    
+
     // Connection Status
     'loading_account_status' => 'Loading account status...',
     'loading_timeout' => 'Loading timeout. Please refresh the page.',
     'redirect_notice' => 'You\'ll be redirected to Facebook to authorize your WhatsApp Business account',
     'sdk_loading' => 'Loading...',
-    
+
     // Account Details
     'phone_number' => 'Phone Number',
     'business_name' => 'Business Name',
@@ -48,14 +48,14 @@ return [
     'enabled' => 'Enabled',
     'disabled' => 'Disabled',
     'unknown' => 'Unknown',
-    
+
     // Disconnect Confirmation
     'disconnect_account' => 'Disconnect Account',
     'disconnect_description' => 'Remove this WhatsApp account from QashierWise',
     'disconnect_confirm_title' => 'Disconnect WhatsApp Account?',
     'disconnect_confirm_message' => 'Are you sure you want to disconnect your WhatsApp Business account? You will no longer be able to send or receive messages until you reconnect.',
     'yes_disconnect' => 'Yes, Disconnect',
-    
+
     // Account Info
     'about_integration' => 'About WhatsApp Business Integration',
     'integration_feature_1' => 'Send and receive WhatsApp messages directly from QashierWise',
@@ -74,7 +74,7 @@ return [
     'status_queued' => 'Queued',
     'status_accepted' => 'Accepted',
     'status_deleted' => 'Deleted',
-    
+
     // ========================================
     // Contact Management
     // ========================================
@@ -83,21 +83,21 @@ return [
     'contact_details' => 'Contact Details',
     'contact_card' => 'Contact Card',
     'contact_shared' => 'Contact shared',
-    
+
     // Contact Information
     'name' => 'Name',
     'profile_name' => 'WhatsApp Profile',
     'last_activity' => 'Last Activity',
     'messages_count' => 'Messages',
     'messages' => 'messages',
-    
+
     // Contact Actions
     'send_message' => 'Send Message',
     'message' => 'Message',
     'view_contact' => 'View Contact',
     'manage_contacts' => 'Manage Contacts',
     'view_and_organize' => 'View and organize',
-    
+
     // Contact Search & Filter
     'search_contacts' => 'Search contacts...',
     'sort_by' => 'Sort by',
@@ -105,11 +105,11 @@ return [
     'name_desc' => 'Name (Z-A)',
     'recently_added' => 'Recently Added',
     'oldest_first' => 'Oldest First',
-    
+
     // Contact Empty States
     'no_contacts_found' => 'No contacts found',
     'contacts_will_appear' => 'Contacts will appear here when you receive or send messages.',
-    
+
     // ========================================
     // Messages & Chat
     // ========================================
@@ -121,7 +121,7 @@ return [
     'type_message' => 'Type a message...',
     'send' => 'Send',
     'sending' => 'Sending...',
-    
+
     // Message Types
     'text_message' => 'Text message',
     'image' => 'Image',
@@ -133,18 +133,18 @@ return [
     'template_message' => 'Template',
     'interactive_message' => 'Interactive message',
     'reaction' => 'Reaction',
-    
+
     // Message Actions
     'download' => 'Download',
     'open_in_maps' => 'Open in Maps',
     'view_options' => 'View Options',
-    
+
     // Chat Interface
     'back_to_contacts' => 'Back to contacts',
     'refresh_messages' => 'Refresh messages',
     'attach' => 'Attach',
     'cancel_template' => 'Cancel template',
-    
+
     // Attachment Menu
     'attach_template' => 'Template',
     'attach_image' => 'Image',
@@ -154,12 +154,12 @@ return [
     'attach_location' => 'Location',
     'attach_buttons' => 'Buttons',
     'attach_list' => 'List',
-    
+
     // Message Indicators
     'template_indicator' => 'Template:',
     'caption' => 'Caption',
     'filename' => 'Filename',
-    
+
     // ========================================
     // Templates
     // ========================================
@@ -168,7 +168,7 @@ return [
     'message_templates' => 'Message Templates',
     'create_manage_templates' => 'Create and manage your WhatsApp message templates',
     'manage_templates' => 'Manage templates',
-    
+
     // Template Actions
     'create_template' => 'Create Template',
     'create_new_template' => 'Create New Template',
@@ -179,20 +179,20 @@ return [
     'sync_from_meta' => 'Sync from Meta',
     'syncing' => 'Syncing...',
     'sync' => 'Sync',
-    
+
     // Template Status
     'approved' => 'Approved',
     'pending' => 'Pending',
     'rejected' => 'Rejected',
     'all_statuses' => 'All Statuses',
-    
+
     // Template Categories
     'category' => 'Category',
     'marketing' => 'Marketing',
     'utility' => 'Utility',
     'authentication' => 'Authentication',
     'all_categories' => 'All Categories',
-    
+
     // Template Components
     'header' => 'Header',
     'body' => 'Body',
@@ -203,7 +203,7 @@ return [
     'image_header' => 'Image',
     'video_header' => 'Video',
     'document_header' => 'Document',
-    
+
     // Template Form
     'template_name' => 'Template Name',
     'template_name_placeholder' => 'e.g., order_confirmation',
@@ -214,25 +214,25 @@ return [
     'basic_information' => 'Basic Information',
     'template_content' => 'Template Content',
     'template_preview' => 'Preview',
-    
+
     // Template Search & Filter
     'search_templates' => 'Search templates...',
     'filter_by_status' => 'Filter by status',
     'filter_by_category' => 'Filter by category',
-    
+
     // Template Details
     'template_details' => 'Template Details',
     'template' => 'Template',
-    
+
     // Template Empty States
     'no_templates_found' => 'No templates found',
     'templates_will_appear' => 'Your message templates will appear here.',
-    
+
     // Template Sending
     'select_contact' => 'Select Contact',
     'choose_contact' => 'Choose a contact...',
     'creating_template' => 'Creating template...',
-    
+
     // ========================================
     // Business Profile
     // ========================================
@@ -244,7 +244,7 @@ return [
     'business_website' => 'Business Website',
     'business_category' => 'Business Category',
     'business_hours' => 'Business Hours',
-    
+
     // ========================================
     // Notifications & Messages
     // ========================================
@@ -255,7 +255,7 @@ return [
     'success_template_updated' => 'Template updated successfully',
     'success_template_deleted' => 'Template deleted successfully',
     'success_synced' => 'Templates synced successfully',
-    
+
     // Error Messages
     'error_connection_failed' => 'Failed to connect WhatsApp account',
     'error_disconnection_failed' => 'Failed to disconnect WhatsApp account',
@@ -273,13 +273,13 @@ return [
     'error_token_expired' => 'WhatsApp token expired. Please reconnect.',
     'error_token_invalid' => 'Invalid WhatsApp token. Please reconnect.',
     'error_config_unavailable' => 'WhatsApp configuration not available. Please refresh the page and try again.',
-    
+
     // Warning Messages
     'warning_no_contacts' => 'No contacts available',
     'warning_no_templates' => 'No templates available',
     'warning_template_pending' => 'This template is pending approval',
     'warning_template_rejected' => 'This template was rejected',
-    
+
     // ========================================
     // Common Actions
     // ========================================
@@ -296,7 +296,7 @@ return [
     'loading' => 'Loading...',
     'processing' => 'Processing...',
     'please_wait' => 'Please wait...',
-    
+
     // ========================================
     // Time & Date
     // ========================================
@@ -306,7 +306,7 @@ return [
     'days_ago' => ':count days ago',
     'hours_ago' => ':count hours ago',
     'minutes_ago' => ':count minutes ago',
-    
+
     // ========================================
     // Validation
     // ========================================
@@ -318,7 +318,6 @@ return [
     'language_required' => 'Language is required',
     'body_required' => 'Message body is required',
     'contact_required' => 'Please select a contact',
-    
 
     // ========================================
     // Profile

@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessQrisPayment;
 use App\Models\Payment;
-use App\Models\QrisTransaction;
 use App\Models\PaymentProviderCredential;
+use App\Models\QrisTransaction;
 use App\Services\EncryptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Controller for handling Doku SNAP API webhook notifications.
- * 
+ *
  * Receives and processes payment status updates from Doku
  * including successful payments, expirations, and cancellations.
  */
@@ -43,22 +43,25 @@ class DokuWebhookController extends Controller
         $referenceNo = $payload['originalReferenceNo'] ?? $payload['referenceNo'] ?? null;
         $transactionStatus = $payload['transactionStatus'] ?? $payload['responseCode'] ?? null;
 
-        if (!$referenceNo || !$transactionStatus) {
+        if (! $referenceNo || ! $transactionStatus) {
             Log::warning('Doku webhook missing required fields', $payload);
+
             return response()->json(['responseCode' => '4000000', 'responseMessage' => 'Missing required fields'], 400);
         }
 
         // Find the transaction
         $transaction = QrisTransaction::where('order_id', $referenceNo)->first();
 
-        if (!$transaction) {
+        if (! $transaction) {
             Log::warning('Doku webhook transaction not found', ['reference_no' => $referenceNo]);
+
             return response()->json(['responseCode' => '2000000', 'responseMessage' => 'Success'], 200);
         }
 
         // Validate signature using merchant's credentials
-        if (!$this->validateSignature($request, $transaction)) {
+        if (! $this->validateSignature($request, $transaction)) {
             Log::warning('Doku webhook invalid signature', ['reference_no' => $referenceNo]);
+
             return response()->json(['responseCode' => '4010000', 'responseMessage' => 'Invalid signature'], 401);
         }
 
@@ -81,7 +84,7 @@ class DokuWebhookController extends Controller
     private function validateSignature(Request $request, QrisTransaction $transaction): bool
     {
         $signature = $request->header('X-SIGNATURE');
-        if (!$signature) {
+        if (! $signature) {
             return false;
         }
 
@@ -91,8 +94,9 @@ class DokuWebhookController extends Controller
             ->where('is_active', true)
             ->first();
 
-        if (!$credential) {
+        if (! $credential) {
             Log::warning('Doku credentials not found for transaction', ['order_id' => $transaction->order_id]);
+
             return true; // Skip validation if no credentials
         }
 
@@ -107,13 +111,14 @@ class DokuWebhookController extends Controller
             $timestamp = $request->header('X-TIMESTAMP');
             $requestBody = $request->getContent();
             $bodyHash = hash('sha256', $requestBody);
-            
+
             $stringToSign = "POST:/api/webhooks/doku::{$bodyHash}:{$timestamp}";
             $expectedSignature = base64_encode(hash_hmac('sha512', $stringToSign, $secretKey, true));
 
             return hash_equals($expectedSignature, $signature);
         } catch (\Exception $e) {
             Log::error('Doku signature validation error', ['error' => $e->getMessage()]);
+
             return true; // Skip validation on error
         }
     }
@@ -131,6 +136,7 @@ class DokuWebhookController extends Controller
 
         if ($transaction->isSettled() || $transaction->isCancelledOrExpired()) {
             Log::info('Transaction already in final state', ['order_id' => $transaction->order_id]);
+
             return;
         }
 
@@ -147,7 +153,7 @@ class DokuWebhookController extends Controller
     private function handleSettlement(QrisTransaction $transaction, array $payload): void
     {
         $providerTransactionId = $payload['transactionId'] ?? $payload['acquirerTransactionId'] ?? null;
-        
+
         $transaction->markAsSettled($providerTransactionId);
         $transaction->save();
 
@@ -181,8 +187,7 @@ class DokuWebhookController extends Controller
     /**
      * Update linked Payment record status when QRIS transaction status changes.
      *
-     * @param QrisTransaction $transaction
-     * @param string $status The status to set ('failed' or 'expired')
+     * @param  string  $status  The status to set ('failed' or 'expired')
      */
     private function updateLinkedPaymentStatus(QrisTransaction $transaction, string $status): void
     {

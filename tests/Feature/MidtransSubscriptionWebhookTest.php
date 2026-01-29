@@ -5,12 +5,11 @@ namespace Tests\Feature;
 use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 /**
  * Test Midtrans subscription webhook handling.
- * 
+ *
  * Tests the complete flow of receiving a Midtrans webhook
  * and creating/updating subscription records.
  */
@@ -19,6 +18,7 @@ class MidtransSubscriptionWebhookTest extends TestCase
     use RefreshDatabase;
 
     private string $serverKey;
+
     private User $user;
 
     protected function setUp(): void
@@ -50,19 +50,19 @@ class MidtransSubscriptionWebhookTest extends TestCase
      */
     public function test_successful_payment_creates_subscription(): void
     {
-        $orderId = "SUB-{$this->user->id}-" . time() . "-test";
-        $grossAmount = "99000.00";
-        $statusCode = "200";
+        $orderId = "SUB-{$this->user->id}-".time().'-test';
+        $grossAmount = '99000.00';
+        $statusCode = '200';
 
         // Calculate signature
-        $signatureString = $orderId . $statusCode . $grossAmount . $this->serverKey;
+        $signatureString = $orderId.$statusCode.$grossAmount.$this->serverKey;
         $signature = hash('sha512', $signatureString);
 
         // Build webhook payload
         $payload = [
             'transaction_time' => now()->format('Y-m-d H:i:s'),
             'transaction_status' => 'settlement',
-            'transaction_id' => 'test-' . uniqid(),
+            'transaction_id' => 'test-'.uniqid(),
             'status_message' => 'midtrans payment notification',
             'status_code' => $statusCode,
             'signature_key' => $signature,
@@ -81,7 +81,7 @@ class MidtransSubscriptionWebhookTest extends TestCase
         $response = $this->postJson('/api/webhooks/midtrans/subscription', $payload);
 
         // Debug response
-        if (!$response->isSuccessful()) {
+        if (! $response->isSuccessful()) {
             dump($response->json());
         }
 
@@ -103,7 +103,7 @@ class MidtransSubscriptionWebhookTest extends TestCase
         $this->assertEquals('standard', $subscription->plan_name);
         $this->assertEquals('active', $subscription->status);
         $this->assertEquals('midtrans', $subscription->provider);
-        
+
         // Verify metadata
         $metadata = json_decode($subscription->metadata, true);
         $this->assertEquals($orderId, $metadata['order_id']);
@@ -123,19 +123,19 @@ class MidtransSubscriptionWebhookTest extends TestCase
             'provider' => 'midtrans',
         ]);
 
-        $orderId = "SUB-{$this->user->id}-" . time() . "-test";
-        $grossAmount = "199000.00";
-        $statusCode = "200";
+        $orderId = "SUB-{$this->user->id}-".time().'-test';
+        $grossAmount = '199000.00';
+        $statusCode = '200';
 
         // Calculate signature
-        $signatureString = $orderId . $statusCode . $grossAmount . $this->serverKey;
+        $signatureString = $orderId.$statusCode.$grossAmount.$this->serverKey;
         $signature = hash('sha512', $signatureString);
 
         // Build webhook payload for pro plan
         $payload = [
             'transaction_time' => now()->format('Y-m-d H:i:s'),
             'transaction_status' => 'settlement',
-            'transaction_id' => 'test-' . uniqid(),
+            'transaction_id' => 'test-'.uniqid(),
             'status_message' => 'midtrans payment notification',
             'status_code' => $statusCode,
             'signature_key' => $signature,
@@ -170,15 +170,15 @@ class MidtransSubscriptionWebhookTest extends TestCase
      */
     public function test_webhook_with_invalid_signature_is_rejected(): void
     {
-        $orderId = "SUB-{$this->user->id}-" . time() . "-test";
-        $grossAmount = "99000.00";
-        $statusCode = "200";
+        $orderId = "SUB-{$this->user->id}-".time().'-test';
+        $grossAmount = '99000.00';
+        $statusCode = '200';
 
         // Build webhook payload with invalid signature
         $payload = [
             'transaction_time' => now()->format('Y-m-d H:i:s'),
             'transaction_status' => 'settlement',
-            'transaction_id' => 'test-' . uniqid(),
+            'transaction_id' => 'test-'.uniqid(),
             'status_message' => 'midtrans payment notification',
             'status_code' => $statusCode,
             'signature_key' => 'invalid-signature',
@@ -211,19 +211,19 @@ class MidtransSubscriptionWebhookTest extends TestCase
      */
     public function test_webhook_with_fraud_status_is_not_processed(): void
     {
-        $orderId = "SUB-{$this->user->id}-" . time() . "-test";
-        $grossAmount = "99000.00";
-        $statusCode = "200";
+        $orderId = "SUB-{$this->user->id}-".time().'-test';
+        $grossAmount = '99000.00';
+        $statusCode = '200';
 
         // Calculate signature
-        $signatureString = $orderId . $statusCode . $grossAmount . $this->serverKey;
+        $signatureString = $orderId.$statusCode.$grossAmount.$this->serverKey;
         $signature = hash('sha512', $signatureString);
 
         // Build webhook payload with fraud status
         $payload = [
             'transaction_time' => now()->format('Y-m-d H:i:s'),
             'transaction_status' => 'settlement',
-            'transaction_id' => 'test-' . uniqid(),
+            'transaction_id' => 'test-'.uniqid(),
             'status_message' => 'midtrans payment notification',
             'status_code' => $statusCode,
             'signature_key' => $signature,
@@ -255,19 +255,19 @@ class MidtransSubscriptionWebhookTest extends TestCase
      */
     public function test_webhook_without_subscription_custom_field_is_ignored(): void
     {
-        $orderId = "ORDER-{$this->user->id}-" . time() . "-test";
-        $grossAmount = "99000.00";
-        $statusCode = "200";
+        $orderId = "ORDER-{$this->user->id}-".time().'-test';
+        $grossAmount = '99000.00';
+        $statusCode = '200';
 
         // Calculate signature
-        $signatureString = $orderId . $statusCode . $grossAmount . $this->serverKey;
+        $signatureString = $orderId.$statusCode.$grossAmount.$this->serverKey;
         $signature = hash('sha512', $signatureString);
 
         // Build webhook payload without subscription custom field
         $payload = [
             'transaction_time' => now()->format('Y-m-d H:i:s'),
             'transaction_status' => 'settlement',
-            'transaction_id' => 'test-' . uniqid(),
+            'transaction_id' => 'test-'.uniqid(),
             'status_message' => 'midtrans payment notification',
             'status_code' => $statusCode,
             'signature_key' => $signature,
@@ -299,19 +299,19 @@ class MidtransSubscriptionWebhookTest extends TestCase
      */
     public function test_webhook_idempotency(): void
     {
-        $orderId = "SUB-{$this->user->id}-" . time() . "-test";
-        $grossAmount = "99000.00";
-        $statusCode = "200";
+        $orderId = "SUB-{$this->user->id}-".time().'-test';
+        $grossAmount = '99000.00';
+        $statusCode = '200';
 
         // Calculate signature
-        $signatureString = $orderId . $statusCode . $grossAmount . $this->serverKey;
+        $signatureString = $orderId.$statusCode.$grossAmount.$this->serverKey;
         $signature = hash('sha512', $signatureString);
 
         // Build webhook payload
         $payload = [
             'transaction_time' => now()->format('Y-m-d H:i:s'),
             'transaction_status' => 'settlement',
-            'transaction_id' => 'test-' . uniqid(),
+            'transaction_id' => 'test-'.uniqid(),
             'status_message' => 'midtrans payment notification',
             'status_code' => $statusCode,
             'signature_key' => $signature,
@@ -339,7 +339,7 @@ class MidtransSubscriptionWebhookTest extends TestCase
 
         // Assert only one subscription exists
         $this->assertEquals(1, Subscription::where('user_id', $this->user->id)->count());
-        
+
         // Assert subscription ID hasn't changed
         $this->assertEquals($subscriptionId, $this->user->fresh()->subscription->id);
     }

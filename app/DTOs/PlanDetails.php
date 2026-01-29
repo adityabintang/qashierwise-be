@@ -4,7 +4,7 @@ namespace App\DTOs;
 
 /**
  * Data Transfer Object for subscription plan details.
- * 
+ *
  * Contains all information about a subscription plan including
  * pricing, features, and Polar.sh product mapping.
  */
@@ -13,12 +13,12 @@ class PlanDetails
     /**
      * Create a new PlanDetails instance.
      *
-     * @param string $id Internal plan identifier (e.g., 'free_trial', 'standard', 'pro')
-     * @param string $name Display name of the plan
-     * @param int $priceMonthly Monthly price in cents
-     * @param string $polarProductId Polar.sh product ID for this plan
-     * @param array $features List of features included in this plan
-     * @param string $tier Access tier level ('basic', 'standard', 'pro')
+     * @param  string  $id  Internal plan identifier (e.g., 'free_trial', 'standard', 'pro')
+     * @param  string  $name  Display name of the plan
+     * @param  int  $priceMonthly  Monthly price in cents
+     * @param  string  $polarProductId  Polar.sh product ID for this plan
+     * @param  array  $features  List of features included in this plan
+     * @param  string  $tier  Access tier level ('basic', 'standard', 'pro')
      */
     public function __construct(
         public readonly string $id,
@@ -49,8 +49,7 @@ class PlanDetails
     /**
      * Create a PlanDetails instance from an array.
      *
-     * @param array<string, mixed> $data
-     * @return self
+     * @param  array<string, mixed>  $data
      */
     public static function fromArray(array $data): self
     {

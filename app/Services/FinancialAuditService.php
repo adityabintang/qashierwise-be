@@ -3,11 +3,9 @@
 namespace App\Services;
 
 use App\Models\FinancialAuditLog;
-use App\Models\MerchantBalance;
 use App\Models\PlatformFee;
 use App\Models\QrisTransaction;
 use App\Models\SubMerchant;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -25,6 +23,7 @@ class FinancialAuditService
     public function setRequest(?Request $request): self
     {
         $this->request = $request;
+
         return $this;
     }
 
@@ -57,7 +56,7 @@ class FinancialAuditService
             'balance_before' => $balanceBefore,
             'balance_after' => $balanceAfter,
             'status' => FinancialAuditLog::STATUS_SUCCESS,
-            'description' => "Balance {$type}: " . $this->formatAmount($amount),
+            'description' => "Balance {$type}: ".$this->formatAmount($amount),
             'metadata' => array_merge($metadata ?? [], [
                 'update_type' => $type,
             ]),
@@ -84,7 +83,7 @@ class FinancialAuditService
             'amount' => $transaction->amount,
             'fee_amount' => $feeAmount,
             'status' => FinancialAuditLog::STATUS_SUCCESS,
-            'description' => "Platform fee calculated: {$feePercentage}% of " . $this->formatAmount($transaction->amount),
+            'description' => "Platform fee calculated: {$feePercentage}% of ".$this->formatAmount($transaction->amount),
             'metadata' => [
                 'gross_amount' => (float) $transaction->amount,
                 'fee_percentage' => $feePercentage,
@@ -113,7 +112,7 @@ class FinancialAuditService
             'amount' => $transaction->amount,
             'fee_amount' => $platformFee->fee_amount,
             'status' => FinancialAuditLog::STATUS_SUCCESS,
-            'description' => "Platform fee collected: " . $this->formatAmount($platformFee->fee_amount),
+            'description' => 'Platform fee collected: '.$this->formatAmount($platformFee->fee_amount),
             'metadata' => [
                 'transaction_id' => $transaction->id,
                 'fee_percentage' => (float) $platformFee->fee_percentage,
@@ -139,7 +138,7 @@ class FinancialAuditService
             'amount' => $transaction->amount,
             'fee_amount' => $transaction->platform_fee,
             'status' => FinancialAuditLog::STATUS_PENDING,
-            'description' => "QRIS generated: " . $this->formatAmount($transaction->amount),
+            'description' => 'QRIS generated: '.$this->formatAmount($transaction->amount),
             'metadata' => [
                 'order_id' => $transaction->order_id,
                 'expires_at' => $transaction->expires_at?->toIso8601String(),
@@ -171,7 +170,7 @@ class FinancialAuditService
             'balance_before' => $balanceBefore,
             'balance_after' => $balanceAfter,
             'status' => FinancialAuditLog::STATUS_SUCCESS,
-            'description' => "QRIS payment settled: " . $this->formatAmount($transaction->amount),
+            'description' => 'QRIS payment settled: '.$this->formatAmount($transaction->amount),
             'metadata' => [
                 'order_id' => $transaction->order_id,
                 'midtrans_transaction_id' => $transaction->midtrans_transaction_id,
@@ -200,7 +199,7 @@ class FinancialAuditService
             'reference_code' => $transaction->order_id,
             'amount' => $transaction->amount,
             'status' => FinancialAuditLog::STATUS_FAILED,
-            'description' => "QRIS expired: " . $transaction->order_id,
+            'description' => 'QRIS expired: '.$transaction->order_id,
             'metadata' => [
                 'order_id' => $transaction->order_id,
                 'expired_at' => $transaction->expires_at?->toIso8601String(),
@@ -225,7 +224,7 @@ class FinancialAuditService
             'reference_code' => $transaction->order_id,
             'amount' => $transaction->amount,
             'status' => FinancialAuditLog::STATUS_FAILED,
-            'description' => "QRIS cancelled: " . $transaction->order_id,
+            'description' => 'QRIS cancelled: '.$transaction->order_id,
             'metadata' => [
                 'order_id' => $transaction->order_id,
             ],
@@ -342,6 +341,6 @@ class FinancialAuditService
      */
     protected function formatAmount(float $amount): string
     {
-        return 'Rp ' . number_format($amount, 0, ',', '.');
+        return 'Rp '.number_format($amount, 0, ',', '.');
     }
 }

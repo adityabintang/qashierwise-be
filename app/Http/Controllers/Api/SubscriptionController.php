@@ -289,7 +289,7 @@ class SubscriptionController extends Controller
 
         $midtransSubscriptionService = app(\App\Services\MidtransSubscriptionService::class);
 
-        if (!$midtransSubscriptionService->isConfigured()) {
+        if (! $midtransSubscriptionService->isConfigured()) {
             return response()->json([
                 'success' => false,
                 'error' => [
@@ -301,7 +301,7 @@ class SubscriptionController extends Controller
 
         $result = $midtransSubscriptionService->cancelSubscription($subscription->midtrans_subscription_id);
 
-        if (!$result) {
+        if (! $result) {
             return response()->json([
                 'success' => false,
                 'error' => [

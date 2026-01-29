@@ -20,29 +20,29 @@ class MenuVisibilityService
         'messages' => ['permission' => null, 'group' => 'main'],
         'templates' => ['permission' => null, 'group' => 'main'],
         'profile' => ['permission' => null, 'group' => 'main'],
-        
+
         // POS Section
-        'pos-orders' => ['permission' => 'pos.orders.view', 'group' => 'pos'],
-        'pos-payment' => ['permission' => 'pos.payments.view', 'group' => 'pos'],
-        
+        'pos-orders' => ['permission' => 'view_orders', 'group' => 'pos'],
+        'pos-payment' => ['permission' => 'process_payment', 'group' => 'pos'],
+
         // Inventory Section
-        'pos-products' => ['permission' => 'pos.products.view', 'group' => 'inventory'],
-        'pos-categories' => ['permission' => 'pos.categories.view', 'group' => 'inventory'],
-        
+        'pos-products' => ['permission' => 'view_products', 'group' => 'inventory'],
+        'pos-categories' => ['permission' => 'view_categories', 'group' => 'inventory'],
+
         // Operations Section
-        'pos-stores' => ['permission' => 'pos.stores.view', 'group' => 'operations'],
-        'pos-tables' => ['permission' => 'pos.tables.view', 'group' => 'operations'],
-        'pos-users' => ['permission' => 'pos.users.view', 'group' => 'operations'],
-        
+        'pos-stores' => ['permission' => 'view_stores', 'group' => 'operations'],
+        'pos-tables' => ['permission' => 'view_tables', 'group' => 'operations'],
+        'pos-users' => ['permission' => 'manage_users', 'group' => 'operations'],
+
         // Analytics Section
-        'pos-reports' => ['permission' => 'pos.reports.view', 'group' => 'analytics'],
-        'pos-transactions' => ['permission' => 'pos.transactions.view', 'group' => 'analytics'],
+        'pos-reports' => ['permission' => 'view_reports', 'group' => 'analytics'],
+        'pos-transactions' => ['permission' => 'view_orders', 'group' => 'analytics'],
     ];
 
     /**
      * Get visible menu items for a given set of permissions
      *
-     * @param array|null $permissions User's permissions array
+     * @param  array|null  $permissions  User's permissions array
      * @return array List of visible menu item keys
      */
     public function getVisibleMenuItems(?array $permissions): array
@@ -61,13 +61,12 @@ class MenuVisibilityService
     /**
      * Check if a specific menu item is visible for given permissions
      *
-     * @param string $menuKey The menu item key
-     * @param array|null $permissions User's permissions array
-     * @return bool
+     * @param  string  $menuKey  The menu item key
+     * @param  array|null  $permissions  User's permissions array
      */
     public function isMenuItemVisible(string $menuKey, ?array $permissions): bool
     {
-        if (!isset(self::MENU_ITEMS[$menuKey])) {
+        if (! isset(self::MENU_ITEMS[$menuKey])) {
             return false;
         }
 
@@ -90,21 +89,18 @@ class MenuVisibilityService
     /**
      * Get visible menu items for a PosUser based on their role
      *
-     * @param PosUser $posUser
      * @return array List of visible menu item keys
      */
     public function getVisibleMenuItemsForUser(PosUser $posUser): array
     {
-        $role = $posUser->role;
-        $permissions = $role ? $role->permissions : null;
+        $user = $posUser->user;
+        $permissions = $user ? $user->getAllPermissions()->pluck('name')->toArray() : null;
 
         return $this->getVisibleMenuItems($permissions);
     }
 
     /**
      * Get all available POS permissions
-     *
-     * @return array
      */
     public static function getAllPosPermissions(): array
     {

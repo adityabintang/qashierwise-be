@@ -7,7 +7,6 @@ use App\Models\Reservation;
 use App\Services\WhatsAppFlowService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class ReservationController extends Controller
 {
@@ -20,7 +19,7 @@ class ReservationController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Reservation::where('user_id', Auth::id())
+        $query = Reservation::where('user_id', auth()->user()->getEffectiveUserId())
             ->with('whatsappContact')
             ->orderBy('reservation_date', 'desc')
             ->orderBy('reservation_time', 'desc');
@@ -85,7 +84,7 @@ class ReservationController extends Controller
             'pre_order_items' => 'nullable|array',
         ]);
 
-        $validated['user_id'] = Auth::id();
+        $validated['user_id'] = auth()->user()->getEffectiveUserId();
         $validated['status'] = 'pending';
 
         $reservation = Reservation::create($validated);
@@ -254,7 +253,7 @@ class ReservationController extends Controller
      */
     public function statistics(Request $request): JsonResponse
     {
-        $userId = Auth::id();
+        $userId = auth()->user()->getEffectiveUserId();
 
         $stats = [
             'today' => Reservation::where('user_id', $userId)->today()->count(),
@@ -295,7 +294,7 @@ class ReservationController extends Controller
      */
     public function listFlows(): JsonResponse
     {
-        $flows = $this->flowService->listFlows(Auth::id());
+        $flows = $this->flowService->listFlows(auth()->user()->getEffectiveUserId());
 
         return response()->json([
             'success' => true,
@@ -309,7 +308,7 @@ class ReservationController extends Controller
     public function createFlow(): JsonResponse
     {
         try {
-            $result = $this->flowService->createReservationFlow(Auth::id());
+            $result = $this->flowService->createReservationFlow(auth()->user()->getEffectiveUserId());
 
             return response()->json([
                 'success' => true,
@@ -336,7 +335,7 @@ class ReservationController extends Controller
 
         try {
             $result = $this->flowService->sendReservationFlow(
-                Auth::id(),
+                auth()->user()->getEffectiveUserId(),
                 $validated['phone'],
                 $validated['flow_id']
             );
@@ -363,7 +362,7 @@ class ReservationController extends Controller
             'flow_id' => 'required|string',
         ]);
 
-        $success = $this->flowService->publishFlow(Auth::id(), $validated['flow_id']);
+        $success = $this->flowService->publishFlow(auth()->user()->getEffectiveUserId(), $validated['flow_id']);
 
         if ($success) {
             return response()->json([
@@ -387,7 +386,7 @@ class ReservationController extends Controller
             'flow_id' => 'required|string',
         ]);
 
-        $success = $this->flowService->deleteFlow(Auth::id(), $validated['flow_id']);
+        $success = $this->flowService->deleteFlow(auth()->user()->getEffectiveUserId(), $validated['flow_id']);
 
         if ($success) {
             return response()->json([
@@ -407,7 +406,7 @@ class ReservationController extends Controller
      */
     private function authorizeReservation(Reservation $reservation): void
     {
-        if ($reservation->user_id !== Auth::id()) {
+        if ($reservation->user_id !== auth()->user()->getEffectiveUserId()) {
             abort(403, 'Unauthorized access to reservation');
         }
     }

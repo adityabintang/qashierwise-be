@@ -8,7 +8,9 @@ use Illuminate\Support\Facades\Log;
 class TemplateService
 {
     protected string $apiVersion;
+
     protected string $accessToken;
+
     protected string $businessAccountId;
 
     public function __construct()
@@ -22,14 +24,14 @@ class TemplateService
      * Set credentials dynamically for multi-tenant support.
      * This allows using user-specific WhatsApp account credentials instead of global config.
      *
-     * @param string $accessToken User's WhatsApp access token
-     * @param string $businessAccountId User's WABA ID (WhatsApp Business Account ID)
-     * @return self
+     * @param  string  $accessToken  User's WhatsApp access token
+     * @param  string  $businessAccountId  User's WABA ID (WhatsApp Business Account ID)
      */
     public function setCredentials(string $accessToken, string $businessAccountId): self
     {
         $this->accessToken = $accessToken;
         $this->businessAccountId = $businessAccountId;
+
         return $this;
     }
 
@@ -44,7 +46,7 @@ class TemplateService
     /**
      * Validate template name - must be lowercase alphanumeric and underscores only
      *
-     * @param string $name Template name to validate
+     * @param  string  $name  Template name to validate
      * @return array{valid: bool, error: string|null}
      */
     public function validateTemplateName(string $name): array
@@ -53,25 +55,24 @@ class TemplateService
         if ($name === '') {
             return [
                 'valid' => false,
-                'error' => 'Template name is required'
+                'error' => 'Template name is required',
             ];
         }
 
         if (preg_match('/^[a-z0-9_]+$/', $name) !== 1) {
             return [
                 'valid' => false,
-                'error' => 'Template name can only contain lowercase letters, numbers, and underscores'
+                'error' => 'Template name can only contain lowercase letters, numbers, and underscores',
             ];
         }
 
         return ['valid' => true, 'error' => null];
     }
 
-
     /**
      * Validate footer text - max 60 characters
      *
-     * @param string|null $footer Footer text to validate
+     * @param  string|null  $footer  Footer text to validate
      * @return array{valid: bool, error: string|null}
      */
     public function validateFooter(?string $footer): array
@@ -83,7 +84,7 @@ class TemplateService
         if (mb_strlen($footer) > 60) {
             return [
                 'valid' => false,
-                'error' => 'Footer text cannot exceed 60 characters'
+                'error' => 'Footer text cannot exceed 60 characters',
             ];
         }
 
@@ -93,7 +94,7 @@ class TemplateService
     /**
      * Validate body text - max 1024 characters
      *
-     * @param string $body Body text to validate
+     * @param  string  $body  Body text to validate
      * @return array{valid: bool, error: string|null}
      */
     public function validateBody(string $body): array
@@ -101,14 +102,14 @@ class TemplateService
         if (empty($body)) {
             return [
                 'valid' => false,
-                'error' => 'Body text is required'
+                'error' => 'Body text is required',
             ];
         }
 
         if (mb_strlen($body) > 1024) {
             return [
                 'valid' => false,
-                'error' => 'Body text cannot exceed 1024 characters'
+                'error' => 'Body text cannot exceed 1024 characters',
             ];
         }
 
@@ -118,7 +119,7 @@ class TemplateService
     /**
      * Validate buttons - max 10 quick reply OR max 2 CTA buttons
      *
-     * @param array|null $buttons Array of button configurations
+     * @param  array|null  $buttons  Array of button configurations
      * @return array{valid: bool, error: string|null}
      */
     public function validateButtons(?array $buttons): array
@@ -132,7 +133,7 @@ class TemplateService
 
         foreach ($buttons as $button) {
             $type = $button['type'] ?? '';
-            
+
             if ($type === 'QUICK_REPLY') {
                 $quickReplyCount++;
             } elseif (in_array($type, ['URL', 'PHONE_NUMBER'])) {
@@ -144,21 +145,21 @@ class TemplateService
         if ($quickReplyCount > 0 && $ctaCount > 0) {
             return [
                 'valid' => false,
-                'error' => 'Cannot mix quick reply buttons with call-to-action buttons'
+                'error' => 'Cannot mix quick reply buttons with call-to-action buttons',
             ];
         }
 
         if ($quickReplyCount > 10) {
             return [
                 'valid' => false,
-                'error' => 'Maximum 10 quick reply buttons allowed'
+                'error' => 'Maximum 10 quick reply buttons allowed',
             ];
         }
 
         if ($ctaCount > 2) {
             return [
                 'valid' => false,
-                'error' => 'Maximum 2 call-to-action buttons allowed'
+                'error' => 'Maximum 2 call-to-action buttons allowed',
             ];
         }
 
@@ -168,7 +169,7 @@ class TemplateService
     /**
      * Validate required fields for template creation
      *
-     * @param array $data Template data to validate
+     * @param  array  $data  Template data to validate
      * @return array{valid: bool, errors: array<string, string>}
      */
     public function validateRequiredFields(array $data): array
@@ -193,7 +194,7 @@ class TemplateService
 
         return [
             'valid' => empty($errors),
-            'errors' => $errors
+            'errors' => $errors,
         ];
     }
 
@@ -201,7 +202,7 @@ class TemplateService
      * Validate variable sequence in body text
      * Variables should be sequential: {{1}}, {{2}}, {{3}}, etc.
      *
-     * @param string $body Body text containing variables
+     * @param  string  $body  Body text containing variables
      * @return array{valid: bool, warning: string|null}
      */
     public function validateVariableSequence(string $body): array
@@ -224,7 +225,7 @@ class TemplateService
         if ($variableNumbers !== $expected) {
             return [
                 'valid' => true, // Still valid, but with warning
-                'warning' => 'Variable placeholders should be sequential starting from {{1}}. Found: {{' . implode('}}, {{', $variableNumbers) . '}}'
+                'warning' => 'Variable placeholders should be sequential starting from {{1}}. Found: {{'.implode('}}, {{', $variableNumbers).'}}',
             ];
         }
 
@@ -234,7 +235,7 @@ class TemplateService
     /**
      * Build components array for WhatsApp API from form data
      *
-     * @param array $formData Form data from frontend
+     * @param  array  $formData  Form data from frontend
      * @return array Formatted components array for WhatsApp API
      */
     public function buildComponents(array $formData): array
@@ -242,20 +243,20 @@ class TemplateService
         $components = [];
 
         // Build HEADER component if present
-        if (!empty($formData['header'])) {
+        if (! empty($formData['header'])) {
             $header = $formData['header'];
             $headerComponent = [
                 'type' => 'HEADER',
                 'format' => $header['type'] ?? 'TEXT',
             ];
 
-            if (($header['type'] ?? 'TEXT') === 'TEXT' && !empty($header['text'])) {
+            if (($header['type'] ?? 'TEXT') === 'TEXT' && ! empty($header['text'])) {
                 $headerComponent['text'] = $header['text'];
             } elseif (in_array($header['type'] ?? '', ['IMAGE', 'VIDEO', 'DOCUMENT'])) {
                 // For media headers, include example if provided
-                if (!empty($header['example'])) {
+                if (! empty($header['example'])) {
                     $headerComponent['example'] = [
-                        'header_handle' => [$header['example']]
+                        'header_handle' => [$header['example']],
                     ];
                 }
             }
@@ -264,7 +265,7 @@ class TemplateService
         }
 
         // Build BODY component (required)
-        if (!empty($formData['body'])) {
+        if (! empty($formData['body'])) {
             $bodyData = is_array($formData['body']) ? $formData['body'] : ['text' => $formData['body']];
             $bodyComponent = [
                 'type' => 'BODY',
@@ -272,9 +273,9 @@ class TemplateService
             ];
 
             // Add example values for variables if provided
-            if (!empty($bodyData['examples'])) {
+            if (! empty($bodyData['examples'])) {
                 $bodyComponent['example'] = [
-                    'body_text' => $bodyData['examples']
+                    'body_text' => $bodyData['examples'],
                 ];
             }
 
@@ -282,12 +283,12 @@ class TemplateService
         }
 
         // Build FOOTER component if present
-        if (!empty($formData['footer'])) {
-            $footerText = is_array($formData['footer']) 
-                ? ($formData['footer']['text'] ?? '') 
+        if (! empty($formData['footer'])) {
+            $footerText = is_array($formData['footer'])
+                ? ($formData['footer']['text'] ?? '')
                 : $formData['footer'];
-            
-            if (!empty($footerText)) {
+
+            if (! empty($footerText)) {
                 $components[] = [
                     'type' => 'FOOTER',
                     'text' => $footerText,
@@ -296,7 +297,7 @@ class TemplateService
         }
 
         // Build BUTTONS component if present
-        if (!empty($formData['buttons'])) {
+        if (! empty($formData['buttons'])) {
             $buttons = [];
             foreach ($formData['buttons'] as $button) {
                 $buttonData = [
@@ -305,19 +306,19 @@ class TemplateService
                 ];
 
                 // Add URL for URL type buttons
-                if ($button['type'] === 'URL' && !empty($button['url'])) {
+                if ($button['type'] === 'URL' && ! empty($button['url'])) {
                     $buttonData['url'] = $button['url'];
                 }
 
                 // Add phone number for PHONE_NUMBER type buttons
-                if ($button['type'] === 'PHONE_NUMBER' && !empty($button['phone_number'])) {
+                if ($button['type'] === 'PHONE_NUMBER' && ! empty($button['phone_number'])) {
                     $buttonData['phone_number'] = $button['phone_number'];
                 }
 
                 $buttons[] = $buttonData;
             }
 
-            if (!empty($buttons)) {
+            if (! empty($buttons)) {
                 $components[] = [
                     'type' => 'BUTTONS',
                     'buttons' => $buttons,
@@ -331,64 +332,64 @@ class TemplateService
     /**
      * Create a new template via WhatsApp Business Management API
      *
-     * @param array $data Template data (name, category, language, components or form data)
+     * @param  array  $data  Template data (name, category, language, components or form data)
      * @return array{success: bool, data: array|null, error: string|null}
      */
     public function createTemplate(array $data): array
     {
         // Validate required fields first
         $requiredValidation = $this->validateRequiredFields($data);
-        if (!$requiredValidation['valid']) {
+        if (! $requiredValidation['valid']) {
             return [
                 'success' => false,
                 'data' => null,
-                'error' => 'Validation failed: ' . implode(', ', $requiredValidation['errors'])
+                'error' => 'Validation failed: '.implode(', ', $requiredValidation['errors']),
             ];
         }
 
         // Validate template name
         $nameValidation = $this->validateTemplateName($data['name']);
-        if (!$nameValidation['valid']) {
+        if (! $nameValidation['valid']) {
             return [
                 'success' => false,
                 'data' => null,
-                'error' => $nameValidation['error']
+                'error' => $nameValidation['error'],
             ];
         }
 
         // Validate body
         $bodyText = is_array($data['body']) ? ($data['body']['text'] ?? '') : $data['body'];
         $bodyValidation = $this->validateBody($bodyText);
-        if (!$bodyValidation['valid']) {
+        if (! $bodyValidation['valid']) {
             return [
                 'success' => false,
                 'data' => null,
-                'error' => $bodyValidation['error']
+                'error' => $bodyValidation['error'],
             ];
         }
 
         // Validate footer if present
         $footerText = null;
-        if (!empty($data['footer'])) {
+        if (! empty($data['footer'])) {
             $footerText = is_array($data['footer']) ? ($data['footer']['text'] ?? '') : $data['footer'];
             $footerValidation = $this->validateFooter($footerText);
-            if (!$footerValidation['valid']) {
+            if (! $footerValidation['valid']) {
                 return [
                     'success' => false,
                     'data' => null,
-                    'error' => $footerValidation['error']
+                    'error' => $footerValidation['error'],
                 ];
             }
         }
 
         // Validate buttons if present
-        if (!empty($data['buttons'])) {
+        if (! empty($data['buttons'])) {
             $buttonsValidation = $this->validateButtons($data['buttons']);
-            if (!$buttonsValidation['valid']) {
+            if (! $buttonsValidation['valid']) {
                 return [
                     'success' => false,
                     'data' => null,
-                    'error' => $buttonsValidation['error']
+                    'error' => $buttonsValidation['error'],
                 ];
             }
         }
@@ -405,8 +406,8 @@ class TemplateService
         ];
 
         try {
-            $url = $this->getBaseUrl() . "/{$this->businessAccountId}/message_templates";
-            
+            $url = $this->getBaseUrl()."/{$this->businessAccountId}/message_templates";
+
             $response = Http::withToken($this->accessToken)
                 ->post($url, $payload);
 
@@ -414,40 +415,40 @@ class TemplateService
                 $responseData = $response->json();
                 Log::info('Template created successfully', [
                     'template_id' => $responseData['id'] ?? null,
-                    'name' => $data['name']
+                    'name' => $data['name'],
                 ]);
 
                 return [
                     'success' => true,
                     'data' => $responseData,
-                    'error' => null
+                    'error' => null,
                 ];
             }
 
             $errorData = $response->json();
             $errorMessage = $errorData['error']['message'] ?? 'Unknown error occurred';
-            
+
             Log::error('Template creation failed', [
                 'name' => $data['name'],
                 'error' => $errorMessage,
-                'response' => $errorData
+                'response' => $errorData,
             ]);
 
             return [
                 'success' => false,
                 'data' => null,
-                'error' => $errorMessage
+                'error' => $errorMessage,
             ];
         } catch (\Exception $e) {
             Log::error('Template creation exception', [
                 'name' => $data['name'],
-                'exception' => $e->getMessage()
+                'exception' => $e->getMessage(),
             ]);
 
             return [
                 'success' => false,
                 'data' => null,
-                'error' => 'Failed to connect to WhatsApp API: ' . $e->getMessage()
+                'error' => 'Failed to connect to WhatsApp API: '.$e->getMessage(),
             ];
         }
     }
@@ -455,46 +456,46 @@ class TemplateService
     /**
      * Update an existing template via WhatsApp Business Management API
      *
-     * @param string $templateId Template ID from WhatsApp
-     * @param array $data Updated template data
+     * @param  string  $templateId  Template ID from WhatsApp
+     * @param  array  $data  Updated template data
      * @return array{success: bool, data: array|null, error: string|null}
      */
     public function updateTemplate(string $templateId, array $data): array
     {
         // Validate body if present
-        if (!empty($data['body'])) {
+        if (! empty($data['body'])) {
             $bodyText = is_array($data['body']) ? ($data['body']['text'] ?? '') : $data['body'];
             $bodyValidation = $this->validateBody($bodyText);
-            if (!$bodyValidation['valid']) {
+            if (! $bodyValidation['valid']) {
                 return [
                     'success' => false,
                     'data' => null,
-                    'error' => $bodyValidation['error']
+                    'error' => $bodyValidation['error'],
                 ];
             }
         }
 
         // Validate footer if present
-        if (!empty($data['footer'])) {
+        if (! empty($data['footer'])) {
             $footerText = is_array($data['footer']) ? ($data['footer']['text'] ?? '') : $data['footer'];
             $footerValidation = $this->validateFooter($footerText);
-            if (!$footerValidation['valid']) {
+            if (! $footerValidation['valid']) {
                 return [
                     'success' => false,
                     'data' => null,
-                    'error' => $footerValidation['error']
+                    'error' => $footerValidation['error'],
                 ];
             }
         }
 
         // Validate buttons if present
-        if (!empty($data['buttons'])) {
+        if (! empty($data['buttons'])) {
             $buttonsValidation = $this->validateButtons($data['buttons']);
-            if (!$buttonsValidation['valid']) {
+            if (! $buttonsValidation['valid']) {
                 return [
                     'success' => false,
                     'data' => null,
-                    'error' => $buttonsValidation['error']
+                    'error' => $buttonsValidation['error'],
                 ];
             }
         }
@@ -509,48 +510,48 @@ class TemplateService
 
         try {
             // WhatsApp API uses POST to /{template-id} for updates
-            $url = $this->getBaseUrl() . "/{$templateId}";
-            
+            $url = $this->getBaseUrl()."/{$templateId}";
+
             $response = Http::withToken($this->accessToken)
                 ->post($url, $payload);
 
             if ($response->successful()) {
                 $responseData = $response->json();
                 Log::info('Template updated successfully', [
-                    'template_id' => $templateId
+                    'template_id' => $templateId,
                 ]);
 
                 return [
                     'success' => true,
                     'data' => $responseData,
-                    'error' => null
+                    'error' => null,
                 ];
             }
 
             $errorData = $response->json();
             $errorMessage = $errorData['error']['message'] ?? 'Unknown error occurred';
-            
+
             Log::error('Template update failed', [
                 'template_id' => $templateId,
                 'error' => $errorMessage,
-                'response' => $errorData
+                'response' => $errorData,
             ]);
 
             return [
                 'success' => false,
                 'data' => null,
-                'error' => $errorMessage
+                'error' => $errorMessage,
             ];
         } catch (\Exception $e) {
             Log::error('Template update exception', [
                 'template_id' => $templateId,
-                'exception' => $e->getMessage()
+                'exception' => $e->getMessage(),
             ]);
 
             return [
                 'success' => false,
                 'data' => null,
-                'error' => 'Failed to connect to WhatsApp API: ' . $e->getMessage()
+                'error' => 'Failed to connect to WhatsApp API: '.$e->getMessage(),
             ];
         }
     }
@@ -558,8 +559,8 @@ class TemplateService
     /**
      * Delete a template via WhatsApp Business Management API
      *
-     * @param string $templateName Template name to delete
-     * @param string|null $templateId Optional template ID (hsm_id) for more reliable deletion
+     * @param  string  $templateName  Template name to delete
+     * @param  string|null  $templateId  Optional template ID (hsm_id) for more reliable deletion
      * @return array{success: bool, data: array|null, error: string|null}
      */
     public function deleteTemplate(string $templateName, ?string $templateId = null): array
@@ -568,7 +569,7 @@ class TemplateService
             return [
                 'success' => false,
                 'data' => null,
-                'error' => 'Template name is required for deletion'
+                'error' => 'Template name is required for deletion',
             ];
         }
 
@@ -579,36 +580,36 @@ class TemplateService
             if ($templateId) {
                 $queryParams['hsm_id'] = $templateId;
             }
-            
+
             $queryString = http_build_query($queryParams);
-            $url = $this->getBaseUrl() . "/{$this->businessAccountId}/message_templates?{$queryString}";
-            
+            $url = $this->getBaseUrl()."/{$this->businessAccountId}/message_templates?{$queryString}";
+
             Log::info('Attempting to delete template', [
                 'url' => $url,
                 'template_name' => $templateName,
                 'template_id' => $templateId,
                 'waba_id' => $this->businessAccountId,
-                'has_token' => !empty($this->accessToken),
+                'has_token' => ! empty($this->accessToken),
             ]);
-            
+
             $response = Http::withToken($this->accessToken)->delete($url);
 
             if ($response->successful()) {
                 $responseData = $response->json();
                 Log::info('Template deleted successfully', [
-                    'template_name' => $templateName
+                    'template_name' => $templateName,
                 ]);
 
                 return [
                     'success' => true,
                     'data' => $responseData,
-                    'error' => null
+                    'error' => null,
                 ];
             }
 
             $errorData = $response->json();
             $errorMessage = $errorData['error']['message'] ?? 'Unknown error occurred';
-            
+
             Log::error('Template deletion failed', [
                 'template_name' => $templateName,
                 'waba_id' => $this->businessAccountId,
@@ -621,18 +622,18 @@ class TemplateService
             return [
                 'success' => false,
                 'data' => null,
-                'error' => $errorMessage
+                'error' => $errorMessage,
             ];
         } catch (\Exception $e) {
             Log::error('Template deletion exception', [
                 'template_name' => $templateName,
-                'exception' => $e->getMessage()
+                'exception' => $e->getMessage(),
             ]);
 
             return [
                 'success' => false,
                 'data' => null,
-                'error' => 'Failed to connect to WhatsApp API: ' . $e->getMessage()
+                'error' => 'Failed to connect to WhatsApp API: '.$e->getMessage(),
             ];
         }
     }
@@ -641,7 +642,7 @@ class TemplateService
      * Serialize template data for storage
      * Converts component arrays to JSON format
      *
-     * @param array $templateData Template data to serialize
+     * @param  array  $templateData  Template data to serialize
      * @return array Serialized template data with JSON-encoded components
      */
     public function serializeTemplate(array $templateData): array
@@ -665,7 +666,7 @@ class TemplateService
      * Deserialize template data from storage
      * Converts JSON strings back to component arrays
      *
-     * @param array $templateData Template data to deserialize
+     * @param  array  $templateData  Template data to deserialize
      * @return array Deserialized template data with array components
      */
     public function deserializeTemplate(array $templateData): array
@@ -695,7 +696,7 @@ class TemplateService
      * Render preview body text with variable placeholders replaced by indicators
      * Replaces {{N}} with [Variable N] for preview display
      *
-     * @param string $body Body text containing variable placeholders
+     * @param  string  $body  Body text containing variable placeholders
      * @return string Body text with variables replaced by placeholder indicators
      */
     public function renderPreviewBody(string $body): string
@@ -711,7 +712,7 @@ class TemplateService
     /**
      * Count the number of unique variable placeholders in body text
      *
-     * @param string $body Body text containing variable placeholders
+     * @param  string  $body  Body text containing variable placeholders
      * @return int Number of unique variable placeholders
      */
     public function countVariables(string $body): int

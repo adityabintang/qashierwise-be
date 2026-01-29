@@ -53,7 +53,7 @@ class WhatsAppController extends Controller
      */
     protected function getWhatsAppClient(): WhatsAppCloudApi
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
         if (! $userId) {
             throw new WhatsAppNotConnectedException('Authentication required to access WhatsApp features.');
         }
@@ -68,7 +68,7 @@ class WhatsAppController extends Controller
      */
     protected function getUserWhatsAppAccount(): WhatsAppAccount
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
         if (! $userId) {
             throw new WhatsAppNotConnectedException('Authentication required to access WhatsApp features.');
         }
@@ -134,7 +134,7 @@ class WhatsAppController extends Controller
     {
         // Clean phone number (remove +, spaces, etc)
         $cleanNumber = preg_replace('/[^0-9]/', '', $phoneNumber);
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
         $account = $this->getWhatsAppAccount();
 
         if (! $userId) {
@@ -1135,7 +1135,7 @@ class WhatsAppController extends Controller
             ]);
 
             // Broadcast profile update event
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
             if ($userId) {
                 broadcast(new \App\Events\ProfileUpdated($userId, $data, 'business_profile'));
             }
@@ -1382,7 +1382,7 @@ class WhatsAppController extends Controller
     public function getDashboardStats()
     {
         try {
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
 
             if (! $userId) {
                 return response()->json([
@@ -1453,7 +1453,7 @@ class WhatsAppController extends Controller
     public function getWeeklyChartData()
     {
         try {
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
 
             if (! $userId) {
                 return response()->json([
@@ -1507,7 +1507,7 @@ class WhatsAppController extends Controller
     public function getMessages(Request $request)
     {
         try {
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
 
             if (! $userId) {
                 return response()->json([
@@ -1584,7 +1584,7 @@ class WhatsAppController extends Controller
     public function getContacts(Request $request)
     {
         try {
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
 
             if (! $userId) {
                 return response()->json([
@@ -1625,7 +1625,7 @@ class WhatsAppController extends Controller
     public function getContactMessages($contactId, Request $request)
     {
         try {
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
 
             if (! $userId) {
                 return response()->json([
@@ -1664,7 +1664,7 @@ class WhatsAppController extends Controller
     public function markContactMessagesAsRead($contactId)
     {
         try {
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
 
             if (! $userId) {
                 return response()->json([

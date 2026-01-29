@@ -6,15 +6,18 @@ use Exception;
 
 /**
  * Exception thrown when payment provider operations fail.
- * 
+ *
  * This exception classifies provider errors into network errors,
  * credential errors, and other provider-specific errors.
  */
 class ProviderException extends Exception
 {
     public const TYPE_NETWORK = 'network';
+
     public const TYPE_CREDENTIAL = 'credential';
+
     public const TYPE_PROVIDER = 'provider';
+
     public const TYPE_UNKNOWN = 'unknown';
 
     /**

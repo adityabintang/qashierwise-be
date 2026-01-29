@@ -1,7 +1,5 @@
 <?php
 
-use App\Models\WhatsAppAccount;
-use App\Models\WhatsAppTemplate;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;

@@ -4,7 +4,7 @@ namespace App\DTOs;
 
 /**
  * Standardized error response DTO.
- * 
+ *
  * Provides a consistent structure for error responses across the application.
  * Ensures sensitive information is never exposed to clients.
  */
@@ -13,11 +13,11 @@ class ErrorResponse
     /**
      * Create a new error response instance.
      *
-     * @param string $message User-friendly error message
-     * @param string $code Error code for programmatic handling
-     * @param int $statusCode HTTP status code
-     * @param array|null $details Additional error details (optional)
-     * @param string|null $provider Provider name if applicable
+     * @param  string  $message  User-friendly error message
+     * @param  string  $code  Error code for programmatic handling
+     * @param  int  $statusCode  HTTP status code
+     * @param  array|null  $details  Additional error details (optional)
+     * @param  string|null  $provider  Provider name if applicable
      */
     public function __construct(
         public readonly string $message,
@@ -29,8 +29,6 @@ class ErrorResponse
 
     /**
      * Convert to array for JSON response.
-     *
-     * @return array
      */
     public function toArray(): array
     {
@@ -43,7 +41,7 @@ class ErrorResponse
             $response['provider'] = $this->provider;
         }
 
-        if ($this->details !== null && !empty($this->details)) {
+        if ($this->details !== null && ! empty($this->details)) {
             $response['details'] = $this->details;
         }
 
@@ -52,9 +50,6 @@ class ErrorResponse
 
     /**
      * Create an error response from a ProviderException.
-     *
-     * @param \App\Exceptions\ProviderException $exception
-     * @return self
      */
     public static function fromProviderException(\App\Exceptions\ProviderException $exception): self
     {
@@ -71,9 +66,6 @@ class ErrorResponse
 
     /**
      * Create a network error response.
-     *
-     * @param string|null $provider
-     * @return self
      */
     public static function networkError(?string $provider = null): self
     {
@@ -87,9 +79,6 @@ class ErrorResponse
 
     /**
      * Create a credential error response.
-     *
-     * @param string|null $provider
-     * @return self
      */
     public static function credentialError(?string $provider = null): self
     {
@@ -103,10 +92,6 @@ class ErrorResponse
 
     /**
      * Create a validation error response.
-     *
-     * @param string $message
-     * @param array|null $details
-     * @return self
      */
     public static function validationError(string $message, ?array $details = null): self
     {
@@ -120,9 +105,6 @@ class ErrorResponse
 
     /**
      * Create a not found error response.
-     *
-     * @param string $resource
-     * @return self
      */
     public static function notFound(string $resource): self
     {
@@ -135,9 +117,6 @@ class ErrorResponse
 
     /**
      * Create an unauthorized error response.
-     *
-     * @param string $message
-     * @return self
      */
     public static function unauthorized(string $message = 'Unauthorized'): self
     {
@@ -150,9 +129,6 @@ class ErrorResponse
 
     /**
      * Create a forbidden error response.
-     *
-     * @param string $message
-     * @return self
      */
     public static function forbidden(string $message = 'Forbidden'): self
     {
@@ -165,9 +141,6 @@ class ErrorResponse
 
     /**
      * Create a generic server error response.
-     *
-     * @param string $message
-     * @return self
      */
     public static function serverError(string $message = 'An unexpected error occurred'): self
     {

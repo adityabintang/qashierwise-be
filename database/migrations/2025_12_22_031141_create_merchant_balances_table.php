@@ -20,7 +20,7 @@ return new class extends Migration
             $table->decimal('total_withdrawn', 15, 2)->default(0.00);
             $table->timestamp('last_updated')->useCurrent()->useCurrentOnUpdate();
             $table->timestamps();
-            
+
             // Indexes
             $table->unique('sub_merchant_id', 'unique_merchant_balance');
             $table->index(['sub_merchant_id', 'available_balance'], 'idx_balance_lookup');

@@ -2,9 +2,7 @@
 
 namespace App\Services;
 
-use App\Contracts\PaymentProviderInterface;
 use App\DTOs\QrisRequest;
-use App\DTOs\QrisResponse;
 use App\Exceptions\UnsupportedProviderException;
 use App\Models\QrisTransaction;
 use App\Models\SubMerchant;
@@ -22,8 +20,11 @@ class QrisService
      * Midtrans API configuration (legacy support).
      */
     private string $serverKey;
+
     private string $clientKey;
+
     private string $baseUrl;
+
     private bool $isProduction;
 
     /**
@@ -51,23 +52,25 @@ class QrisService
     public function setAuditService(FinancialAuditService $auditService): self
     {
         $this->auditService = $auditService;
+
         return $this;
     }
 
     /**
      * Generate a QRIS code for a sub-merchant transaction using multi-provider system.
      *
-     * @param SubMerchant $merchant The sub-merchant generating the QRIS
-     * @param float $amount Transaction amount in IDR
-     * @param array $details Additional transaction details (description, customer_name, etc.)
+     * @param  SubMerchant  $merchant  The sub-merchant generating the QRIS
+     * @param  float  $amount  Transaction amount in IDR
+     * @param  array  $details  Additional transaction details (description, customer_name, etc.)
      * @return QrisTransaction The created QRIS transaction
+     *
      * @throws InvalidArgumentException If validation fails
      * @throws RuntimeException If provider API call fails
      */
     public function generateQris(SubMerchant $merchant, float $amount, array $details = []): QrisTransaction
     {
         // Validate merchant can accept payments
-        if (!$merchant->is_active) {
+        if (! $merchant->is_active) {
             throw new InvalidArgumentException('Sub-merchant is not active');
         }
 
@@ -78,13 +81,13 @@ class QrisService
 
         // Get the merchant's user
         $user = $merchant->user;
-        if (!$user) {
+        if (! $user) {
             throw new InvalidArgumentException('Sub-merchant must be associated with a user');
         }
 
         // Get active provider credentials
         $activeCredential = $this->credentialService->getActiveProvider($user);
-        if (!$activeCredential) {
+        if (! $activeCredential) {
             throw new RuntimeException('No active payment provider configured. Please configure a provider in settings.');
         }
 
@@ -152,8 +155,8 @@ class QrisService
                     'qr_code_url' => $qrisResponse->qrCodeUrl,
                     'provider_transaction_id' => $qrisResponse->providerTransactionId,
                     // Keep midtrans_transaction_id for backward compatibility
-                    'midtrans_transaction_id' => $activeCredential->provider === 'midtrans' 
-                        ? $qrisResponse->providerTransactionId 
+                    'midtrans_transaction_id' => $activeCredential->provider === 'midtrans'
+                        ? $qrisResponse->providerTransactionId
                         : null,
                 ]);
 
@@ -170,7 +173,7 @@ class QrisService
                     'provider' => $activeCredential->provider,
                     'error' => $e->getMessage(),
                 ]);
-                
+
                 // Log failed credential access
                 if ($this->credentialAuditService !== null) {
                     $this->credentialAuditService->logAccess(
@@ -181,9 +184,8 @@ class QrisService
                         "Unsupported provider: {$activeCredential->provider}"
                     );
                 }
-                
+
                 throw new RuntimeException("Provider {$activeCredential->provider} is not supported");
-                
             } catch (\Exception $e) {
                 Log::error('QRIS generation failed', [
                     'order_id' => $orderId,
@@ -191,7 +193,7 @@ class QrisService
                     'error' => $e->getMessage(),
                     'error_class' => get_class($e),
                 ]);
-                
+
                 // Log failed credential access
                 if ($this->credentialAuditService !== null) {
                     $this->credentialAuditService->logDecryption(
@@ -201,7 +203,7 @@ class QrisService
                         $e->getMessage()
                     );
                 }
-                
+
                 // If provider fails, we still have the transaction record
                 // Generate a fallback QR code URL
                 $transaction->update([
@@ -221,10 +223,11 @@ class QrisService
     /**
      * Create QRIS via Midtrans API.
      *
-     * @param QrisTransaction $transaction The transaction record
-     * @param SubMerchant $merchant The sub-merchant
-     * @param array $details Additional details
+     * @param  QrisTransaction  $transaction  The transaction record
+     * @param  SubMerchant  $merchant  The sub-merchant
+     * @param  array  $details  Additional details
      * @return array Response data with qr_code_url and transaction_id
+     *
      * @throws RuntimeException If API call fails
      */
     private function createMidtransQris(QrisTransaction $transaction, SubMerchant $merchant, array $details): array
@@ -233,7 +236,7 @@ class QrisService
             // Return mock data for development/testing when no API key is configured
             return [
                 'qr_code_url' => $this->generateMockQrCodeUrl($transaction->order_id),
-                'transaction_id' => 'mock-' . $transaction->order_id,
+                'transaction_id' => 'mock-'.$transaction->order_id,
             ];
         }
 
@@ -253,7 +256,7 @@ class QrisService
         ];
 
         // Add item details if provided
-        if (!empty($details['description'])) {
+        if (! empty($details['description'])) {
             $payload['item_details'] = [
                 [
                     'id' => $transaction->order_id,
@@ -265,7 +268,7 @@ class QrisService
         }
 
         // Add customer details if provided
-        if (!empty($details['customer_name']) || !empty($details['customer_email'])) {
+        if (! empty($details['customer_name']) || ! empty($details['customer_email'])) {
             $payload['customer_details'] = [
                 'first_name' => $details['customer_name'] ?? 'Customer',
                 'email' => $details['customer_email'] ?? null,
@@ -276,7 +279,7 @@ class QrisService
             ->timeout(30)
             ->post("{$this->baseUrl}/v2/charge", $payload);
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             $errorMessage = $response->json('status_message') ?? 'Unknown error';
             throw new RuntimeException("Midtrans API error: {$errorMessage}");
         }
@@ -291,7 +294,7 @@ class QrisService
         // Extract QR code URL from actions array
         // Midtrans returns actions with name "generate-qr-code" containing the QR image URL
         $qrCodeUrl = null;
-        if (!empty($data['actions'])) {
+        if (! empty($data['actions'])) {
             foreach ($data['actions'] as $action) {
                 if (($action['name'] ?? '') === 'generate-qr-code') {
                     $qrCodeUrl = $action['url'] ?? null;
@@ -299,13 +302,13 @@ class QrisService
                 }
             }
             // Fallback to first action URL if no generate-qr-code found
-            if (!$qrCodeUrl && !empty($data['actions'][0]['url'])) {
+            if (! $qrCodeUrl && ! empty($data['actions'][0]['url'])) {
                 $qrCodeUrl = $data['actions'][0]['url'];
             }
         }
 
         // If still no QR URL, try to generate from qr_string
-        if (!$qrCodeUrl && !empty($data['qr_string'])) {
+        if (! $qrCodeUrl && ! empty($data['qr_string'])) {
             $qrCodeUrl = $this->generateQrCodeFromString($data['qr_string']);
         }
 
@@ -318,32 +321,34 @@ class QrisService
     /**
      * Generate QR code image URL from QRIS string.
      *
-     * @param string $qrString The QRIS string data
+     * @param  string  $qrString  The QRIS string data
      * @return string QR code image URL
      */
     private function generateQrCodeFromString(string $qrString): string
     {
         $encodedData = urlencode($qrString);
+
         return "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={$encodedData}";
     }
 
     /**
      * Generate a mock QR code URL for development/testing.
      *
-     * @param string $orderId The order ID
+     * @param  string  $orderId  The order ID
      * @return string Mock QR code URL
      */
     private function generateMockQrCodeUrl(string $orderId): string
     {
         // Use a QR code generator service for mock data
         $data = urlencode("QRIS:{$orderId}");
+
         return "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={$data}";
     }
 
     /**
      * Get the QR code image URL for a transaction.
      *
-     * @param QrisTransaction $transaction The transaction
+     * @param  QrisTransaction  $transaction  The transaction
      * @return string|null QR code URL or null if not available
      */
     public function getQrCodeUrl(QrisTransaction $transaction): ?string
@@ -359,7 +364,7 @@ class QrisService
     /**
      * Generate a shareable link for a QRIS transaction.
      *
-     * @param QrisTransaction $transaction The transaction
+     * @param  QrisTransaction  $transaction  The transaction
      * @return string Shareable link
      */
     public function generateShareableLink(QrisTransaction $transaction): string
@@ -370,7 +375,7 @@ class QrisService
     /**
      * Validate if a QRIS transaction can still be used.
      *
-     * @param QrisTransaction $transaction The transaction to validate
+     * @param  QrisTransaction  $transaction  The transaction to validate
      * @return bool True if the QRIS can be used
      */
     public function validateQrisExpiry(QrisTransaction $transaction): bool
@@ -381,7 +386,7 @@ class QrisService
     /**
      * Check if a QRIS transaction is expired.
      *
-     * @param QrisTransaction $transaction The transaction to check
+     * @param  QrisTransaction  $transaction  The transaction to check
      * @return bool True if expired
      */
     public function isExpired(QrisTransaction $transaction): bool
@@ -420,8 +425,7 @@ class QrisService
     /**
      * Find a QRIS transaction by order ID.
      *
-     * @param string $orderId The order ID
-     * @return QrisTransaction|null
+     * @param  string  $orderId  The order ID
      */
     public function findByOrderId(string $orderId): ?QrisTransaction
     {
@@ -431,8 +435,7 @@ class QrisService
     /**
      * Find a QRIS transaction by Midtrans transaction ID (legacy support).
      *
-     * @param string $transactionId The Midtrans transaction ID
-     * @return QrisTransaction|null
+     * @param  string  $transactionId  The Midtrans transaction ID
      */
     public function findByMidtransId(string $transactionId): ?QrisTransaction
     {
@@ -442,26 +445,25 @@ class QrisService
     /**
      * Find a QRIS transaction by provider transaction ID.
      *
-     * @param string $transactionId The provider transaction ID
-     * @param string|null $provider Optional provider filter
-     * @return QrisTransaction|null
+     * @param  string  $transactionId  The provider transaction ID
+     * @param  string|null  $provider  Optional provider filter
      */
     public function findByProviderTransactionId(string $transactionId, ?string $provider = null): ?QrisTransaction
     {
         $query = QrisTransaction::where('provider_transaction_id', $transactionId);
-        
+
         if ($provider !== null) {
             $query->where('provider', $provider);
         }
-        
+
         return $query->first();
     }
 
     /**
      * Get transaction history for a sub-merchant.
      *
-     * @param SubMerchant $merchant The sub-merchant
-     * @param int $limit Number of transactions to return
+     * @param  SubMerchant  $merchant  The sub-merchant
+     * @param  int  $limit  Number of transactions to return
      * @return \Illuminate\Database\Eloquent\Collection
      */
     public function getTransactionHistory(SubMerchant $merchant, int $limit = 50)
@@ -475,9 +477,9 @@ class QrisService
     /**
      * Get transaction history for a sub-merchant filtered by provider.
      *
-     * @param SubMerchant $merchant The sub-merchant
-     * @param string $provider The provider to filter by
-     * @param int $limit Number of transactions to return
+     * @param  SubMerchant  $merchant  The sub-merchant
+     * @param  string  $provider  The provider to filter by
+     * @param  int  $limit  Number of transactions to return
      * @return \Illuminate\Database\Eloquent\Collection
      */
     public function getTransactionHistoryByProvider(SubMerchant $merchant, string $provider, int $limit = 50)
@@ -492,7 +494,7 @@ class QrisService
     /**
      * Get pending transactions for a sub-merchant.
      *
-     * @param SubMerchant $merchant The sub-merchant
+     * @param  SubMerchant  $merchant  The sub-merchant
      * @return \Illuminate\Database\Eloquent\Collection
      */
     public function getPendingTransactions(SubMerchant $merchant)
@@ -507,13 +509,14 @@ class QrisService
     /**
      * Cancel a pending QRIS transaction.
      *
-     * @param QrisTransaction $transaction The transaction to cancel
+     * @param  QrisTransaction  $transaction  The transaction to cancel
      * @return bool True if cancelled successfully
+     *
      * @throws InvalidArgumentException If transaction cannot be cancelled
      */
     public function cancelTransaction(QrisTransaction $transaction): bool
     {
-        if (!$transaction->isPending()) {
+        if (! $transaction->isPending()) {
             throw new InvalidArgumentException('Only pending transactions can be cancelled');
         }
 
@@ -537,7 +540,7 @@ class QrisService
     /**
      * Get the active provider credential for a user.
      *
-     * @param User $user The user to get the active provider for
+     * @param  User  $user  The user to get the active provider for
      * @return \App\Models\PaymentProviderCredential|null The active provider credential or null
      */
     public function getActiveProviderCredential(User $user): ?\App\Models\PaymentProviderCredential
@@ -549,10 +552,10 @@ class QrisService
      * Handle webhook notification from payment provider.
      * Verifies webhook signature and updates transaction status.
      *
-     * @param string $provider The provider name (xendit, midtrans, etc.)
-     * @param array $payload The webhook payload data
-     * @param string $signature The webhook signature from headers
-     * @return void
+     * @param  string  $provider  The provider name (xendit, midtrans, etc.)
+     * @param  array  $payload  The webhook payload data
+     * @param  string  $signature  The webhook signature from headers
+     *
      * @throws \App\Exceptions\InvalidWebhookException If webhook signature is invalid
      * @throws \App\Exceptions\NoActiveProviderException If provider credentials not found
      * @throws RuntimeException If webhook processing fails
@@ -570,7 +573,7 @@ class QrisService
             ->where('is_active', true)
             ->first();
 
-        if (!$credential) {
+        if (! $credential) {
             Log::error('No active credential found for webhook provider', [
                 'provider' => $provider,
             ]);
@@ -599,7 +602,7 @@ class QrisService
             }
 
             // Verify webhook signature
-            if (!$providerInstance->verifyWebhook($payload, $signature, $decryptedCredentials)) {
+            if (! $providerInstance->verifyWebhook($payload, $signature, $decryptedCredentials)) {
                 Log::warning('Invalid webhook signature', [
                     'provider' => $provider,
                     'signature' => $signature,
@@ -638,7 +641,7 @@ class QrisService
                 'error_class' => get_class($e),
                 'trace' => $e->getTraceAsString(),
             ]);
-            
+
             // Log failed credential access if applicable
             if ($this->credentialAuditService !== null && isset($credential)) {
                 $this->credentialAuditService->logDecryption(
@@ -648,7 +651,7 @@ class QrisService
                     "Webhook processing failed: {$e->getMessage()}"
                 );
             }
-            
+
             throw new RuntimeException("Failed to process webhook: {$e->getMessage()}");
         }
     }
@@ -657,8 +660,8 @@ class QrisService
      * Update transaction status from webhook data.
      * Processes the standardized webhook transaction data and updates the database.
      *
-     * @param \App\DTOs\WebhookTransaction $webhookTransaction The parsed webhook transaction data
-     * @return void
+     * @param  \App\DTOs\WebhookTransaction  $webhookTransaction  The parsed webhook transaction data
+     *
      * @throws RuntimeException If transaction update fails
      */
     public function updateTransactionStatus(\App\DTOs\WebhookTransaction $webhookTransaction): void
@@ -674,7 +677,7 @@ class QrisService
             ->where('provider', $webhookTransaction->provider)
             ->first();
 
-        if (!$transaction) {
+        if (! $transaction) {
             Log::warning('Transaction not found for webhook', [
                 'external_id' => $webhookTransaction->externalId,
                 'provider' => $webhookTransaction->provider,
@@ -694,6 +697,7 @@ class QrisService
                 'current_status' => $transaction->status,
                 'webhook_status' => $webhookTransaction->status,
             ]);
+
             return;
         }
 
@@ -732,8 +736,8 @@ class QrisService
                 // Log to financial audit trail if payment was successful
                 // Note: Audit logging is skipped in webhook context as balance updates
                 // are handled by ProcessQrisPayment job which has access to balance info
-                if ($newStatus === QrisTransaction::STATUS_SETTLEMENT && 
-                    $this->auditService !== null && 
+                if ($newStatus === QrisTransaction::STATUS_SETTLEMENT &&
+                    $this->auditService !== null &&
                     $transaction->subMerchant !== null) {
                     // Skip audit logging here - it's handled by ProcessQrisPayment job
                     Log::info('Transaction settlement logged, audit will be handled by ProcessQrisPayment job', [
@@ -753,7 +757,7 @@ class QrisService
     /**
      * Map webhook status to QrisTransaction status constants.
      *
-     * @param string $webhookStatus The status from webhook (success, pending, failed, expired)
+     * @param  string  $webhookStatus  The status from webhook (success, pending, failed, expired)
      * @return string The mapped transaction status constant
      */
     private function mapWebhookStatusToTransactionStatus(string $webhookStatus): string

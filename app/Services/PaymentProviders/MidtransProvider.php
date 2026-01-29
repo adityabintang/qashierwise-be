@@ -13,21 +13,22 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Midtrans payment provider implementation.
- * 
+ *
  * Implements QRIS generation using Midtrans Charge API.
  * Documentation: https://docs.midtrans.com
  */
 class MidtransProvider implements PaymentProviderInterface
 {
     private const BASE_URL_PRODUCTION = 'https://api.midtrans.com';
+
     private const BASE_URL_SANDBOX = 'https://api.sandbox.midtrans.com';
-    
+
     private string $baseUrl;
 
     public function __construct()
     {
-        $this->baseUrl = config('app.env') === 'production' 
-            ? self::BASE_URL_PRODUCTION 
+        $this->baseUrl = config('app.env') === 'production'
+            ? self::BASE_URL_PRODUCTION
             : self::BASE_URL_SANDBOX;
     }
 
@@ -54,7 +55,7 @@ class MidtransProvider implements PaymentProviderInterface
     {
         try {
             // Validate required fields
-            if (!isset($credentials['server_key']) || !isset($credentials['client_key'])) {
+            if (! isset($credentials['server_key']) || ! isset($credentials['client_key'])) {
                 return ValidationResult::failure(
                     'Missing required credentials: server_key and client_key',
                     'MISSING_CREDENTIALS'
@@ -63,7 +64,7 @@ class MidtransProvider implements PaymentProviderInterface
 
             // Test API call - try to get status of a dummy transaction
             // This will fail but validates the credentials
-            $testOrderId = 'test-' . time();
+            $testOrderId = 'test-'.time();
             $response = Http::withBasicAuth($credentials['server_key'], '')
                 ->withHeaders([
                     'Content-Type' => 'application/json',
@@ -94,10 +95,10 @@ class MidtransProvider implements PaymentProviderInterface
                 ]);
             }
 
-            $errorMessage = $response->json('status_message') 
-                ?? $response->json('error_message') 
+            $errorMessage = $response->json('status_message')
+                ?? $response->json('error_message')
                 ?? 'Invalid credentials';
-            
+
             return ValidationResult::failure(
                 $errorMessage,
                 $response->json('status_code') ?? 'VALIDATION_FAILED',
@@ -148,11 +149,11 @@ class MidtransProvider implements PaymentProviderInterface
                     ],
                 ]);
 
-            if (!$response->successful()) {
-                $errorMessage = $response->json('status_message') 
-                    ?? $response->json('error_message') 
+            if (! $response->successful()) {
+                $errorMessage = $response->json('status_message')
+                    ?? $response->json('error_message')
                     ?? 'Failed to generate QRIS';
-                throw new \Exception($errorMessage . ': ' . $response->body());
+                throw new \Exception($errorMessage.': '.$response->body());
             }
 
             $data = $response->json();
@@ -206,8 +207,8 @@ class MidtransProvider implements PaymentProviderInterface
                 ])
                 ->get("{$this->baseUrl}/v2/{$transactionId}/status");
 
-            if (!$response->successful()) {
-                throw new \Exception('Failed to check transaction status: ' . $response->body());
+            if (! $response->successful()) {
+                throw new \Exception('Failed to check transaction status: '.$response->body());
             }
 
             $data = $response->json();
@@ -268,21 +269,21 @@ class MidtransProvider implements PaymentProviderInterface
         try {
             // Midtrans uses SHA512 hash for signature verification
             $serverKey = $credentials['server_key'] ?? '';
-            
+
             // Construct signature string: order_id + status_code + gross_amount + server_key
             $orderId = $payload['order_id'] ?? '';
             $statusCode = $payload['status_code'] ?? '';
             $grossAmount = $payload['gross_amount'] ?? '';
-            
-            $signatureString = $orderId . $statusCode . $grossAmount . $serverKey;
+
+            $signatureString = $orderId.$statusCode.$grossAmount.$serverKey;
             $computedSignature = hash('sha512', $signatureString);
-            
+
             return hash_equals($computedSignature, $signature);
         } catch (\Exception $e) {
             Log::error('Midtrans webhook verification error', [
                 'error' => $e->getMessage(),
             ]);
-            
+
             return false;
         }
     }
@@ -293,7 +294,7 @@ class MidtransProvider implements PaymentProviderInterface
     public function parseWebhookPayload(array $payload): WebhookTransaction
     {
         $status = $this->mapMidtransStatus($payload['transaction_status'] ?? 'pending');
-        
+
         $paidAt = null;
         if ($status === TransactionStatus::STATUS_SETTLEMENT && isset($payload['settlement_time'])) {
             $paidAt = $payload['settlement_time'];

@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\MidtransSubscriptionService;
-use App\Services\SubscriptionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\TestCase;
@@ -17,7 +16,7 @@ class MidtransSubscriptionControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Set up Midtrans config for tests
         config([
             'subscription.midtrans.server_key' => 'test_server_key',
@@ -93,7 +92,7 @@ class MidtransSubscriptionControllerTest extends TestCase
     public function test_create_checkout_checks_service_configuration(): void
     {
         config(['subscription.midtrans.server_key' => '']);
-        
+
         $user = User::factory()->create();
 
         $response = $this->actingAs($user)
@@ -111,7 +110,7 @@ class MidtransSubscriptionControllerTest extends TestCase
     public function test_create_checkout_redirects_if_user_has_active_subscription(): void
     {
         $user = User::factory()->create();
-        
+
         Subscription::create([
             'user_id' => $user->id,
             'provider' => 'midtrans',
@@ -209,7 +208,7 @@ class MidtransSubscriptionControllerTest extends TestCase
     public function test_cancel_subscription_returns_error_if_not_midtrans(): void
     {
         $user = User::factory()->create();
-        
+
         Subscription::create([
             'user_id' => $user->id,
             'provider' => 'polar',
@@ -234,7 +233,7 @@ class MidtransSubscriptionControllerTest extends TestCase
     public function test_cancel_subscription_returns_info_if_already_cancelled(): void
     {
         $user = User::factory()->create();
-        
+
         Subscription::create([
             'user_id' => $user->id,
             'provider' => 'midtrans',
@@ -260,7 +259,7 @@ class MidtransSubscriptionControllerTest extends TestCase
     public function test_cancel_subscription_successfully_cancels_midtrans_subscription(): void
     {
         $user = User::factory()->create();
-        
+
         $subscription = Subscription::create([
             'user_id' => $user->id,
             'provider' => 'midtrans',
@@ -278,7 +277,7 @@ class MidtransSubscriptionControllerTest extends TestCase
             ->once()
             ->with('sub_123')
             ->andReturn(true);
-        
+
         $this->app->instance(MidtransSubscriptionService::class, $mockService);
 
         $response = $this->actingAs($user)
@@ -299,7 +298,7 @@ class MidtransSubscriptionControllerTest extends TestCase
     public function test_cancel_subscription_handles_service_failure(): void
     {
         $user = User::factory()->create();
-        
+
         Subscription::create([
             'user_id' => $user->id,
             'provider' => 'midtrans',
@@ -317,7 +316,7 @@ class MidtransSubscriptionControllerTest extends TestCase
             ->once()
             ->with('sub_123')
             ->andReturn(false);
-        
+
         $this->app->instance(MidtransSubscriptionService::class, $mockService);
 
         $response = $this->actingAs($user)
@@ -348,4 +347,3 @@ class MidtransSubscriptionControllerTest extends TestCase
         }
     }
 }
-

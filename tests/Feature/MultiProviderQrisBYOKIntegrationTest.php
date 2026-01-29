@@ -7,24 +7,22 @@ use App\Models\QrisTransaction;
 use App\Models\SubMerchant;
 use App\Models\User;
 use App\Models\UserEncryptionKey;
-use App\Services\EncryptionService;
 use App\Services\KeyManagementService;
 use App\Services\ProviderCredentialService;
 use App\Services\QrisService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
  * End-to-end integration tests for Multi-Provider QRIS BYOK System.
- * 
+ *
  * Tests complete flows:
  * - Configure provider → validate → generate QRIS
  * - Provider switching scenarios
  * - Multi-user isolation
  * - Error scenarios (invalid credentials, network errors)
- * 
+ *
  * Requirements: All requirements integration
  */
 class MultiProviderQrisBYOKIntegrationTest extends TestCase
@@ -32,10 +30,15 @@ class MultiProviderQrisBYOKIntegrationTest extends TestCase
     use RefreshDatabase;
 
     private User $user1;
+
     private User $user2;
+
     private SubMerchant $merchant1;
+
     private SubMerchant $merchant2;
+
     private ProviderCredentialService $credentialService;
+
     private QrisService $qrisService;
 
     protected function setUp(): void
@@ -250,7 +253,7 @@ class MultiProviderQrisBYOKIntegrationTest extends TestCase
         // Set Doku as active
         $response = $this->actingAs($this->user1, 'sanctum')
             ->postJson('/api/sub-merchant/providers/set-active', ['provider' => 'doku']);
-        
+
         $response->assertStatus(200)
             ->assertJson(['success' => true]);
 
@@ -262,7 +265,7 @@ class MultiProviderQrisBYOKIntegrationTest extends TestCase
         // Switch to Xendit
         $response = $this->actingAs($this->user1, 'sanctum')
             ->postJson('/api/sub-merchant/providers/set-active', ['provider' => 'xendit']);
-        
+
         $response->assertStatus(200)
             ->assertJson(['success' => true]);
 
@@ -516,7 +519,7 @@ class MultiProviderQrisBYOKIntegrationTest extends TestCase
         // Credentials are stored but validation fails
         $response->assertStatus(201)
             ->assertJson(['success' => true]);
-        
+
         // Verify credential was stored but marked as invalid
         $credential = PaymentProviderCredential::where('user_id', $this->user1->id)
             ->where('provider', 'doku')
@@ -603,7 +606,7 @@ class MultiProviderQrisBYOKIntegrationTest extends TestCase
 
         // The service creates a transaction with fallback QR code
         $response->assertStatus(201);
-        
+
         $transaction = QrisTransaction::where('sub_merchant_id', $this->merchant1->id)->first();
         $this->assertNotNull($transaction);
         $this->assertNotNull($transaction->qr_code_url); // Fallback QR code
@@ -624,7 +627,7 @@ class MultiProviderQrisBYOKIntegrationTest extends TestCase
         // The validation happens at the provider level, not controller level
         // So credentials are stored but validation will fail
         $response->assertStatus(201);
-        
+
         $credential = PaymentProviderCredential::where('user_id', $this->user1->id)->first();
         $this->assertNotNull($credential);
         // Validation will fail because secret_key is missing
@@ -724,7 +727,7 @@ class MultiProviderQrisBYOKIntegrationTest extends TestCase
 
         $response = $this->actingAs($this->user1, 'sanctum')
             ->postJson('/api/sub-merchant/providers/set-active', ['provider' => 'doku']);
-        
+
         $response->assertStatus(200);
 
         $credential->refresh();

@@ -7,7 +7,7 @@ use App\Exceptions\UnsupportedProviderException;
 
 /**
  * Factory for creating payment provider instances.
- * 
+ *
  * This factory provides a centralized way to instantiate payment providers
  * based on the provider name.
  */
@@ -16,8 +16,8 @@ class ProviderFactory
     /**
      * Create a payment provider instance.
      *
-     * @param string $provider Provider name (doku, xendit, midtrans, duitku)
-     * @return PaymentProviderInterface
+     * @param  string  $provider  Provider name (doku, xendit, midtrans, duitku)
+     *
      * @throws UnsupportedProviderException
      */
     public function make(string $provider): PaymentProviderInterface
@@ -33,8 +33,6 @@ class ProviderFactory
 
     /**
      * Get list of all supported providers.
-     *
-     * @return array
      */
     public function getSupportedProviders(): array
     {
@@ -43,9 +41,6 @@ class ProviderFactory
 
     /**
      * Check if a provider is supported.
-     *
-     * @param string $provider
-     * @return bool
      */
     public function isSupported(string $provider): bool
     {

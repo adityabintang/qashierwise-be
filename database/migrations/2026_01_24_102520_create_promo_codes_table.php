@@ -25,7 +25,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->text('description')->nullable();
             $table->timestamps();
-            
+
             $table->index('code');
             $table->index('is_active');
         });
@@ -39,7 +39,7 @@ return new class extends Migration
             $table->decimal('discount_amount', 10, 2);
             $table->decimal('final_amount', 10, 2);
             $table->timestamps();
-            
+
             $table->index(['user_id', 'promo_code_id']);
         });
     }

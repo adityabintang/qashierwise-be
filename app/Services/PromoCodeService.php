@@ -12,17 +12,13 @@ class PromoCodeService
     /**
      * Validate and apply promo code.
      *
-     * @param string $code
-     * @param string $planId
-     * @param float $amount
-     * @param User $user
      * @return array{valid: bool, message: string, discount?: float, final_amount?: float, promo_code?: PromoCode}
      */
     public function validateAndApply(string $code, string $planId, float $amount, User $user): array
     {
         $promoCode = PromoCode::where('code', strtoupper($code))->first();
 
-        if (!$promoCode) {
+        if (! $promoCode) {
             return [
                 'valid' => false,
                 'message' => 'Kode promo tidak ditemukan',
@@ -30,7 +26,7 @@ class PromoCodeService
         }
 
         // Check if valid
-        if (!$promoCode->isValid()) {
+        if (! $promoCode->isValid()) {
             if ($promoCode->valid_until && now()->isAfter($promoCode->valid_until)) {
                 return [
                     'valid' => false,
@@ -52,7 +48,7 @@ class PromoCodeService
         }
 
         // Check if applicable to plan
-        if (!$promoCode->isApplicableToPlan($planId)) {
+        if (! $promoCode->isApplicableToPlan($planId)) {
             return [
                 'valid' => false,
                 'message' => 'Kode promo tidak berlaku untuk paket ini',
@@ -97,14 +93,6 @@ class PromoCodeService
 
     /**
      * Record promo code usage.
-     *
-     * @param PromoCode $promoCode
-     * @param User $user
-     * @param float $originalAmount
-     * @param float $discountAmount
-     * @param float $finalAmount
-     * @param int|null $subscriptionId
-     * @return PromoCodeUsage
      */
     public function recordUsage(
         PromoCode $promoCode,

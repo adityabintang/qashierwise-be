@@ -51,7 +51,7 @@ class EmbeddedSignupController extends Controller
             'business_id' => 'nullable|string',
         ]);
 
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
         $code = $request->input('code');
 
         // Get session info from embedded signup response (waba_id, phone_number_id, business_id)
@@ -141,7 +141,7 @@ class EmbeddedSignupController extends Controller
      */
     public function disconnect(): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
         $deactivated = $this->whatsAppAccountService->deactivateAccount($userId);
 
@@ -167,7 +167,7 @@ class EmbeddedSignupController extends Controller
      */
     public function getAccountStatus(): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
         $status = $this->whatsAppAccountService->getAccountStatus($userId);
 
@@ -193,7 +193,7 @@ class EmbeddedSignupController extends Controller
      */
     public function subscribeToWebhooks(): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
         $account = $this->whatsAppAccountService->getActiveAccount($userId);
 
@@ -235,7 +235,7 @@ class EmbeddedSignupController extends Controller
      */
     public function getWebhookStatus(): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
         $account = $this->whatsAppAccountService->getActiveAccount($userId);
 

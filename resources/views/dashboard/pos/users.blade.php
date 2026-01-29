@@ -3,7 +3,7 @@
 @section('title', 'Users Management - QashierWise')
 
 @section('content')
-<div x-data="posUsersApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
+<div x-data="posUsersApp()" x-init="initDashboard()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'pos-users'])
 
     <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
@@ -17,10 +17,12 @@
                         <h2 class="text-lg font-semibold">Staff Users</h2>
                         <p class="text-sm text-[hsl(var(--muted-foreground))] hidden sm:block">Manage POS staff and assign roles</p>
                     </div>
-                    <button @click="openCreateModal()" class="btn btn-primary btn-md">
-                        <i class="fas fa-plus"></i>
-                        <span>Add User</span>
-                    </button>
+                    <template x-if="hasPermission('create_users') || hasPermission('manage_users')">
+                        <button @click="openCreateModal()" class="btn btn-primary btn-md">
+                            <i class="fas fa-plus"></i>
+                            <span>Add User</span>
+                        </button>
+                    </template>
                 </div>
 
                 <!-- Users List -->
@@ -56,13 +58,19 @@
                                     <span class="badge" :class="user.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700'" x-text="user.is_active ? 'Active' : 'Inactive'"></span>
                                 </div>
                                 <div class="flex gap-2 mt-3 pt-3 border-t border-[hsl(var(--border))]">
-                                    <button @click="openEditModal(user)" class="btn btn-outline btn-sm flex-1"><i class="fas fa-edit"></i> Edit</button>
-                                    <button @click="toggleStatus(user)" class="btn btn-outline btn-sm" :class="user.is_active ? 'text-amber-600' : 'text-emerald-600'">
-                                        <i class="fas" :class="user.is_active ? 'fa-user-slash' : 'fa-user-check'"></i>
-                                    </button>
-                                    <button @click="deleteUser(user)" class="btn btn-outline btn-sm text-red-600">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+                                    <template x-if="hasPermission('edit_users') || hasPermission('manage_users')">
+                                        <button @click="openEditModal(user)" class="btn btn-outline btn-sm flex-1"><i class="fas fa-edit"></i> Edit</button>
+                                    </template>
+                                    <template x-if="hasPermission('edit_users') || hasPermission('manage_users')">
+                                        <button @click="toggleStatus(user)" class="btn btn-outline btn-sm" :class="user.is_active ? 'text-amber-600' : 'text-emerald-600'">
+                                            <i class="fas" :class="user.is_active ? 'fa-user-slash' : 'fa-user-check'"></i>
+                                        </button>
+                                    </template>
+                                    <template x-if="hasPermission('delete_users') || hasPermission('manage_users')">
+                                        <button @click="deleteUser(user)" class="btn btn-outline btn-sm text-red-600">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </template>
                                 </div>
                             </div>
                         </template>
@@ -116,13 +124,19 @@
                                             </td>
                                             <td class="p-4 text-right">
                                                 <div class="flex items-center justify-end gap-2">
-                                                    <button @click="openEditModal(user)" class="btn btn-ghost btn-sm"><i class="fas fa-edit"></i></button>
-                                                    <button @click="toggleStatus(user)" class="btn btn-ghost btn-sm" :class="user.is_active ? 'text-amber-600' : 'text-emerald-600'">
-                                                        <i class="fas" :class="user.is_active ? 'fa-user-slash' : 'fa-user-check'"></i>
-                                                    </button>
-                                                    <button @click="deleteUser(user)" class="btn btn-ghost btn-sm text-red-600">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
+                                                    <template x-if="hasPermission('edit_users') || hasPermission('manage_users')">
+                                                        <button @click="openEditModal(user)" class="btn btn-ghost btn-sm"><i class="fas fa-edit"></i></button>
+                                                    </template>
+                                                    <template x-if="hasPermission('edit_users') || hasPermission('manage_users')">
+                                                        <button @click="toggleStatus(user)" class="btn btn-ghost btn-sm" :class="user.is_active ? 'text-amber-600' : 'text-emerald-600'">
+                                                            <i class="fas" :class="user.is_active ? 'fa-user-slash' : 'fa-user-check'"></i>
+                                                        </button>
+                                                    </template>
+                                                    <template x-if="hasPermission('delete_users') || hasPermission('manage_users')">
+                                                        <button @click="deleteUser(user)" class="btn btn-ghost btn-sm text-red-600">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </template>
                                                 </div>
                                             </td>
                                         </tr>
@@ -139,7 +153,9 @@
                         <div class="empty-state-icon"><i class="fas fa-users text-2xl"></i></div>
                         <h3 class="font-semibold mt-4">No POS users found</h3>
                         <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">Add staff users to manage POS.</p>
-                        <button @click="openCreateModal()" class="btn btn-primary btn-md mt-4"><i class="fas fa-plus"></i> Add User</button>
+                        <template x-if="hasPermission('create_users') || hasPermission('manage_users')">
+                            <button @click="openCreateModal()" class="btn btn-primary btn-md mt-4"><i class="fas fa-plus"></i> Add User</button>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -263,10 +279,11 @@ function posUsersApp() {
         userForm: { name: '', email: '', password: '', store_id: '', role_id: '', is_active: true },
         editForm: { store_id: '', role_id: '', is_active: true },
         sidebarOpen: window.innerWidth >= 1024, isMobile: window.innerWidth < 768, user: null, notifications: [],
+        userPermissions: [], isAdmin: true,
 
-        async init() { this.initSidebar(); await Promise.all([this.fetchUsers(), this.fetchStores(), this.fetchRoles()]); },
+        async init() { this.initDashboard(); await this.fetchUserPermissions(); await Promise.all([this.fetchUsers(), this.fetchStores(), this.fetchRoles()]); },
 
-        initSidebar() {
+        initDashboard() {
             this.isMobile = window.innerWidth < 768;
             if (this.isMobile) { this.sidebarOpen = false; }
             else { let s = localStorage.getItem('sidebarOpen'); if (s !== null) this.sidebarOpen = JSON.parse(s); }
@@ -277,9 +294,34 @@ function posUsersApp() {
                 else if (!was && this.isMobile) { this.sidebarOpen = false; }
             });
             let u = localStorage.getItem('user'); if (u) { try { this.user = JSON.parse(u); } catch (e) { this.user = { name: 'User' }; } } else { this.user = { name: 'User' }; }
+            this.fetchUserPermissions();
+        },
+
+        async fetchUserPermissions() {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) { this.isAdmin = true; this.userPermissions = []; return; }
+                const res = await fetch(`${window.location.origin}/api/user/permissions`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success) { this.isAdmin = data.data.is_admin || false; this.userPermissions = data.data.permissions || []; }
+                }
+            } catch (e) { console.error('Failed to fetch permissions:', e); }
+        },
+
+        hasPermission(permission) {
+            if (this.isAdmin) return true;
+            if (this.userPermissions.includes('*')) return true;
+            return this.userPermissions.includes(permission);
         },
 
         async fetchUsers() {
+            // Check permission first
+            if (!this.hasPermission('view_users') && !this.hasPermission('manage_users')) {
+                this.users = []; this.loading = false; return;
+            }
             this.loading = true;
             try {
                 const token = localStorage.getItem('token');
@@ -318,10 +360,16 @@ function posUsersApp() {
         },
 
         async saveUser() {
+            // Check permission before creating
+            if (!this.hasPermission('create_users') && !this.hasPermission('manage_users')) {
+                alert('You do not have permission to create users');
+                this.saving = false;
+                return;
+            }
             this.saving = true;
             try {
                 const token = localStorage.getItem('token');
-                
+
                 // Create user first
                 const userRes = await fetch(`${this.API_BASE_URL}/users/create-user`, {
                     method: 'POST',
@@ -333,13 +381,13 @@ function posUsersApp() {
                     })
                 });
                 const userData = await userRes.json();
-                
+
                 if (!userData.success) {
                     alert(userData.message || 'Failed to create user');
                     this.saving = false;
                     return;
                 }
-                
+
                 // Then create POS user
                 const posUserRes = await fetch(`${this.API_BASE_URL}/users`, {
                     method: 'POST',
@@ -352,18 +400,18 @@ function posUsersApp() {
                     })
                 });
                 const posUserData = await posUserRes.json();
-                
+
                 if (posUserData.success) {
                     this.closeCreateUserModal();
                     await this.fetchUsers();
                 } else {
                     alert(posUserData.message || 'Failed to assign role');
                 }
-            } catch (e) { 
-                console.error('Error:', e); 
+            } catch (e) {
+                console.error('Error:', e);
                 alert('Failed to create user');
-            } finally { 
-                this.saving = false; 
+            } finally {
+                this.saving = false;
             }
         },
 
@@ -379,6 +427,12 @@ function posUsersApp() {
         },
 
         async updateUser() {
+            // Check permission before updating
+            if (!this.hasPermission('edit_users') && !this.hasPermission('manage_users')) {
+                alert('You do not have permission to edit users');
+                this.saving = false;
+                return;
+            }
             this.saving = true;
             try {
                 const token = localStorage.getItem('token');
@@ -393,6 +447,11 @@ function posUsersApp() {
         },
 
         async toggleStatus(user) {
+            // Check permission before toggling
+            if (!this.hasPermission('edit_users') && !this.hasPermission('manage_users')) {
+                alert('You do not have permission to modify users');
+                return;
+            }
             try {
                 const token = localStorage.getItem('token');
                 const res = await fetch(`${this.API_BASE_URL}/users/${user.id}`, {
@@ -406,6 +465,11 @@ function posUsersApp() {
         },
 
         async deleteUser(user) {
+            // Check permission before deleting
+            if (!this.hasPermission('delete_users') && !this.hasPermission('manage_users')) {
+                alert('You do not have permission to delete users');
+                return;
+            }
             if (!confirm(`Are you sure you want to delete ${user.user?.name || 'this user'}?`)) { return; }
             try {
                 const token = localStorage.getItem('token');

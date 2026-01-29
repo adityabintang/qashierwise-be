@@ -16,8 +16,11 @@ class ProcessQrisPaymentJobTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private SubMerchant $subMerchant;
+
     private MerchantBalance $balance;
+
     private QrisTransaction $transaction;
 
     protected function setUp(): void
@@ -26,7 +29,7 @@ class ProcessQrisPaymentJobTest extends TestCase
 
         // Create user and sub-merchant
         $this->user = User::factory()->create();
-        
+
         $this->subMerchant = SubMerchant::create([
             'user_id' => $this->user->id,
             'business_name' => 'Test User',
@@ -44,7 +47,7 @@ class ProcessQrisPaymentJobTest extends TestCase
         // Create a settled transaction
         $this->transaction = QrisTransaction::create([
             'sub_merchant_id' => $this->subMerchant->id,
-            'order_id' => 'QRIS-' . now()->format('YmdHis') . '-TEST1234',
+            'order_id' => 'QRIS-'.now()->format('YmdHis').'-TEST1234',
             'amount' => 100000,
             'platform_fee' => 2500,
             'net_amount' => 97500,
@@ -80,7 +83,7 @@ class ProcessQrisPaymentJobTest extends TestCase
 
         // Verify platform fee record was created
         $platformFee = PlatformFee::where('qris_transaction_id', $this->transaction->id)->first();
-        
+
         $this->assertNotNull($platformFee);
         $this->assertEquals(2.5, $platformFee->fee_percentage);
         $this->assertEquals(2500, $platformFee->fee_amount);
@@ -131,7 +134,7 @@ class ProcessQrisPaymentJobTest extends TestCase
 
         // Verify balance was NOT updated again
         $this->assertEquals($firstBalance, $this->balance->available_balance);
-        
+
         // Verify only one platform fee record exists
         $feeCount = PlatformFee::where('qris_transaction_id', $this->transaction->id)->count();
         $this->assertEquals(1, $feeCount);
@@ -149,7 +152,7 @@ class ProcessQrisPaymentJobTest extends TestCase
         // Create and process second transaction
         $transaction2 = QrisTransaction::create([
             'sub_merchant_id' => $this->subMerchant->id,
-            'order_id' => 'QRIS-' . now()->format('YmdHis') . '-TEST5678',
+            'order_id' => 'QRIS-'.now()->format('YmdHis').'-TEST5678',
             'amount' => 50000,
             'platform_fee' => 1250,
             'net_amount' => 48750,

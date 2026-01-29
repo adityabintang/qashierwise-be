@@ -11,7 +11,7 @@ class ApiResponseTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Set default locale
         app()->setLocale('en');
     }
@@ -22,7 +22,7 @@ class ApiResponseTest extends TestCase
 
         $this->assertInstanceOf(JsonResponse::class, $response);
         $this->assertEquals(201, $response->getStatusCode());
-        
+
         $data = $response->getData(true);
         $this->assertTrue($data['success']);
         $this->assertEquals('Created successfully', $data['message']);
@@ -58,7 +58,7 @@ class ApiResponseTest extends TestCase
 
         $this->assertInstanceOf(JsonResponse::class, $response);
         $this->assertEquals(400, $response->getStatusCode());
-        
+
         $data = $response->getData(true);
         $this->assertFalse($data['success']);
         $this->assertEquals('An error occurred. Please try again.', $data['message']);
@@ -81,7 +81,7 @@ class ApiResponseTest extends TestCase
         $response = ApiResponse::validationError($errors);
 
         $this->assertEquals(422, $response->getStatusCode());
-        
+
         $data = $response->getData(true);
         $this->assertFalse($data['success']);
         $this->assertEquals('Please fix the validation errors', $data['message']);
@@ -93,7 +93,7 @@ class ApiResponseTest extends TestCase
         $response = ApiResponse::unauthorized();
 
         $this->assertEquals(401, $response->getStatusCode());
-        
+
         $data = $response->getData(true);
         $this->assertFalse($data['success']);
         $this->assertEquals('You are not authorized to perform this action', $data['message']);
@@ -104,7 +104,7 @@ class ApiResponseTest extends TestCase
         $response = ApiResponse::forbidden();
 
         $this->assertEquals(403, $response->getStatusCode());
-        
+
         $data = $response->getData(true);
         $this->assertFalse($data['success']);
         $this->assertEquals('Access denied', $data['message']);
@@ -115,7 +115,7 @@ class ApiResponseTest extends TestCase
         $response = ApiResponse::notFound();
 
         $this->assertEquals(404, $response->getStatusCode());
-        
+
         $data = $response->getData(true);
         $this->assertFalse($data['success']);
         $this->assertEquals('Resource not found', $data['message']);
@@ -126,7 +126,7 @@ class ApiResponseTest extends TestCase
         $response = ApiResponse::serverError();
 
         $this->assertEquals(500, $response->getStatusCode());
-        
+
         $data = $response->getData(true);
         $this->assertFalse($data['success']);
         $this->assertEquals('Server error. Please try again later.', $data['message']);

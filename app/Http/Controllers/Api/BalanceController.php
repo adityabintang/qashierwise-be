@@ -11,7 +11,7 @@ use Illuminate\Support\Carbon;
 
 /**
  * Controller for balance management API endpoints.
- * 
+ *
  * Handles balance retrieval, transaction history, and earnings breakdown.
  * Requirements: 4.1, 4.2, 4.3
  */
@@ -24,11 +24,8 @@ class BalanceController extends Controller
 
     /**
      * Get the current balance for the sub-merchant.
-     * 
+     *
      * Requirement 4.1: Display current available balance
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function current(Request $request): JsonResponse
     {
@@ -65,11 +62,8 @@ class BalanceController extends Controller
 
     /**
      * Get balance breakdown with detailed information.
-     * 
+     *
      * Requirement 4.2: Show pending and available amounts separately
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function breakdown(Request $request): JsonResponse
     {
@@ -87,7 +81,7 @@ class BalanceController extends Controller
         }
 
         $balanceHistory = $this->balanceService->getBalanceHistory($subMerchant);
-        
+
         // Get withdrawal validation info
         $canWithdraw = $this->balanceService->canWithdraw($subMerchant, $balanceHistory['available_balance']);
         $minimumWithdrawal = \App\Models\MerchantBalance::MINIMUM_WITHDRAWAL;
@@ -130,11 +124,8 @@ class BalanceController extends Controller
 
     /**
      * Get transaction history with fee breakdown.
-     * 
+     *
      * Requirement 4.3: Provide transaction history with fee breakdowns
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function transactions(Request $request): JsonResponse
     {
@@ -166,9 +157,6 @@ class BalanceController extends Controller
 
     /**
      * Get earnings summary for a date range.
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function earnings(Request $request): JsonResponse
     {
@@ -185,11 +173,11 @@ class BalanceController extends Controller
             ], 403);
         }
 
-        $startDate = $request->input('start_date') 
-            ? Carbon::parse($request->input('start_date'))->startOfDay() 
+        $startDate = $request->input('start_date')
+            ? Carbon::parse($request->input('start_date'))->startOfDay()
             : null;
-        $endDate = $request->input('end_date') 
-            ? Carbon::parse($request->input('end_date'))->endOfDay() 
+        $endDate = $request->input('end_date')
+            ? Carbon::parse($request->input('end_date'))->endOfDay()
             : null;
 
         $summary = $this->balanceService->getEarningsSummary($subMerchant, $startDate, $endDate);
@@ -215,9 +203,6 @@ class BalanceController extends Controller
 
     /**
      * Get daily earnings summary for the current month.
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function dailyEarnings(Request $request): JsonResponse
     {
@@ -284,9 +269,6 @@ class BalanceController extends Controller
 
     /**
      * Calculate platform fee for a given amount (utility endpoint).
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function calculateFee(Request $request): JsonResponse
     {

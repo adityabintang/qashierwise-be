@@ -15,8 +15,9 @@ class KeyManagementService
      * Get the encryption key for a user.
      * If the key doesn't exist, it will be generated and stored.
      *
-     * @param User $user The user to get the encryption key for
+     * @param  User  $user  The user to get the encryption key for
      * @return string The decrypted user encryption key
+     *
      * @throws RuntimeException If key retrieval or generation fails
      */
     public function getUserEncryptionKey(User $user): string
@@ -32,15 +33,16 @@ class KeyManagementService
             // Decrypt the stored key using Laravel's master key (APP_KEY)
             return Crypt::decryptString($keyRecord->encryption_key_encrypted);
         } catch (\Exception $e) {
-            throw new RuntimeException('Failed to decrypt user encryption key: ' . $e->getMessage());
+            throw new RuntimeException('Failed to decrypt user encryption key: '.$e->getMessage());
         }
     }
 
     /**
      * Generate a new encryption key for a user using secure random bytes.
      *
-     * @param User $user The user to generate the key for
+     * @param  User  $user  The user to generate the key for
      * @return string The generated encryption key
+     *
      * @throws RuntimeException If key generation or storage fails
      */
     public function generateUserKey(User $user): string
@@ -54,16 +56,17 @@ class KeyManagementService
 
             return $key;
         } catch (\Exception $e) {
-            throw new RuntimeException('Failed to generate user encryption key: ' . $e->getMessage());
+            throw new RuntimeException('Failed to generate user encryption key: '.$e->getMessage());
         }
     }
 
     /**
      * Store a user's encryption key with master key encryption.
      *
-     * @param User $user The user to store the key for
-     * @param string $key The encryption key to store
+     * @param  User  $user  The user to store the key for
+     * @param  string  $key  The encryption key to store
      * @return bool True if storage was successful
+     *
      * @throws InvalidArgumentException If the key is invalid
      * @throws RuntimeException If storage fails
      */
@@ -92,7 +95,7 @@ class KeyManagementService
 
             return true;
         } catch (\Exception $e) {
-            throw new RuntimeException('Failed to store user encryption key: ' . $e->getMessage());
+            throw new RuntimeException('Failed to store user encryption key: '.$e->getMessage());
         }
     }
 
@@ -100,8 +103,9 @@ class KeyManagementService
      * Rotate a user's encryption key.
      * This generates a new key and increments the key version.
      *
-     * @param User $user The user to rotate the key for
+     * @param  User  $user  The user to rotate the key for
      * @return string The new encryption key
+     *
      * @throws RuntimeException If key rotation fails
      */
     public function rotateKey(User $user): string
@@ -133,7 +137,7 @@ class KeyManagementService
 
             return $newKey;
         } catch (\Exception $e) {
-            throw new RuntimeException('Failed to rotate user encryption key: ' . $e->getMessage());
+            throw new RuntimeException('Failed to rotate user encryption key: '.$e->getMessage());
         }
     }
 
@@ -141,15 +145,15 @@ class KeyManagementService
      * Derive a key from user-specific data.
      * This is used as an additional layer of security.
      *
-     * @param User $user The user to derive the key from
+     * @param  User  $user  The user to derive the key from
      * @return string The derived key
      */
     private function deriveKeyFromUserSecret(User $user): string
     {
         // Use user ID and email as the basis for key derivation
         // This provides an additional layer of security
-        $userSecret = $user->id . '|' . $user->email;
-        
+        $userSecret = $user->id.'|'.$user->email;
+
         // Use PBKDF2 for key derivation
         return hash_pbkdf2('sha256', $userSecret, config('app.key'), 10000, 32, true);
     }

@@ -13,6 +13,7 @@ class WithdrawalStatusChangedNotification extends Notification implements Should
     use Queueable;
 
     protected WithdrawalRequest $withdrawalRequest;
+
     protected string $previousStatus;
 
     /**
@@ -54,7 +55,7 @@ class WithdrawalStatusChangedNotification extends Notification implements Should
                     ->line('The funds will be transferred to your registered bank account shortly.')
                     ->line("**Bank:** {$this->withdrawalRequest->getBankName()}")
                     ->line("**Account:** {$this->withdrawalRequest->getAccountNumber()}");
-                
+
                 if ($this->withdrawalRequest->admin_notes) {
                     $mailMessage->line("**Notes:** {$this->withdrawalRequest->admin_notes}");
                 }

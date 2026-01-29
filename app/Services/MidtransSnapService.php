@@ -8,15 +8,18 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Service for handling Midtrans Snap integration for subscriptions.
- * 
+ *
  * This service creates Snap payment tokens for subscription checkout,
  * allowing users to pay via Midtrans payment page.
  */
 class MidtransSnapService
 {
     private string $serverKey;
+
     private string $clientKey;
+
     private string $snapUrl;
+
     private array $plans;
 
     public function __construct()
@@ -24,7 +27,7 @@ class MidtransSnapService
         $this->serverKey = config('midtrans.server_key', '');
         $this->clientKey = config('midtrans.client_key', '');
         $this->plans = config('subscription.plans', []);
-        
+
         // Set Snap URL based on environment
         $isProduction = config('midtrans.is_production', false);
         $this->snapUrl = $isProduction
@@ -34,53 +37,49 @@ class MidtransSnapService
 
     /**
      * Check if Midtrans Snap is properly configured.
-     * 
-     * @return bool
      */
     public function isConfigured(): bool
     {
-        return !empty($this->serverKey) && !empty($this->clientKey);
+        return ! empty($this->serverKey) && ! empty($this->clientKey);
     }
 
     /**
      * Create a Snap token for subscription checkout.
-     * 
-     * @param User $user
-     * @param string $planId
-     * @param string $duration
-     * @param float|null $customAmount Optional custom amount (for promo codes)
-     * @param string|null $promoCode Optional promo code
+     *
+     * @param  float|null  $customAmount  Optional custom amount (for promo codes)
+     * @param  string|null  $promoCode  Optional promo code
      * @return array|null ['snap_token' => string, 'redirect_url' => string] or null on failure
      */
     public function createSubscriptionSnapToken(
-        User $user, 
-        string $planId, 
+        User $user,
+        string $planId,
         string $duration,
         ?float $customAmount = null,
         ?string $promoCode = null
-    ): ?array
-    {
+    ): ?array {
         // Validate plan exists
-        if (!isset($this->plans[$planId])) {
+        if (! isset($this->plans[$planId])) {
             Log::error('Invalid plan_id provided', [
                 'planId' => $planId,
                 'userId' => $user->id,
             ]);
+
             return null;
         }
 
         $plan = $this->plans[$planId];
-        
+
         // Validate duration exists
-        if (!isset($plan['durations'][$duration])) {
+        if (! isset($plan['durations'][$duration])) {
             Log::error('Invalid duration provided', [
                 'planId' => $planId,
                 'duration' => $duration,
                 'userId' => $user->id,
             ]);
+
             return null;
         }
-        
+
         $durationDetails = $plan['durations'][$duration];
 
         // Use custom amount if provided (for promo codes), otherwise use plan price
@@ -156,11 +155,11 @@ class MidtransSnapService
 
             if ($response->successful()) {
                 $data = $response->json();
-                
+
                 Log::info('Snap token created successfully', [
                     'userId' => $user->id,
                     'orderId' => $orderId,
-                    'snapToken' => substr($data['token'] ?? '', 0, 20) . '...',
+                    'snapToken' => substr($data['token'] ?? '', 0, 20).'...',
                 ]);
 
                 return [
@@ -193,18 +192,14 @@ class MidtransSnapService
 
     /**
      * Generate a unique order ID for subscription.
-     * 
+     *
      * Format: SUB-{user_id}-{duration}-{timestamp}-{random}
-     * 
-     * @param int $userId
-     * @param string $duration
-     * @return string
      */
     private function generateOrderId(int $userId, string $duration): string
     {
         $timestamp = time();
         $random = substr(md5(uniqid((string) rand(), true)), 0, 8);
-        
+
         return "SUB-{$userId}-{$duration}-{$timestamp}-{$random}";
     }
 }

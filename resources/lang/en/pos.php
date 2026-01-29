@@ -104,7 +104,7 @@ return [
         'to' => 'to',
         'of' => 'of',
         'orders_count' => 'orders',
-        
+
         // Status
         'pending' => 'Pending',
         'completed' => 'Completed',
@@ -132,7 +132,7 @@ return [
         'number_placeholder' => 'e.g., 1, A1',
         'capacity_placeholder' => 'Number of seats',
         'delete_confirmation' => 'Delete this table?',
-        
+
         // Status
         'available' => 'Available',
         'occupied' => 'Occupied',
@@ -162,7 +162,7 @@ return [
         'select_role' => 'Select role...',
         'no_role' => 'No role',
         'no_store' => 'No store',
-        
+
         // Roles
         'admin' => 'Admin',
         'cashier' => 'Cashier',
@@ -207,17 +207,17 @@ return [
         'date' => 'Date',
         'start_date' => 'Start Date',
         'end_date' => 'End Date',
-        
+
         // Summary cards
         'total_sales' => 'Total Sales',
         'total_orders' => 'Total Orders',
         'avg_order' => 'Avg Order',
         'items_sold' => 'Items Sold',
-        
+
         // Charts
         'sales_overview' => 'Sales Overview',
         'top_selling_products' => 'Top Selling Products',
-        
+
         // Tables
         'product_performance' => 'Product Performance',
         'product' => 'Product',

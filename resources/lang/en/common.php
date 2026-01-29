@@ -32,7 +32,7 @@ return [
     'language' => 'Language',
     'english' => 'English',
     'indonesian' => 'Bahasa Indonesia',
-    
+
     // Months
     'january' => 'January',
     'february' => 'February',

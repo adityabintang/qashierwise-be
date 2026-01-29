@@ -54,7 +54,7 @@ class AiAgentService
             'contact_wa_id' => $contact->wa_id,
             'message_preview' => substr($messageText, 0, 30),
         ]);
-        
+
         try {
             // Get AI Agent for this account
             $aiAgent = AiAgent::where('whatsapp_account_id', $account->id)

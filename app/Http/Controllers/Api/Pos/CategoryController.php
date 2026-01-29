@@ -19,16 +19,19 @@ class CategoryController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $user = $request->user();
 
-        if (!$userId) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
                 'message' => 'Authentication required',
             ], 401);
         }
 
-        $categories = $this->categoryService->getAllWithProductCounts($userId);
+        // Use effective user ID (master admin ID for sub-accounts)
+        $effectiveUserId = $user->getEffectiveUserId();
+
+        $categories = $this->categoryService->getAllWithProductCounts($effectiveUserId);
 
         if ($request->boolean('active_only', false)) {
             $categories = $categories->where('is_active', true)->values();
@@ -45,9 +48,9 @@ class CategoryController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
-        if (!$userId) {
+        if (! $userId) {
             return response()->json([
                 'success' => false,
                 'message' => 'Authentication required',
@@ -74,8 +77,17 @@ class CategoryController extends Controller
     /**
      * Display the specified category.
      */
-    public function show(Category $category): JsonResponse
+    public function show(Category $category, Request $request): JsonResponse
     {
+        $effectiveUserId = $request->user()->getEffectiveUserId();
+
+        if ($category->user_id !== $effectiveUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this resource.',
+            ], 403);
+        }
+
         return response()->json([
             'success' => true,
             'data' => $category->loadCount('products'),
@@ -87,8 +99,17 @@ class CategoryController extends Controller
      */
     public function update(Request $request, Category $category): JsonResponse
     {
+        $effectiveUserId = auth()->user()->getEffectiveUserId();
+
+        if ($category->user_id !== $effectiveUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this resource.',
+            ], 403);
+        }
+
         $validated = $request->validate([
-            'name' => 'sometimes|string|max:255|unique:categories,name,' . $category->id,
+            'name' => 'sometimes|string|max:255|unique:categories,name,'.$category->id,
             'description' => 'nullable|string',
             'is_active' => 'sometimes|boolean',
         ]);
@@ -105,8 +126,17 @@ class CategoryController extends Controller
     /**
      * Remove the specified category.
      */
-    public function destroy(Category $category): JsonResponse
+    public function destroy(Category $category, Request $request): JsonResponse
     {
+        $effectiveUserId = $request->user()->getEffectiveUserId();
+
+        if ($category->user_id !== $effectiveUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this resource.',
+            ], 403);
+        }
+
         try {
             $this->categoryService->delete($category);
 

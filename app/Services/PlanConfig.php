@@ -15,18 +15,20 @@ class PlanConfig
      * Valid plan identifiers.
      */
     public const PLAN_FREE_TRIAL = 'free_trial';
+
     public const PLAN_PRO = 'pro';
 
     /**
      * Valid tier identifiers.
      */
     public const TIER_BASIC = 'basic';
+
     public const TIER_PRO = 'pro';
 
     /**
      * Get plan details by plan identifier.
      *
-     * @param string $planId The plan identifier (free_trial, pro)
+     * @param  string  $planId  The plan identifier (free_trial, pro)
      * @return PlanDetails|null Returns null if plan doesn't exist
      */
     public function getPlan(string $planId): ?PlanDetails
@@ -70,7 +72,7 @@ class PlanConfig
     /**
      * Get features available for a specific tier.
      *
-     * @param string $tier The tier identifier (basic, pro)
+     * @param  string  $tier  The tier identifier (basic, pro)
      * @return array<string> List of features for tier
      */
     public function getFeaturesByTier(string $tier): array
@@ -89,7 +91,7 @@ class PlanConfig
     /**
      * Get plan ID that corresponds to a tier.
      *
-     * @param string $tier The tier identifier
+     * @param  string  $tier  The tier identifier
      * @return string|null The plan ID or null if tier is invalid
      */
     private function getPlanIdByTier(string $tier): ?string
@@ -104,7 +106,7 @@ class PlanConfig
     /**
      * Check if a plan identifier is valid.
      *
-     * @param string $planId The plan identifier to check
+     * @param  string  $planId  The plan identifier to check
      * @return bool True if plan exists
      */
     public function isValidPlan(string $planId): bool
@@ -118,7 +120,7 @@ class PlanConfig
     /**
      * Check if a tier identifier is valid.
      *
-     * @param string $tier The tier identifier to check
+     * @param  string  $tier  The tier identifier to check
      * @return bool True if tier is valid
      */
     public function isValidTier(string $tier): bool

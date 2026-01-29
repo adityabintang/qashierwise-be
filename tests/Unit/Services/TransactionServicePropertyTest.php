@@ -5,7 +5,6 @@ namespace Tests\Unit\Services;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\PosUser;
-use App\Models\Product;
 use App\Models\Role;
 use App\Models\Store;
 use App\Models\User;
@@ -19,30 +18,33 @@ use Tests\TestCase;
 
 /**
  * Property-based tests for TransactionService
- * 
+ *
  * Feature: point-of-sale
  */
 class TransactionServicePropertyTest extends TestCase
 {
-    use TestTrait;
     use RefreshDatabase;
+    use TestTrait;
 
     protected TransactionService $transactionService;
+
     protected Store $store;
+
     protected PosUser $posUser;
+
     protected Category $category;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->transactionService = new TransactionService();
-        
+        $this->transactionService = new TransactionService;
+
         $uniqueId = uniqid();
-        
+
         // Create store
         $this->store = Store::create([
             'name' => 'Test Store',
-            'code' => 'TST-' . $uniqueId,
+            'code' => 'TST-'.$uniqueId,
             'address' => 'Test Address',
             'is_active' => true,
         ]);
@@ -53,10 +55,14 @@ class TransactionServicePropertyTest extends TestCase
             'password' => bcrypt('password'),
         ]);
 
-        $role = Role::create([
-            'name' => 'Cashier-' . $uniqueId,
-            'permissions' => ['orders.create', 'orders.update'],
-        ]);
+        // Get or create Spatie role
+        $role = \Spatie\Permission\Models\Role::firstOrCreate(
+            ['name' => 'Cashier', 'guard_name' => 'sanctum'],
+            []
+        );
+
+        // Assign role to user
+        $user->syncRoles([$role->name]);
 
         $this->posUser = PosUser::create([
             'user_id' => $user->id,
@@ -67,11 +73,10 @@ class TransactionServicePropertyTest extends TestCase
 
         $this->category = Category::create([
             'name' => 'Test Category',
-            'slug' => 'test-category-' . $uniqueId,
+            'slug' => 'test-category-'.$uniqueId,
             'is_active' => true,
         ]);
     }
-
 
     /**
      * Helper to create a completed order with a specific order number and date
@@ -88,7 +93,7 @@ class TransactionServicePropertyTest extends TestCase
             'discount_amount' => 0,
             'total' => $total,
         ]);
-        
+
         // Manually set timestamps to the desired date
         $order->created_at = $date;
         $order->updated_at = $date;
@@ -100,8 +105,8 @@ class TransactionServicePropertyTest extends TestCase
     /**
      * Feature: point-of-sale, Property 17: Transaction Search Accuracy
      * Validates: Requirements 9.2
-     * 
-     * For any transaction search by order_number, all returned results SHALL 
+     *
+     * For any transaction search by order_number, all returned results SHALL
      * contain the exact order_number.
      */
     #[Test]
@@ -118,21 +123,21 @@ class TransactionServicePropertyTest extends TestCase
             ->then(function (int $matchingCount, int $nonMatchingCount) {
                 // Clear any existing orders
                 Order::query()->delete();
-                
+
                 $testDate = Carbon::now();
-                $searchPattern = 'SEARCH-' . uniqid();
-                
+                $searchPattern = 'SEARCH-'.uniqid();
+
                 // Create orders that should match the search
                 $matchingOrderNumbers = [];
                 for ($i = 0; $i < $matchingCount; $i++) {
-                    $orderNumber = $searchPattern . '-' . str_pad($i + 1, 4, '0', STR_PAD_LEFT);
+                    $orderNumber = $searchPattern.'-'.str_pad($i + 1, 4, '0', STR_PAD_LEFT);
                     $this->createCompletedOrder($orderNumber, $testDate, rand(1000, 50000) / 100);
                     $matchingOrderNumbers[] = $orderNumber;
                 }
-                
+
                 // Create orders that should NOT match the search
                 for ($i = 0; $i < $nonMatchingCount; $i++) {
-                    $orderNumber = 'OTHER-' . uniqid() . '-' . str_pad($i + 1, 4, '0', STR_PAD_LEFT);
+                    $orderNumber = 'OTHER-'.uniqid().'-'.str_pad($i + 1, 4, '0', STR_PAD_LEFT);
                     $this->createCompletedOrder($orderNumber, $testDate, rand(1000, 50000) / 100);
                 }
 
@@ -150,24 +155,23 @@ class TransactionServicePropertyTest extends TestCase
                     $this->assertStringContainsString(
                         $searchPattern,
                         $transaction->order_number,
-                        "All returned transactions should contain the search pattern in order_number"
+                        'All returned transactions should contain the search pattern in order_number'
                     );
-                    
+
                     $this->assertContains(
                         $transaction->order_number,
                         $matchingOrderNumbers,
-                        "Returned transaction order_number should be in the list of matching orders"
+                        'Returned transaction order_number should be in the list of matching orders'
                     );
                 }
             });
     }
 
-
     /**
      * Feature: point-of-sale, Property 18: Transaction Date Filter Consistency
      * Validates: Requirements 9.3
-     * 
-     * For any transaction filter by date, all returned transactions SHALL have 
+     *
+     * For any transaction filter by date, all returned transactions SHALL have
      * created_at within the specified date.
      */
     #[Test]
@@ -184,20 +188,20 @@ class TransactionServicePropertyTest extends TestCase
             ->then(function (int $targetDateCount, int $otherDateCount) {
                 // Clear any existing orders
                 Order::query()->delete();
-                
+
                 $targetDate = Carbon::now()->subDays(3);
                 $otherDate1 = Carbon::now()->subDays(5);
                 $otherDate2 = Carbon::now()->subDays(1);
-                
+
                 // Create orders on the target date
                 for ($i = 0; $i < $targetDateCount; $i++) {
-                    $orderNumber = 'TARGET-' . uniqid() . '-' . str_pad($i + 1, 4, '0', STR_PAD_LEFT);
+                    $orderNumber = 'TARGET-'.uniqid().'-'.str_pad($i + 1, 4, '0', STR_PAD_LEFT);
                     $this->createCompletedOrder($orderNumber, $targetDate, rand(1000, 50000) / 100);
                 }
-                
+
                 // Create orders on other dates
                 for ($i = 0; $i < $otherDateCount; $i++) {
-                    $orderNumber = 'OTHER-' . uniqid() . '-' . str_pad($i + 1, 4, '0', STR_PAD_LEFT);
+                    $orderNumber = 'OTHER-'.uniqid().'-'.str_pad($i + 1, 4, '0', STR_PAD_LEFT);
                     // Alternate between two other dates
                     $date = ($i % 2 === 0) ? $otherDate1 : $otherDate2;
                     $this->createCompletedOrder($orderNumber, $date, rand(1000, 50000) / 100);
@@ -217,7 +221,7 @@ class TransactionServicePropertyTest extends TestCase
                     $this->assertEquals(
                         $targetDate->toDateString(),
                         $transaction->created_at->toDateString(),
-                        "All returned transactions should have created_at on the target date"
+                        'All returned transactions should have created_at on the target date'
                     );
                 }
             });

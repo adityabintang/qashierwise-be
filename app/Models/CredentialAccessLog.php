@@ -14,9 +14,13 @@ class CredentialAccessLog extends Model
      * Action constants
      */
     const ACTION_CREATE = 'create';
+
     const ACTION_READ = 'read';
+
     const ACTION_UPDATE = 'update';
+
     const ACTION_DELETE = 'delete';
+
     const ACTION_DECRYPT = 'decrypt';
 
     /**
@@ -85,9 +89,6 @@ class CredentialAccessLog extends Model
 
     /**
      * Check if an action is valid.
-     *
-     * @param string $action
-     * @return bool
      */
     public static function isValidAction(string $action): bool
     {

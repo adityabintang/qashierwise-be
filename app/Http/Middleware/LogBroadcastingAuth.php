@@ -16,14 +16,14 @@ class LogBroadcastingAuth
             'headers' => $request->headers->all(),
             'input' => $request->all(),
             'token' => $request->bearerToken() ? 'Present' : 'Missing',
-            'user' => auth('sanctum')->user() ? auth('sanctum')->user()->id : 'Not authenticated'
+            'user' => auth('sanctum')->user() ? auth('sanctum')->user()->id : 'Not authenticated',
         ]);
 
         $response = $next($request);
 
         Log::info('Broadcasting auth response', [
             'status' => $response->status(),
-            'content' => $response->getContent()
+            'content' => $response->getContent(),
         ]);
 
         return $response;

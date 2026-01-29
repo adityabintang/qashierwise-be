@@ -103,7 +103,7 @@ class AntiSpamWorkflow
 
         // Push message to buffer FIRST
         $this->messageBuffer->push($phoneNumber, $messageContent);
-        
+
         // Get buffer size after push for logging
         $bufferSize = $this->messageBuffer->getBufferSize($phoneNumber);
 
@@ -119,7 +119,7 @@ class AntiSpamWorkflow
         if ($isFirstMessage) {
             // Dispatch delayed job to process buffered messages
             $debounceSeconds = $this->getDebounceSeconds();
-            
+
             ProcessBufferedMessages::dispatch($account, $contact)
                 ->onQueue('ai-agent')
                 ->delay(now()->addSeconds($debounceSeconds));
@@ -135,7 +135,7 @@ class AntiSpamWorkflow
         } else {
             // Extend debounce timer for subsequent messages
             $this->messageBuffer->extendDebounce($phoneNumber);
-            
+
             Log::info('Buffered message: added to existing buffer', [
                 'phone_number' => $phoneNumber,
                 'message_id' => $messageId,
@@ -244,7 +244,6 @@ class AntiSpamWorkflow
      *
      * @param  WhatsAppAccount  $account  The WhatsApp account
      * @param  string  $messageId  The WhatsApp message ID
-     * @return void
      */
     protected function sendSeenStatus(WhatsAppAccount $account, string $messageId): void
     {
@@ -331,15 +330,16 @@ class AntiSpamWorkflow
     protected function getDebounceSeconds(): int
     {
         $value = config('ai_agent.anti_spam.buffer.debounce_seconds', 2);
-        
-        if (!is_int($value) || $value <= 0) {
+
+        if (! is_int($value) || $value <= 0) {
             Log::warning('Invalid buffer.debounce_seconds config', [
                 'configured_value' => $value,
                 'default_value' => 2,
             ]);
+
             return 2;
         }
-        
+
         return $value;
     }
 

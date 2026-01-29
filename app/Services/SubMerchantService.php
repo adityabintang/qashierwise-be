@@ -14,9 +14,10 @@ class SubMerchantService
     /**
      * Register a user as a sub-merchant.
      *
-     * @param User $user The user to register as sub-merchant
-     * @param array $details Optional details (business_name)
+     * @param  User  $user  The user to register as sub-merchant
+     * @param  array  $details  Optional details (business_name)
      * @return SubMerchant The created sub-merchant
+     *
      * @throws InvalidArgumentException If user is already a sub-merchant
      */
     public function registerSubMerchant(User $user, array $details = []): SubMerchant
@@ -57,7 +58,7 @@ class SubMerchantService
     /**
      * Activate a sub-merchant.
      *
-     * @param SubMerchant $merchant The sub-merchant to activate
+     * @param  SubMerchant  $merchant  The sub-merchant to activate
      * @return bool True if activation was successful
      */
     public function activateSubMerchant(SubMerchant $merchant): bool
@@ -81,12 +82,12 @@ class SubMerchantService
     /**
      * Deactivate a sub-merchant.
      *
-     * @param SubMerchant $merchant The sub-merchant to deactivate
+     * @param  SubMerchant  $merchant  The sub-merchant to deactivate
      * @return bool True if deactivation was successful
      */
     public function deactivateSubMerchant(SubMerchant $merchant): bool
     {
-        if (!$merchant->is_active) {
+        if (! $merchant->is_active) {
             return true; // Already inactive
         }
 
@@ -105,7 +106,7 @@ class SubMerchantService
     /**
      * Verify a sub-merchant (admin action).
      *
-     * @param SubMerchant $merchant The sub-merchant to verify
+     * @param  SubMerchant  $merchant  The sub-merchant to verify
      * @return bool True if verification was successful
      */
     public function verifySubMerchant(SubMerchant $merchant): bool
@@ -129,8 +130,7 @@ class SubMerchantService
     /**
      * Find a sub-merchant by ID.
      *
-     * @param int $id Sub-merchant ID
-     * @return SubMerchant|null
+     * @param  int  $id  Sub-merchant ID
      */
     public function find(int $id): ?SubMerchant
     {
@@ -140,8 +140,7 @@ class SubMerchantService
     /**
      * Find a sub-merchant by user ID.
      *
-     * @param int $userId User ID
-     * @return SubMerchant|null
+     * @param  int  $userId  User ID
      */
     public function findByUserId(int $userId): ?SubMerchant
     {
@@ -151,13 +150,13 @@ class SubMerchantService
     /**
      * Get sub-merchant with balance information.
      *
-     * @param SubMerchant $merchant The sub-merchant
+     * @param  SubMerchant  $merchant  The sub-merchant
      * @return array Sub-merchant data with balance
      */
     public function getWithBalance(SubMerchant $merchant): array
     {
         $merchant->load('balance');
-        
+
         return [
             'sub_merchant' => $merchant,
             'balance' => $merchant->balance,
@@ -168,7 +167,7 @@ class SubMerchantService
     /**
      * Check if a user can become a sub-merchant.
      *
-     * @param User $user The user to check
+     * @param  User  $user  The user to check
      * @return bool True if user can become a sub-merchant
      */
     public function canBecomeSubMerchant(User $user): bool

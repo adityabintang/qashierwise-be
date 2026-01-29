@@ -9,19 +9,17 @@ use App\Models\QrisTransaction;
 use App\Models\SubMerchant;
 use App\Models\User;
 use App\Services\BalanceService;
-use App\Services\QrisService;
-use App\Services\SubMerchantService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 /**
  * End-to-end integration tests for the Sub-Merchant QRIS System.
- * 
+ *
  * Tests complete flows:
  * - QRIS generation to payment settlement
  * - Balance tracking
- * 
+ *
  * Requirements: All requirements integration
  */
 class SubMerchantQrisIntegrationTest extends TestCase
@@ -29,8 +27,11 @@ class SubMerchantQrisIntegrationTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private User $adminUser;
+
     private SubMerchant $subMerchant;
+
     private MerchantBalance $balance;
 
     protected function setUp(): void
@@ -77,9 +78,9 @@ class SubMerchantQrisIntegrationTest extends TestCase
     {
         $grossAmount = number_format($amount, 2, '.', '');
         $statusCode = $status === 'settlement' ? '200' : ($status === 'pending' ? '201' : '202');
-        
+
         $serverKey = config('services.midtrans.server_key') ?? '';
-        $signatureString = $orderId . $statusCode . $grossAmount . $serverKey;
+        $signatureString = $orderId.$statusCode.$grossAmount.$serverKey;
         $signatureKey = hash('sha512', $signatureString);
 
         return [
@@ -88,7 +89,7 @@ class SubMerchantQrisIntegrationTest extends TestCase
             'status_code' => $statusCode,
             'gross_amount' => $grossAmount,
             'signature_key' => $signatureKey,
-            'transaction_id' => 'midtrans-' . uniqid(),
+            'transaction_id' => 'midtrans-'.uniqid(),
             'payment_type' => 'qris',
             'fraud_status' => 'accept',
             'transaction_time' => now()->toDateTimeString(),
@@ -141,7 +142,7 @@ class SubMerchantQrisIntegrationTest extends TestCase
 
         // Step 3: Simulate Midtrans webhook for settlement
         $webhookPayload = $this->buildWebhookPayload($orderId, 'settlement', 100000);
-        
+
         $response = $this->postJson('/api/webhooks/midtrans', $webhookPayload);
         $response->assertStatus(200);
 
@@ -162,7 +163,7 @@ class SubMerchantQrisIntegrationTest extends TestCase
         // Create a settled transaction
         $transaction = QrisTransaction::create([
             'sub_merchant_id' => $this->subMerchant->id,
-            'order_id' => 'QRIS-' . now()->format('YmdHis') . '-TEST1234',
+            'order_id' => 'QRIS-'.now()->format('YmdHis').'-TEST1234',
             'amount' => 100000,
             'platform_fee' => 2500,
             'net_amount' => 97500,
@@ -200,7 +201,7 @@ class SubMerchantQrisIntegrationTest extends TestCase
         // Process first payment
         $transaction1 = QrisTransaction::create([
             'sub_merchant_id' => $this->subMerchant->id,
-            'order_id' => 'QRIS-' . now()->format('YmdHis') . '-TEST0001',
+            'order_id' => 'QRIS-'.now()->format('YmdHis').'-TEST0001',
             'amount' => 100000,
             'platform_fee' => 2500,
             'net_amount' => 97500,
@@ -215,7 +216,7 @@ class SubMerchantQrisIntegrationTest extends TestCase
         // Process second payment
         $transaction2 = QrisTransaction::create([
             'sub_merchant_id' => $this->subMerchant->id,
-            'order_id' => 'QRIS-' . now()->format('YmdHis') . '-TEST0002',
+            'order_id' => 'QRIS-'.now()->format('YmdHis').'-TEST0002',
             'amount' => 50000,
             'platform_fee' => 1250,
             'net_amount' => 48750,
@@ -242,7 +243,7 @@ class SubMerchantQrisIntegrationTest extends TestCase
         // Create an expired transaction
         $transaction = QrisTransaction::create([
             'sub_merchant_id' => $this->subMerchant->id,
-            'order_id' => 'QRIS-' . now()->format('YmdHis') . '-EXPIRED',
+            'order_id' => 'QRIS-'.now()->format('YmdHis').'-EXPIRED',
             'amount' => 100000,
             'platform_fee' => 2500,
             'net_amount' => 97500,
@@ -256,7 +257,7 @@ class SubMerchantQrisIntegrationTest extends TestCase
 
         // Webhook should still process but balance shouldn't update for expired
         $webhookPayload = $this->buildWebhookPayload($transaction->order_id, 'expire', 100000);
-        
+
         $response = $this->postJson('/api/webhooks/midtrans', $webhookPayload);
         $response->assertStatus(200);
 
@@ -309,14 +310,14 @@ class SubMerchantQrisIntegrationTest extends TestCase
         $response = $this->actingAs($this->user)
             ->getJson('/api/sub-merchant/balance');
         $response->assertStatus(200);
-        
+
         $expectedBalance = 200000 - (200000 * 0.025); // 195000
         $this->assertEquals($expectedBalance, $response->json('data.balance.available'));
 
         // 6. Verify final state
         $subMerchant = SubMerchant::where('user_id', $this->user->id)->first();
         $subMerchant->load('balance');
-        
+
         $this->assertEquals($expectedBalance, $subMerchant->balance->available_balance);
         $this->assertEquals($expectedBalance, $subMerchant->balance->total_earned);
     }

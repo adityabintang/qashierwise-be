@@ -2,23 +2,23 @@
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use App\Models\User;
-use App\Models\PaymentProviderCredential;
-use App\Services\ProviderValidationService;
-use App\Services\EncryptionService;
-use App\Services\KeyManagementService;
-use App\Services\PaymentProviders\ProviderFactory;
 use App\Contracts\PaymentProviderInterface;
 use App\DTOs\ValidationResult;
+use App\Models\PaymentProviderCredential;
+use App\Models\User;
+use App\Services\EncryptionService;
+use App\Services\PaymentProviders\ProviderFactory;
+use App\Services\ProviderValidationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
+use Tests\TestCase;
 
 class ProviderValidationServiceTest extends TestCase
 {
     use RefreshDatabase;
 
     protected ProviderValidationService $service;
+
     protected User $user;
 
     protected function setUp(): void
@@ -52,7 +52,7 @@ class ProviderValidationServiceTest extends TestCase
         $result = $service->validateCredentials($credential);
 
         $this->assertTrue($result->isValid);
-        
+
         $credential->refresh();
         $this->assertEquals(PaymentProviderCredential::STATUS_VALID, $credential->connection_status);
         $this->assertNotNull($credential->last_validated_at);
@@ -83,7 +83,7 @@ class ProviderValidationServiceTest extends TestCase
 
         $this->assertFalse($result->isValid);
         $this->assertEquals('Invalid credentials', $result->errorMessage);
-        
+
         $credential->refresh();
         $this->assertEquals(PaymentProviderCredential::STATUS_INVALID, $credential->connection_status);
         $this->assertEquals('Invalid credentials', $credential->validation_error);
@@ -103,7 +103,7 @@ class ProviderValidationServiceTest extends TestCase
         $result = $service->updateConnectionStatus($credential, $validationResult);
 
         $this->assertTrue($result);
-        
+
         $credential->refresh();
         $this->assertEquals(PaymentProviderCredential::STATUS_VALID, $credential->connection_status);
         $this->assertNull($credential->validation_error);
@@ -122,7 +122,7 @@ class ProviderValidationServiceTest extends TestCase
         $result = $service->captureProviderError($credential, $errorMessage);
 
         $this->assertTrue($result);
-        
+
         $credential->refresh();
         $this->assertEquals(PaymentProviderCredential::STATUS_INVALID, $credential->connection_status);
         $this->assertEquals($errorMessage, $credential->validation_error);
@@ -132,7 +132,7 @@ class ProviderValidationServiceTest extends TestCase
     public function test_can_revalidate_credentials(): void
     {
         $credential = $this->createCredential();
-        
+
         // Set initial status
         $credential->update([
             'connection_status' => PaymentProviderCredential::STATUS_VALID,
@@ -157,7 +157,7 @@ class ProviderValidationServiceTest extends TestCase
         $result = $service->revalidate($credential);
 
         $this->assertTrue($result->isValid);
-        
+
         $credential->refresh();
         $this->assertEquals(PaymentProviderCredential::STATUS_VALID, $credential->connection_status);
     }
@@ -189,7 +189,7 @@ class ProviderValidationServiceTest extends TestCase
     public function test_validate_if_needed_validates_when_needed(): void
     {
         $credential = $this->createCredential();
-        
+
         // Set status to pending (needs validation)
         $credential->update([
             'connection_status' => PaymentProviderCredential::STATUS_PENDING,
@@ -219,7 +219,7 @@ class ProviderValidationServiceTest extends TestCase
     public function test_validate_if_needed_skips_when_not_needed(): void
     {
         $credential = $this->createCredential();
-        
+
         // Set status to valid and recently validated
         $credential->update([
             'connection_status' => PaymentProviderCredential::STATUS_VALID,

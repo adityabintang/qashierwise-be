@@ -42,7 +42,8 @@ class FixMessageTypeConstraint extends Command
 
             return 0;
         } catch (\Exception $e) {
-            $this->error('Failed to update constraint: ' . $e->getMessage());
+            $this->error('Failed to update constraint: '.$e->getMessage());
+
             return 1;
         }
     }

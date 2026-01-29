@@ -13,7 +13,7 @@ use InvalidArgumentException;
 
 /**
  * Controller for payment provider credential management API endpoints.
- * 
+ *
  * Handles provider credential configuration, updates, deletion, and active provider selection.
  * Requirements: 1.6, 1.7, 4.1, 8.1, 8.3
  */
@@ -25,17 +25,14 @@ class ProviderCredentialController extends Controller
 
     /**
      * List all configured providers for the current user.
-     * 
+     *
      * Requirement 1.6: Allow users to configure credentials for multiple providers
      * Requirement 1.7: Store provider type and credential fields
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        
+
         $credentials = PaymentProviderCredential::where('user_id', $user->id)
             ->orderBy('provider')
             ->get();
@@ -64,12 +61,9 @@ class ProviderCredentialController extends Controller
 
     /**
      * Store new provider credentials.
-     * 
+     *
      * Requirement 1.6: Allow users to configure credentials for multiple providers
      * Requirement 8.1: Allow users to update existing provider credentials
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function store(Request $request): JsonResponse
     {
@@ -149,12 +143,8 @@ class ProviderCredentialController extends Controller
 
     /**
      * Update existing provider credentials.
-     * 
+     *
      * Requirement 8.1: Allow users to update existing provider credentials
-     * 
-     * @param Request $request
-     * @param int $id
-     * @return JsonResponse
      */
     public function update(Request $request, int $id): JsonResponse
     {
@@ -175,12 +165,12 @@ class ProviderCredentialController extends Controller
         }
 
         $user = $request->user();
-        
+
         $credential = PaymentProviderCredential::where('id', $id)
             ->where('user_id', $user->id)
             ->first();
 
-        if (!$credential) {
+        if (! $credential) {
             return response()->json([
                 'success' => false,
                 'error' => [
@@ -196,7 +186,7 @@ class ProviderCredentialController extends Controller
                 $request->input('credentials')
             );
 
-            if (!$success) {
+            if (! $success) {
                 return response()->json([
                     'success' => false,
                     'error' => [
@@ -256,22 +246,18 @@ class ProviderCredentialController extends Controller
 
     /**
      * Delete provider credentials.
-     * 
+     *
      * Requirement 8.3: Allow users to delete provider credentials
-     * 
-     * @param Request $request
-     * @param int $id
-     * @return JsonResponse
      */
     public function destroy(Request $request, int $id): JsonResponse
     {
         $user = $request->user();
-        
+
         $credential = PaymentProviderCredential::where('id', $id)
             ->where('user_id', $user->id)
             ->first();
 
-        if (!$credential) {
+        if (! $credential) {
             return response()->json([
                 'success' => false,
                 'error' => [
@@ -287,7 +273,7 @@ class ProviderCredentialController extends Controller
         try {
             $success = $this->credentialService->deleteCredentials($credential);
 
-            if (!$success) {
+            if (! $success) {
                 return response()->json([
                     'success' => false,
                     'error' => [
@@ -331,11 +317,8 @@ class ProviderCredentialController extends Controller
 
     /**
      * Set active provider for the current user.
-     * 
+     *
      * Requirement 4.1: Allow users to designate one provider as active at a time
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function setActive(Request $request): JsonResponse
     {
@@ -360,7 +343,7 @@ class ProviderCredentialController extends Controller
         try {
             $success = $this->credentialService->setActiveProvider($user, $provider);
 
-            if (!$success) {
+            if (! $success) {
                 return response()->json([
                     'success' => false,
                     'error' => [

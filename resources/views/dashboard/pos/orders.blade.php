@@ -3,7 +3,7 @@
 @section('title', __('pos.orders.title') . ' - QashierWise POS')
 
 @section('content')
-<div x-data="ordersApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
+<div x-data="ordersApp()" x-init="initDashboard()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'pos-orders'])
 
     <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
@@ -17,10 +17,12 @@
                         <h2 class="text-lg font-semibold">Sales Orders</h2>
                         <p class="text-sm text-[hsl(var(--muted-foreground))] hidden sm:block">Create and manage customer orders</p>
                     </div>
-                    <button @click="openCreateModal()" class="btn btn-primary btn-md">
-                        <i class="fas fa-plus"></i>
-                        <span>New Order</span>
-                    </button>
+                    <template x-if="hasPermission('create_orders') || hasPermission('manage_orders')">
+                        <button @click="openCreateModal()" class="btn btn-primary btn-md">
+                            <i class="fas fa-plus"></i>
+                            <span>New Order</span>
+                        </button>
+                    </template>
                 </div>
 
                 <!-- Filters -->
@@ -158,7 +160,9 @@
                         <div class="empty-state-icon"><i class="fas fa-shopping-cart text-2xl"></i></div>
                         <h3 class="font-semibold mt-4">No orders found</h3>
                         <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">Create your first order to get started.</p>
-                        <button @click="openCreateModal()" class="btn btn-primary btn-md mt-4"><i class="fas fa-plus"></i> New Order</button>
+                        <template x-if="hasPermission('create_orders') || hasPermission('manage_orders')">
+                            <button @click="openCreateModal()" class="btn btn-primary btn-md mt-4"><i class="fas fa-plus"></i> New Order</button>
+                        </template>
                     </div>
                 </div>
 
@@ -358,9 +362,12 @@ function ordersApp() {
         pagination: { currentPage: 1, lastPage: 1, from: 0, to: 0, total: 0 },
         sidebarOpen: window.innerWidth >= 1024, isMobile: window.innerWidth < 768, user: null, notifications: [],
         searchTimeout: null,
+        // Permissions
+        userPermissions: [], isAdmin: true,
 
         async init() {
-            this.initSidebar();
+            this.initDashboard();
+            await this.fetchUserPermissions();
             await Promise.all([this.fetchOrders(), this.fetchStores(), this.fetchProducts()]);
         },
 
@@ -372,7 +379,7 @@ function ordersApp() {
             }, 300);
         },
 
-        initSidebar() {
+        initDashboard() {
             this.isMobile = window.innerWidth < 768;
             if (this.isMobile) { this.sidebarOpen = false; }
             else { let s = localStorage.getItem('sidebarOpen'); if (s !== null) this.sidebarOpen = JSON.parse(s); }
@@ -383,13 +390,38 @@ function ordersApp() {
                 else if (!was && this.isMobile) { this.sidebarOpen = false; }
             });
             let u = localStorage.getItem('user'); if (u) { try { this.user = JSON.parse(u); } catch (e) { this.user = { name: 'User' }; } } else { this.user = { name: 'User' }; }
+            this.fetchUserPermissions();
             this.$watch('createForm.store_id', () => {
                 this.createForm.table_id = '';
                 this.fetchTables();
             });
         },
 
+        async fetchUserPermissions() {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) { this.isAdmin = true; this.userPermissions = []; return; }
+                const res = await fetch(`${window.location.origin}/api/user/permissions`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success) { this.isAdmin = data.data.is_admin || false; this.userPermissions = data.data.permissions || []; }
+                }
+            } catch (e) { console.error('Failed to fetch permissions:', e); }
+        },
+
+        hasPermission(permission) {
+            if (this.isAdmin) return true;
+            if (this.userPermissions.includes('*')) return true;
+            return this.userPermissions.includes(permission);
+        },
+
         async fetchOrders() {
+            // Check permission first
+            if (!this.hasPermission('view_orders') && !this.hasPermission('manage_orders')) {
+                this.orders = []; this.loading = false; return;
+            }
             this.loading = true;
             try {
                 const token = localStorage.getItem('token');
@@ -459,6 +491,11 @@ function ordersApp() {
         closeCreateModal() { this.showCreateModal = false; },
 
         async createOrder() {
+            // Check permission before creating
+            if (!this.hasPermission('create_orders') && !this.hasPermission('manage_orders')) {
+                alert('You do not have permission to create orders');
+                return;
+            }
             if (!this.createForm.store_id || this.orderItems.length === 0) return;
             this.creating = true;
             try {
@@ -495,6 +532,11 @@ function ordersApp() {
         },
 
         async cancelOrder(order) {
+            // Check permission before canceling
+            if (!this.hasPermission('cancel_orders') && !this.hasPermission('manage_orders')) {
+                alert('You do not have permission to cancel orders');
+                return;
+            }
             if (!confirm('Cancel this order?')) return;
             try {
                 const token = localStorage.getItem('token');

@@ -18,9 +18,13 @@ class AntiSpamWorkflowIntegrationTest extends TestCase
     use RefreshDatabase;
 
     protected User $user;
+
     protected WhatsAppAccount $account;
+
     protected WhatsAppContact $contact;
+
     protected AntiSpamWorkflow $workflow;
+
     protected MessageBuffer $messageBuffer;
 
     protected function setUp(): void
@@ -119,7 +123,7 @@ class AntiSpamWorkflowIntegrationTest extends TestCase
     public function workflow_detects_duplicate_messages(): void
     {
         Queue::fake();
-        
+
         $content = 'Duplicate message test';
 
         // First message should be buffered
@@ -141,7 +145,7 @@ class AntiSpamWorkflowIntegrationTest extends TestCase
             $content,
             'msg_457'
         );
-        
+
         // Note: With buffer enabled, dedup check happens before buffering
         // If dedup is working, this should still be false (either buffered or rejected)
         $this->assertFalse($result2);
@@ -151,7 +155,7 @@ class AntiSpamWorkflowIntegrationTest extends TestCase
     public function workflow_enforces_rate_limit(): void
     {
         Queue::fake();
-        
+
         $maxMessages = config('ai_agent.anti_spam.rate_limit.max_messages', 20);
 
         // Send max_messages
@@ -178,7 +182,7 @@ class AntiSpamWorkflowIntegrationTest extends TestCase
     public function workflow_is_per_user(): void
     {
         Queue::fake();
-        
+
         // Create second user
         $user2 = User::factory()->create();
         $account2 = WhatsAppAccount::factory()->create([
@@ -208,10 +212,10 @@ class AntiSpamWorkflowIntegrationTest extends TestCase
             'User 2 message',
             'msg_u2_1'
         );
-        
+
         // Returns false because buffered, but job should be dispatched
         $this->assertFalse($result);
-        
+
         // Check that second user's buffer has the message
         $bufferSize = $this->messageBuffer->getBufferSize($contact2->wa_id);
         $this->assertEquals(1, $bufferSize, 'Second user buffer should have 1 message');
@@ -222,7 +226,7 @@ class AntiSpamWorkflowIntegrationTest extends TestCase
     {
         // Disable buffering
         config(['ai_agent.anti_spam.buffer.enabled' => false]);
-        
+
         // Recreate workflow with new config
         $this->workflow = app(AntiSpamWorkflow::class);
 

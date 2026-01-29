@@ -16,7 +16,7 @@ use RuntimeException;
 
 /**
  * Controller for QRIS generation and sharing API endpoints.
- * 
+ *
  * Handles QRIS code generation, retrieval, and sharing functionality.
  * Requirements: 2.1, 2.2, 2.3, 8.1, 8.2, 8.5
  */
@@ -29,15 +29,12 @@ class QrisController extends Controller
 
     /**
      * Generate a new QRIS code for a transaction.
-     * 
+     *
      * Requirement 2.1: Generate unique order_id for each transaction
      * Requirement 2.2: Create QR code through multi-provider API
      * Requirement 2.3: Provide both image and shareable link formats
      * Requirement 4.5: Prevent QRIS generation when no provider is active
      * Requirement 7.5: Provide provider-specific error messages
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function generate(Request $request): JsonResponse
     {
@@ -109,10 +106,6 @@ class QrisController extends Controller
 
     /**
      * Get QRIS transaction details by order ID.
-     * 
-     * @param Request $request
-     * @param string $orderId
-     * @return JsonResponse
      */
     public function show(Request $request, string $orderId): JsonResponse
     {
@@ -136,12 +129,8 @@ class QrisController extends Controller
 
     /**
      * Get QR code image URL for a transaction.
-     * 
+     *
      * Requirement 8.1: Provide downloadable QR code image
-     * 
-     * @param Request $request
-     * @param string $orderId
-     * @return JsonResponse
      */
     public function getQrCode(Request $request, string $orderId): JsonResponse
     {
@@ -185,12 +174,8 @@ class QrisController extends Controller
 
     /**
      * Get shareable link for a QRIS transaction.
-     * 
+     *
      * Requirement 8.2: Generate shareable links for QRIS codes
-     * 
-     * @param Request $request
-     * @param string $orderId
-     * @return JsonResponse
      */
     public function getShareableLink(Request $request, string $orderId): JsonResponse
     {
@@ -235,12 +220,8 @@ class QrisController extends Controller
 
     /**
      * Check QRIS transaction status.
-     * 
+     *
      * Requirement 8.5: Display payment interface when QRIS is accessed
-     * 
-     * @param Request $request
-     * @param string $orderId
-     * @return JsonResponse
      */
     public function checkStatus(Request $request, string $orderId): JsonResponse
     {
@@ -287,9 +268,6 @@ class QrisController extends Controller
 
     /**
      * Get transaction history for the current sub-merchant.
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function history(Request $request): JsonResponse
     {
@@ -333,9 +311,6 @@ class QrisController extends Controller
 
     /**
      * Get pending transactions for the current sub-merchant.
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function pending(Request $request): JsonResponse
     {
@@ -365,10 +340,6 @@ class QrisController extends Controller
 
     /**
      * Cancel a pending QRIS transaction.
-     * 
-     * @param Request $request
-     * @param string $orderId
-     * @return JsonResponse
      */
     public function cancel(Request $request, string $orderId): JsonResponse
     {
@@ -422,11 +393,8 @@ class QrisController extends Controller
 
     /**
      * Format transaction data for API response.
-     * 
+     *
      * Requirement 7.5: Include provider information in response
-     * 
-     * @param QrisTransaction $transaction
-     * @return array
      */
     private function formatTransactionResponse(QrisTransaction $transaction): array
     {

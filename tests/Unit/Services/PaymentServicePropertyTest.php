@@ -20,32 +20,36 @@ use Tests\TestCase;
 
 /**
  * Property-based tests for PaymentService
- * 
+ *
  * Feature: point-of-sale
  */
 class PaymentServicePropertyTest extends TestCase
 {
-    use TestTrait;
     use RefreshDatabase;
+    use TestTrait;
 
     protected PaymentService $paymentService;
+
     protected OrderService $orderService;
+
     protected Store $store;
+
     protected PosUser $posUser;
+
     protected Category $category;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->paymentService = new PaymentService();
-        $this->orderService = new OrderService();
-        
+        $this->paymentService = new PaymentService;
+        $this->orderService = new OrderService;
+
         $uniqueId = uniqid();
-        
+
         // Create required entities for testing
         $this->store = Store::create([
             'name' => 'Test Store',
-            'code' => 'TST-' . $uniqueId,
+            'code' => 'TST-'.$uniqueId,
             'address' => 'Test Address',
             'is_active' => true,
         ]);
@@ -56,10 +60,14 @@ class PaymentServicePropertyTest extends TestCase
             'password' => bcrypt('password'),
         ]);
 
-        $role = Role::create([
-            'name' => 'Cashier-' . $uniqueId,
-            'permissions' => ['orders.create', 'payments.create'],
-        ]);
+        // Get or create Spatie role
+        $role = \Spatie\Permission\Models\Role::firstOrCreate(
+            ['name' => 'Cashier', 'guard_name' => 'sanctum'],
+            []
+        );
+
+        // Assign role to user
+        $user->syncRoles([$role->name]);
 
         $this->posUser = PosUser::create([
             'user_id' => $user->id,
@@ -70,7 +78,7 @@ class PaymentServicePropertyTest extends TestCase
 
         $this->category = Category::create([
             'name' => 'Test Category',
-            'slug' => 'test-category-' . $uniqueId,
+            'slug' => 'test-category-'.$uniqueId,
             'is_active' => true,
         ]);
     }
@@ -82,11 +90,11 @@ class PaymentServicePropertyTest extends TestCase
     {
         static $counter = 0;
         $counter++;
-        
+
         return Product::create([
             'category_id' => $this->category->id,
             'name' => "Product {$counter}",
-            'sku' => "SKU-{$counter}-" . uniqid(),
+            'sku' => "SKU-{$counter}-".uniqid(),
             'price' => $price,
             'stock_quantity' => $stock,
             'is_active' => true,
@@ -115,8 +123,8 @@ class PaymentServicePropertyTest extends TestCase
     /**
      * Feature: point-of-sale, Property 7: Payment Change Calculation
      * Validates: Requirements 4.2
-     * 
-     * For any cash Payment where amount_paid >= order_total, 
+     *
+     * For any cash Payment where amount_paid >= order_total,
      * the calculated change SHALL equal amount_paid - order_total.
      */
     #[Test]
@@ -150,17 +158,16 @@ class PaymentServicePropertyTest extends TestCase
                 $this->assertGreaterThanOrEqual(
                     0,
                     $change,
-                    "Change should never be negative when amount_paid >= order_total"
+                    'Change should never be negative when amount_paid >= order_total'
                 );
             });
     }
 
-
     /**
      * Feature: point-of-sale, Property 8: Split Payment Total Invariant
      * Validates: Requirements 4.4, 4.5
-     * 
-     * For any Order with split payments, the sum of all payment amounts 
+     *
+     * For any Order with split payments, the sum of all payment amounts
      * SHALL equal or exceed the order total.
      */
     #[Test]
@@ -197,14 +204,14 @@ class PaymentServicePropertyTest extends TestCase
 
                 for ($i = 0; $i < $numPayments; $i++) {
                     $isLastPayment = ($i === $numPayments - 1);
-                    
+
                     if ($isLastPayment) {
                         // Last payment covers remaining amount (plus possible extra)
                         $amount = $remainingAmount + (rand(0, 1000) / 100);
                     } else {
                         // Random portion of remaining amount
                         $maxPortion = $remainingAmount / ($numPayments - $i);
-                        $amount = max(0.01, rand(1, (int)($maxPortion * 100)) / 100);
+                        $amount = max(0.01, rand(1, (int) ($maxPortion * 100)) / 100);
                         $remainingAmount -= $amount;
                     }
 
@@ -234,7 +241,7 @@ class PaymentServicePropertyTest extends TestCase
                 $this->assertEquals(
                     Order::STATUS_PAID,
                     $order->status,
-                    "Order should be marked as paid when payments cover total"
+                    'Order should be marked as paid when payments cover total'
                 );
 
                 // Verify number of payments created

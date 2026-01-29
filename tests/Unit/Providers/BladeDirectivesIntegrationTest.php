@@ -19,10 +19,10 @@ class BladeDirectivesIntegrationTest extends TestCase
 
         // Create a test view with @trans directive
         $blade = "@trans('test.welcome')";
-        
+
         // Compile the view
         $compiled = app('view')->getEngineResolver()->resolve('blade')->getCompiler()->compileString($blade);
-        
+
         $this->assertStringContainsString("<?php echo __('test.welcome'); ?>", $compiled);
     }
 
@@ -33,14 +33,14 @@ class BladeDirectivesIntegrationTest extends TestCase
     {
         // Set locale
         app()->setLocale('en');
-        
+
         // Create a test view with @locale directive
-        $blade = "Current language: @locale";
-        
+        $blade = 'Current language: @locale';
+
         // Compile the view
         $compiled = app('view')->getEngineResolver()->resolve('blade')->getCompiler()->compileString($blade);
-        
-        $this->assertStringContainsString("<?php echo app()->getLocale(); ?>", $compiled);
+
+        $this->assertStringContainsString('<?php echo app()->getLocale(); ?>', $compiled);
     }
 
     /**
@@ -54,15 +54,15 @@ class BladeDirectivesIntegrationTest extends TestCase
         ], 'en');
 
         app()->setLocale('en');
-        
+
         // Create a test view with both directives
         $blade = "@trans('test.language_info') @locale";
-        
+
         // Compile the view
         $compiled = app('view')->getEngineResolver()->resolve('blade')->getCompiler()->compileString($blade);
-        
+
         $this->assertStringContainsString("<?php echo __('test.language_info'); ?>", $compiled);
-        $this->assertStringContainsString("<?php echo app()->getLocale(); ?>", $compiled);
+        $this->assertStringContainsString('<?php echo app()->getLocale(); ?>', $compiled);
     }
 
     /**
@@ -74,13 +74,13 @@ class BladeDirectivesIntegrationTest extends TestCase
         app('translator')->addLines([
             'dashboard.menu.products' => 'Products',
         ], 'en');
-        
+
         // Create a test view with nested key
         $blade = "@trans('dashboard.menu.products')";
-        
+
         // Compile the view
         $compiled = app('view')->getEngineResolver()->resolve('blade')->getCompiler()->compileString($blade);
-        
+
         $this->assertStringContainsString("<?php echo __('dashboard.menu.products'); ?>", $compiled);
     }
 
@@ -91,14 +91,14 @@ class BladeDirectivesIntegrationTest extends TestCase
     {
         // Test with English
         app()->setLocale('en');
-        $blade = "@locale";
+        $blade = '@locale';
         $compiled = app('view')->getEngineResolver()->resolve('blade')->getCompiler()->compileString($blade);
-        $this->assertStringContainsString("<?php echo app()->getLocale(); ?>", $compiled);
-        
+        $this->assertStringContainsString('<?php echo app()->getLocale(); ?>', $compiled);
+
         // Test with Indonesian
         app()->setLocale('id');
-        $blade = "@locale";
+        $blade = '@locale';
         $compiled = app('view')->getEngineResolver()->resolve('blade')->getCompiler()->compileString($blade);
-        $this->assertStringContainsString("<?php echo app()->getLocale(); ?>", $compiled);
+        $this->assertStringContainsString('<?php echo app()->getLocale(); ?>', $compiled);
     }
 }

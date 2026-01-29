@@ -3,7 +3,7 @@
 @section('title', __('pos.reports.title') . ' - QashierWise POS')
 
 @section('content')
-<div x-data="reportsApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
+<div x-data="reportsApp()" x-init="initDashboard()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'pos-reports'])
 
     <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
@@ -189,10 +189,11 @@ function reportsApp() {
         summary: { total_sales: 0, total_orders: 0, average_order: 0, items_sold: 0 },
         chart: null,
         sidebarOpen: window.innerWidth >= 1024, isMobile: window.innerWidth < 768, user: null, notifications: [],
+        userPermissions: [], isAdmin: true,
 
-        async init() { this.initSidebar(); await this.fetchStores(); await this.fetchReport(); },
+        async init() { this.initDashboard(); await this.fetchUserPermissions(); await this.fetchStores(); await this.fetchReport(); },
 
-        initSidebar() {
+        initDashboard() {
             this.isMobile = window.innerWidth < 768;
             if (this.isMobile) { this.sidebarOpen = false; }
             else { let s = localStorage.getItem('sidebarOpen'); if (s !== null) this.sidebarOpen = JSON.parse(s); }
@@ -203,6 +204,27 @@ function reportsApp() {
                 else if (!was && this.isMobile) { this.sidebarOpen = false; }
             });
             let u = localStorage.getItem('user'); if (u) { try { this.user = JSON.parse(u); } catch (e) { this.user = { name: 'User' }; } } else { this.user = { name: 'User' }; }
+            this.fetchUserPermissions();
+        },
+
+        async fetchUserPermissions() {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) { this.isAdmin = true; this.userPermissions = []; return; }
+                const res = await fetch(`${window.location.origin}/api/user/permissions`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success) { this.isAdmin = data.data.is_admin || false; this.userPermissions = data.data.permissions || []; }
+                }
+            } catch (e) { console.error('Failed to fetch permissions:', e); }
+        },
+
+        hasPermission(permission) {
+            if (this.isAdmin) return true;
+            if (this.userPermissions.includes('*')) return true;
+            return this.userPermissions.includes(permission);
         },
 
         async fetchStores() {
@@ -215,6 +237,10 @@ function reportsApp() {
         },
 
         async fetchReport() {
+            // Check permission first
+            if (!this.hasPermission('view_reports') && !this.hasPermission('manage_reports')) {
+                this.loading = false; return;
+            }
             this.loading = true;
             try {
                 const token = localStorage.getItem('token');

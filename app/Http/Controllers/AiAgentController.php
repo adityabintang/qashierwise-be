@@ -38,7 +38,7 @@ class AiAgentController extends Controller
     public function show(): JsonResponse
     {
         try {
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
 
             $whatsappAccount = WhatsAppAccount::where('user_id', $userId)->first();
 
@@ -92,7 +92,7 @@ class AiAgentController extends Controller
     public function store(StoreAiAgentRequest $request): JsonResponse
     {
         try {
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
 
             $whatsappAccount = WhatsAppAccount::where('user_id', $userId)->first();
 
@@ -162,7 +162,7 @@ class AiAgentController extends Controller
     public function toggleActive(Request $request): JsonResponse
     {
         try {
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
 
             $whatsappAccount = WhatsAppAccount::where('user_id', $userId)->first();
 
@@ -208,7 +208,7 @@ class AiAgentController extends Controller
     public function toggleOrder(Request $request): JsonResponse
     {
         try {
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
 
             $whatsappAccount = WhatsAppAccount::where('user_id', $userId)->first();
 
@@ -261,7 +261,7 @@ class AiAgentController extends Controller
     public function toggleQris(Request $request): JsonResponse
     {
         try {
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
 
             $whatsappAccount = WhatsAppAccount::where('user_id', $userId)->first();
 
@@ -325,7 +325,7 @@ class AiAgentController extends Controller
         ]);
 
         try {
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
 
             $whatsappAccount = WhatsAppAccount::where('user_id', $userId)->first();
 
@@ -430,7 +430,7 @@ class AiAgentController extends Controller
 
         } catch (\Exception $e) {
             Log::error('Test AI Agent failed', [
-                'user_id' => auth()->id(),
+                'user_id' => auth()->user()->getEffectiveUserId(),
                 'message' => $request->message ?? null,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -1722,7 +1722,7 @@ class AiAgentController extends Controller
     public function clearConversation(Request $request, int $contactId): JsonResponse
     {
         try {
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
 
             $whatsappAccount = WhatsAppAccount::where('user_id', $userId)->first();
 
@@ -1766,7 +1766,7 @@ class AiAgentController extends Controller
     public function clearTestConversation(Request $request): JsonResponse
     {
         try {
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
 
             $whatsappAccount = WhatsAppAccount::where('user_id', $userId)->first();
 

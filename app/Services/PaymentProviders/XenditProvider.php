@@ -15,14 +15,14 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Xendit payment provider implementation.
- * 
+ *
  * Implements QRIS generation using Xendit QR Code API.
  * Documentation: https://developers.xendit.co/api-reference/#create-qr-code
  */
 class XenditProvider implements PaymentProviderInterface
 {
     private const BASE_URL = 'https://api.xendit.co';
-    
+
     /**
      * Credential audit service for logging credential access.
      */
@@ -34,9 +34,10 @@ class XenditProvider implements PaymentProviderInterface
     public function setAuditService(CredentialAuditService $auditService): self
     {
         $this->auditService = $auditService;
+
         return $this;
     }
-    
+
     /**
      * {@inheritdoc}
      */
@@ -59,15 +60,15 @@ class XenditProvider implements PaymentProviderInterface
     public function validateCredentials(array $credentials): ValidationResult
     {
         $startTime = microtime(true);
-        
+
         try {
             // Validate required fields
-            if (!isset($credentials['api_key'])) {
+            if (! isset($credentials['api_key'])) {
                 Log::warning('Xendit credential validation failed: missing api_key', [
                     'provider' => 'xendit',
                     'has_webhook_token' => isset($credentials['webhook_token']),
                 ]);
-                
+
                 return ValidationResult::failure(
                     'Missing required credential: api_key',
                     'MISSING_CREDENTIALS'
@@ -86,7 +87,7 @@ class XenditProvider implements PaymentProviderInterface
                     'Content-Type' => 'application/json',
                 ])
                 ->timeout(10)
-                ->get(self::BASE_URL . '/balance');
+                ->get(self::BASE_URL.'/balance');
 
             $duration = round((microtime(true) - $startTime) * 1000, 2);
 
@@ -96,7 +97,7 @@ class XenditProvider implements PaymentProviderInterface
                     'duration_ms' => $duration,
                     'status_code' => $response->status(),
                 ]);
-                
+
                 return ValidationResult::success([
                     'balance' => $response->json('balance'),
                 ]);
@@ -109,7 +110,7 @@ class XenditProvider implements PaymentProviderInterface
                     'status_code' => 401,
                     'duration_ms' => $duration,
                 ]);
-                
+
                 return ValidationResult::failure(
                     'Invalid API key',
                     'INVALID_CREDENTIALS',
@@ -120,14 +121,14 @@ class XenditProvider implements PaymentProviderInterface
             $errorMessage = $this->sanitizeErrorMessage(
                 $response->json('message') ?? $response->json('error_code') ?? 'Invalid credentials'
             );
-            
+
             Log::error('Xendit credential validation failed', [
                 'provider' => 'xendit',
                 'status_code' => $response->status(),
                 'error_code' => $response->json('error_code'),
                 'duration_ms' => $duration,
             ]);
-            
+
             return ValidationResult::failure(
                 $errorMessage,
                 $response->json('error_code') ?? 'VALIDATION_FAILED',
@@ -136,7 +137,7 @@ class XenditProvider implements PaymentProviderInterface
 
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
             $duration = round((microtime(true) - $startTime) * 1000, 2);
-            
+
             Log::error('Xendit credential validation failed: connection error', [
                 'provider' => 'xendit',
                 'error' => $e->getMessage(),
@@ -148,10 +149,10 @@ class XenditProvider implements PaymentProviderInterface
                 'NETWORK_ERROR',
                 ['exception' => 'Connection timeout']
             );
-            
+
         } catch (\Exception $e) {
             $duration = round((microtime(true) - $startTime) * 1000, 2);
-            
+
             Log::error('Xendit credential validation failed: unexpected error', [
                 'provider' => 'xendit',
                 'error' => $e->getMessage(),
@@ -174,14 +175,14 @@ class XenditProvider implements PaymentProviderInterface
     public function generateQris(array $credentials, QrisRequest $request): QrisResponse
     {
         $startTime = microtime(true);
-        
+
         try {
-            if (!isset($credentials['api_key'])) {
+            if (! isset($credentials['api_key'])) {
                 Log::error('Xendit QRIS generation failed: missing API key', [
                     'provider' => 'xendit',
                     'order_id' => $request->orderId,
                 ]);
-                
+
                 throw ProviderException::credentialError(
                     'xendit',
                     'Missing API key',
@@ -193,7 +194,7 @@ class XenditProvider implements PaymentProviderInterface
             $expiresAt = now()->addMinutes($expiryMinutes);
 
             // Prepare callback URL
-            $callbackUrl = config('app.url') . '/api/webhooks/xendit';
+            $callbackUrl = config('app.url').'/api/webhooks/xendit';
 
             Log::info('Xendit QRIS generation started', [
                 'provider' => 'xendit',
@@ -210,7 +211,7 @@ class XenditProvider implements PaymentProviderInterface
                     'api-version' => '2022-07-31',
                 ])
                 ->timeout(30)
-                ->post(self::BASE_URL . '/qr_codes', [
+                ->post(self::BASE_URL.'/qr_codes', [
                     'reference_id' => $request->orderId,
                     'type' => 'DYNAMIC',
                     'currency' => 'IDR',
@@ -219,13 +220,13 @@ class XenditProvider implements PaymentProviderInterface
 
             $duration = round((microtime(true) - $startTime) * 1000, 2);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 $errorMessage = $this->sanitizeErrorMessage(
                     $response->json('message') ?? $response->json('error_code') ?? 'Failed to generate QRIS'
                 );
-                
+
                 $errorCode = $response->json('error_code');
-                
+
                 Log::error('Xendit QRIS generation failed', [
                     'provider' => 'xendit',
                     'order_id' => $request->orderId,
@@ -233,7 +234,7 @@ class XenditProvider implements PaymentProviderInterface
                     'error_code' => $errorCode,
                     'duration_ms' => $duration,
                 ]);
-                
+
                 // Check for credential errors
                 if ($response->status() === 401 || $errorCode === 'API_VALIDATION_ERROR') {
                     throw ProviderException::credentialError(
@@ -242,12 +243,12 @@ class XenditProvider implements PaymentProviderInterface
                         $errorCode
                     );
                 }
-                
+
                 // Check for network errors
                 if ($response->status() >= 500) {
                     throw ProviderException::networkError('xendit');
                 }
-                
+
                 throw ProviderException::providerError(
                     'xendit',
                     $errorMessage,
@@ -294,10 +295,9 @@ class XenditProvider implements PaymentProviderInterface
             ]);
 
             throw $e;
-            
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
             $duration = round((microtime(true) - $startTime) * 1000, 2);
-            
+
             Log::error('Xendit QRIS generation failed: connection error', [
                 'provider' => 'xendit',
                 'order_id' => $request->orderId,
@@ -306,10 +306,9 @@ class XenditProvider implements PaymentProviderInterface
             ]);
 
             throw ProviderException::networkError('xendit', $e);
-            
         } catch (\Exception $e) {
             $duration = round((microtime(true) - $startTime) * 1000, 2);
-            
+
             Log::error('Xendit QRIS generation failed: unexpected error', [
                 'provider' => 'xendit',
                 'order_id' => $request->orderId,
@@ -328,14 +327,14 @@ class XenditProvider implements PaymentProviderInterface
     public function checkTransactionStatus(array $credentials, string $transactionId): TransactionStatus
     {
         $startTime = microtime(true);
-        
+
         try {
-            if (!isset($credentials['api_key'])) {
+            if (! isset($credentials['api_key'])) {
                 Log::error('Xendit transaction status check failed: missing API key', [
                     'provider' => 'xendit',
                     'transaction_id' => $transactionId,
                 ]);
-                
+
                 throw ProviderException::credentialError(
                     'xendit',
                     'Missing API key',
@@ -354,22 +353,22 @@ class XenditProvider implements PaymentProviderInterface
                     'Content-Type' => 'application/json',
                 ])
                 ->timeout(10)
-                ->get(self::BASE_URL . "/qr_codes/{$transactionId}");
+                ->get(self::BASE_URL."/qr_codes/{$transactionId}");
 
             $duration = round((microtime(true) - $startTime) * 1000, 2);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 $errorMessage = $this->sanitizeErrorMessage(
                     $response->json('message') ?? 'Failed to check transaction status'
                 );
-                
+
                 Log::error('Xendit transaction status check failed', [
                     'provider' => 'xendit',
                     'transaction_id' => $transactionId,
                     'status_code' => $response->status(),
                     'duration_ms' => $duration,
                 ]);
-                
+
                 throw ProviderException::providerError('xendit', $errorMessage);
             }
 
@@ -388,8 +387,8 @@ class XenditProvider implements PaymentProviderInterface
                 status: $status,
                 transactionId: $transactionId,
                 amount: isset($data['amount']) ? (float) $data['amount'] : null,
-                settledAt: $status === TransactionStatus::STATUS_SETTLEMENT && isset($data['updated']) 
-                    ? new \DateTime($data['updated']) 
+                settledAt: $status === TransactionStatus::STATUS_SETTLEMENT && isset($data['updated'])
+                    ? new \DateTime($data['updated'])
                     : null,
                 metadata: [
                     'provider' => 'xendit',
@@ -408,10 +407,9 @@ class XenditProvider implements PaymentProviderInterface
             ]);
 
             throw $e;
-            
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
             $duration = round((microtime(true) - $startTime) * 1000, 2);
-            
+
             Log::error('Xendit transaction status check failed: connection error', [
                 'provider' => 'xendit',
                 'transaction_id' => $transactionId,
@@ -420,10 +418,9 @@ class XenditProvider implements PaymentProviderInterface
             ]);
 
             throw ProviderException::networkError('xendit', $e);
-            
         } catch (\Exception $e) {
             $duration = round((microtime(true) - $startTime) * 1000, 2);
-            
+
             Log::error('Xendit transaction status check failed: unexpected error', [
                 'provider' => 'xendit',
                 'transaction_id' => $transactionId,
@@ -445,25 +442,26 @@ class XenditProvider implements PaymentProviderInterface
             // Xendit uses webhook token for verification
             // The signature is sent in the x-callback-token header
             $webhookToken = $credentials['webhook_token'] ?? null;
-            
-            if (!$webhookToken) {
+
+            if (! $webhookToken) {
                 Log::warning('Xendit webhook verification failed: missing webhook token', [
                     'provider' => 'xendit',
-                    'has_signature' => !empty($signature),
+                    'has_signature' => ! empty($signature),
                 ]);
+
                 return false;
             }
 
             // Xendit sends the webhook token directly in the header
             // Compare it with the stored token
             $isValid = hash_equals($webhookToken, $signature);
-            
+
             Log::info('Xendit webhook verification completed', [
                 'provider' => 'xendit',
                 'is_valid' => $isValid,
                 'external_id' => $payload['external_id'] ?? null,
             ]);
-            
+
             return $isValid;
 
         } catch (\Exception $e) {
@@ -472,7 +470,7 @@ class XenditProvider implements PaymentProviderInterface
                 'error' => $e->getMessage(),
                 'error_class' => get_class($e),
             ]);
-            
+
             return false;
         }
     }
@@ -484,7 +482,7 @@ class XenditProvider implements PaymentProviderInterface
     {
         try {
             $status = $this->mapXenditStatus($payload['status'] ?? 'ACTIVE');
-            
+
             // Extract paid_at timestamp if status is COMPLETED
             $paidAt = null;
             if ($status === TransactionStatus::STATUS_SETTLEMENT && isset($payload['updated'])) {
@@ -516,7 +514,7 @@ class XenditProvider implements PaymentProviderInterface
                     'original_status' => $payload['status'] ?? null,
                 ]
             );
-            
+
         } catch (\Exception $e) {
             Log::error('Xendit webhook payload parsing failed', [
                 'provider' => 'xendit',
@@ -524,7 +522,7 @@ class XenditProvider implements PaymentProviderInterface
                 'error_class' => get_class($e),
                 'payload_keys' => array_keys($payload),
             ]);
-            
+
             throw $e;
         }
     }
@@ -533,7 +531,7 @@ class XenditProvider implements PaymentProviderInterface
      * Sanitize error messages to remove sensitive information.
      * Removes API keys, tokens, and other credentials from error messages.
      *
-     * @param string $message The error message to sanitize
+     * @param  string  $message  The error message to sanitize
      * @return string The sanitized error message
      */
     private function sanitizeErrorMessage(string $message): string
@@ -541,25 +539,25 @@ class XenditProvider implements PaymentProviderInterface
         // Remove anything that looks like an API key or token
         // Xendit API keys typically start with xnd_
         $message = preg_replace('/xnd_[a-zA-Z0-9_-]+/', '[REDACTED_API_KEY]', $message);
-        
+
         // Remove bearer tokens
         $message = preg_replace('/Bearer\s+[a-zA-Z0-9_-]+/', 'Bearer [REDACTED_TOKEN]', $message);
-        
+
         // Remove basic auth credentials
         $message = preg_replace('/Basic\s+[a-zA-Z0-9+\/=]+/', 'Basic [REDACTED_CREDENTIALS]', $message);
-        
+
         // Remove anything that looks like a secret key or password
         $message = preg_replace('/(secret|password|key|token)[\s:=]+[^\s,}]+/i', '$1=[REDACTED]', $message);
-        
+
         // Remove webhook tokens
         $message = preg_replace('/webhook[_-]?token[\s:=]+[^\s,}]+/i', 'webhook_token=[REDACTED]', $message);
-        
+
         return $message;
     }
 
     /**
      * Map Xendit status codes to standard status.
-     * 
+     *
      * Xendit QR Code statuses:
      * - ACTIVE: QR code is active and awaiting payment
      * - COMPLETED: Payment has been received
@@ -577,12 +575,12 @@ class XenditProvider implements PaymentProviderInterface
 
     /**
      * Generate QR code image URL from QRIS string data.
-     * 
+     *
      * Xendit API returns qr_string (raw QRIS data), not an image URL.
      * This method converts the QRIS string to a displayable QR code image URL
      * using a QR code generator service.
      *
-     * @param string $qrString The raw QRIS string data from Xendit
+     * @param  string  $qrString  The raw QRIS string data from Xendit
      * @return string QR code image URL
      */
     private function generateQrCodeImageUrl(string $qrString): string
@@ -593,6 +591,7 @@ class XenditProvider implements PaymentProviderInterface
 
         // Use QR Server API to generate QR code image from QRIS string
         $encodedData = urlencode($qrString);
+
         return "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={$encodedData}";
     }
 }

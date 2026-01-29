@@ -2,15 +2,15 @@
 
 namespace App\Services;
 
+use App\DTOs\ValidationResult;
 use App\Models\PaymentProviderCredential;
 use App\Services\PaymentProviders\ProviderFactory;
-use App\DTOs\ValidationResult;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
  * Service for validating payment provider credentials.
- * 
+ *
  * Handles credential validation, connection status updates, and error capture.
  */
 class ProviderValidationService
@@ -26,8 +26,9 @@ class ProviderValidationService
     /**
      * Validate credentials by making a test API call to the provider.
      *
-     * @param PaymentProviderCredential $credential The credential to validate
+     * @param  PaymentProviderCredential  $credential  The credential to validate
      * @return ValidationResult The validation result
+     *
      * @throws RuntimeException If validation process fails
      */
     public function validateCredentials(PaymentProviderCredential $credential): ValidationResult
@@ -65,8 +66,8 @@ class ProviderValidationService
     /**
      * Update the connection status of a credential based on validation result.
      *
-     * @param PaymentProviderCredential $credential The credential to update
-     * @param ValidationResult $validationResult The validation result
+     * @param  PaymentProviderCredential  $credential  The credential to update
+     * @param  ValidationResult  $validationResult  The validation result
      * @return bool True if update was successful
      */
     public function updateConnectionStatus(
@@ -88,7 +89,7 @@ class ProviderValidationService
                 return true;
             });
         } catch (\Exception $e) {
-            \Log::error("Failed to update connection status", [
+            \Log::error('Failed to update connection status', [
                 'credential_id' => $credential->id,
                 'error' => $e->getMessage(),
             ]);
@@ -100,8 +101,8 @@ class ProviderValidationService
     /**
      * Capture and store provider error messages.
      *
-     * @param PaymentProviderCredential $credential The credential that failed validation
-     * @param string $errorMessage The error message from the provider
+     * @param  PaymentProviderCredential  $credential  The credential that failed validation
+     * @param  string  $errorMessage  The error message from the provider
      * @return bool True if error was captured successfully
      */
     public function captureProviderError(
@@ -119,7 +120,7 @@ class ProviderValidationService
                 return true;
             });
         } catch (\Exception $e) {
-            \Log::error("Failed to capture provider error", [
+            \Log::error('Failed to capture provider error', [
                 'credential_id' => $credential->id,
                 'error' => $e->getMessage(),
             ]);
@@ -132,7 +133,7 @@ class ProviderValidationService
      * Manually trigger revalidation of credentials.
      * This can be called by users to check if their credentials are still valid.
      *
-     * @param PaymentProviderCredential $credential The credential to revalidate
+     * @param  PaymentProviderCredential  $credential  The credential to revalidate
      * @return ValidationResult The validation result
      */
     public function revalidate(PaymentProviderCredential $credential): ValidationResult
@@ -151,7 +152,7 @@ class ProviderValidationService
      * Validate multiple credentials for a user.
      * Useful for batch validation operations.
      *
-     * @param \Illuminate\Database\Eloquent\Collection $credentials Collection of credentials
+     * @param  \Illuminate\Database\Eloquent\Collection  $credentials  Collection of credentials
      * @return array Array of validation results keyed by credential ID
      */
     public function validateMultiple($credentials): array
@@ -175,7 +176,7 @@ class ProviderValidationService
     /**
      * Check if credentials need revalidation and validate if necessary.
      *
-     * @param PaymentProviderCredential $credential The credential to check
+     * @param  PaymentProviderCredential  $credential  The credential to check
      * @return ValidationResult|null Validation result if revalidation was performed, null otherwise
      */
     public function validateIfNeeded(PaymentProviderCredential $credential): ?ValidationResult
@@ -190,7 +191,7 @@ class ProviderValidationService
     /**
      * Get validation status summary for a credential.
      *
-     * @param PaymentProviderCredential $credential The credential to check
+     * @param  PaymentProviderCredential  $credential  The credential to check
      * @return array Status summary with connection status, last validated time, and error
      */
     public function getValidationStatus(PaymentProviderCredential $credential): array

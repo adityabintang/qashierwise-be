@@ -17,7 +17,7 @@ return new class extends Migration
             $table->decimal('fee_percentage', 5, 4)->default(2.5000);
             $table->decimal('fee_amount', 15, 2);
             $table->timestamp('collected_at')->useCurrent();
-            
+
             // Indexes
             $table->index(['collected_at', 'fee_amount'], 'idx_fee_collection');
         });

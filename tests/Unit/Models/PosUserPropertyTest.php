@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Property-based tests for PosUser model
- * 
+ *
  * Feature: point-of-sale
  */
 class PosUserPropertyTest extends TestCase
@@ -20,7 +20,7 @@ class PosUserPropertyTest extends TestCase
     /**
      * Feature: point-of-sale, Property 14: Staff User Serialization Round-Trip
      * Validates: Requirements 7.5, 7.6
-     * 
+     *
      * For any valid PosUser object, serializing to JSON and then deserializing back
      * SHALL produce an equivalent PosUser object with role information.
      */

@@ -19,11 +19,11 @@ class CheckWebAuth
         // For web routes, we'll inject JavaScript to check localStorage token
         // If no token or invalid, redirect to login
         $response = $next($request);
-        
+
         // Only inject script for HTML responses
-        if ($response->headers->get('Content-Type') && 
+        if ($response->headers->get('Content-Type') &&
             str_contains($response->headers->get('Content-Type'), 'text/html')) {
-            
+
             $authCheckScript = "
             <script>
                 (function() {
@@ -57,12 +57,12 @@ class CheckWebAuth
                 })();
             </script>
             ";
-            
+
             $content = $response->getContent();
-            $content = str_replace('</head>', $authCheckScript . '</head>', $content);
+            $content = str_replace('</head>', $authCheckScript.'</head>', $content);
             $response->setContent($content);
         }
-        
+
         return $response;
     }
 }

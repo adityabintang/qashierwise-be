@@ -25,9 +25,21 @@ class PosUserController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $posUsers = PosUser::with(['user', 'store', 'role'])
-            ->when($request->input('store_id'), fn($q, $storeId) => $q->where('store_id', $storeId))
-            ->when($request->boolean('active_only', false), fn($q) => $q->where('is_active', true))
+        $user = $request->user();
+
+        $query = PosUser::with(['user', 'store', 'role']);
+
+        // Use effective user ID (master admin ID for sub-accounts)
+        $effectiveUserId = $user->getEffectiveUserId();
+
+        // Show POS users from stores owned by the effective user (master admin)
+        $query->whereHas('store', function ($q) use ($effectiveUserId) {
+            $q->where('user_id', $effectiveUserId);
+        });
+
+        $posUsers = $query
+            ->when($request->input('store_id'), fn ($q, $storeId) => $q->where('store_id', $storeId))
+            ->when($request->boolean('active_only', false), fn ($q) => $q->where('is_active', true))
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -52,6 +64,7 @@ class PosUserController extends Controller
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
+            'is_master_admin' => false,
         ]);
 
         return response()->json([
@@ -62,7 +75,7 @@ class PosUserController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'email_verified_at' => $user->email_verified_at,
-                'is_email_verified' => !is_null($user->email_verified_at),
+                'is_email_verified' => ! is_null($user->email_verified_at),
             ],
         ], 201);
     }
@@ -134,7 +147,7 @@ class PosUserController extends Controller
 
         $isValid = $this->otpService->verify($email, $code, $type);
 
-        if (!$isValid) {
+        if (! $isValid) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid or expired OTP code.',
@@ -151,7 +164,7 @@ class PosUserController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'email_verified_at' => $user->email_verified_at,
-                'is_email_verified' => !is_null($user->email_verified_at),
+                'is_email_verified' => ! is_null($user->email_verified_at),
             ],
         ]);
     }
@@ -169,7 +182,7 @@ class PosUserController extends Controller
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
-                    'is_email_verified' => !is_null($user->email_verified_at),
+                    'is_email_verified' => ! is_null($user->email_verified_at),
                 ];
             });
 
@@ -207,6 +220,18 @@ class PosUserController extends Controller
 
         $posUser = PosUser::create($validated);
 
+        // Assign role to user via Spatie with proper guard
+        $role = \Spatie\Permission\Models\Role::where('id', $validated['role_id'])
+            ->where('guard_name', 'sanctum')
+            ->first();
+
+        if ($role) {
+            $user = $posUser->user;
+            // Ensure guard is set before assigning role
+            $user->guard_name = 'sanctum';
+            $user->assignRole($role->name);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'POS user created successfully',
@@ -217,8 +242,17 @@ class PosUserController extends Controller
     /**
      * Display the specified POS user.
      */
-    public function show(PosUser $posUser): JsonResponse
+    public function show(PosUser $posUser, Request $request): JsonResponse
     {
+        $effectiveUserId = $request->user()->getEffectiveUserId();
+
+        if ($posUser->store->user_id !== $effectiveUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this resource.',
+            ], 403);
+        }
+
         return response()->json([
             'success' => true,
             'data' => $posUser->load(['user', 'store', 'role']),
@@ -230,11 +264,34 @@ class PosUserController extends Controller
      */
     public function update(Request $request, PosUser $posUser): JsonResponse
     {
+        $effectiveUserId = auth()->user()->getEffectiveUserId();
+
+        if ($posUser->store->user_id !== $effectiveUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this resource.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'store_id' => 'sometimes|exists:stores,id',
             'role_id' => 'sometimes|exists:roles,id',
             'is_active' => 'sometimes|boolean',
         ]);
+
+        // If role_id is being updated, sync with Spatie
+        if (isset($validated['role_id'])) {
+            $role = \Spatie\Permission\Models\Role::where('id', $validated['role_id'])
+                ->where('guard_name', 'sanctum')
+                ->first();
+
+            if ($role) {
+                $user = $posUser->user;
+                // Ensure guard is set before syncing role
+                $user->guard_name = 'sanctum';
+                $user->syncRoles([$role->name]);
+            }
+        }
 
         $posUser->update($validated);
 
@@ -248,8 +305,17 @@ class PosUserController extends Controller
     /**
      * Deactivate the specified POS user.
      */
-    public function deactivate(PosUser $posUser): JsonResponse
+    public function deactivate(PosUser $posUser, Request $request): JsonResponse
     {
+        $effectiveUserId = $request->user()->getEffectiveUserId();
+
+        if ($posUser->store->user_id !== $effectiveUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this resource.',
+            ], 403);
+        }
+
         $posUser->update(['is_active' => false]);
 
         return response()->json([
@@ -262,8 +328,17 @@ class PosUserController extends Controller
     /**
      * Activate the specified POS user.
      */
-    public function activate(PosUser $posUser): JsonResponse
+    public function activate(PosUser $posUser, Request $request): JsonResponse
     {
+        $effectiveUserId = $request->user()->getEffectiveUserId();
+
+        if ($posUser->store->user_id !== $effectiveUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this resource.',
+            ], 403);
+        }
+
         $posUser->update(['is_active' => true]);
 
         return response()->json([
@@ -275,14 +350,32 @@ class PosUserController extends Controller
 
     /**
      * Remove the specified POS user.
+     * Also deletes the associated User account so they cannot login anymore.
      */
-    public function destroy(PosUser $posUser): JsonResponse
+    public function destroy(PosUser $posUser, Request $request): JsonResponse
     {
+        $effectiveUserId = $request->user()->getEffectiveUserId();
+
+        if ($posUser->store->user_id !== $effectiveUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this resource.',
+            ], 403);
+        }
+
+        $user = $posUser->user;
+
+        // Delete POS user first
         $posUser->delete();
+
+        // Then delete the User account (if not master admin)
+        if ($user && ! $user->isMasterAdmin()) {
+            $user->delete();
+        }
 
         return response()->json([
             'success' => true,
-            'message' => 'POS user deleted successfully',
+            'message' => 'POS user and associated account deleted successfully',
         ]);
     }
 }

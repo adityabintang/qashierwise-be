@@ -19,7 +19,7 @@ return [
         'title' => 'Privacy Policy',
         'meta_title' => 'Privacy Policy - QashierWise',
         'last_updated_date' => 'November 27, 2025',
-        
+
         'section_1' => [
             'title' => 'Information We Collect',
             'intro' => 'QashierWise collects information you provide to us when using our services, including:',
@@ -115,7 +115,7 @@ return [
         'title' => 'Terms of Service',
         'meta_title' => 'Terms of Service - QashierWise',
         'last_updated_date' => 'February 10, 2025',
-        
+
         'intro' => [
             'title' => 'Terms and Conditions for Using QashierWise Products',
             'paragraph_1' => 'Thank you for trusting QashierWise products. By using the services and/or products provided by "QashierWise", you, the company and/or business that has granted permission or authorization to represent you ("User") agree to these Terms and Conditions for Using QashierWise Products as well as other related terms, policies and documentation provided by QashierWise from time to time ("Terms and Conditions").',
@@ -125,7 +125,7 @@ return [
         'section_1' => [
             'title' => 'General Terms',
             'intro' => 'These General Terms apply to all Users who use the Products (as defined below) provided by QashierWise.',
-            
+
             'subsection_a' => [
                 'title' => 'General Definitions',
                 'items' => [
@@ -195,7 +195,7 @@ return [
         'title' => 'Refund Policy',
         'meta_title' => 'Refund Policy - QashierWise',
         'last_updated_date' => 'January 23, 2026',
-        
+
         'intro' => 'At QashierWise, we are committed to providing the best service to our customers. This refund policy explains your rights regarding refunds for QashierWise subscription services.',
 
         'section_1' => [

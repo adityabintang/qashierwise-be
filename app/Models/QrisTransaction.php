@@ -16,16 +16,22 @@ class QrisTransaction extends Model
      * Transaction status constants.
      */
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_SETTLEMENT = 'settlement';
+
     public const STATUS_EXPIRE = 'expire';
+
     public const STATUS_CANCEL = 'cancel';
 
     /**
      * Payment provider constants.
      */
     public const PROVIDER_DOKU = 'doku';
+
     public const PROVIDER_XENDIT = 'xendit';
+
     public const PROVIDER_MIDTRANS = 'midtrans';
+
     public const PROVIDER_DUITKU = 'duitku';
 
     /**
@@ -117,6 +123,7 @@ class QrisTransaction extends Model
     {
         $timestamp = now()->format('YmdHis');
         $random = strtoupper(Str::random(8));
+
         return "QRIS-{$timestamp}-{$random}";
     }
 
@@ -144,7 +151,7 @@ class QrisTransaction extends Model
         if ($this->expires_at === null) {
             return false;
         }
-        
+
         return now()->isAfter($this->expires_at);
     }
 
@@ -153,7 +160,7 @@ class QrisTransaction extends Model
      */
     public function canBeUsed(): bool
     {
-        return $this->status === self::STATUS_PENDING && !$this->isExpired();
+        return $this->status === self::STATUS_PENDING && ! $this->isExpired();
     }
 
     /**
@@ -195,7 +202,7 @@ class QrisTransaction extends Model
     {
         $this->status = self::STATUS_SETTLEMENT;
         $this->settled_at = now();
-        
+
         if ($midtransTransactionId !== null) {
             $this->midtrans_transaction_id = $midtransTransactionId;
         }
@@ -225,7 +232,7 @@ class QrisTransaction extends Model
         if ($this->expires_at === null || $this->isExpired()) {
             return 0;
         }
-        
+
         return (int) now()->diffInSeconds($this->expires_at, false);
     }
 
@@ -267,7 +274,7 @@ class QrisTransaction extends Model
      */
     public function getProviderDisplayName(): string
     {
-        return match($this->provider) {
+        return match ($this->provider) {
             self::PROVIDER_DOKU => 'Doku',
             self::PROVIDER_XENDIT => 'Xendit',
             self::PROVIDER_MIDTRANS => 'Midtrans',

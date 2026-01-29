@@ -14,12 +14,13 @@ class MidtransSnapServiceTest extends TestCase
     use RefreshDatabase;
 
     private MidtransSnapService $service;
+
     private User $user;
 
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Create test user
         $this->user = User::factory()->create([
             'name' => 'Test User',
@@ -43,7 +44,7 @@ class MidtransSnapServiceTest extends TestCase
             ],
         ]);
 
-        $this->service = new MidtransSnapService();
+        $this->service = new MidtransSnapService;
     }
 
     public function test_is_configured_returns_true_when_keys_are_set(): void
@@ -54,16 +55,16 @@ class MidtransSnapServiceTest extends TestCase
     public function test_is_configured_returns_false_when_server_key_is_missing(): void
     {
         Config::set('midtrans.server_key', '');
-        $service = new MidtransSnapService();
-        
+        $service = new MidtransSnapService;
+
         $this->assertFalse($service->isConfigured());
     }
 
     public function test_is_configured_returns_false_when_client_key_is_missing(): void
     {
         Config::set('midtrans.client_key', '');
-        $service = new MidtransSnapService();
-        
+        $service = new MidtransSnapService;
+
         $this->assertFalse($service->isConfigured());
     }
 
@@ -71,15 +72,15 @@ class MidtransSnapServiceTest extends TestCase
     {
         Config::set('midtrans.server_key', '');
         Config::set('midtrans.client_key', '');
-        $service = new MidtransSnapService();
-        
+        $service = new MidtransSnapService;
+
         $this->assertFalse($service->isConfigured());
     }
 
     public function test_create_subscription_snap_token_returns_null_for_invalid_plan(): void
     {
         $result = $this->service->createSubscriptionSnapToken($this->user, 'invalid_plan');
-        
+
         $this->assertNull($result);
     }
 
@@ -133,7 +134,7 @@ class MidtransSnapServiceTest extends TestCase
         Http::fake([
             'app.sandbox.midtrans.com/snap/v1/transactions' => function ($request) {
                 $body = json_decode($request->body(), true);
-                
+
                 // Verify payload structure
                 $this->assertArrayHasKey('transaction_details', $body);
                 $this->assertArrayHasKey('item_details', $body);
@@ -141,25 +142,25 @@ class MidtransSnapServiceTest extends TestCase
                 $this->assertArrayHasKey('custom_field1', $body);
                 $this->assertArrayHasKey('custom_field2', $body);
                 $this->assertArrayHasKey('custom_field3', $body);
-                
+
                 // Verify transaction details
                 $this->assertEquals(99000, $body['transaction_details']['gross_amount']);
                 $this->assertStringStartsWith('SUB-', $body['transaction_details']['order_id']);
-                
+
                 // Verify item details
                 $this->assertEquals('standard', $body['item_details'][0]['id']);
                 $this->assertEquals(99000, $body['item_details'][0]['price']);
                 $this->assertEquals(1, $body['item_details'][0]['quantity']);
-                
+
                 // Verify customer details
                 $this->assertEquals('Test User', $body['customer_details']['first_name']);
                 $this->assertEquals('test@example.com', $body['customer_details']['email']);
-                
+
                 // Verify custom fields
                 $this->assertEquals('standard', $body['custom_field1']);
                 $this->assertEquals('subscription', $body['custom_field2']);
                 $this->assertEquals((string) $this->user->id, $body['custom_field3']);
-                
+
                 return Http::response([
                     'token' => 'test_token',
                     'redirect_url' => 'https://test.com',
@@ -173,7 +174,7 @@ class MidtransSnapServiceTest extends TestCase
     public function test_create_subscription_snap_token_uses_production_url_when_configured(): void
     {
         Config::set('midtrans.is_production', true);
-        $service = new MidtransSnapService();
+        $service = new MidtransSnapService;
 
         Http::fake([
             'app.midtrans.com/snap/v1/transactions' => Http::response([

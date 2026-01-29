@@ -9,7 +9,7 @@ use Tests\TestCase;
 
 /**
  * Property-based tests for WhatsApp Embedded Signup configuration
- * 
+ *
  * Feature: whatsapp-embedded-signup
  */
 class WhatsAppEmbeddedSignupConfigPropertyTest extends TestCase
@@ -26,15 +26,15 @@ class WhatsAppEmbeddedSignupConfigPropertyTest extends TestCase
         $appSecret = config('whatsapp.embedded_signup.app_secret');
         $configId = config('whatsapp.embedded_signup.config_id');
 
-        return !empty($appId) && !empty($appSecret) && !empty($configId);
+        return ! empty($appId) && ! empty($appSecret) && ! empty($configId);
     }
 
     /**
      * Feature: whatsapp-embedded-signup, Property 12: Missing Config Disables Feature
      * Validates: Requirements 6.2
-     * 
-     * For any application startup where WHATSAPP_APP_ID, WHATSAPP_APP_SECRET, 
-     * or WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID is missing, the Embedded Signup 
+     *
+     * For any application startup where WHATSAPP_APP_ID, WHATSAPP_APP_SECRET,
+     * or WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID is missing, the Embedded Signup
      * feature SHALL be disabled.
      */
     #[Test]
@@ -76,7 +76,7 @@ class WhatsAppEmbeddedSignupConfigPropertyTest extends TestCase
                 $this->assertFalse(
                     $isEnabled,
                     sprintf(
-                        'Embedded Signup should be disabled when config is incomplete. ' .
+                        'Embedded Signup should be disabled when config is incomplete. '.
                         'app_id=%s, app_secret=%s, config_id=%s',
                         var_export($configValues['app_id'], true),
                         var_export($configValues['app_secret'], true),
@@ -89,7 +89,7 @@ class WhatsAppEmbeddedSignupConfigPropertyTest extends TestCase
     /**
      * Feature: whatsapp-embedded-signup, Property 12: Missing Config Disables Feature (Inverse)
      * Validates: Requirements 6.2
-     * 
+     *
      * For any application startup where all required config values are present,
      * the Embedded Signup feature SHALL be enabled.
      */
@@ -122,7 +122,7 @@ class WhatsAppEmbeddedSignupConfigPropertyTest extends TestCase
                 $this->assertTrue(
                     $isEnabled,
                     sprintf(
-                        'Embedded Signup should be enabled when config is complete. ' .
+                        'Embedded Signup should be enabled when config is complete. '.
                         'app_id=%s, app_secret=%s, config_id=%s',
                         $appId,
                         $appSecret,
@@ -135,7 +135,7 @@ class WhatsAppEmbeddedSignupConfigPropertyTest extends TestCase
     /**
      * Feature: whatsapp-embedded-signup, Property 12: Missing Config Disables Feature
      * Validates: Requirements 6.2
-     * 
+     *
      * Test with randomly generated strings to ensure robustness.
      */
     #[Test]
@@ -178,7 +178,7 @@ class WhatsAppEmbeddedSignupConfigPropertyTest extends TestCase
                 $this->assertFalse(
                     $isEnabled,
                     sprintf(
-                        'Embedded Signup should be disabled when any config is missing. ' .
+                        'Embedded Signup should be disabled when any config is missing. '.
                         'app_id=%s, app_secret=%s, config_id=%s',
                         var_export($appId, true),
                         var_export($appSecret, true),
@@ -191,7 +191,7 @@ class WhatsAppEmbeddedSignupConfigPropertyTest extends TestCase
     /**
      * Feature: whatsapp-embedded-signup, Property 12: ES Version Configuration
      * Validates: Requirements 6.3
-     * 
+     *
      * The ES version SHALL be set to 'v4' for coexistence support.
      */
     #[Test]

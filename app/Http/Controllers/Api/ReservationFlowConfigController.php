@@ -9,7 +9,6 @@ use App\Models\ReservationFlowConfig;
 use App\Models\Table;
 use App\Services\WhatsAppFlowService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Auth;
 
 class ReservationFlowConfigController extends Controller
 {
@@ -22,14 +21,15 @@ class ReservationFlowConfigController extends Controller
      */
     public function show(): JsonResponse
     {
-        $config = ReservationFlowConfig::getOrCreateForUser(Auth::id());
+        $effectiveUserId = auth()->user()->getEffectiveUserId();
+        $config = ReservationFlowConfig::getOrCreateForUser($effectiveUserId);
 
         // Get available tables and products for selection
-        $tables = Table::where('user_id', Auth::id())
+        $tables = Table::where('user_id', $effectiveUserId)
             ->orderBy('number')
             ->get(['id', 'number', 'capacity', 'status']);
 
-        $products = Product::where('user_id', Auth::id())
+        $products = Product::where('user_id', $effectiveUserId)
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'price', 'category_id']);
@@ -54,11 +54,11 @@ class ReservationFlowConfigController extends Controller
      */
     public function update(UpdateReservationFlowConfigRequest $request): JsonResponse
     {
-        $config = ReservationFlowConfig::getOrCreateForUser(Auth::id());
+        $config = ReservationFlowConfig::getOrCreateForUser(auth()->user()->getEffectiveUserId());
 
         // Validate table IDs belong to user
         if ($request->has('available_table_ids')) {
-            $validTableIds = Table::where('user_id', Auth::id())
+            $validTableIds = Table::where('user_id', auth()->user()->getEffectiveUserId())
                 ->whereIn('id', $request->available_table_ids)
                 ->pluck('id')
                 ->toArray();
@@ -67,7 +67,7 @@ class ReservationFlowConfigController extends Controller
 
         // Validate product IDs belong to user
         if ($request->has('available_product_ids')) {
-            $validProductIds = Product::where('user_id', Auth::id())
+            $validProductIds = Product::where('user_id', auth()->user()->getEffectiveUserId())
                 ->whereIn('id', $request->available_product_ids)
                 ->pluck('id')
                 ->toArray();
@@ -76,7 +76,7 @@ class ReservationFlowConfigController extends Controller
 
         // Ensure at least one payment type is enabled
         if ($request->has('allow_full_payment') && $request->has('allow_dp_payment')) {
-            if (!$request->allow_full_payment && !$request->allow_dp_payment) {
+            if (! $request->allow_full_payment && ! $request->allow_dp_payment) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Minimal satu tipe pembayaran harus diaktifkan',
@@ -86,7 +86,7 @@ class ReservationFlowConfigController extends Controller
 
         // Ensure at least one payment method is enabled if payment is enabled
         if ($request->has('enable_qris') && $request->has('enable_cash')) {
-            if ($config->enable_payment && !$request->enable_qris && !$request->enable_cash) {
+            if ($config->enable_payment && ! $request->enable_qris && ! $request->enable_cash) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Minimal satu metode pembayaran harus diaktifkan',
@@ -99,7 +99,7 @@ class ReservationFlowConfigController extends Controller
         // If flow exists, update the flow JSON to reflect config changes
         if ($config->hasFlow()) {
             try {
-                $this->flowService->updateFlowJson(Auth::id(), $config->flow_id, $config);
+                $this->flowService->updateFlowJson(auth()->user()->getEffectiveUserId(), $config->flow_id, $config);
             } catch (\Exception $e) {
                 \Log::warning('Failed to update flow JSON after config change', [
                     'error' => $e->getMessage(),
@@ -125,9 +125,9 @@ class ReservationFlowConfigController extends Controller
      */
     public function regenerateFlow(): JsonResponse
     {
-        $config = ReservationFlowConfig::getOrCreateForUser(Auth::id());
+        $config = ReservationFlowConfig::getOrCreateForUser(auth()->user()->getEffectiveUserId());
 
-        if (!$config->hasFlow()) {
+        if (! $config->hasFlow()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Belum ada flow yang dibuat. Silakan buat flow terlebih dahulu.',
@@ -135,7 +135,7 @@ class ReservationFlowConfigController extends Controller
         }
 
         try {
-            $this->flowService->updateFlowJson(Auth::id(), $config->flow_id, $config);
+            $this->flowService->updateFlowJson(auth()->user()->getEffectiveUserId(), $config->flow_id, $config);
 
             return response()->json([
                 'success' => true,
@@ -155,7 +155,7 @@ class ReservationFlowConfigController extends Controller
      */
     public function preview(): JsonResponse
     {
-        $config = ReservationFlowConfig::getOrCreateForUser(Auth::id());
+        $config = ReservationFlowConfig::getOrCreateForUser(auth()->user()->getEffectiveUserId());
 
         // Build preview data
         $preview = [
@@ -194,7 +194,7 @@ class ReservationFlowConfigController extends Controller
      */
     public function publish(): JsonResponse
     {
-        $config = ReservationFlowConfig::getOrCreateForUser(Auth::id());
+        $config = ReservationFlowConfig::getOrCreateForUser(auth()->user()->getEffectiveUserId());
 
         try {
             // Check if private key is configured
@@ -217,8 +217,8 @@ class ReservationFlowConfigController extends Controller
             }
 
             // Create flow if not exists
-            if (!$config->hasFlow()) {
-                $result = $this->flowService->createReservationFlowWithConfig(Auth::id(), $config);
+            if (! $config->hasFlow()) {
+                $result = $this->flowService->createReservationFlowWithConfig(auth()->user()->getEffectiveUserId(), $config);
                 $config->update([
                     'flow_id' => $result['id'],
                     'flow_status' => ReservationFlowConfig::STATUS_DRAFT,
@@ -226,7 +226,7 @@ class ReservationFlowConfigController extends Controller
             }
 
             // Publish the flow (this will auto-configure endpoint URI and upload public key)
-            $published = $this->flowService->publishFlow(Auth::id(), $config->flow_id);
+            $published = $this->flowService->publishFlow(auth()->user()->getEffectiveUserId(), $config->flow_id);
 
             if ($published) {
                 $config->update(['flow_status' => ReservationFlowConfig::STATUS_PUBLISHED]);
@@ -240,12 +240,12 @@ class ReservationFlowConfigController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal mempublish flow. Pastikan: 1) Endpoint ' . $appUrl . '/api/whatsapp/flow/endpoint dapat diakses dari internet, 2) Public key sudah ter-upload ke Meta. Untuk sandbox account, coba test dengan mode DRAFT terlebih dahulu.',
+                'message' => 'Gagal mempublish flow. Pastikan: 1) Endpoint '.$appUrl.'/api/whatsapp/flow/endpoint dapat diakses dari internet, 2) Public key sudah ter-upload ke Meta. Untuk sandbox account, coba test dengan mode DRAFT terlebih dahulu.',
             ], 500);
 
         } catch (\Exception $e) {
             \Log::error('Flow publish error', [
-                'user_id' => Auth::id(),
+                'user_id' => auth()->user()->getEffectiveUserId(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -262,9 +262,9 @@ class ReservationFlowConfigController extends Controller
      */
     public function sync(): JsonResponse
     {
-        $config = ReservationFlowConfig::getOrCreateForUser(Auth::id());
+        $config = ReservationFlowConfig::getOrCreateForUser(auth()->user()->getEffectiveUserId());
 
-        if (!$config->hasFlow()) {
+        if (! $config->hasFlow()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Belum ada flow yang dibuat',
@@ -272,7 +272,7 @@ class ReservationFlowConfigController extends Controller
         }
 
         try {
-            $flowData = $this->flowService->getFlow(Auth::id(), $config->flow_id);
+            $flowData = $this->flowService->getFlow(auth()->user()->getEffectiveUserId(), $config->flow_id);
 
             if ($flowData) {
                 $status = match ($flowData['status'] ?? '') {
@@ -311,11 +311,11 @@ class ReservationFlowConfigController extends Controller
      */
     public function destroy(): JsonResponse
     {
-        $config = ReservationFlowConfig::getOrCreateForUser(Auth::id());
+        $config = ReservationFlowConfig::getOrCreateForUser(auth()->user()->getEffectiveUserId());
 
         if ($config->hasFlow()) {
             try {
-                $this->flowService->deleteFlow(Auth::id(), $config->flow_id);
+                $this->flowService->deleteFlow(auth()->user()->getEffectiveUserId(), $config->flow_id);
             } catch (\Exception $e) {
                 // Log but continue - flow might already be deleted
             }
@@ -343,12 +343,12 @@ class ReservationFlowConfigController extends Controller
             'phone' => 'required|string',
         ]);
 
-        $config = ReservationFlowConfig::getOrCreateForUser(Auth::id());
+        $config = ReservationFlowConfig::getOrCreateForUser(auth()->user()->getEffectiveUserId());
 
-        if (!$config->hasFlow()) {
+        if (! $config->hasFlow()) {
             // Create flow if not exists
             try {
-                $result = $this->flowService->createReservationFlowWithConfig(Auth::id(), $config);
+                $result = $this->flowService->createReservationFlowWithConfig(auth()->user()->getEffectiveUserId(), $config);
                 $config->update([
                     'flow_id' => $result['id'],
                     'flow_status' => ReservationFlowConfig::STATUS_DRAFT,
@@ -357,7 +357,7 @@ class ReservationFlowConfigController extends Controller
             } catch (\Exception $e) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Gagal membuat flow: ' . $e->getMessage(),
+                    'message' => 'Gagal membuat flow: '.$e->getMessage(),
                 ], 500);
             }
         }
@@ -366,20 +366,20 @@ class ReservationFlowConfigController extends Controller
             // Send flow (works for both DRAFT and PUBLISHED)
             // Note: DRAFT flows will show a warning banner on the user's device
             $result = $this->flowService->sendReservationFlowWithConfig(
-                Auth::id(),
+                auth()->user()->getEffectiveUserId(),
                 $request->phone,
                 $config
             );
 
-            $statusMessage = $config->isPublished() 
-                ? 'Flow reservasi berhasil dikirim' 
+            $statusMessage = $config->isPublished()
+                ? 'Flow reservasi berhasil dikirim'
                 : 'Flow DRAFT berhasil dikirim (akan tampil dengan banner peringatan untuk testing)';
 
             return response()->json([
                 'success' => true,
                 'message' => $statusMessage,
                 'data' => $result,
-                'is_draft' => !$config->isPublished(),
+                'is_draft' => ! $config->isPublished(),
             ]);
 
         } catch (\Exception $e) {
@@ -394,11 +394,11 @@ class ReservationFlowConfigController extends Controller
 
     private function getTablesForPreview(ReservationFlowConfig $config): array
     {
-        $query = Table::where('user_id', Auth::id())
+        $query = Table::where('user_id', auth()->user()->getEffectiveUserId())
             ->where('status', Table::STATUS_AVAILABLE)
             ->orderBy('number');
 
-        if (!empty($config->available_table_ids)) {
+        if (! empty($config->available_table_ids)) {
             $query->whereIn('id', $config->available_table_ids);
         }
 
@@ -410,17 +410,17 @@ class ReservationFlowConfigController extends Controller
 
     private function getProductsForPreview(ReservationFlowConfig $config): array
     {
-        $query = Product::where('user_id', Auth::id())
+        $query = Product::where('user_id', auth()->user()->getEffectiveUserId())
             ->where('is_active', true)
             ->orderBy('name');
 
-        if (!empty($config->available_product_ids)) {
+        if (! empty($config->available_product_ids)) {
             $query->whereIn('id', $config->available_product_ids);
         }
 
         return $query->get()->map(fn ($product) => [
             'id' => (string) $product->id,
-            'title' => "{$product->name} - Rp" . number_format($product->price, 0, ',', '.'),
+            'title' => "{$product->name} - Rp".number_format($product->price, 0, ',', '.'),
         ])->toArray();
     }
 }

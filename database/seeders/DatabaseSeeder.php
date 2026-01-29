@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -15,6 +14,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // No default seeding - users should register through the application
+        // Seed permissions and roles for Laravel-Permission
+        $this->call([
+            PermissionSeeder::class,
+            RoleSeeder::class,
+        ]);
     }
 }

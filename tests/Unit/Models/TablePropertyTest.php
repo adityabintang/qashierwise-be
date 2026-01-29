@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Property-based tests for Table model
- * 
+ *
  * Feature: point-of-sale
  */
 class TablePropertyTest extends TestCase
@@ -20,7 +20,7 @@ class TablePropertyTest extends TestCase
     /**
      * Feature: point-of-sale, Property 13: Table Serialization Round-Trip
      * Validates: Requirements 6.5, 6.6
-     * 
+     *
      * For any valid Table object, serializing to JSON and then deserializing back
      * SHALL produce an equivalent Table object with identical field values.
      */

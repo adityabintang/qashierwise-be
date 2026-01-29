@@ -13,13 +13,13 @@ use Tests\TestCase;
 
 /**
  * Property-based tests for EmbeddedSignupService
- * 
+ *
  * Feature: whatsapp-embedded-signup
  */
 class EmbeddedSignupServicePropertyTest extends TestCase
 {
-    use TestTrait;
     use RefreshDatabase;
+    use TestTrait;
 
     /**
      * Generate a valid phone number ID (numeric string).
@@ -47,23 +47,24 @@ class EmbeddedSignupServicePropertyTest extends TestCase
         for ($i = 0; $i < 100; $i++) {
             $token .= $chars[rand(0, strlen($chars) - 1)];
         }
+
         return $token;
     }
 
     /**
      * Feature: whatsapp-embedded-signup, Property 1: Credential Storage Completeness
      * Validates: Requirements 2.1, 2.4
-     * 
-     * For any valid credentials response from Meta API containing phone_number_id, 
-     * waba_id, access_token, display_name, verified_name, and quality_rating, 
-     * storing these credentials SHALL result in a WhatsAppAccount record 
+     *
+     * For any valid credentials response from Meta API containing phone_number_id,
+     * waba_id, access_token, display_name, verified_name, and quality_rating,
+     * storing these credentials SHALL result in a WhatsAppAccount record
      * containing all these fields with correct values.
      */
     #[Test]
     public function credential_storage_contains_all_required_fields(): void
     {
         $qualityRatings = ['GREEN', 'YELLOW', 'RED'];
-        
+
         $this
             ->limitTo(100)
             ->forAll(
@@ -72,20 +73,20 @@ class EmbeddedSignupServicePropertyTest extends TestCase
             ->then(function (string $qualityRating) {
                 // Create a user
                 $user = User::factory()->create();
-                
+
                 // Generate credentials
                 $credentials = [
                     'phone_number_id' => $this->generatePhoneNumberId(),
                     'waba_id' => $this->generateWabaId(),
                     'access_token' => $this->generateAccessToken(),
-                    'display_name' => '+1 555 ' . rand(100, 999) . ' ' . rand(1000, 9999),
-                    'verified_name' => 'Test Business ' . uniqid(),
+                    'display_name' => '+1 555 '.rand(100, 999).' '.rand(1000, 9999),
+                    'verified_name' => 'Test Business '.uniqid(),
                     'quality_rating' => $qualityRating,
                     'coexistence_enabled' => true,
                 ];
 
                 // Store credentials using the service
-                $service = new EmbeddedSignupService();
+                $service = new EmbeddedSignupService;
                 $account = $service->storeCredentials($user->id, $credentials);
 
                 // Property: All required fields must be stored correctly
@@ -115,12 +116,11 @@ class EmbeddedSignupServicePropertyTest extends TestCase
             });
     }
 
-
     /**
      * Feature: whatsapp-embedded-signup, Property 3: Upsert Prevents Duplicates
      * Validates: Requirements 2.3
-     * 
-     * For any user who already has a WhatsAppAccount record, storing new credentials 
+     *
+     * For any user who already has a WhatsAppAccount record, storing new credentials
      * SHALL result in exactly one WhatsAppAccount record for that user (update, not insert).
      */
     #[Test]
@@ -134,7 +134,7 @@ class EmbeddedSignupServicePropertyTest extends TestCase
             ->then(function (int $storeCount) {
                 // Create a user
                 $user = User::factory()->create();
-                $service = new EmbeddedSignupService();
+                $service = new EmbeddedSignupService;
 
                 // Store credentials multiple times
                 for ($i = 0; $i < $storeCount; $i++) {
@@ -142,8 +142,8 @@ class EmbeddedSignupServicePropertyTest extends TestCase
                         'phone_number_id' => $this->generatePhoneNumberId(),
                         'waba_id' => $this->generateWabaId(),
                         'access_token' => $this->generateAccessToken(),
-                        'display_name' => '+1 555 ' . rand(100, 999) . ' ' . rand(1000, 9999),
-                        'verified_name' => 'Test Business ' . uniqid(),
+                        'display_name' => '+1 555 '.rand(100, 999).' '.rand(1000, 9999),
+                        'verified_name' => 'Test Business '.uniqid(),
                         'quality_rating' => 'GREEN',
                         'coexistence_enabled' => true,
                     ];
@@ -153,7 +153,7 @@ class EmbeddedSignupServicePropertyTest extends TestCase
 
                 // Property: There should be exactly ONE account for this user
                 $accountCount = WhatsAppAccount::where('user_id', $user->id)->count();
-                
+
                 $this->assertEquals(
                     1,
                     $accountCount,
@@ -169,7 +169,7 @@ class EmbeddedSignupServicePropertyTest extends TestCase
     /**
      * Feature: whatsapp-embedded-signup, Property 1: Credential Storage Completeness
      * Validates: Requirements 2.1, 2.4
-     * 
+     *
      * Test that credentials with various display name formats are stored correctly.
      */
     #[Test]
@@ -190,7 +190,7 @@ class EmbeddedSignupServicePropertyTest extends TestCase
             )
             ->then(function (string $displayName) {
                 $user = User::factory()->create();
-                $service = new EmbeddedSignupService();
+                $service = new EmbeddedSignupService;
 
                 $credentials = [
                     'phone_number_id' => $this->generatePhoneNumberId(),

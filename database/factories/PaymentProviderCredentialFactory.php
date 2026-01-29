@@ -16,8 +16,8 @@ class PaymentProviderCredentialFactory extends Factory
             'user_id' => User::factory(),
             'provider' => 'midtrans',
             'credentials_encrypted' => encrypt(json_encode([
-                'server_key' => 'test-server-key-' . fake()->uuid(),
-                'client_key' => 'test-client-key-' . fake()->uuid(),
+                'server_key' => 'test-server-key-'.fake()->uuid(),
+                'client_key' => 'test-client-key-'.fake()->uuid(),
             ])),
             'is_active' => false,
             'connection_status' => 'pending',
@@ -56,8 +56,8 @@ class PaymentProviderCredentialFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'provider' => 'xendit',
             'credentials_encrypted' => encrypt(json_encode([
-                'api_key' => 'test-api-key-' . fake()->uuid(),
-                'webhook_token' => 'test-webhook-token-' . fake()->uuid(),
+                'api_key' => 'test-api-key-'.fake()->uuid(),
+                'webhook_token' => 'test-webhook-token-'.fake()->uuid(),
             ])),
         ]);
     }
@@ -67,8 +67,8 @@ class PaymentProviderCredentialFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'provider' => 'midtrans',
             'credentials_encrypted' => encrypt(json_encode([
-                'server_key' => 'test-server-key-' . fake()->uuid(),
-                'client_key' => 'test-client-key-' . fake()->uuid(),
+                'server_key' => 'test-server-key-'.fake()->uuid(),
+                'client_key' => 'test-client-key-'.fake()->uuid(),
             ])),
         ]);
     }

@@ -4,14 +4,13 @@ namespace App\Services;
 
 use App\Models\PaymentProviderCredential;
 use App\Models\User;
-use App\DTOs\ValidationResult;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use RuntimeException;
 
 /**
  * Service for managing payment provider credentials.
- * 
+ *
  * Handles storing, updating, deleting, and managing active provider credentials
  * with encryption and validation.
  */
@@ -28,10 +27,11 @@ class ProviderCredentialService
     /**
      * Store new provider credentials with encryption and validation.
      *
-     * @param User $user The user storing the credentials
-     * @param string $provider The provider name (doku, xendit, midtrans, duitku)
-     * @param array $credentials The provider-specific credentials
+     * @param  User  $user  The user storing the credentials
+     * @param  string  $provider  The provider name (doku, xendit, midtrans, duitku)
+     * @param  array  $credentials  The provider-specific credentials
      * @return PaymentProviderCredential The stored credential record
+     *
      * @throws InvalidArgumentException If provider is invalid or credentials are empty
      * @throws RuntimeException If storage fails
      */
@@ -41,7 +41,7 @@ class ProviderCredentialService
         array $credentials
     ): PaymentProviderCredential {
         // Validate provider
-        if (!PaymentProviderCredential::isValidProvider($provider)) {
+        if (! PaymentProviderCredential::isValidProvider($provider)) {
             throw new InvalidArgumentException("Invalid provider: {$provider}");
         }
 
@@ -74,7 +74,7 @@ class ProviderCredentialService
                     $validationResult = $this->validation->validateCredentials($credential);
                 } catch (\Exception $e) {
                     // Log validation error but don't fail the storage
-                    \Log::warning("Failed to validate credentials during storage", [
+                    \Log::warning('Failed to validate credentials during storage', [
                         'user_id' => $user->id,
                         'provider' => $provider,
                         'error' => $e->getMessage(),
@@ -91,9 +91,10 @@ class ProviderCredentialService
     /**
      * Update existing provider credentials with re-encryption.
      *
-     * @param PaymentProviderCredential $credential The credential to update
-     * @param array $newCredentials The new credentials
+     * @param  PaymentProviderCredential  $credential  The credential to update
+     * @param  array  $newCredentials  The new credentials
      * @return bool True if update was successful
+     *
      * @throws InvalidArgumentException If credentials are empty
      * @throws RuntimeException If update fails
      */
@@ -125,7 +126,7 @@ class ProviderCredentialService
                 try {
                     $this->validation->validateCredentials($credential);
                 } catch (\Exception $e) {
-                    \Log::warning("Failed to validate credentials during update", [
+                    \Log::warning('Failed to validate credentials during update', [
                         'credential_id' => $credential->id,
                         'error' => $e->getMessage(),
                     ]);
@@ -141,8 +142,9 @@ class ProviderCredentialService
     /**
      * Delete provider credentials with secure wipe.
      *
-     * @param PaymentProviderCredential $credential The credential to delete
+     * @param  PaymentProviderCredential  $credential  The credential to delete
      * @return bool True if deletion was successful
+     *
      * @throws RuntimeException If deletion fails
      */
     public function deleteCredentials(PaymentProviderCredential $credential): bool
@@ -164,7 +166,7 @@ class ProviderCredentialService
 
                 // If this was the active provider, log a warning
                 if ($wasActive) {
-                    \Log::info("Active provider deleted", [
+                    \Log::info('Active provider deleted', [
                         'user_id' => $userId,
                         'provider' => $provider,
                     ]);
@@ -181,16 +183,17 @@ class ProviderCredentialService
      * Set a provider as active with constraint enforcement.
      * Ensures only one provider is active at a time and validates credentials exist.
      *
-     * @param User $user The user setting the active provider
-     * @param string $provider The provider to activate
+     * @param  User  $user  The user setting the active provider
+     * @param  string  $provider  The provider to activate
      * @return bool True if activation was successful
+     *
      * @throws InvalidArgumentException If provider is invalid or credentials don't exist
      * @throws RuntimeException If activation fails
      */
     public function setActiveProvider(User $user, string $provider): bool
     {
         // Validate provider
-        if (!PaymentProviderCredential::isValidProvider($provider)) {
+        if (! PaymentProviderCredential::isValidProvider($provider)) {
             throw new InvalidArgumentException("Invalid provider: {$provider}");
         }
 
@@ -201,7 +204,7 @@ class ProviderCredentialService
                     ->where('provider', $provider)
                     ->first();
 
-                if (!$credential) {
+                if (! $credential) {
                     throw new InvalidArgumentException(
                         "No credentials found for provider: {$provider}"
                     );
@@ -227,7 +230,7 @@ class ProviderCredentialService
     /**
      * Get the active provider for a user.
      *
-     * @param User $user The user to get the active provider for
+     * @param  User  $user  The user to get the active provider for
      * @return PaymentProviderCredential|null The active provider credential or null
      */
     public function getActiveProvider(User $user): ?PaymentProviderCredential
@@ -240,7 +243,7 @@ class ProviderCredentialService
     /**
      * Get all configured providers for a user.
      *
-     * @param User $user The user to get providers for
+     * @param  User  $user  The user to get providers for
      * @return \Illuminate\Database\Eloquent\Collection
      */
     public function getUserProviders(User $user)
@@ -254,7 +257,7 @@ class ProviderCredentialService
     /**
      * Check if a user has any configured providers.
      *
-     * @param User $user The user to check
+     * @param  User  $user  The user to check
      * @return bool True if user has at least one configured provider
      */
     public function hasConfiguredProviders(User $user): bool
@@ -266,8 +269,9 @@ class ProviderCredentialService
      * Decrypt credentials for use in API calls.
      * This method should only be called when credentials are needed for provider API calls.
      *
-     * @param PaymentProviderCredential $credential The credential to decrypt
+     * @param  PaymentProviderCredential  $credential  The credential to decrypt
      * @return array The decrypted credentials
+     *
      * @throws RuntimeException If decryption fails
      */
     public function decryptCredentials(PaymentProviderCredential $credential): array

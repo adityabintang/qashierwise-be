@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -22,10 +22,10 @@ return new class extends Migration
             $table->text('validation_error')->nullable();
             $table->timestamp('last_validated_at')->nullable();
             $table->timestamps();
-            
+
             // Unique constraint: one credential per user per provider
             $table->unique(['user_id', 'provider'], 'unique_user_provider');
-            
+
             // Indexes for performance
             $table->index(['user_id', 'is_active'], 'idx_user_active');
             $table->index(['provider', 'connection_status'], 'idx_provider_status');
@@ -34,28 +34,28 @@ return new class extends Migration
         // Enable Row Level Security for PostgreSQL
         if (DB::connection()->getDriverName() === 'pgsql') {
             DB::statement('ALTER TABLE payment_provider_credentials ENABLE ROW LEVEL SECURITY');
-            
+
             // Policy: Users can only see their own credentials
             DB::statement("
                 CREATE POLICY user_credentials_select ON payment_provider_credentials
                 FOR SELECT
                 USING (user_id = NULLIF(current_setting('app.current_user_id', true), '')::BIGINT)
             ");
-            
+
             // Policy: Users can only insert their own credentials
             DB::statement("
                 CREATE POLICY user_credentials_insert ON payment_provider_credentials
                 FOR INSERT
                 WITH CHECK (user_id = NULLIF(current_setting('app.current_user_id', true), '')::BIGINT)
             ");
-            
+
             // Policy: Users can only update their own credentials
             DB::statement("
                 CREATE POLICY user_credentials_update ON payment_provider_credentials
                 FOR UPDATE
                 USING (user_id = NULLIF(current_setting('app.current_user_id', true), '')::BIGINT)
             ");
-            
+
             // Policy: Users can only delete their own credentials
             DB::statement("
                 CREATE POLICY user_credentials_delete ON payment_provider_credentials
@@ -77,7 +77,7 @@ return new class extends Migration
             DB::statement('DROP POLICY IF EXISTS user_credentials_insert ON payment_provider_credentials');
             DB::statement('DROP POLICY IF EXISTS user_credentials_select ON payment_provider_credentials');
         }
-        
+
         Schema::dropIfExists('payment_provider_credentials');
     }
 };

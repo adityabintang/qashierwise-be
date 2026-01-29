@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Service for managing subscription business logic.
- * 
+ *
  * Handles subscription status detection, webhook event processing,
  * trial period management, and feature access control.
  */
@@ -25,9 +25,13 @@ class SubscriptionService
      * Subscription status constants.
      */
     public const STATUS_TRIAL = 'trial';
+
     public const STATUS_TRIAL_EXPIRED = 'trial_expired';
+
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_CANCELLED = 'cancelled';
+
     public const STATUS_EXPIRED = 'expired';
 
     private PlanConfig $planConfig;
@@ -39,9 +43,8 @@ class SubscriptionService
 
     /**
      * Get the subscription status for a user.
-     * 
-     * @param User $user The user to check
-     * @return SubscriptionStatus
+     *
+     * @param  User  $user  The user to check
      */
     public function getUserSubscriptionStatus(User $user): SubscriptionStatus
     {
@@ -53,7 +56,7 @@ class SubscriptionService
         }
 
         // If subscription is cancelled but still within period
-        if ($subscription->isCancelled() && !$subscription->isExpired()) {
+        if ($subscription->isCancelled() && ! $subscription->isExpired()) {
             return new SubscriptionStatus(
                 status: self::STATUS_CANCELLED,
                 planName: $subscription->plan_name,
@@ -95,12 +98,10 @@ class SubscriptionService
         );
     }
 
-
     /**
      * Get trial status for a user without a subscription.
-     * 
-     * @param User $user The user to check
-     * @return SubscriptionStatus
+     *
+     * @param  User  $user  The user to check
      */
     private function getTrialStatus(User $user): SubscriptionStatus
     {
@@ -128,8 +129,7 @@ class SubscriptionService
     /**
      * Process a webhook event from Midtrans.
      *
-     * @param array $payload The webhook payload data
-     * @return void
+     * @param  array  $payload  The webhook payload data
      */
     public function processMidtransWebhook(array $payload): void
     {
@@ -139,6 +139,7 @@ class SubscriptionService
 
         if ($transactionStatus === null) {
             Log::warning('Midtrans webhook missing transaction_status', ['payload' => $payload]);
+
             return;
         }
 
@@ -159,9 +160,8 @@ class SubscriptionService
 
     /**
      * Handle successful Midtrans payment.
-     * 
-     * @param array $payload The webhook payload
-     * @return void
+     *
+     * @param  array  $payload  The webhook payload
      */
     private function handleMidtransPaymentSuccess(array $payload): void
     {
@@ -183,9 +183,8 @@ class SubscriptionService
 
     /**
      * Handle pending Midtrans payment.
-     * 
-     * @param array $payload The webhook payload
-     * @return void
+     *
+     * @param  array  $payload  The webhook payload
      */
     private function handleMidtransPaymentPending(array $payload): void
     {
@@ -201,9 +200,8 @@ class SubscriptionService
 
     /**
      * Handle failed Midtrans payment.
-     * 
-     * @param array $payload The webhook payload
-     * @return void
+     *
+     * @param  array  $payload  The webhook payload
      */
     private function handleMidtransPaymentFailed(array $payload): void
     {
@@ -228,9 +226,8 @@ class SubscriptionService
     /**
      * Create or update a subscription for a user from Midtrans data.
      *
-     * @param User $user The user
-     * @param array $midtransData The Midtrans subscription data
-     * @return Subscription
+     * @param  User  $user  The user
+     * @param  array  $midtransData  The Midtrans subscription data
      */
     public function createOrUpdateSubscription(User $user, array $midtransData): Subscription
     {
@@ -271,6 +268,7 @@ class SubscriptionService
                 'planName' => $data['plan_name'],
                 'status' => $data['status'],
             ]);
+
             return $subscription->fresh();
         }
 
@@ -289,10 +287,9 @@ class SubscriptionService
 
     /**
      * Cancel a subscription.
-     * 
-     * @param Subscription $subscription The subscription to cancel
-     * @param Carbon $cancelledAt The cancellation timestamp
-     * @return Subscription
+     *
+     * @param  Subscription  $subscription  The subscription to cancel
+     * @param  Carbon  $cancelledAt  The cancellation timestamp
      */
     public function cancelSubscription(Subscription $subscription, Carbon $cancelledAt): Subscription
     {
@@ -314,10 +311,9 @@ class SubscriptionService
 
     /**
      * Update subscription from Midtrans webhook data.
-     * 
-     * @param string $midtransSubscriptionId The Midtrans subscription ID
-     * @param array $data The webhook data
-     * @return void
+     *
+     * @param  string  $midtransSubscriptionId  The Midtrans subscription ID
+     * @param  array  $data  The webhook data
      */
     public function updateFromMidtransWebhook(string $midtransSubscriptionId, array $data): void
     {
@@ -327,6 +323,7 @@ class SubscriptionService
             Log::warning('Subscription not found for Midtrans webhook update', [
                 'midtransSubscriptionId' => $midtransSubscriptionId,
             ]);
+
             return;
         }
 
@@ -355,7 +352,7 @@ class SubscriptionService
             $updateData['metadata'] = json_encode($existingMetadata);
         }
 
-        if (!empty($updateData)) {
+        if (! empty($updateData)) {
             $subscription->update($updateData);
             Log::info('Subscription updated from Midtrans webhook', [
                 'subscriptionId' => $subscription->id,
@@ -368,7 +365,7 @@ class SubscriptionService
     /**
      * Calculate remaining trial days for a user.
      *
-     * @param User $user The user to check
+     * @param  User  $user  The user to check
      * @return int Days remaining (0 if trial expired)
      */
     public function calculateTrialDaysRemaining(User $user): int
@@ -392,10 +389,9 @@ class SubscriptionService
 
     /**
      * Check if a user can access a feature based on their subscription tier.
-     * 
-     * @param User $user The user to check
-     * @param string $featureTier The required tier ('basic', 'standard', 'pro')
-     * @return bool
+     *
+     * @param  User  $user  The user to check
+     * @param  string  $featureTier  The required tier ('basic', 'standard', 'pro')
      */
     public function canAccessFeature(User $user, string $featureTier): bool
     {
@@ -430,7 +426,7 @@ class SubscriptionService
     /**
      * Get tier from a plan name.
      *
-     * @param string $planName The plan name
+     * @param  string  $planName  The plan name
      * @return string The tier
      */
     private function getTierFromPlanName(string $planName): string
@@ -444,8 +440,8 @@ class SubscriptionService
 
     /**
      * Map Midtrans subscription status to internal status.
-     * 
-     * @param string $midtransStatus The Midtrans status
+     *
+     * @param  string  $midtransStatus  The Midtrans status
      * @return string The internal status
      */
     private function mapMidtransStatus(string $midtransStatus): string
@@ -460,8 +456,8 @@ class SubscriptionService
 
     /**
      * Get plan ID from Midtrans metadata.
-     * 
-     * @param array $metadata The Midtrans metadata
+     *
+     * @param  array  $metadata  The Midtrans metadata
      * @return string The plan ID
      */
     private function getPlanIdFromMetadata(array $metadata): string
@@ -471,10 +467,10 @@ class SubscriptionService
 
     /**
      * Calculate next period end date based on interval.
-     * 
-     * @param Carbon $startDate The start date
-     * @param string $interval The interval unit (month, year)
-     * @param int $intervalCount The interval count
+     *
+     * @param  Carbon  $startDate  The start date
+     * @param  string  $interval  The interval unit (month, year)
+     * @param  int  $intervalCount  The interval count
      * @return Carbon The end date
      */
     private function calculatePeriodEnd(Carbon $startDate, string $interval = 'month', int $intervalCount = 1): Carbon

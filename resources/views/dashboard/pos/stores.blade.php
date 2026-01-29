@@ -3,7 +3,7 @@
 @section('title', __('pos.stores.title') . ' - QashierWise POS')
 
 @section('content')
-<div x-data="storesApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
+<div x-data="storesApp()" x-init="initDashboard()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'pos-stores'])
 
     <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
@@ -17,10 +17,12 @@
                         <h2 class="text-lg font-semibold">Store Locations</h2>
                         <p class="text-sm text-[hsl(var(--muted-foreground))] hidden sm:block">Manage your business locations</p>
                     </div>
-                    <button @click="openCreateModal()" class="btn btn-primary btn-md">
-                        <i class="fas fa-plus"></i>
-                        <span>Add Store</span>
-                    </button>
+                    <template x-if="hasPermission('create_stores') || hasPermission('manage_stores')">
+                        <button @click="openCreateModal()" class="btn btn-primary btn-md">
+                            <i class="fas fa-plus"></i>
+                            <span>Add Store</span>
+                        </button>
+                    </template>
                 </div>
 
                 <!-- Stores Grid -->
@@ -61,10 +63,14 @@
                                     <p class="flex items-center gap-2"><i class="fas fa-phone w-4"></i><span x-text="store.phone || 'No phone'"></span></p>
                                 </div>
                                 <div class="flex gap-2 mt-4 pt-4 border-t border-[hsl(var(--border))]">
-                                    <button @click="openEditModal(store)" class="btn btn-outline btn-sm flex-1"><i class="fas fa-edit"></i> Edit</button>
-                                    <button @click="toggleStatus(store)" class="btn btn-outline btn-sm" :class="store.is_active ? 'text-amber-600' : 'text-emerald-600'">
-                                        <i class="fas" :class="store.is_active ? 'fa-pause' : 'fa-play'"></i>
-                                    </button>
+                                    <template x-if="hasPermission('edit_stores') || hasPermission('manage_stores')">
+                                        <button @click="openEditModal(store)" class="btn btn-outline btn-sm flex-1"><i class="fas fa-edit"></i> Edit</button>
+                                    </template>
+                                    <template x-if="hasPermission('edit_stores') || hasPermission('manage_stores')">
+                                        <button @click="toggleStatus(store)" class="btn btn-outline btn-sm" :class="store.is_active ? 'text-amber-600' : 'text-emerald-600'">
+                                            <i class="fas" :class="store.is_active ? 'fa-pause' : 'fa-play'"></i>
+                                        </button>
+                                    </template>
                                 </div>
                             </div>
                         </template>
@@ -77,7 +83,9 @@
                         <div class="empty-state-icon"><i class="fas fa-store text-2xl"></i></div>
                         <h3 class="font-semibold mt-4">No stores found</h3>
                         <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">Add your first store location.</p>
-                        <button @click="openCreateModal()" class="btn btn-primary btn-md mt-4"><i class="fas fa-plus"></i> Add Store</button>
+                        <template x-if="hasPermission('create_stores') || hasPermission('manage_stores')">
+                            <button @click="openCreateModal()" class="btn btn-primary btn-md mt-4"><i class="fas fa-plus"></i> Add Store</button>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -133,10 +141,11 @@ function storesApp() {
         stores: [], showModal: false, editingStore: null,
         form: { name: '', code: '', address: '', phone: '', is_active: true },
         sidebarOpen: window.innerWidth >= 1024, isMobile: window.innerWidth < 768, user: null, notifications: [],
+        userPermissions: [], isAdmin: true,
 
-        async init() { this.initSidebar(); await this.fetchStores(); },
+        async init() { this.initDashboard(); await this.fetchUserPermissions(); await this.fetchStores(); },
 
-        initSidebar() {
+        initDashboard() {
             this.isMobile = window.innerWidth < 768;
             if (this.isMobile) { this.sidebarOpen = false; }
             else { let s = localStorage.getItem('sidebarOpen'); if (s !== null) this.sidebarOpen = JSON.parse(s); }
@@ -147,9 +156,34 @@ function storesApp() {
                 else if (!was && this.isMobile) { this.sidebarOpen = false; }
             });
             let u = localStorage.getItem('user'); if (u) { try { this.user = JSON.parse(u); } catch (e) { this.user = { name: 'User' }; } } else { this.user = { name: 'User' }; }
+            this.fetchUserPermissions();
+        },
+
+        async fetchUserPermissions() {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) { this.isAdmin = true; this.userPermissions = []; return; }
+                const res = await fetch(`${window.location.origin}/api/user/permissions`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success) { this.isAdmin = data.data.is_admin || false; this.userPermissions = data.data.permissions || []; }
+                }
+            } catch (e) { console.error('Failed to fetch permissions:', e); }
+        },
+
+        hasPermission(permission) {
+            if (this.isAdmin) return true;
+            if (this.userPermissions.includes('*')) return true;
+            return this.userPermissions.includes(permission);
         },
 
         async fetchStores() {
+            // Check permission first
+            if (!this.hasPermission('view_stores') && !this.hasPermission('manage_stores')) {
+                this.stores = []; this.loading = false; return;
+            }
             this.loading = true;
             try {
                 const token = localStorage.getItem('token');
@@ -164,6 +198,13 @@ function storesApp() {
         closeModal() { this.showModal = false; this.editingStore = null; },
 
         async saveStore() {
+            // Check permission before saving
+            const canCreate = this.hasPermission('create_stores') || this.hasPermission('manage_stores');
+            const canEdit = this.hasPermission('edit_stores') || this.hasPermission('manage_stores');
+            if ((!this.editingStore && !canCreate) || (this.editingStore && !canEdit)) {
+                alert('You do not have permission to perform this action');
+                return;
+            }
             this.saving = true;
             try {
                 const token = localStorage.getItem('token');
@@ -176,6 +217,11 @@ function storesApp() {
         },
 
         async toggleStatus(store) {
+            // Check permission before toggling
+            if (!this.hasPermission('edit_stores') && !this.hasPermission('manage_stores')) {
+                alert('You do not have permission to modify stores');
+                return;
+            }
             try {
                 const token = localStorage.getItem('token');
                 const res = await fetch(`${this.API_BASE_URL}/stores/${store.id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ ...store, is_active: !store.is_active }) });

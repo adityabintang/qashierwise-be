@@ -9,16 +9,16 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Middleware to set PostgreSQL session context for Row Level Security (RLS).
- * 
+ *
  * This middleware sets the app.current_user_id session variable in PostgreSQL
  * for the duration of the request, enabling Row Level Security policies to
  * automatically filter data based on the authenticated user.
- * 
+ *
  * The session variable is reset after the request completes to prevent
  * context leakage between requests.
- * 
+ *
  * Usage: Apply to authenticated routes that access RLS-protected tables.
- * 
+ *
  * @see Requirements 3.1, 3.2, 3.3
  */
 class SetPostgresUserContext
@@ -37,7 +37,7 @@ class SetPostgresUserContext
         if ($user = $request->user()) {
             // Check if we're using PostgreSQL
             $driver = DB::connection()->getDriverName();
-            
+
             if ($driver === 'pgsql') {
                 try {
                     // Set PostgreSQL session variable for RLS
@@ -67,10 +67,6 @@ class SetPostgresUserContext
      *
      * Resets the PostgreSQL session context after the request completes
      * to prevent context leakage between requests.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \Symfony\Component\HttpFoundation\Response  $response
-     * @return void
      */
     public function terminate(Request $request, Response $response): void
     {
@@ -79,10 +75,10 @@ class SetPostgresUserContext
         if ($request->user()) {
             // Check if we're using PostgreSQL
             $driver = DB::connection()->getDriverName();
-            
+
             if ($driver === 'pgsql') {
                 try {
-                    DB::unprepared("RESET app.current_user_id");
+                    DB::unprepared('RESET app.current_user_id');
                 } catch (\Exception $e) {
                     // Log but don't fail if reset fails
                     // The connection will be returned to pool and reset anyway

@@ -13,7 +13,7 @@ use Tests\TestCase;
 
 /**
  * Test backward compatibility with existing Midtrans transactions.
- * 
+ *
  * Requirements: 7.1, 7.2, 7.3, 7.4, 7.5
  */
 class BackwardCompatibilityTest extends TestCase
@@ -21,7 +21,9 @@ class BackwardCompatibilityTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private SubMerchant $subMerchant;
+
     private QrisService $qrisService;
 
     protected function setUp(): void
@@ -70,13 +72,13 @@ class BackwardCompatibilityTest extends TestCase
 
         // Assert provider was set to midtrans
         $this->assertEquals('midtrans', $transaction->provider);
-        
+
         // Assert midtrans_transaction_id is preserved
         $this->assertEquals('midtrans-txn-12345', $transaction->midtrans_transaction_id);
-        
+
         // Assert transaction is still settled
         $this->assertTrue($transaction->isSettled());
-        
+
         // Assert we can still find by midtrans transaction ID
         $foundTransaction = $this->qrisService->findByMidtransId('midtrans-txn-12345');
         $this->assertNotNull($foundTransaction);
@@ -228,7 +230,7 @@ class BackwardCompatibilityTest extends TestCase
 
         // Calculate signature
         $serverKey = config('services.midtrans.server_key', 'test-server-key');
-        $signatureString = $payload['order_id'] . $payload['status_code'] . $payload['gross_amount'] . $serverKey;
+        $signatureString = $payload['order_id'].$payload['status_code'].$payload['gross_amount'].$serverKey;
         $signature = hash('sha512', $signatureString);
 
         // Send webhook
@@ -403,7 +405,7 @@ class BackwardCompatibilityTest extends TestCase
         $this->assertEquals($originalData['status'], $transaction->status);
         $this->assertEquals($originalData['midtrans_transaction_id'], $transaction->midtrans_transaction_id);
         $this->assertEquals($originalData['qr_code_url'], $transaction->qr_code_url);
-        
+
         // Assert provider was set
         $this->assertEquals('midtrans', $transaction->provider);
     }

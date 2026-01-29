@@ -15,7 +15,7 @@ class LanguageSwitcherTest extends TestCase
     {
         // Switch to Indonesian
         $response = $this->get(route('language.switch', 'id'));
-        
+
         $response->assertRedirect();
         $this->assertEquals('id', session('locale'));
     }
@@ -31,10 +31,10 @@ class LanguageSwitcherTest extends TestCase
 
         // Switch to Indonesian
         $response = $this->get(route('language.switch', 'id'));
-        
+
         $response->assertRedirect();
         $this->assertEquals('id', session('locale'));
-        
+
         // Verify user preference was updated
         $this->assertEquals('id', $user->fresh()->language_preference);
     }
@@ -43,7 +43,7 @@ class LanguageSwitcherTest extends TestCase
     public function it_rejects_unsupported_locales()
     {
         $response = $this->get(route('language.switch', 'fr'));
-        
+
         $response->assertStatus(400);
     }
 
@@ -52,10 +52,10 @@ class LanguageSwitcherTest extends TestCase
     {
         // Switch to Indonesian
         $this->get(route('language.switch', 'id'));
-        
+
         // Make another request
         $response = $this->get('/');
-        
+
         $response->assertSuccessful();
         $this->assertEquals('id', session('locale'));
     }
@@ -74,7 +74,7 @@ class LanguageSwitcherTest extends TestCase
 
         // Make a request - user preference should override session
         $response = $this->get('/dashboard');
-        
+
         $this->assertEquals('id', app()->getLocale());
     }
 }

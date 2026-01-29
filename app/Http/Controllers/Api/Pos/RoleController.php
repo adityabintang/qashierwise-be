@@ -3,63 +3,38 @@
 namespace App\Http\Controllers\Api\Pos;
 
 use App\Http\Controllers\Controller;
-use App\Models\Role;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class RoleController extends Controller
 {
-    /**
-     * List of available permissions for POS system
-     * These permissions control access to POS endpoints
-     */
-    protected array $availablePermissions = [
-        // Product Management
-        'view_products' => 'View Products',
-        'manage_products' => 'Manage Products (Create/Edit/Delete)',
-
-        // Category Management
-        'view_categories' => 'View Categories',
-        'manage_categories' => 'Manage Categories (Create/Edit/Delete)',
-
-        // Order Management
-        'view_orders' => 'View Orders',
-        'manage_orders' => 'Manage Orders (Create/Edit/Cancel)',
-
-        // Payment Processing
-        'process_payment' => 'Process Payments',
-
-        // Store Management
-        'view_stores' => 'View Stores',
-        'manage_stores' => 'Manage Stores (Create/Edit/Activate/Deactivate)',
-
-        // Table Management
-        'view_tables' => 'View Tables',
-        'manage_tables' => 'Manage Tables (Create/Edit/Delete)',
-
-        // User Management
-        'view_users' => 'View POS Users',
-        'manage_users' => 'Manage POS Users (Create/Edit/Delete/Activate/Deactivate)',
-
-        // Role Management
-        'view_roles' => 'View Roles',
-        'manage_roles' => 'Manage Roles (Create/Edit/Delete)',
-
-        // Reports & Analytics
-        'view_reports' => 'View Reports & Analytics',
-
-        // Transaction History
-        'view_transactions' => 'View Transaction History',
-    ];
-
     /**
      * Display a listing of roles.
      */
     public function index(Request $request): JsonResponse
     {
-        $roles = Role::withCount('posUsers')
+        $roles = Role::where('guard_name', 'sanctum')
+            ->with('permissions')
             ->orderBy('name', 'asc')
-            ->get();
+            ->get()
+            ->map(function ($role) {
+                // Manually count users from model_has_roles table
+                $usersCount = \DB::table('model_has_roles')
+                    ->where('role_id', $role->id)
+                    ->where('model_type', 'App\\Models\\User')
+                    ->count();
+
+                return [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                    'permissions' => $role->permissions->pluck('name')->toArray(),
+                    'pos_users_count' => $usersCount,
+                    'created_at' => $role->created_at,
+                    'updated_at' => $role->updated_at,
+                ];
+            });
 
         return response()->json([
             'success' => true,
@@ -72,9 +47,16 @@ class RoleController extends Controller
      */
     public function permissions(): JsonResponse
     {
+        $permissions = Permission::where('guard_name', 'sanctum')
+            ->orderBy('name', 'asc')
+            ->get()
+            ->mapWithKeys(function ($permission) {
+                return [$permission->name => $this->getPermissionDescription($permission->name)];
+            });
+
         return response()->json([
             'success' => true,
-            'data' => $this->availablePermissions,
+            'data' => $permissions,
         ]);
     }
 
@@ -83,41 +65,95 @@ class RoleController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:roles,name',
-            'permissions' => 'nullable|array',
-            'permissions.*' => 'required|string',
-        ]);
+        $currentUser = $request->user();
 
-        // Validate that permissions exist in available list
-        $invalidPermissions = array_diff($validated['permissions'] ?? [], array_keys($this->availablePermissions));
-        if (!empty($invalidPermissions)) {
+        // Only master admin can create roles
+        if (! $currentUser->isMasterAdmin()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid permissions: ' . implode(', ', $invalidPermissions),
+                'message' => 'Only master admin can create roles',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'permissions' => 'nullable|array',
+            'permissions.*' => 'required|string|exists:permissions,name',
+        ]);
+
+        // Check if role name already exists
+        $existingRole = Role::where('guard_name', 'sanctum')
+            ->where('name', $validated['name'])
+            ->first();
+
+        if ($existingRole) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Role name already exists',
             ], 422);
         }
 
         $role = Role::create([
             'name' => $validated['name'],
-            'permissions' => $validated['permissions'] ?? [],
+            'guard_name' => 'sanctum',
         ]);
+
+        if (! empty($validated['permissions'])) {
+            $role->givePermissionTo($validated['permissions']);
+        }
+
+        $role->load('permissions');
+
+        // Manually count users from model_has_roles table
+        $usersCount = \DB::table('model_has_roles')
+            ->where('role_id', $role->id)
+            ->where('model_type', 'App\\Models\\User')
+            ->count();
 
         return response()->json([
             'success' => true,
             'message' => 'Role created successfully',
-            'data' => $role->loadCount('posUsers'),
+            'data' => [
+                'id' => $role->id,
+                'name' => $role->name,
+                'permissions' => $role->permissions->pluck('name')->toArray(),
+                'pos_users_count' => $usersCount,
+                'created_at' => $role->created_at,
+                'updated_at' => $role->updated_at,
+            ],
         ], 201);
     }
 
     /**
      * Display the specified role.
      */
-    public function show(Role $role): JsonResponse
+    public function show(Request $request, Role $role): JsonResponse
     {
+        if ($role->guard_name !== 'sanctum') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Role not found',
+            ], 404);
+        }
+
+        $role->load('permissions');
+
+        // Manually count users from model_has_roles table
+        $usersCount = \DB::table('model_has_roles')
+            ->where('role_id', $role->id)
+            ->where('model_type', 'App\\Models\\User')
+            ->count();
+
         return response()->json([
             'success' => true,
-            'data' => $role->loadCount('posUsers'),
+            'data' => [
+                'id' => $role->id,
+                'name' => $role->name,
+                'permissions' => $role->permissions->pluck('name')->toArray(),
+                'pos_users_count' => $usersCount,
+                'created_at' => $role->created_at,
+                'updated_at' => $role->updated_at,
+            ],
         ]);
     }
 
@@ -126,58 +162,146 @@ class RoleController extends Controller
      */
     public function update(Request $request, Role $role): JsonResponse
     {
+        $currentUser = $request->user();
+
+        // Only master admin can update roles
+        if (! $currentUser->isMasterAdmin()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only master admin can update roles',
+            ], 403);
+        }
+
+        if ($role->guard_name !== 'sanctum') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Role not found',
+            ], 404);
+        }
+
         $validated = $request->validate([
-            'name' => 'sometimes|string|max:255|unique:roles,name,'.$role->id,
+            'name' => 'sometimes|string|max:255',
             'permissions' => 'nullable|array',
-            'permissions.*' => 'required|string',
+            'permissions.*' => 'required|string|exists:permissions,name',
         ]);
 
-        // Validate that permissions exist in available list
-        if (isset($validated['permissions'])) {
-            $invalidPermissions = array_diff($validated['permissions'], array_keys($this->availablePermissions));
-            if (!empty($invalidPermissions)) {
+        // Check if role name already exists (excluding current role)
+        if (isset($validated['name'])) {
+            $existingRole = Role::where('guard_name', 'sanctum')
+                ->where('name', $validated['name'])
+                ->where('id', '!=', $role->id)
+                ->first();
+
+            if ($existingRole) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid permissions: ' . implode(', ', $invalidPermissions),
+                    'message' => 'Role name already exists',
                 ], 422);
             }
-        }
 
-        if (isset($validated['name'])) {
             $role->name = $validated['name'];
-        }
-        if (isset($validated['permissions'])) {
-            $role->permissions = $validated['permissions'];
+            $role->save();
         }
 
-        $role->save();
+        if (isset($validated['permissions'])) {
+            $role->syncPermissions($validated['permissions']);
+        }
+
+        $role->load('permissions');
+
+        // Manually count users from model_has_roles table
+        $usersCount = \DB::table('model_has_roles')
+            ->where('role_id', $role->id)
+            ->where('model_type', 'App\\Models\\User')
+            ->count();
 
         return response()->json([
             'success' => true,
             'message' => 'Role updated successfully',
-            'data' => $role->fresh()->loadCount('posUsers'),
+            'data' => [
+                'id' => $role->id,
+                'name' => $role->name,
+                'permissions' => $role->permissions->pluck('name')->toArray(),
+                'pos_users_count' => $usersCount,
+                'created_at' => $role->created_at,
+                'updated_at' => $role->updated_at,
+            ],
         ]);
     }
 
     /**
      * Remove the specified role.
      */
-    public function destroy(Role $role): JsonResponse
+    public function destroy(Request $request, Role $role): JsonResponse
     {
-        $posUserCount = $role->posUsers()->count();
+        $currentUser = $request->user();
 
-        if ($posUserCount > 0) {
+        // Only master admin can delete roles
+        if (! $currentUser->isMasterAdmin()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Cannot delete role. It is assigned to '.$posUserCount.' user(s).',
+                'message' => 'Only master admin can delete roles',
+            ], 403);
+        }
+
+        if ($role->guard_name !== 'sanctum') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Role not found',
+            ], 404);
+        }
+
+        // Check if role is assigned to any users via model_has_roles
+        $userCount = \DB::table('model_has_roles')
+            ->where('role_id', $role->id)
+            ->where('model_type', 'App\\Models\\User')
+            ->count();
+
+        if ($userCount > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete role. It is assigned to '.$userCount.' user(s).',
             ], 400);
         }
 
-        $role->delete();
+        // Delete directly via DB to bypass Spatie event issues
+        \DB::table('role_has_permissions')->where('role_id', $role->id)->delete();
+        \DB::table('roles')->where('id', $role->id)->delete();
+
+        // Clear permission cache
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
         return response()->json([
             'success' => true,
             'message' => 'Role deleted successfully',
         ]);
+    }
+
+    /**
+     * Get permission description for display.
+     */
+    private function getPermissionDescription(string $permission): string
+    {
+        $descriptions = [
+            'view_products' => 'View Products',
+            'manage_products' => 'Manage Products (Create/Edit/Delete)',
+            'view_categories' => 'View Categories',
+            'manage_categories' => 'Manage Categories (Create/Edit/Delete)',
+            'view_orders' => 'View Orders',
+            'manage_orders' => 'Manage Orders (Create/Edit/Cancel)',
+            'process_payment' => 'Process Payments',
+            'view_stores' => 'View Stores',
+            'manage_stores' => 'Manage Stores (Create/Edit/Activate/Deactivate)',
+            'view_tables' => 'View Tables',
+            'manage_tables' => 'Manage Tables (Create/Edit/Delete)',
+            'view_users' => 'View POS Users',
+            'manage_users' => 'Manage POS Users (Create/Edit/Delete/Activate/Deactivate)',
+            'view_roles' => 'View Roles',
+            'manage_roles' => 'Manage Roles (Create/Edit/Delete)',
+            'view_reports' => 'View Reports & Analytics',
+            'view_transactions' => 'View Transaction History',
+        ];
+
+        return $descriptions[$permission] ?? ucwords(str_replace('_', ' ', $permission));
     }
 }

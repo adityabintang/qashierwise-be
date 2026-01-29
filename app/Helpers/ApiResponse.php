@@ -9,10 +9,9 @@ class ApiResponse
     /**
      * Return a success JSON response
      *
-     * @param mixed $data The data to return
-     * @param string|null $message Translation key or message
-     * @param int $code HTTP status code
-     * @return JsonResponse
+     * @param  mixed  $data  The data to return
+     * @param  string|null  $message  Translation key or message
+     * @param  int  $code  HTTP status code
      */
     public static function success($data = null, ?string $message = null, int $code = 200): JsonResponse
     {
@@ -37,10 +36,9 @@ class ApiResponse
     /**
      * Return an error JSON response
      *
-     * @param string $message Translation key or error message
-     * @param int $code HTTP status code
-     * @param mixed $errors Additional error details
-     * @return JsonResponse
+     * @param  string  $message  Translation key or error message
+     * @param  int  $code  HTTP status code
+     * @param  mixed  $errors  Additional error details
      */
     public static function error(string $message, int $code = 400, $errors = null): JsonResponse
     {
@@ -62,9 +60,8 @@ class ApiResponse
     /**
      * Return a validation error response
      *
-     * @param mixed $errors Validation errors
-     * @param string|null $message Custom message or translation key
-     * @return JsonResponse
+     * @param  mixed  $errors  Validation errors
+     * @param  string|null  $message  Custom message or translation key
      */
     public static function validationError($errors, ?string $message = null): JsonResponse
     {
@@ -78,8 +75,7 @@ class ApiResponse
     /**
      * Return an unauthorized response
      *
-     * @param string|null $message Custom message or translation key
-     * @return JsonResponse
+     * @param  string|null  $message  Custom message or translation key
      */
     public static function unauthorized(?string $message = null): JsonResponse
     {
@@ -92,8 +88,7 @@ class ApiResponse
     /**
      * Return a forbidden response
      *
-     * @param string|null $message Custom message or translation key
-     * @return JsonResponse
+     * @param  string|null  $message  Custom message or translation key
      */
     public static function forbidden(?string $message = null): JsonResponse
     {
@@ -106,8 +101,7 @@ class ApiResponse
     /**
      * Return a not found response
      *
-     * @param string|null $message Custom message or translation key
-     * @return JsonResponse
+     * @param  string|null  $message  Custom message or translation key
      */
     public static function notFound(?string $message = null): JsonResponse
     {
@@ -120,8 +114,7 @@ class ApiResponse
     /**
      * Return a server error response
      *
-     * @param string|null $message Custom message or translation key
-     * @return JsonResponse
+     * @param  string|null  $message  Custom message or translation key
      */
     public static function serverError(?string $message = null): JsonResponse
     {
@@ -135,8 +128,7 @@ class ApiResponse
      * Detect locale from request
      * Priority: locale parameter > Accept-Language header > session > default
      *
-     * @param \Illuminate\Http\Request $request
-     * @return string
+     * @param  \Illuminate\Http\Request  $request
      */
     public static function detectLocale($request): string
     {
@@ -168,14 +160,11 @@ class ApiResponse
 
     /**
      * Parse Accept-Language header
-     *
-     * @param string $header
-     * @return string|null
      */
     private static function parseAcceptLanguage(string $header): ?string
     {
         $locales = [];
-        
+
         foreach (explode(',', $header) as $locale) {
             $parts = explode(';', $locale);
             $locales[] = trim($parts[0]);
@@ -196,8 +185,7 @@ class ApiResponse
     /**
      * Set locale for API request
      *
-     * @param \Illuminate\Http\Request $request
-     * @return void
+     * @param  \Illuminate\Http\Request  $request
      */
     public static function setLocaleFromRequest($request): void
     {

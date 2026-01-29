@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Property-based tests for Category model
- * 
+ *
  * Feature: point-of-sale
  */
 class CategoryPropertyTest extends TestCase
@@ -20,7 +20,7 @@ class CategoryPropertyTest extends TestCase
     /**
      * Feature: point-of-sale, Property 2: Category Serialization Round-Trip
      * Validates: Requirements 2.5, 2.6
-     * 
+     *
      * For any valid Category object, serializing to JSON and then deserializing back
      * SHALL produce an equivalent Category object with identical field values.
      */

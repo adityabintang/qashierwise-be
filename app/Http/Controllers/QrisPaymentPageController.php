@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\QrisTransaction;
-use Illuminate\Http\Request;
 
 class QrisPaymentPageController extends Controller
 {
@@ -16,7 +15,7 @@ class QrisPaymentPageController extends Controller
             ->where('order_id', $orderId)
             ->first();
 
-        if (!$transaction) {
+        if (! $transaction) {
             abort(404, 'Transaksi tidak ditemukan');
         }
 

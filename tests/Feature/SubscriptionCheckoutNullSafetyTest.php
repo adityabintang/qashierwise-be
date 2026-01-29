@@ -6,12 +6,11 @@ use App\Models\Subscription;
 use App\Models\User;
 use App\Services\MidtransSubscriptionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Mockery;
 use Tests\TestCase;
 
 /**
  * Integration tests for subscription checkout null safety.
- * 
+ *
  * Validates: Requirements FR-1.1, FR-1.2, FR-1.3, FR-2.1, FR-2.2, FR-2.3
  */
 class SubscriptionCheckoutNullSafetyTest extends TestCase
@@ -20,7 +19,7 @@ class SubscriptionCheckoutNullSafetyTest extends TestCase
 
     /**
      * Test full checkout flow for new user.
-     * 
+     *
      * Validates: Requirements FR-1.1, FR-1.2, FR-1.3
      */
     public function test_full_checkout_flow_for_new_user(): void
@@ -44,7 +43,7 @@ class SubscriptionCheckoutNullSafetyTest extends TestCase
 
         // Verify no errors in response
         $response->assertSessionHasNoErrors();
-        
+
         // Verify redirect works correctly
         $response->assertRedirect(route('subscription.manage'));
         $response->assertSessionHas('info', 'Please complete payment setup to activate your subscription.');
@@ -52,7 +51,7 @@ class SubscriptionCheckoutNullSafetyTest extends TestCase
 
     /**
      * Test unauthenticated checkout attempt.
-     * 
+     *
      * Validates: Requirements FR-1.1, FR-1.2
      */
     public function test_unauthenticated_checkout_redirects_to_login(): void
@@ -68,7 +67,7 @@ class SubscriptionCheckoutNullSafetyTest extends TestCase
 
     /**
      * Test unauthenticated manage page access.
-     * 
+     *
      * Validates: Requirements FR-1.1, FR-1.2
      */
     public function test_unauthenticated_manage_page_redirects_to_login(): void
@@ -80,13 +79,13 @@ class SubscriptionCheckoutNullSafetyTest extends TestCase
         // Both are acceptable for unauthenticated access
         $this->assertTrue(
             $response->status() === 401 || $response->isRedirect(),
-            'Expected 401 or redirect for unauthenticated access, got ' . $response->status()
+            'Expected 401 or redirect for unauthenticated access, got '.$response->status()
         );
     }
 
     /**
      * Test unauthenticated cancel attempt.
-     * 
+     *
      * Validates: Requirements FR-1.1, FR-1.2
      */
     public function test_unauthenticated_cancel_redirects_to_login(): void
@@ -118,7 +117,7 @@ class SubscriptionCheckoutNullSafetyTest extends TestCase
 
     /**
      * Test subscription status validation with various statuses.
-     * 
+     *
      * Validates: Requirements FR-2.1, FR-2.2, FR-2.3
      */
     public function test_subscription_status_validation(): void
@@ -217,7 +216,7 @@ class SubscriptionCheckoutNullSafetyTest extends TestCase
 
         // Assert page renders successfully without errors
         $response->assertOk();
-        
+
         // The key test: no null pointer errors occurred
         $this->assertTrue(true, 'Page rendered without null pointer errors');
     }
@@ -229,9 +228,9 @@ class SubscriptionCheckoutNullSafetyTest extends TestCase
     {
         // Test 1: No subscription - should show error
         $userNoSub = User::factory()->create();
-        
+
         $response = $this->actingAs($userNoSub)->post(route('subscription.cancel.post'));
-        
+
         $response->assertRedirect();
         $response->assertSessionHas('error', 'No active subscription found.');
 
@@ -246,7 +245,7 @@ class SubscriptionCheckoutNullSafetyTest extends TestCase
         ]);
 
         $response = $this->actingAs($userCancelled)->post(route('subscription.cancel.post'));
-        
+
         $response->assertRedirect();
         $response->assertSessionHas('info', 'Subscription is already cancelled.');
 
@@ -260,7 +259,7 @@ class SubscriptionCheckoutNullSafetyTest extends TestCase
         ]);
 
         $response = $this->actingAs($userOther)->post(route('subscription.cancel.post'));
-        
+
         $response->assertRedirect();
         $response->assertSessionHas('error', 'This subscription cannot be cancelled through this interface.');
     }

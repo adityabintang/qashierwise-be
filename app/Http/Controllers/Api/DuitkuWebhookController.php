@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessQrisPayment;
 use App\Models\Payment;
-use App\Models\QrisTransaction;
 use App\Models\PaymentProviderCredential;
+use App\Models\QrisTransaction;
 use App\Services\EncryptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Controller for handling Duitku webhook notifications.
- * 
+ *
  * Receives and processes payment status updates from Duitku
  * including successful payments, expirations, and cancellations.
  */
@@ -45,22 +45,25 @@ class DuitkuWebhookController extends Controller
         $resultCode = $payload['resultCode'] ?? null;
         $signature = $payload['signature'] ?? null;
 
-        if (!$merchantOrderId || $resultCode === null) {
+        if (! $merchantOrderId || $resultCode === null) {
             Log::warning('Duitku webhook missing required fields', $payload);
+
             return response()->json(['status' => 'error', 'message' => 'Missing required fields'], 400);
         }
 
         // Find the transaction
         $transaction = QrisTransaction::where('order_id', $merchantOrderId)->first();
 
-        if (!$transaction) {
+        if (! $transaction) {
             Log::warning('Duitku webhook transaction not found', ['merchant_order_id' => $merchantOrderId]);
+
             return response()->json(['status' => 'ok'], 200);
         }
 
         // Validate signature
-        if (!$this->validateSignature($payload, $transaction, $signature)) {
+        if (! $this->validateSignature($payload, $transaction, $signature)) {
             Log::warning('Duitku webhook invalid signature', ['merchant_order_id' => $merchantOrderId]);
+
             return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
         }
 
@@ -83,7 +86,7 @@ class DuitkuWebhookController extends Controller
      */
     private function validateSignature(array $payload, QrisTransaction $transaction, ?string $signature): bool
     {
-        if (!$signature) {
+        if (! $signature) {
             return false;
         }
 
@@ -93,8 +96,9 @@ class DuitkuWebhookController extends Controller
             ->where('is_active', true)
             ->first();
 
-        if (!$credential) {
+        if (! $credential) {
             Log::warning('Duitku credentials not found for transaction', ['order_id' => $transaction->order_id]);
+
             return true; // Skip validation if no credentials
         }
 
@@ -103,18 +107,19 @@ class DuitkuWebhookController extends Controller
                 $credential->encrypted_credentials,
                 $credential->user_id
             );
-            
+
             $merchantCode = $decrypted['merchant_code'] ?? '';
             $apiKey = $decrypted['api_key'] ?? '';
             $amount = $payload['amount'] ?? $transaction->amount;
             $merchantOrderId = $payload['merchantOrderId'] ?? '';
 
             // Duitku signature format: MD5(merchantCode + amount + merchantOrderId + apiKey)
-            $expectedSignature = md5($merchantCode . $amount . $merchantOrderId . $apiKey);
+            $expectedSignature = md5($merchantCode.$amount.$merchantOrderId.$apiKey);
 
             return hash_equals($expectedSignature, $signature);
         } catch (\Exception $e) {
             Log::error('Duitku signature validation error', ['error' => $e->getMessage()]);
+
             return true; // Skip validation on error
         }
     }
@@ -136,6 +141,7 @@ class DuitkuWebhookController extends Controller
 
         if ($transaction->isSettled() || $transaction->isCancelledOrExpired()) {
             Log::info('Transaction already in final state', ['order_id' => $transaction->order_id]);
+
             return;
         }
 
@@ -161,7 +167,7 @@ class DuitkuWebhookController extends Controller
     private function handleSettlement(QrisTransaction $transaction, array $payload): void
     {
         $providerTransactionId = $payload['reference'] ?? null;
-        
+
         $transaction->markAsSettled($providerTransactionId);
         $transaction->save();
 
@@ -184,8 +190,7 @@ class DuitkuWebhookController extends Controller
     /**
      * Update linked Payment record status when QRIS transaction status changes.
      *
-     * @param QrisTransaction $transaction
-     * @param string $status The status to set ('failed' or 'expired')
+     * @param  string  $status  The status to set ('failed' or 'expired')
      */
     private function updateLinkedPaymentStatus(QrisTransaction $transaction, string $status): void
     {

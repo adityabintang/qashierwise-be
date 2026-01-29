@@ -15,7 +15,7 @@ use Tests\TestCase;
 
 /**
  * Unit tests for SubscriptionController null safety.
- * 
+ *
  * Validates: Requirements FR-1.1, FR-1.2, FR-1.3, FR-2.1, FR-2.2, FR-3.1, FR-3.2, FR-4.1, FR-4.3
  */
 class SubscriptionControllerNullSafetyTest extends TestCase
@@ -23,7 +23,9 @@ class SubscriptionControllerNullSafetyTest extends TestCase
     use RefreshDatabase;
 
     private SubscriptionController $controller;
+
     private MidtransSubscriptionService $midtransService;
+
     private SubscriptionService $subscriptionService;
 
     protected function setUp(): void
@@ -43,14 +45,14 @@ class SubscriptionControllerNullSafetyTest extends TestCase
 
     /**
      * Test checkout with null subscription.
-     * 
+     *
      * Validates: Requirements FR-1.1, FR-1.3
      */
     public function test_checkout_allows_users_without_subscription(): void
     {
         // Create user without subscription
         $user = User::factory()->create();
-        
+
         // Mock Midtrans service
         $this->midtransService->shouldReceive('isConfigured')
             ->once()
@@ -60,7 +62,7 @@ class SubscriptionControllerNullSafetyTest extends TestCase
         $request = Request::create('/subscription/checkout', 'POST', [
             'plan_id' => 'standard',
         ]);
-        $request->setUserResolver(fn() => $user);
+        $request->setUserResolver(fn () => $user);
 
         // Execute
         $response = $this->controller->createCheckout($request);
@@ -73,7 +75,7 @@ class SubscriptionControllerNullSafetyTest extends TestCase
 
     /**
      * Test unauthenticated checkout attempt.
-     * 
+     *
      * Validates: Requirements FR-1.1, FR-1.2
      */
     public function test_checkout_redirects_unauthenticated_users_to_login(): void
@@ -94,7 +96,7 @@ class SubscriptionControllerNullSafetyTest extends TestCase
         $request = Request::create('/subscription/checkout', 'POST', [
             'plan_id' => 'standard',
         ]);
-        $request->setUserResolver(fn() => null);
+        $request->setUserResolver(fn () => null);
 
         // Execute
         $response = $this->controller->createCheckout($request);
@@ -107,7 +109,7 @@ class SubscriptionControllerNullSafetyTest extends TestCase
 
     /**
      * Test unauthenticated manage page access.
-     * 
+     *
      * Validates: Requirements FR-1.1, FR-1.2
      */
     public function test_manage_page_redirects_unauthenticated_users_to_login(): void
@@ -119,7 +121,7 @@ class SubscriptionControllerNullSafetyTest extends TestCase
 
     /**
      * Test unauthenticated cancel attempt.
-     * 
+     *
      * Validates: Requirements FR-1.1, FR-1.2
      */
     public function test_cancel_redirects_unauthenticated_users_to_login(): void
@@ -138,7 +140,7 @@ class SubscriptionControllerNullSafetyTest extends TestCase
 
         // Create request without user
         $request = Request::create('/subscription/cancel', 'POST');
-        $request->setUserResolver(fn() => null);
+        $request->setUserResolver(fn () => null);
 
         // Execute
         $response = $this->controller->cancelSubscription($request);
@@ -151,7 +153,7 @@ class SubscriptionControllerNullSafetyTest extends TestCase
 
     /**
      * Test checkout with active subscription.
-     * 
+     *
      * Validates: Requirements FR-2.1, FR-2.2
      */
     public function test_checkout_prevents_duplicate_active_subscription(): void
@@ -173,7 +175,7 @@ class SubscriptionControllerNullSafetyTest extends TestCase
         $request = Request::create('/subscription/checkout', 'POST', [
             'plan_id' => 'pro',
         ]);
-        $request->setUserResolver(fn() => $user);
+        $request->setUserResolver(fn () => $user);
 
         // Execute
         $response = $this->controller->createCheckout($request);
@@ -186,7 +188,7 @@ class SubscriptionControllerNullSafetyTest extends TestCase
 
     /**
      * Test checkout with cancelled subscription.
-     * 
+     *
      * Validates: Requirements FR-2.2
      */
     public function test_checkout_allows_resubscribe_after_cancellation(): void
@@ -209,7 +211,7 @@ class SubscriptionControllerNullSafetyTest extends TestCase
         $request = Request::create('/subscription/checkout', 'POST', [
             'plan_id' => 'pro',
         ]);
-        $request->setUserResolver(fn() => $user);
+        $request->setUserResolver(fn () => $user);
 
         // Execute
         $response = $this->controller->createCheckout($request);
@@ -222,7 +224,7 @@ class SubscriptionControllerNullSafetyTest extends TestCase
 
     /**
      * Test manage page with null subscription.
-     * 
+     *
      * Validates: Requirements FR-4.1, FR-4.3
      */
     public function test_manage_page_handles_null_subscription(): void
@@ -255,7 +257,7 @@ class SubscriptionControllerNullSafetyTest extends TestCase
 
     /**
      * Test cancel with null subscription.
-     * 
+     *
      * Validates: Requirements FR-3.1, FR-3.2
      */
     public function test_cancel_fails_gracefully_without_subscription(): void
@@ -265,7 +267,7 @@ class SubscriptionControllerNullSafetyTest extends TestCase
 
         // Create request
         $request = Request::create('/subscription/cancel', 'POST');
-        $request->setUserResolver(fn() => $user);
+        $request->setUserResolver(fn () => $user);
 
         // Execute
         $response = $this->controller->cancelSubscription($request);
@@ -298,7 +300,7 @@ class SubscriptionControllerNullSafetyTest extends TestCase
 
         // Create request
         $request = Request::create('/subscription/cancel', 'POST');
-        $request->setUserResolver(fn() => $user);
+        $request->setUserResolver(fn () => $user);
 
         // Execute
         $response = $this->controller->cancelSubscription($request);
@@ -307,7 +309,7 @@ class SubscriptionControllerNullSafetyTest extends TestCase
         $this->assertEquals(302, $response->getStatusCode());
         $this->assertTrue($response->isRedirect(route('subscription.manage')));
         $this->assertStringContainsString('cancelled successfully', session('success'));
-        
+
         // Verify subscription was updated
         $subscription->refresh();
         $this->assertEquals('cancelled', $subscription->status);
@@ -331,7 +333,7 @@ class SubscriptionControllerNullSafetyTest extends TestCase
 
         // Create request
         $request = Request::create('/subscription/cancel', 'POST');
-        $request->setUserResolver(fn() => $user);
+        $request->setUserResolver(fn () => $user);
 
         // Execute
         $response = $this->controller->cancelSubscription($request);

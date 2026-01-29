@@ -4,7 +4,7 @@ namespace App\DTOs;
 
 /**
  * Data Transfer Object for webhook transaction data.
- * 
+ *
  * Represents standardized transaction data parsed from provider webhooks.
  */
 class WebhookTransaction

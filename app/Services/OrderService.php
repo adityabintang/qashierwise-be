@@ -21,15 +21,15 @@ class OrderService
     /**
      * Create a new order with auto-generated order number
      *
-     * @param array $data Order data (store_id, table_id, pos_user_id)
-     * @return Order
+     * @param  array  $data  Order data (store_id, table_id, pos_user_id)
+     *
      * @throws InvalidArgumentException If store is inactive
      */
     public function create(array $data): Order
     {
         // Validate store is active
         $store = Store::find($data['store_id']);
-        if (!$store || !$store->is_active) {
+        if (! $store || ! $store->is_active) {
             throw new InvalidArgumentException('Cannot create order at inactive store');
         }
 
@@ -44,21 +44,20 @@ class OrderService
         $order = Order::create($data);
 
         // Update table status if table is assigned
-        if (!empty($data['table_id'])) {
+        if (! empty($data['table_id'])) {
             $this->updateTableStatus($data['table_id'], Table::STATUS_OCCUPIED);
         }
 
         return $order;
     }
 
-
     /**
      * Add an item to an order
      *
-     * @param Order $order Order to add item to
-     * @param Product $product Product to add
-     * @param int $quantity Quantity to add
-     * @return OrderItem
+     * @param  Order  $order  Order to add item to
+     * @param  Product  $product  Product to add
+     * @param  int  $quantity  Quantity to add
+     *
      * @throws InvalidArgumentException If order is not pending or insufficient stock
      */
     public function addItem(Order $order, Product $product, int $quantity): OrderItem
@@ -108,9 +107,9 @@ class OrderService
     /**
      * Remove an item from an order
      *
-     * @param Order $order Order to remove item from
-     * @param OrderItem $item Item to remove
-     * @return void
+     * @param  Order  $order  Order to remove item from
+     * @param  OrderItem  $item  Item to remove
+     *
      * @throws InvalidArgumentException If order is not pending
      */
     public function removeItem(Order $order, OrderItem $item): void
@@ -132,20 +131,20 @@ class OrderService
     /**
      * Calculate and update order totals
      *
-     * @param Order $order Order to calculate totals for
+     * @param  Order  $order  Order to calculate totals for
      * @return array Array with subtotal, tax_amount, discount_amount, total
      */
     public function calculateTotals(Order $order): array
     {
         $order->refresh();
-        
+
         // Calculate subtotal from items
         $subtotal = $order->items->sum('subtotal');
-        
+
         // Calculate tax on subtotal minus discount
         $taxableAmount = max(0, $subtotal - $order->discount_amount);
         $taxAmount = round($taxableAmount * self::DEFAULT_TAX_RATE, 2);
-        
+
         // Calculate total
         $total = $subtotal + $taxAmount - $order->discount_amount;
 
@@ -166,9 +165,9 @@ class OrderService
     /**
      * Apply a discount to an order
      *
-     * @param Order $order Order to apply discount to
-     * @param float $discount Discount amount
-     * @return Order
+     * @param  Order  $order  Order to apply discount to
+     * @param  float  $discount  Discount amount
+     *
      * @throws InvalidArgumentException If order is not pending or discount is invalid
      */
     public function applyDiscount(Order $order, float $discount): Order
@@ -183,7 +182,7 @@ class OrderService
 
         // Refresh to get current subtotal
         $order->refresh();
-        
+
         if ($discount > $order->subtotal) {
             throw new InvalidArgumentException('Discount cannot exceed subtotal');
         }
@@ -197,12 +196,11 @@ class OrderService
         return $order->fresh();
     }
 
-
     /**
      * Complete an order and update inventory
      *
-     * @param Order $order Order to complete
-     * @return Order
+     * @param  Order  $order  Order to complete
+     *
      * @throws InvalidArgumentException If order cannot be completed
      */
     public function complete(Order $order): Order
@@ -238,8 +236,8 @@ class OrderService
     /**
      * Cancel an order and restore inventory if needed
      *
-     * @param Order $order Order to cancel
-     * @return Order
+     * @param  Order  $order  Order to cancel
+     *
      * @throws InvalidArgumentException If order cannot be cancelled
      */
     public function cancel(Order $order): Order
@@ -274,19 +272,18 @@ class OrderService
     /**
      * Generate a unique order number
      *
-     * @param int $storeId Store ID
-     * @return string
+     * @param  int  $storeId  Store ID
      */
     protected function generateOrderNumber(int $storeId): string
     {
         $date = now()->format('Ymd');
         $prefix = "ORD-{$storeId}-{$date}";
-        
+
         // Get the count of orders for this store today
         $count = Order::where('store_id', $storeId)
             ->whereDate('created_at', now()->toDateString())
             ->count();
-        
+
         $sequence = str_pad($count + 1, 4, '0', STR_PAD_LEFT);
         $orderNumber = "{$prefix}-{$sequence}";
 
@@ -303,9 +300,8 @@ class OrderService
     /**
      * Update table status
      *
-     * @param int $tableId Table ID
-     * @param string $status New status
-     * @return void
+     * @param  int  $tableId  Table ID
+     * @param  string  $status  New status
      */
     protected function updateTableStatus(int $tableId, string $status): void
     {
@@ -319,8 +315,7 @@ class OrderService
     /**
      * Find an order by ID
      *
-     * @param int $id Order ID
-     * @return Order|null
+     * @param  int  $id  Order ID
      */
     public function find(int $id): ?Order
     {
@@ -330,8 +325,7 @@ class OrderService
     /**
      * Get orders by store
      *
-     * @param int $storeId Store ID
-     * @return Collection
+     * @param  int  $storeId  Store ID
      */
     public function getByStore(int $storeId): Collection
     {
@@ -344,8 +338,7 @@ class OrderService
     /**
      * Get pending orders
      *
-     * @param int|null $storeId Optional store filter
-     * @return Collection
+     * @param  int|null  $storeId  Optional store filter
      */
     public function getPending(?int $storeId = null): Collection
     {

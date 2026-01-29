@@ -62,6 +62,7 @@ class PlatformFee extends Model
     public static function calculateFeeAmount(float $transactionAmount, ?float $feePercentage = null): float
     {
         $percentage = $feePercentage ?? self::DEFAULT_FEE_PERCENTAGE;
+
         return round($transactionAmount * ($percentage / 100), 2);
     }
 
@@ -95,6 +96,7 @@ class PlatformFee extends Model
     public function isValidFeeAmount(float $transactionAmount): bool
     {
         $expectedFee = self::calculateFeeAmount($transactionAmount, (float) $this->fee_percentage);
+
         return abs((float) $this->fee_amount - $expectedFee) < 0.01; // Allow for rounding differences
     }
 
@@ -120,11 +122,11 @@ class PlatformFee extends Model
     public static function getTotalFeesCollected($startDate = null, $endDate = null): float
     {
         $query = self::query();
-        
+
         if ($startDate !== null && $endDate !== null) {
             $query->collectedBetween($startDate, $endDate);
         }
-        
+
         return (float) $query->sum('fee_amount');
     }
 }

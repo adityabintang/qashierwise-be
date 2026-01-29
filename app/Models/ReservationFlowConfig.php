@@ -9,7 +9,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ReservationFlowConfig extends Model
 {
     public const STATUS_DRAFT = 'draft';
+
     public const STATUS_PUBLISHED = 'published';
+
     public const STATUS_DEPRECATED = 'deprecated';
 
     public const DEFAULT_EVENT_TYPES = [
@@ -122,7 +124,7 @@ class ReservationFlowConfig extends Model
 
     public function hasFlow(): bool
     {
-        return !empty($this->flow_id);
+        return ! empty($this->flow_id);
     }
 
     /**
@@ -138,14 +140,14 @@ class ReservationFlowConfig extends Model
 
         while ($opening <= $closing) {
             $timeStr = $opening->format('H:i');
-            
-            if (!in_array($timeStr, $blockedTimes)) {
+
+            if (! in_array($timeStr, $blockedTimes)) {
                 $slots[] = [
                     'id' => $timeStr,
                     'title' => "{$timeStr} WIB",
                 ];
             }
-            
+
             $opening->addMinutes($interval);
         }
 
@@ -164,7 +166,7 @@ class ReservationFlowConfig extends Model
 
         for ($i = 0; $i < $maxDays; $i++) {
             $date = $start->copy()->addDays($i);
-            
+
             // Check if day of week is in operating days (1=Mon, 7=Sun)
             if (in_array($date->dayOfWeekIso, $operatingDays)) {
                 $dates[] = [
@@ -202,7 +204,7 @@ class ReservationFlowConfig extends Model
     public function getEventTypes(): array
     {
         $enabledTypes = $this->enabled_event_types ?? array_keys(self::DEFAULT_EVENT_TYPES);
-        
+
         return collect($enabledTypes)
             ->filter(fn ($type) => isset(self::DEFAULT_EVENT_TYPES[$type]))
             ->map(fn ($type) => [
@@ -224,14 +226,14 @@ class ReservationFlowConfig extends Model
         if ($this->allow_dp_payment) {
             $options[] = [
                 'id' => 'dp',
-                'title' => "DP ({$this->dp_percentage}%) - " . $this->formatCurrency($dpAmount),
+                'title' => "DP ({$this->dp_percentage}%) - ".$this->formatCurrency($dpAmount),
             ];
         }
 
         if ($this->allow_full_payment) {
             $options[] = [
                 'id' => 'lunas',
-                'title' => "Lunas - " . $this->formatCurrency($grandTotal),
+                'title' => 'Lunas - '.$this->formatCurrency($grandTotal),
             ];
         }
 
@@ -269,7 +271,7 @@ class ReservationFlowConfig extends Model
      */
     private function formatCurrency(float $amount): string
     {
-        return 'Rp' . number_format($amount, 0, ',', '.');
+        return 'Rp'.number_format($amount, 0, ',', '.');
     }
 
     /**
