@@ -1,0 +1,1 @@
+{"mcpServers":{"laravel-boost":{"command":"C:\\xampp\\php\\php.exe","args":["artisan","boost:mcp"],"cwd":"${workspaceFolder}","disabled":true,"alwaysAllow":[]},"exa":{"command":"npx","args":["-y","exa-mcp-server"],"env":{"EXA_API_KEY":"692bf254-1515-4ed8-96e9-dccd02e42c15"}},"context7":{"command":"npx","args":["-y","@upstash/context7-mcp"],"env":{"DEFAULT_MINIMUM_TOKENS":""}}}}

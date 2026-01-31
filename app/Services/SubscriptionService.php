@@ -43,14 +43,29 @@ class SubscriptionService
 
     /**
      * Get the subscription status for a user.
+     * 
+     * CRITICAL: Uses getEffectiveSubscription() to ensure POS users inherit
+     * subscription from their master admin. This enforces that all users
+     * under a merchant share the same subscription tier.
      *
      * @param  User  $user  The user to check
      */
     public function getUserSubscriptionStatus(User $user): SubscriptionStatus
     {
-        $subscription = $user->subscription;
+        // CRITICAL: Use effective subscription to support inheritance
+        // POS users inherit subscription from their master admin
+        $subscription = $user->getEffectiveSubscription();
 
-        // If user has no subscription, check trial status
+        Log::info('Getting subscription status', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'is_master_admin' => $user->isMasterAdmin(),
+            'subscription_id' => $subscription?->id,
+            'plan_name' => $subscription?->plan_name,
+            'inherited' => $user->subscription === null && $subscription !== null,
+        ]);
+
+        // If user has no subscription (even inherited), check trial status
         if ($subscription === null) {
             return $this->getTrialStatus($user);
         }
@@ -225,19 +240,36 @@ class SubscriptionService
 
     /**
      * Create or update a subscription for a user from Midtrans data.
+     * 
+     * CRITICAL: Subscriptions are ALWAYS created for the master admin.
+     * POS users (kasir) cannot have their own subscription - they inherit
+     * from their master admin. This enforces the single subscription
+     * per merchant model.
      *
-     * @param  User  $user  The user
+     * @param  User  $user  The user (could be master admin or POS user)
      * @param  array  $midtransData  The Midtrans subscription data
      */
     public function createOrUpdateSubscription(User $user, array $midtransData): Subscription
     {
-        $subscription = $user->subscription;
+        // CRITICAL: Get the master admin who owns the subscription
+        // Subscriptions are always linked to master admin, never to POS users
+        $masterAdmin = $user->isMasterAdmin() ? $user : $user->getMasterAdmin();
+        
+        if ($masterAdmin === null) {
+            Log::error('Cannot create subscription - no master admin found', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+            ]);
+            throw new \Exception('Cannot create subscription: User is not associated with any merchant');
+        }
+        
+        $subscription = $masterAdmin->subscription;
 
         $metadata = $midtransData['metadata'] ?? [];
         $schedule = $midtransData['schedule'] ?? [];
 
         $data = [
-            'user_id' => $user->id,
+            'user_id' => $masterAdmin->id,  // ALWAYS linked to master admin
             'midtrans_subscription_id' => $midtransData['id'],
             'midtrans_customer_id' => $midtransData['customer_id'] ?? null,
             'plan_name' => $metadata['plan_id'] ?? 'pro',
@@ -255,6 +287,8 @@ class SubscriptionService
                 'payment_type' => $midtransData['payment_type'] ?? null,
                 'interval' => $schedule['interval_unit'] ?? 'month',
                 'interval_count' => $schedule['interval'] ?? 1,
+                'initiated_by_user_id' => $user->id,  // Track who initiated
+                'initiated_by_email' => $user->email,
             ]),
         ];
 

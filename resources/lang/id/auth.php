@@ -39,8 +39,13 @@ return [
     // Register Page
     'free_trial' => 'Coba Gratis 14 Hari',
     'register_subtitle' => 'Buat akun dan mulai gunakan QashierWise sekarang',
+    'username' => 'Username',
+    'username_placeholder' => 'Masukkan username Anda',
     'business_name' => 'Nama Restoran/Bisnis',
     'business_name_placeholder' => 'Contoh: Resto Nusantara',
+    'store_name' => 'Nama Restoran/Bisnis',
+    'store_name_placeholder' => 'Contoh: Resto Nusantara',
+    'store_name_help' => 'Ini akan menjadi nama restoran atau bisnis Anda',
     'password_confirmation' => 'Konfirmasi Password',
     'confirm_password' => 'Konfirmasi Password',
     'confirm_password_placeholder' => 'Masukkan password lagi',

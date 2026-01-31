@@ -12,6 +12,11 @@ class CheckPosPermission
      * Handle an incoming request.
      * Supports multiple permissions separated by pipe (|) for OR logic.
      * Example: pos.permission:view_products|manage_products
+     *
+     * Access levels:
+     * - Super admin (admin@qashierwise.com): Can access everything across all merchants
+     * - Master admin: Can access their own merchant's data
+     * - Sub-account: Limited to assigned store permissions
      */
     public function handle(Request $request, Closure $next, string $permission): Response
     {
@@ -24,6 +29,8 @@ class CheckPosPermission
             'has_user' => $user ? true : false,
             'user_id' => $user?->id,
             'email' => $user?->email,
+            'is_master_admin' => $user?->isMasterAdmin(),
+            'is_super_admin' => $user?->isSuperAdmin(),
         ]);
 
         if (! $user) {
@@ -34,7 +41,14 @@ class CheckPosPermission
             ], 401);
         }
 
-        // Check if user is master admin (can access everything)
+        // Super admin (admin@qashierwise.com) has full system access
+        // This is a system-wide administrator, not tied to any merchant
+        if ($user->isSuperAdmin()) {
+            \Log::info('CheckPosPermission: Super admin bypass - GRANTED');
+            return $next($request);
+        }
+
+        // Check if user is master admin (can access everything for their merchant)
         if ($user->isMasterAdmin()) {
             \Log::info('CheckPosPermission: Master admin bypass - GRANTED');
             return $next($request);
@@ -58,9 +72,17 @@ class CheckPosPermission
             ], 403);
         }
 
+        // Check if POS user is active
+        if (!$posUser->is_active) {
+            \Log::warning('CheckPosPermission: POS user inactive - DENIED - RETURN 403');
+            return response()->json([
+                'success' => false,
+                'message' => 'Your account is inactive. Please contact your administrator.',
+            ], 403);
+        }
+
         // Check if user has any of the required permissions (OR logic)
         $requiredPermissions = explode('|', $permission);
-        $allPermissions = $user->getAllPermissions()->pluck('name')->toArray();
         $hasAnyPermission = false;
 
         foreach ($requiredPermissions as $perm) {
@@ -69,6 +91,9 @@ class CheckPosPermission
                 break;
             }
         }
+
+        // Get user permissions via direct query for logging (bypasses JSON column conflict)
+        $allPermissions = $user->getPermissionsViaDirectQuery();
 
         \Log::info('CheckPosPermission: Permission check', [
             'required_permissions' => $requiredPermissions,

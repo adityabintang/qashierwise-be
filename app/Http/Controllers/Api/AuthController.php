@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
+use App\Models\Store;
 use App\Models\User;
 use App\Notifications\SendOtpNotification;
 use App\Notifications\SendPasswordResetLinkNotification;
@@ -13,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -27,7 +29,8 @@ class AuthController extends Controller
     }
 
     /**
-     * Register a new user
+     * Register a new user with optional store creation.
+     * If store_name is provided, user becomes master admin for that store.
      */
     public function register(Request $request)
     {
@@ -35,17 +38,55 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
+            'store_name' => 'required|string|max:255',
         ]);
 
         if ($validator->fails()) {
             return ApiResponse::validationError($validator->errors());
         }
 
+        $hasStore = !empty($request->store_name);
+
+        // Create user - mark as master admin if creating a store
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'is_master_admin' => $hasStore,
         ]);
+
+        $store = null;
+
+        // If store_name is provided, create the store and associate with user
+        if ($hasStore) {
+            // Check if user already has a store with this name
+            $existingStore = Store::where('user_id', $user->id)
+                ->where('name', $request->store_name)
+                ->first();
+
+            if ($existingStore) {
+                // Rollback user creation if store validation fails
+                $user->delete();
+
+                return ApiResponse::validationError([
+                    'store_name' => ['You already have a store with this name.'],
+                ]);
+            }
+
+            $store = Store::create([
+                'user_id' => $user->id,
+                'name' => $request->store_name,
+                'code' => $this->generateStoreCode($request->store_name),
+                'is_active' => true,
+            ]);
+
+            \Log::info('New merchant registered with store', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'store_id' => $store->id,
+                'store_name' => $store->name,
+            ]);
+        }
 
         $otp = $this->otpService->generate($user->email, 'email_verification');
         $user->notify(new SendOtpNotification($otp, 'email_verification', (int) config('otp.expiration_minutes')));
@@ -62,13 +103,37 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'email_verified_at' => $user->email_verified_at,
                 'is_email_verified' => ! is_null($user->email_verified_at),
+                'is_master_admin' => $user->is_master_admin,
                 'created_at' => $user->created_at,
                 'updated_at' => $user->updated_at,
             ],
+            'store' => $hasStore ? [
+                'id' => $store->id,
+                'name' => $store->name,
+                'code' => $store->code,
+                'is_active' => $store->is_active,
+            ] : null,
             'access_token' => $token,
             'token_type' => 'Bearer',
             'expires_at' => $expiresAt->toIso8601String(),
         ], 'messages.success.created', 201);
+    }
+
+    /**
+     * Generate a unique store code from store name.
+     */
+    private function generateStoreCode(string $name): string
+    {
+        $baseCode = Str::upper(Str::slug($name, ''));
+        $code = $baseCode;
+        $counter = 1;
+
+        while (Store::where('code', $code)->exists()) {
+            $code = $baseCode . $counter;
+            $counter++;
+        }
+
+        return $code;
     }
 
     /**
@@ -146,6 +211,8 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'email_verified_at' => $user->email_verified_at,
                 'is_email_verified' => ! is_null($user->email_verified_at),
+                'is_super_admin' => $user->isSuperAdmin(),
+                'is_master_admin' => $user->isMasterAdmin(),
                 'created_at' => $user->created_at,
                 'updated_at' => $user->updated_at,
             ],
@@ -159,44 +226,72 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
-        // CRITICAL: Force load roles and permissions for Spatie
-        // Sanctum doesn't eager load these by default, causing empty permissions
-        $user->load('roles.permissions');
-
         \Log::info('=== getUserPermissions DEBUG ===');
         \Log::info('User ID: ' . $user->id);
         \Log::info('User Email: ' . $user->email);
+        \Log::info('Is Super Admin: ' . ($user->isSuperAdmin() ? 'true' : 'false'));
+        \Log::info('Is Master Admin: ' . ($user->isMasterAdmin() ? 'true' : 'false'));
 
-        // Direct test: Call getAllPermissions right here
-        $testPerms = $user->getAllPermissions();
-        \Log::info('getAllPermissions() count: ' . $testPerms->count());
-        \Log::info('getAllPermissions() dump: ' . json_encode($testPerms->pluck('name')));
+        // Get all available permissions from database
+        $allPermissions = \Spatie\Permission\Models\Permission::where('guard_name', 'sanctum')
+            ->pluck('name')
+            ->sort()
+            ->values()
+            ->toArray();
 
-        $testPermsSanctum = $user->getAllPermissions('sanctum');
-        \Log::info('getAllPermissions(sanctum) count: ' . $testPermsSanctum->count());
-        \Log::info('getAllPermissions(sanctum) dump: ' . json_encode($testPermsSanctum->pluck('name')));
+        // Super admin has full system access
+        if ($user->isSuperAdmin()) {
+            \Log::info('Super admin - granting all permissions');
+            return ApiResponse::success([
+                'is_super_admin' => true,
+                'is_master_admin' => false,
+                'is_admin' => true,
+                'permissions' => $allPermissions, // All permissions from database
+                'role' => 'super_admin',
+            ]);
+        }
+
+        // Master admin has full access to their merchant
+        if ($user->isMasterAdmin()) {
+            \Log::info('Master admin - granting all permissions');
+            return ApiResponse::success([
+                'is_super_admin' => false,
+                'is_master_admin' => true,
+                'is_admin' => true,
+                'permissions' => $allPermissions, // All permissions from database
+                'role' => 'master_admin',
+            ]);
+        }
 
         // Check if user has a POS user record
         $posUser = $user->posUsers()->first();
 
-        // If no POS user, return all permissions (admin)
+        // If no POS user and not master admin, return minimal permissions
         if (!$posUser) {
+            \Log::info('No POS user found - returning empty permissions');
             return ApiResponse::success([
-                'is_admin' => true,
-                'permissions' => ['*'], // All permissions
+                'is_super_admin' => false,
+                'is_master_admin' => false,
+                'is_admin' => false,
+                'permissions' => [],
                 'role' => null,
             ]);
         }
 
-        // Get user permissions via Spatie (guard auto-detected from User model)
-        $permissions = $user->getAllPermissions()->pluck('name')->toArray();
-        $roles = $user->getRoleNames();
+        // Get user roles and permissions using User model methods
+        // These methods bypass JSON column conflict in roles table
+        $roles = $user->getRoleNamesViaDirectQuery();
+        \Log::info('User roles: ' . json_encode($roles));
+
+        $permissions = $user->getPermissionsViaDirectQuery();
 
         \Log::info('Final permissions array: ' . json_encode($permissions));
         \Log::info('Final roles: ' . json_encode($roles));
 
         return ApiResponse::success([
-            'is_admin' => $user->isMasterAdmin(),
+            'is_super_admin' => false,
+            'is_master_admin' => false,
+            'is_admin' => false,
             'permissions' => $permissions,
             'roles' => $roles,
         ]);
@@ -214,9 +309,8 @@ class AuthController extends Controller
         $user = $request->user();
         $permission = $request->input('permission');
 
-        // Force load roles and permissions
-        $user->load('roles.permissions');
-
+        // hasPermissionTo works correctly even with JSON column conflict
+        // It queries the database directly
         $hasPermission = $user->hasPermissionTo($permission, 'sanctum');
 
         return ApiResponse::success([
@@ -224,9 +318,6 @@ class AuthController extends Controller
             'permission' => $permission,
         ]);
     }
-
-    /**
-            ],
 
     /**
      * Send OTP for email verification or password reset
@@ -416,21 +507,18 @@ class AuthController extends Controller
             }
         };
 
-        $expirationMinutes = (int) config('auth.passwords.users.expire', 60);
-        $notifiable->notify(new SendPasswordResetLinkNotification($token, $expirationMinutes));
+        $notifiable->notify(new SendPasswordResetLinkNotification($token));
 
-        return ApiResponse::success([
-            'message' => 'Password reset link has been sent to your email',
-            'expires_in_minutes' => $expirationMinutes,
-        ], 'Password reset link has been sent to your email');
+        return ApiResponse::success(null, 'Password reset link sent to your email');
     }
 
     /**
-     * Reset password using token
+     * Reset password using the token
      */
     public function resetPassword(Request $request)
     {
         $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
             'token' => 'required|string',
             'password' => 'required|string|min:8|confirmed',
         ]);
@@ -439,25 +527,90 @@ class AuthController extends Controller
             return ApiResponse::validationError($validator->errors());
         }
 
-        $email = $this->passwordResetService->verifyToken($request->token);
+        $email = $request->email;
+        $token = $request->token;
+        $password = $request->password;
 
-        if (! $email) {
-            return ApiResponse::error('Invalid or expired password reset token', 400);
+        if (! $this->passwordResetService->validateToken($email, $token)) {
+            return ApiResponse::error('Invalid or expired reset token.', 400);
         }
 
         $user = User::where('email', $email)->first();
 
         if (! $user) {
-            return ApiResponse::error('User not found', 404);
+            return ApiResponse::error('User not found.', 404);
+        }
+
+        $user->password = Hash::make($password);
+        $user->save();
+
+        // Delete the used token
+        $this->passwordResetService->deleteToken($email);
+
+        return ApiResponse::success(null, 'Password reset successfully');
+    }
+
+    /**
+     * Update user profile
+     */
+    public function updateProfile(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'language_preference' => 'nullable|string|in:en,id',
+        ]);
+
+        if ($validator->fails()) {
+            return ApiResponse::validationError($validator->errors());
+        }
+
+        $user = $request->user();
+
+        $user->name = $request->name;
+
+        if ($request->has('language_preference')) {
+            $user->language_preference = $request->language_preference;
+        }
+
+        $user->save();
+
+        return ApiResponse::success([
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'language_preference' => $user->language_preference,
+                'updated_at' => $user->updated_at,
+            ],
+        ], 'Profile updated successfully');
+    }
+
+    /**
+     * Change password
+     */
+    public function changePassword(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'current_password' => 'required|string',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        if ($validator->fails()) {
+            return ApiResponse::validationError($validator->errors());
+        }
+
+        $user = $request->user();
+
+        if (! Hash::check($request->current_password, $user->password)) {
+            return ApiResponse::error('Current password is incorrect.', 400);
         }
 
         $user->password = Hash::make($request->password);
         $user->save();
 
-        $this->passwordResetService->deleteToken($request->token);
+        // Revoke all tokens for security
+        $user->tokens()->delete();
 
-        return ApiResponse::success([
-            'message' => 'Password has been reset successfully',
-        ], 'Password has been reset successfully');
+        return ApiResponse::success(null, 'Password changed successfully. Please login again.');
     }
 }

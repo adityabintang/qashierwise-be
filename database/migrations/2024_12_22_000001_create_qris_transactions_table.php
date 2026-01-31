@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('qris_transactions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('sub_merchant_id')->constrained()->onDelete('cascade');
+            $table->unsignedBigInteger('sub_merchant_id'); // FK added later after sub_merchants table exists
             $table->string('order_id', 100)->unique();
             $table->decimal('amount', 15, 2);
             $table->decimal('platform_fee', 15, 2);

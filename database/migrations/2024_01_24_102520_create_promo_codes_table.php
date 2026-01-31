@@ -34,7 +34,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('promo_code_id')->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('subscription_id')->nullable()->constrained()->onDelete('set null');
+            $table->unsignedBigInteger('subscription_id')->nullable(); // FK added later after subscriptions table exists
             $table->decimal('original_amount', 10, 2);
             $table->decimal('discount_amount', 10, 2);
             $table->decimal('final_amount', 10, 2);

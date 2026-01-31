@@ -12,10 +12,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Add user_id to stores table
-        Schema::table('stores', function (Blueprint $table) {
-            $table->foreignId('user_id')->nullable()->after('id')->constrained()->onDelete('cascade');
-        });
+        // Add user_id to stores table (if not already added by 2025_01_29_000001_add_user_id_and_unique_constraint_to_stores)
+        if (!Schema::hasColumn('stores', 'user_id')) {
+            Schema::table('stores', function (Blueprint $table) {
+                $table->foreignId('user_id')->nullable()->after('id')->constrained()->onDelete('cascade');
+            });
+        }
 
         // Add user_id to categories table
         Schema::table('categories', function (Blueprint $table) {

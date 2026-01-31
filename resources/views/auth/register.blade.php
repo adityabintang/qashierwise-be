@@ -29,6 +29,11 @@
             <p class="text-xs md:text-sm text-[hsl(var(--muted-foreground))] mt-1">{{ __('auth.register_subtitle') }}</p>
         </div>
 
+        <!-- Success Alert -->
+        <div x-show="successMessage" x-cloak x-transition class="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+            <span x-text="successMessage"></span>
+        </div>
+
         <!-- Error Alert -->
         <div x-show="errorMessage" x-cloak x-transition class="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
             <span x-text="errorMessage"></span>
@@ -36,8 +41,8 @@
 
         <form @submit.prevent="handleSubmit" class="space-y-4 md:space-y-5">
             <div>
-                <label for="name" class="text-sm font-medium mb-1.5 block">{{ __('auth.business_name') }}</label>
-                <input x-model="formData.name" id="name" type="text" required class="input w-full touch-target-input" :class="{'border-red-500': errors.name}" placeholder="{{ __('auth.business_name_placeholder') }}">
+                <label for="name" class="text-sm font-medium mb-1.5 block">{{ __('auth.username') }}</label>
+                <input x-model="formData.name" id="name" type="text" required class="input w-full touch-target-input" :class="{'border-red-500': errors.name}" placeholder="{{ __('auth.username_placeholder') }}">
                 <p x-show="errors.name" x-text="errors.name" class="mt-1 text-sm text-red-600" x-cloak></p>
             </div>
 
@@ -45,6 +50,15 @@
                 <label for="email" class="text-sm font-medium mb-1.5 block">{{ __('auth.email') }}</label>
                 <input x-model="formData.email" id="email" type="email" required class="input w-full touch-target-input" :class="{'border-red-500': errors.email}" placeholder="{{ __('auth.email_placeholder') }}">
                 <p x-show="errors.email" x-text="errors.email" class="mt-1 text-sm text-red-600" x-cloak></p>
+            </div>
+
+            <div>
+                <label for="store_name" class="text-sm font-medium mb-1.5 block">
+                    {{ __('auth.store_name') }}
+                </label>
+                <input x-model="formData.store_name" id="store_name" type="text" required class="input w-full touch-target-input" :class="{'border-red-500': errors.store_name}" placeholder="{{ __('auth.store_name_placeholder') }}">
+                <p x-show="errors.store_name" x-text="errors.store_name" class="mt-1 text-sm text-red-600" x-cloak></p>
+                <p class="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{{ __('auth.store_name_help') }}</p>
             </div>
 
             <div>
@@ -68,7 +82,17 @@
                 </div>
             </div>
 
-            <button type="submit" :disabled="loading" class="btn btn-primary w-full h-11 md:h-12 touch-target">
+            <!-- Password Strength Indicator -->
+            <div x-show="formData.password.length > 0" x-cloak class="space-y-1">
+                <div class="flex gap-1">
+                    <div class="h-1 flex-1 rounded" :class="{'bg-red-500': passwordStrength < 1, 'bg-yellow-500': passwordStrength === 1, 'bg-green-500': passwordStrength >= 2}"></div>
+                    <div class="h-1 flex-1 rounded" :class="{'bg-gray-200': passwordStrength < 2, 'bg-yellow-500': passwordStrength === 2, 'bg-green-500': passwordStrength >= 3}"></div>
+                    <div class="h-1 flex-1 rounded" :class="{'bg-gray-200': passwordStrength < 3, 'bg-green-500': passwordStrength >= 3}"></div>
+                </div>
+                <p class="text-xs" :class="passwordStrengthClass" x-text="passwordStrengthText"></p>
+            </div>
+
+            <button type="submit" :disabled="loading || passwordStrength < 2" class="btn btn-primary w-full h-11 md:h-12 touch-target">
                 <span x-show="!loading">{{ __('auth.register_now') }}</span>
                 <span x-show="loading" class="flex items-center justify-center">
                     <i class="fas fa-spinner animate-spin mr-2"></i> {{ __('auth.processing') }}
@@ -87,33 +111,77 @@
 <script>
 function registerForm() {
     return {
-        formData: { name: '', email: '', password: '', password_confirmation: '' },
+        formData: {
+            name: '',
+            email: '',
+            store_name: '',
+            password: '',
+            password_confirmation: ''
+        },
         showPassword: false,
         showPasswordConfirm: false,
         loading: false,
+        successMessage: '',
         errorMessage: '',
         errors: {},
+
+        get passwordStrength() {
+            let strength = 0;
+            if (this.formData.password.length >= 8) strength++;
+            if (/[A-Z]/.test(this.formData.password)) strength++;
+            if (/[0-9]/.test(this.formData.password)) strength++;
+            if (/[^A-Za-z0-9]/.test(this.formData.password)) strength++;
+            return strength;
+        },
+
+        get passwordStrengthClass() {
+            if (this.passwordStrength < 2) return 'text-red-600';
+            if (this.passwordStrength < 3) return 'text-yellow-600';
+            return 'text-green-600';
+        },
+
+        get passwordStrengthText() {
+            if (this.passwordStrength < 2) return '{{ __("auth.password_weak") }}';
+            if (this.passwordStrength < 3) return '{{ __("auth.password_medium") }}';
+            return '{{ __("auth.password_strong") }}';
+        },
 
         async handleSubmit() {
             this.loading = true;
             this.errorMessage = '';
             this.errors = {};
+            this.successMessage = '';
 
             try {
                 const response = await fetch('/api/register', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
                     body: JSON.stringify(this.formData)
                 });
 
                 const data = await response.json();
 
                 if (response.ok && data.success) {
+                    // Store token and user data
                     localStorage.setItem('token', data.data.access_token);
                     localStorage.setItem('user', JSON.stringify(data.data.user));
                     localStorage.setItem('verification_email', data.data.user.email);
                     localStorage.setItem('just_registered', 'true');
-                    window.location.href = '/verify-email';
+
+                    // Show success message with store info if created
+                    if (data.data.store) {
+                        this.successMessage = '{{ __("auth.register_success_with_store") }}'.replace(':store', data.data.store.name);
+                    } else {
+                        this.successMessage = '{{ __("auth.register_success") }}';
+                    }
+
+                    // Redirect after short delay
+                    setTimeout(() => {
+                        window.location.href = '/verify-email';
+                    }, 2000);
                 } else {
                     if (data.errors) {
                         this.errors = data.errors;
@@ -124,6 +192,7 @@ function registerForm() {
                     }
                 }
             } catch (e) {
+                console.error('Registration error:', e);
                 this.errorMessage = '{{ __("auth.network_error") }}';
             } finally {
                 this.loading = false;

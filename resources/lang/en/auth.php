@@ -39,8 +39,13 @@ return [
     // Register Page
     'free_trial' => 'Try Free for 14 Days',
     'register_subtitle' => 'Create an account and start using QashierWise now',
+    'username' => 'Username',
+    'username_placeholder' => 'Enter your username',
     'business_name' => 'Restaurant/Business Name',
     'business_name_placeholder' => 'Example: Nusantara Restaurant',
+    'store_name' => 'Restaurant/Business Name',
+    'store_name_placeholder' => 'Example: Nusantara Restaurant',
+    'store_name_help' => 'This will be the name of your restaurant or business',
     'password_confirmation' => 'Confirm Password',
     'confirm_password' => 'Confirm Password',
     'confirm_password_placeholder' => 'Enter password again',

@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -11,10 +12,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Drop foreign key constraint from pos_users table first
-        Schema::table('pos_users', function (Blueprint $table) {
-            $table->dropForeign(['role_id']);
-        });
+        if (Schema::hasTable('roles')) { return; }
+        // Drop foreign key constraint from pos_users table if it exists
+        // Using raw SQL to avoid transaction issues in PostgreSQL
+        if (Schema::hasTable('pos_users') && Schema::hasColumn('pos_users', 'role_id')) {
+            DB::statement('ALTER TABLE "pos_users" DROP CONSTRAINT IF EXISTS "pos_users_role_id_foreign"');
+        }
 
         // Drop the old roles table to make way for Spatie's roles table
         Schema::dropIfExists('roles');

@@ -17,6 +17,12 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, HasRoles, Notifiable;
 
     /**
+     * The super admin email - system-wide administrator.
+     * This user has access to all merchant data and system-wide settings.
+     */
+    public const SUPER_ADMIN_EMAIL = 'admin@qashierwise.com';
+
+    /**
      * The guard name for Spatie Permission.
      *
      * @var string
@@ -174,6 +180,23 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if the user is a super admin (system-wide administrator).
+     * Super admin has access to all merchant data and system-wide settings.
+     */
+    public function isSuperAdmin(): bool
+    {
+        return $this->email === self::SUPER_ADMIN_EMAIL;
+    }
+
+    /**
+     * Check if the user is a regular merchant admin (not super admin).
+     */
+    public function isMerchantAdmin(): bool
+    {
+        return $this->isMasterAdmin() && !$this->isSuperAdmin();
+    }
+
+    /**
      * Get the master admin for this user.
      * If user is master admin, returns self.
      * If user is sub-account (POS user), returns their master admin via store ownership.
@@ -223,5 +246,55 @@ class User extends Authenticatable
         $masterAdmin = $this->getMasterAdmin();
 
         return $masterAdmin ? $masterAdmin->id : $this->id;
+    }
+
+    /**
+     * Get user permissions via direct database query.
+     * This bypasses the getAllPermissions() issue when there's a JSON column named 'permissions'
+     * in the roles table that conflicts with Eloquent relationship loading.
+     *
+     * @return array<int, string> Array of permission names
+     */
+    public function getPermissionsViaDirectQuery(): array
+    {
+        // Get role IDs from model_has_roles
+        $roleIds = \DB::table('model_has_roles')
+            ->where('model_type', 'App\\Models\\User')
+            ->where('model_id', $this->id)
+            ->pluck('role_id');
+
+        if ($roleIds->isEmpty()) {
+            return [];
+        }
+
+        // Get permission names via direct database join
+        return \DB::table('role_has_permissions')
+            ->join('permissions', 'role_has_permissions.permission_id', '=', 'permissions.id')
+            ->whereIn('role_has_permissions.role_id', $roleIds)
+            ->where('permissions.guard_name', $this->guardName())
+            ->pluck('permissions.name')
+            ->unique()
+            ->sort()
+            ->values()
+            ->toArray();
+    }
+
+    /**
+     * Get role names via direct database query.
+     * This provides consistent results without relying on Eloquent relationship loading.
+     *
+     * @return array<int, string> Array of role names
+     */
+    public function getRoleNamesViaDirectQuery(): array
+    {
+        return \DB::table('model_has_roles')
+            ->join('roles', 'model_has_roles.role_id', '=', 'roles.id')
+            ->where('model_has_roles.model_type', 'App\\Models\\User')
+            ->where('model_has_roles.model_id', $this->id)
+            ->where('roles.guard_name', $this->guardName())
+            ->pluck('roles.name')
+            ->sort()
+            ->values()
+            ->toArray();
     }
 }

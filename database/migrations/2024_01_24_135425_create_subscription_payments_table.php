@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('subscription_payments', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('subscription_id')->constrained()->onDelete('cascade');
+            $table->unsignedBigInteger('subscription_id'); // FK added later after subscriptions table exists
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->string('order_id')->unique();
             $table->string('transaction_id')->nullable()->index();

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Pos;
 
 use App\Http\Controllers\Controller;
 use App\Models\PosUser;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\OtpService;
 use Illuminate\Http\JsonResponse;
@@ -174,7 +175,21 @@ class PosUserController extends Controller
      */
     public function getAvailableUsers(Request $request): JsonResponse
     {
+        $currentUser = $request->user();
+        $effectiveUserId = $currentUser->getEffectiveUserId();
+
+        // Get stores owned by the effective user (master admin)
+        $storeIds = \App\Models\Store::where('user_id', $effectiveUserId)->pluck('id');
+
+        // Get user IDs that are already assigned as POS users in these stores
+        $assignedUserIds = PosUser::whereIn('store_id', $storeIds)
+            ->pluck('user_id')
+            ->unique()
+            ->values();
+
+        // Only show users that are already assigned to this tenant's stores
         $users = User::select('id', 'name', 'email', 'email_verified_at')
+            ->whereIn('id', $assignedUserIds)
             ->orderBy('name', 'asc')
             ->get()
             ->map(function ($user) {
@@ -197,6 +212,9 @@ class PosUserController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $currentUser = $request->user();
+        $effectiveUserId = $currentUser->getEffectiveUserId();
+
         $validated = $request->validate([
             'user_id' => 'required|exists:users,id',
             'store_id' => 'required|exists:stores,id',
@@ -206,22 +224,80 @@ class PosUserController extends Controller
 
         $validated['is_active'] = $validated['is_active'] ?? true;
 
-        // Check if user already has a POS user record for this store
+        // Verify that the store belongs to the current user (tenant isolation)
+        $store = \App\Models\Store::where('id', $validated['store_id'])
+            ->where('user_id', $effectiveUserId)
+            ->first();
+
+        if (! $store) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Store not found or you do not have permission to access it.',
+            ], 403);
+        }
+
+        // STRICT OWNERSHIP CONSTRAINT: Verify user belongs to same merchant
+        // A user can only be assigned as POS user for stores owned by the same merchant
+        // that either created them or already owns them through the ownership chain
+        $userToAssign = User::find($validated['user_id']);
+
+        if (!$userToAssign) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found.',
+            ], 404);
+        }
+
+        // If the user is a master admin, they can only be assigned to their own stores
+        if ($userToAssign->isMasterAdmin() && $userToAssign->id !== $effectiveUserId) {
+            \Log::warning('Strict ownership violation: attempting to assign another merchant\'s master admin', [
+                'attempted_by' => $currentUser->id,
+                'target_user_id' => $userToAssign->id,
+                'target_user_email' => $userToAssign->email,
+                'store_id' => $store->id,
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot assign users from another merchant.',
+            ], 403);
+        }
+
+        // If the user is already assigned to another store in a different merchant, deny
         $existing = PosUser::where('user_id', $validated['user_id'])
-            ->where('store_id', $validated['store_id'])
+            ->with('store')
             ->first();
 
         if ($existing) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User already assigned to this store',
-            ], 400);
+            $storeOwner = \App\Models\Store::find($existing->store_id);
+            if ($storeOwner && $storeOwner->user_id !== $effectiveUserId) {
+                \Log::warning('Strict ownership violation: user already owned by different merchant', [
+                    'attempted_by' => $currentUser->id,
+                    'target_user_id' => $userToAssign->id,
+                    'existing_store_id' => $existing->store_id,
+                    'existing_store_owner' => $storeOwner->user_id,
+                    'attempted_store_id' => $store->id,
+                    'attempted_store_owner' => $effectiveUserId,
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User is already assigned to a different merchant.',
+                ], 400);
+            }
+
+            // Same merchant, different store - check if duplicate
+            if ($existing->store_id === (int)$validated['store_id']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User already assigned to this store',
+                ], 400);
+            }
         }
 
         $posUser = PosUser::create($validated);
 
         // Assign role to user via Spatie with proper guard
-        $role = \Spatie\Permission\Models\Role::where('id', $validated['role_id'])
+        // CRITICAL: Use App\Models\Role (not Spatie\Permission\Models\Role) for consistency with config
+        $role = Role::where('id', $validated['role_id'])
             ->where('guard_name', 'sanctum')
             ->first();
 
@@ -230,6 +306,22 @@ class PosUserController extends Controller
             // Ensure guard is set before assigning role
             $user->guard_name = 'sanctum';
             $user->assignRole($role->name);
+
+            // CRITICAL: Clear permission cache so new role assignment is immediately effective
+            app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+
+            \Log::info('Role assigned to POS user', [
+                'pos_user_id' => $posUser->id,
+                'user_id' => $user->id,
+                'role_id' => $role->id,
+                'role_name' => $role->name,
+                'permissions_count' => $role->permissions->count(),
+            ]);
+        } else {
+            \Log::warning('Role not found for POS user assignment', [
+                'pos_user_id' => $posUser->id,
+                'role_id' => $validated['role_id'],
+            ]);
         }
 
         return response()->json([
@@ -281,7 +373,8 @@ class PosUserController extends Controller
 
         // If role_id is being updated, sync with Spatie
         if (isset($validated['role_id'])) {
-            $role = \Spatie\Permission\Models\Role::where('id', $validated['role_id'])
+            // CRITICAL: Use App\Models\Role (not Spatie\Permission\Models\Role) for consistency with config
+            $role = Role::where('id', $validated['role_id'])
                 ->where('guard_name', 'sanctum')
                 ->first();
 
@@ -290,6 +383,21 @@ class PosUserController extends Controller
                 // Ensure guard is set before syncing role
                 $user->guard_name = 'sanctum';
                 $user->syncRoles([$role->name]);
+
+                // CRITICAL: Clear permission cache so role update is immediately effective
+                app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+
+                \Log::info('Role updated for POS user', [
+                    'pos_user_id' => $posUser->id,
+                    'user_id' => $user->id,
+                    'role_id' => $role->id,
+                    'role_name' => $role->name,
+                ]);
+            } else {
+                \Log::warning('Role not found for POS user update', [
+                    'pos_user_id' => $posUser->id,
+                    'role_id' => $validated['role_id'],
+                ]);
             }
         }
 
