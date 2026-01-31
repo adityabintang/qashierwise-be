@@ -34,25 +34,17 @@ class RoleController extends Controller
     public function index(Request $request): JsonResponse
     {
         $currentUser = $request->user();
-        $effectiveUserId = $currentUser->getEffectiveUserId();
 
-        // Super admin can see all roles, master admin only sees their own roles
-        if ($currentUser->isSuperAdmin()) {
-            $roles = Role::where('guard_name', 'sanctum')
-                ->with('permissions')
-                ->orderBy('name', 'asc')
-                ->get();
-        } else {
-            // Get roles created by this user (via user_id column)
-            $roles = Role::where('guard_name', 'sanctum')
-                ->where('user_id', $effectiveUserId)
-                ->with('permissions')
-                ->orderBy('name', 'asc')
-                ->get();
-        }
+        // All users (including super admin per merchant) can only see roles they created
+        // Each merchant admin has isolated data - they can only see their own roles
+        $roles = Role::where('guard_name', 'sanctum')
+            ->where('user_id', $currentUser->id)
+            ->with('permissions')
+            ->orderBy('name', 'asc')
+            ->get();
 
-        // Get stores owned by the effective user (master admin)
-        $storeIds = \App\Models\Store::where('user_id', $effectiveUserId)->pluck('id');
+        // Get stores owned by the current user
+        $storeIds = \App\Models\Store::where('user_id', $currentUser->id)->pluck('id');
 
         $roles = $roles->map(function ($role) use ($storeIds) {
             // Clear conflicting 'permissions' JSON column and load relationship
@@ -125,9 +117,10 @@ class RoleController extends Controller
             'permissions.*' => 'required|string|exists:permissions,name,guard_name,sanctum',
         ]);
 
-        // Check if role name already exists
+        // Check if role name already exists for this user (scoped by user_id)
         $existingRole = Role::where('guard_name', 'sanctum')
             ->where('name', $validated['name'])
+            ->where('user_id', $effectiveUserId)
             ->first();
 
         if ($existingRole) {
@@ -137,11 +130,17 @@ class RoleController extends Controller
             ], 422);
         }
 
-        $role = Role::create([
+        // Create role using direct database insertion
+        // Bypass Spatie's Role::create() which enforces unique(name, guard_name) validation
+        $roleId = \DB::table('roles')->insertGetId([
             'name' => $validated['name'],
             'guard_name' => 'sanctum',
             'user_id' => $effectiveUserId,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
+
+        $role = Role::find($roleId);
 
         // Add permissions if provided using direct database manipulation
         if (!empty($validated['permissions']) && is_array($validated['permissions'])) {
@@ -363,7 +362,6 @@ class RoleController extends Controller
     public function destroy(Request $request, Role $role): JsonResponse
     {
         $currentUser = $request->user();
-        $storeIds = [];
 
         // Super admin can delete any role
         if (!$currentUser->isSuperAdmin()) {
@@ -377,15 +375,8 @@ class RoleController extends Controller
 
             $effectiveUserId = $currentUser->getEffectiveUserId();
 
-            // Get stores owned by the effective user (master admin)
-            $storeIds = \App\Models\Store::where('user_id', $effectiveUserId)->pluck('id');
-
-            // Check if this role is assigned to any POS user in these stores
-            $roleAssignedToStore = \App\Models\PosUser::whereIn('store_id', $storeIds)
-                ->where('role_id', $role->id)
-                ->exists();
-
-            if (!$roleAssignedToStore) {
+            // Check if this role belongs to the current user (via user_id)
+            if ($role->user_id !== $effectiveUserId) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Role not found',
@@ -393,22 +384,12 @@ class RoleController extends Controller
             }
         }
 
-        // For super admin, any sanctum role is valid
-        // For master admin, role must be assigned to their stores
-        if (!$currentUser->isSuperAdmin()) {
-            if ($role->guard_name !== 'sanctum' || ! $roleAssignedToStore) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Role not found',
-                ], 404);
-            }
-        } else {
-            if ($role->guard_name !== 'sanctum') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Role not found',
-                ], 404);
-            }
+        // Check guard name
+        if ($role->guard_name !== 'sanctum') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Role not found',
+            ], 404);
         }
 
         // Check if role is assigned to any users in this tenant's stores via model_has_roles

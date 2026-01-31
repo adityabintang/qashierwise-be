@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
+use App\Models\PosUser;
 use App\Models\Store;
 use App\Models\User;
 use App\Notifications\SendOtpNotification;
@@ -155,6 +156,14 @@ class AuthController extends Controller
         }
 
         $user = User::where('email', $request->email)->firstOrFail();
+
+        // Check if user is a POS user and if their account is active
+        $posUser = PosUser::where('user_id', $user->id)->first();
+        if ($posUser && ! $posUser->is_active) {
+            Auth::logout();
+
+            return ApiResponse::error('Your account is inactive. Please contact your administrator.', 403);
+        }
 
         // Create token with expiration (1 month)
         $expirationMinutes = (int) config('sanctum.expiration', 43200);
@@ -518,7 +527,6 @@ class AuthController extends Controller
     public function resetPassword(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email',
             'token' => 'required|string',
             'password' => 'required|string|min:8|confirmed',
         ]);
@@ -527,11 +535,13 @@ class AuthController extends Controller
             return ApiResponse::validationError($validator->errors());
         }
 
-        $email = $request->email;
         $token = $request->token;
         $password = $request->password;
 
-        if (! $this->passwordResetService->validateToken($email, $token)) {
+        // Verify token and get email
+        $email = $this->passwordResetService->verifyToken($token);
+
+        if (! $email) {
             return ApiResponse::error('Invalid or expired reset token.', 400);
         }
 
@@ -545,7 +555,7 @@ class AuthController extends Controller
         $user->save();
 
         // Delete the used token
-        $this->passwordResetService->deleteToken($email);
+        $this->passwordResetService->deleteToken($token);
 
         return ApiResponse::success(null, 'Password reset successfully');
     }
