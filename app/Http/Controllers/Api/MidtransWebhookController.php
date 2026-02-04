@@ -567,7 +567,7 @@ class MidtransWebhookController extends Controller
                         'plan_name' => $planId,
                         'status' => 'active',
                         'current_period_start' => now(),
-                        'current_period_end' => now()->addMonths($months),
+                        'current_period_end' => now()->addMonthsNoOverflow($months),
                         'amount' => $payload['gross_amount'] ?? $durationDetails['price'],
                         'metadata' => json_encode([
                             'order_id' => $orderId,

@@ -59,6 +59,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'postgres.user.context' => \App\Http\Middleware\SetPostgresUserContext::class,
             'sanitize.provider.errors' => \App\Http\Middleware\SanitizeProviderErrors::class,
             'pos.permission' => \App\Http\Middleware\CheckPosPermission::class,
+            'clear.permission.cache' => \App\Http\Middleware\ClearPermissionCache::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

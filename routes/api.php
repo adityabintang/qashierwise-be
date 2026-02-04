@@ -90,7 +90,7 @@ Route::post('/broadcasting/auth', [BroadcastAuthController::class, 'authenticate
     ->middleware(['auth:sanctum', \App\Http\Middleware\LogBroadcastingAuth::class]);
 
 // Protected routes
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function () {
     // Auth routes
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);

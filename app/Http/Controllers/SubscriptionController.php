@@ -86,10 +86,9 @@ class SubscriptionController extends Controller
     }
 
     /**
-     * Create checkout session and redirect to Midtrans payment page.
+     * Create checkout session and redirect to Midtrans Subscription payment page.
      *
-     * Handles null subscription safely by checking existence before accessing properties.
-     * Allows users without subscriptions or with cancelled subscriptions to proceed.
+     * Uses Midtrans Subscription API for recurring payments instead of Snap.
      */
     public function createCheckout(Request $request): RedirectResponse
     {
@@ -146,36 +145,21 @@ class SubscriptionController extends Controller
                 'existingStatus' => $existingSubscription?->status,
             ]);
 
-            // Create Midtrans Snap token
-            $snapData = app(\App\Services\MidtransSnapService::class)->createSubscriptionSnapToken($user, $planId, $duration);
-
-            if ($snapData === null || empty($snapData['snap_token'])) {
-                Log::error('Failed to create Snap token', [
-                    'event' => 'checkout.snap_token_failed',
-                    'userId' => $user->id,
-                    'planId' => $planId,
-                    'duration' => $duration,
-                ]);
-
-                return redirect()->back()->with('error', 'Failed to create payment session. Please try again.');
-            }
-
-            // Store snap token in session and redirect to payment page
+            // Store plan info in session and redirect to card tokenization page
             session([
                 'selected_plan_id' => $planId,
                 'selected_duration' => $duration,
-                'snap_token' => $snapData['snap_token'],
             ]);
 
-            Log::info('Snap token created, redirecting to payment', [
-                'event' => 'checkout.snap_token_created',
+            Log::info('Redirecting to card tokenization page', [
+                'event' => 'checkout.redirect_to_tokenization',
                 'userId' => $user->id,
                 'planId' => $planId,
                 'duration' => $duration,
             ]);
 
-            // Redirect to payment page
-            return redirect()->route('subscription.payment');
+            // Redirect to card tokenization page
+            return redirect()->route('subscription.tokenization');
         } catch (\Exception $e) {
             Log::error('Failed to create checkout session', [
                 'event' => 'checkout.failed',
@@ -187,6 +171,145 @@ class SubscriptionController extends Controller
             ]);
 
             return redirect()->back()->with('error', 'Failed to create checkout session. Please try again.');
+        }
+    }
+
+    /**
+     * Show card tokenization page for Midtrans Subscription.
+     */
+    public function tokenization(): View|RedirectResponse
+    {
+        $user = auth()->user();
+
+        if ($user === null) {
+            return redirect()->route('login')->with('error', 'Please login to continue.');
+        }
+
+        $planId = session('selected_plan_id');
+        $duration = session('selected_duration');
+
+        if (empty($planId) || empty($duration)) {
+            return redirect()->route('subscription.pricing')->with('error', 'Please select a plan first.');
+        }
+
+        $plan = config("subscription.plans.{$planId}");
+
+        if ($plan === null || ! isset($plan['durations'][$duration])) {
+            return redirect()->route('subscription.pricing')->with('error', 'Invalid plan selected.');
+        }
+
+        $durationDetails = $plan['durations'][$duration];
+
+        return view('subscription.tokenization', [
+            'plan' => $plan,
+            'planId' => $planId,
+            'duration' => $duration,
+            'durationDetails' => $durationDetails,
+            'clientKey' => config('subscription.midtrans.client_key'),
+        ]);
+    }
+
+    /**
+     * Process card token and create subscription.
+     */
+    public function createSubscription(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'card_token' => 'required|string',
+        ]);
+
+        $user = $request->user();
+
+        if ($user === null) {
+            return redirect()->route('login')->with('error', 'Please login to continue.');
+        }
+
+        $planId = session('selected_plan_id');
+        $duration = session('selected_duration');
+
+        if (empty($planId) || empty($duration)) {
+            return redirect()->route('subscription.pricing')->with('error', 'Please select a plan first.');
+        }
+
+        $cardToken = $request->input('card_token');
+
+        try {
+            Log::info('Creating Midtrans subscription', [
+                'event' => 'subscription.create_start',
+                'userId' => $user->id,
+                'planId' => $planId,
+                'duration' => $duration,
+            ]);
+
+            // Create subscription using Midtrans Subscription API
+            $subscriptionData = $this->midtransService->createSubscription($user, $planId, $cardToken);
+
+            if ($subscriptionData === null || empty($subscriptionData['id'])) {
+                Log::error('Failed to create Midtrans subscription', [
+                    'event' => 'subscription.create_failed',
+                    'userId' => $user->id,
+                    'planId' => $planId,
+                ]);
+
+                return redirect()->back()->with('error', 'Failed to create subscription. Please try again.');
+            }
+
+            // Store subscription info in database
+            $plan = config("subscription.plans.{$planId}");
+            $durationDetails = $plan['durations'][$duration] ?? null;
+            $months = $durationDetails['months'] ?? 1;
+
+            // Create or update local subscription
+            $subscription = $user->subscription;
+            $subscriptionData = [
+                'user_id' => $user->id,
+                'midtrans_subscription_id' => $subscriptionData['id'],
+                'midtrans_customer_id' => $subscriptionData['customer_id'] ?? null,
+                'plan_name' => $planId,
+                'status' => $subscriptionData['status'] === 'active' ? 'active' : 'pending',
+                'current_period_start' => now(),
+                'current_period_end' => now()->addMonthsNoOverflow($months),
+                'amount' => $durationDetails['price'] ?? $plan['price_monthly'],
+                'metadata' => json_encode([
+                    'midtrans_name' => $subscriptionData['name'] ?? null,
+                    'amount' => $subscriptionData['amount'] ?? null,
+                    'currency' => $subscriptionData['currency'] ?? 'IDR',
+                    'payment_type' => 'credit_card',
+                    'interval' => $subscriptionData['schedule']['interval_unit'] ?? 'month',
+                    'interval_count' => $subscriptionData['schedule']['interval'] ?? 1,
+                    'duration' => $duration,
+                    'duration_name' => $durationDetails['name'] ?? null,
+                    'months' => $months,
+                ]),
+            ];
+
+            if ($subscription) {
+                $subscription->update($subscriptionData);
+            } else {
+                $subscription = \App\Models\Subscription::create($subscriptionData);
+            }
+
+            // Clear session
+            session()->forget(['selected_plan_id', 'selected_duration']);
+
+            Log::info('Subscription created successfully', [
+                'event' => 'subscription.created',
+                'subscription_id' => $subscription->id,
+                'midtrans_subscription_id' => $subscriptionData['id'],
+                'user_id' => $user->id,
+            ]);
+
+            return redirect()->route('subscription.success')
+                ->with('success', 'Subscription created successfully! Your subscription is now active.');
+        } catch (\Exception $e) {
+            Log::error('Exception creating subscription', [
+                'event' => 'subscription.exception',
+                'error' => $e->getMessage(),
+                'userId' => $user->id,
+                'planId' => $planId,
+            ]);
+
+            return redirect()->back()->with('error', 'Failed to create subscription. Please try again.');
         }
     }
 

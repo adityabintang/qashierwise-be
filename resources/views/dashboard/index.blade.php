@@ -13,7 +13,7 @@
             <div class="max-w-7xl mx-auto space-y-6">
                 <!-- Trial Expired Banner -->
                 <div x-data="subscriptionStatus()" x-init="init()">
-                    <div x-show="!loading && subscription.status === 'trial_expired'" x-cloak 
+                    <div x-show="!loading && subscription.status === 'trial_expired'" x-cloak
                          class="bg-gradient-to-r from-red-500 to-orange-500 rounded-xl p-4 md:p-6 text-white shadow-lg">
                         <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                             <div class="flex items-center gap-4">
@@ -233,14 +233,14 @@
                                 <template x-for="message in messages" :key="message.id">
                                     <div @click="viewMessage(message)" class="flex items-start gap-3 p-3 rounded-lg hover:bg-[hsl(var(--muted)/0.5)] transition-colors cursor-pointer">
                                         <!-- Avatar with name -->
-                                        <img 
+                                        <img
                                             x-show="message.contact_name && message.contact_name.trim()"
-                                            :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(message.contact_name || 'U')}&backgroundColor=a855f7`" 
+                                            :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(message.contact_name || 'U')}&backgroundColor=a855f7`"
                                             :alt="message.contact_name"
                                             class="avatar"
                                         >
                                         <!-- Avatar without name -->
-                                        <div 
+                                        <div
                                             x-show="!message.contact_name || !message.contact_name.trim()"
                                             class="avatar flex items-center justify-center text-white font-bold"
                                             style="background: linear-gradient(135deg, #a855f7, #9333ea); font-size: 0.75rem;"
@@ -391,9 +391,9 @@
 <script>
 function dashboardApp() {
     return {
-        sidebarOpen: true, 
+        sidebarOpen: true,
         isMobile: window.innerWidth < 768,
-        user: null, 
+        user: null,
         notifications: [],
         init() {
             // Set initial sidebar state based on viewport
@@ -405,12 +405,12 @@ function dashboardApp() {
                 this.sidebarOpen = true;
                 localStorage.setItem('sidebarOpen', 'true');
             }
-            
+
             // Watch sidebar state changes (only save on desktop)
             this.$watch('sidebarOpen', v => {
                 if (!this.isMobile) localStorage.setItem('sidebarOpen', JSON.stringify(v));
             });
-            
+
             // Handle resize events with debounce
             let resizeTimeout;
             window.addEventListener('resize', () => {
@@ -418,7 +418,7 @@ function dashboardApp() {
                 resizeTimeout = setTimeout(() => {
                     const wasMobile = this.isMobile;
                     this.isMobile = window.innerWidth < 768;
-                    
+
                     // Auto-adjust sidebar when crossing breakpoint
                     if (wasMobile && !this.isMobile) {
                         // Switched from mobile to desktop
@@ -430,7 +430,7 @@ function dashboardApp() {
                     }
                 }, 150);
             });
-            
+
             let storedUser = localStorage.getItem('user');
             if (storedUser) { try { this.user = JSON.parse(storedUser); } catch (e) { this.user = { name: 'User', email: 'user@example.com' }; } }
             else { this.user = { name: 'User', email: 'user@example.com' }; }
@@ -444,8 +444,26 @@ function dashboardApp() {
         clearNotifications() { this.notifications = []; localStorage.removeItem('notifications'); },
         removeNotification(id) { this.notifications = this.notifications.filter(n => n.id !== id); localStorage.setItem('notifications', JSON.stringify(this.notifications)); },
         formatNotificationTime(timestamp) { let date = new Date(timestamp), diff = Math.floor((new Date() - date) / 1000); if (diff < 60) return 'Just now'; if (diff < 3600) return Math.floor(diff / 60) + 'm ago'; if (diff < 86400) return Math.floor(diff / 3600) + 'h ago'; return date.toLocaleDateString(); },
-        logout() { let token = localStorage.getItem('token'); if (token) { fetch(`${window.location.origin}/api/logout`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } }).finally(() => this.clearAndRedirect()); } else { this.clearAndRedirect(); } },
-        clearAndRedirect() { localStorage.removeItem('token'); localStorage.removeItem('user'); localStorage.removeItem('sidebarOpen'); localStorage.removeItem('notifications'); window.location.href = '/login'; }
+        logout() {
+            let token = localStorage.getItem('token');
+            if (token) {
+                // CRITICAL: Call API logout FIRST before clearing storage
+                fetch(`${window.location.origin}/api/logout`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                }).finally(() => {
+                    // Clear storage AFTER API call (success or fail)
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    window.location.replace('/login');
+                });
+            } else {
+                // No token, just clear and redirect
+                localStorage.clear();
+                sessionStorage.clear();
+                window.location.replace('/login');
+            }
+        },
     }
 }
 
@@ -487,11 +505,11 @@ function weeklyChart() {
         chart: null,
         chartData: [],
         chartSummary: { totalIncoming: 0, totalOutgoing: 0, total: 0 },
-        
+
         init() {
             this.fetchChartData();
         },
-        
+
         async fetchChartData() {
             this.loading = true;
             try {
@@ -500,7 +518,7 @@ function weeklyChart() {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const result = await response.json();
-                
+
                 if (result.success && result.data) {
                     this.chartData = result.data;
                     console.log('Chart Data:', this.chartData);
@@ -508,7 +526,7 @@ function weeklyChart() {
                     this.chartSummary.totalOutgoing = this.chartData.reduce((sum, d) => sum + (d.outgoing || 0), 0);
                     this.chartSummary.total = this.chartSummary.totalIncoming + this.chartSummary.totalOutgoing;
                     console.log('Chart Summary:', this.chartSummary);
-                    
+
                     this.loading = false;
                     // Give more time for DOM and ApexCharts to be ready
                     setTimeout(() => this.renderChart(), 300);
@@ -518,29 +536,29 @@ function weeklyChart() {
                 this.loading = false;
             }
         },
-        
+
         renderChart() {
             if (this.chartData.length === 0) return;
-            
+
             // Check if ApexCharts is loaded
             if (typeof ApexCharts === 'undefined') {
                 console.warn('ApexCharts not loaded yet, retrying...');
                 setTimeout(() => this.renderChart(), 100);
                 return;
             }
-            
+
             const chartElement = document.querySelector("#weeklyMessagesChart");
             if (!chartElement) {
                 console.warn('Chart element not found, retrying...');
                 setTimeout(() => this.renderChart(), 100);
                 return;
             }
-            
+
             const incomingData = this.chartData.map(d => d.incoming || 0);
             const outgoingData = this.chartData.map(d => d.outgoing || 0);
             console.log('Incoming Data:', incomingData);
             console.log('Outgoing Data:', outgoingData);
-            
+
             const options = {
                 series: [
                     {
@@ -602,11 +620,11 @@ function weeklyChart() {
                     }
                 }
             };
-            
+
             if (this.chart) {
                 this.chart.destroy();
             }
-            
+
             this.chart = new ApexCharts(document.querySelector("#weeklyMessagesChart"), options);
             this.chart.render();
         }
@@ -671,7 +689,7 @@ function subscriptionStatus() {
 
         async init() {
             console.log('[Subscription] Initializing...');
-            
+
             // Set timeout to prevent infinite loading
             setTimeout(() => {
                 if (this.loading) {
@@ -679,9 +697,9 @@ function subscriptionStatus() {
                     this.loading = false;
                 }
             }, 5000);
-            
+
             await this.fetchSubscriptionStatus();
-            
+
             // If still on trial/expired after initial fetch, start polling
             // This handles the case where user just completed payment
             if (this.subscription.status === 'trial' || this.subscription.status === 'trial_expired') {
@@ -693,13 +711,13 @@ function subscriptionStatus() {
         startPolling() {
             let pollCount = 0;
             const maxPolls = 6; // Poll for 30 seconds (6 * 5 seconds)
-            
+
             const pollInterval = setInterval(async () => {
                 pollCount++;
                 console.log(`[Subscription] Polling for updates (${pollCount}/${maxPolls})`);
-                
+
                 await this.fetchSubscriptionStatus();
-                
+
                 // Stop polling if subscription is active or max polls reached
                 if (this.subscription.status === 'active' || pollCount >= maxPolls) {
                     clearInterval(pollInterval);
@@ -723,6 +741,14 @@ function subscriptionStatus() {
                     headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
                 });
                 console.log('[Subscription] API response status:', response.status);
+
+                // Handle 401 Unauthorized - don't redirect, just stop polling
+                if (response.status === 401) {
+                    console.warn('[Subscription] Unauthorized - token may be invalid');
+                    this.loading = false;
+                    return;
+                }
+
                 const data = await response.json();
                 console.log('[Subscription] API data:', data);
                 if (data.success && data.data?.subscription) {
@@ -762,8 +788,16 @@ function subscriptionStatus() {
 
         formatDate(dateString) {
             if (!dateString) return '-';
-            const date = new Date(dateString);
-            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            // Extract just the date part (YYYY-MM-DD) from ISO string
+            // This prevents JavaScript from doing any timezone conversion
+            const datePart = dateString.split('T')[0] || dateString.split(' ')[0];
+            const [year, month, day] = datePart.split('-').map(Number);
+
+            // Format manually to avoid any timezone issues
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+            return `${monthNames[month - 1]} ${day}, ${year}`;
         },
 
         async openCustomerPortal() {

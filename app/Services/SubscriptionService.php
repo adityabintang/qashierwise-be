@@ -43,7 +43,7 @@ class SubscriptionService
 
     /**
      * Get the subscription status for a user.
-     * 
+     *
      * CRITICAL: Uses getEffectiveSubscription() to ensure POS users inherit
      * subscription from their master admin. This enforces that all users
      * under a merchant share the same subscription tier.
@@ -240,7 +240,7 @@ class SubscriptionService
 
     /**
      * Create or update a subscription for a user from Midtrans data.
-     * 
+     *
      * CRITICAL: Subscriptions are ALWAYS created for the master admin.
      * POS users (kasir) cannot have their own subscription - they inherit
      * from their master admin. This enforces the single subscription
@@ -254,7 +254,7 @@ class SubscriptionService
         // CRITICAL: Get the master admin who owns the subscription
         // Subscriptions are always linked to master admin, never to POS users
         $masterAdmin = $user->isMasterAdmin() ? $user : $user->getMasterAdmin();
-        
+
         if ($masterAdmin === null) {
             Log::error('Cannot create subscription - no master admin found', [
                 'user_id' => $user->id,
@@ -262,7 +262,7 @@ class SubscriptionService
             ]);
             throw new \Exception('Cannot create subscription: User is not associated with any merchant');
         }
-        
+
         $subscription = $masterAdmin->subscription;
 
         $metadata = $midtransData['metadata'] ?? [];
@@ -274,12 +274,14 @@ class SubscriptionService
             'midtrans_customer_id' => $midtransData['customer_id'] ?? null,
             'plan_name' => $metadata['plan_id'] ?? 'pro',
             'status' => $this->mapMidtransStatus($midtransData['status'] ?? 'active'),
-            'current_period_start' => isset($schedule['start_time'])
+            'current_period_start' => $periodStart = isset($schedule['start_time'])
                 ? Carbon::parse($schedule['start_time'])
                 : Carbon::now(),
-            'current_period_end' => isset($schedule['start_time'])
-                ? Carbon::parse($schedule['start_time'])->addMonth()
-                : Carbon::now()->addMonth(),
+            'current_period_end' => $this->calculatePeriodEnd(
+                $periodStart,
+                $schedule['interval_unit'] ?? 'month',
+                $schedule['interval'] ?? 1
+            ),
             'metadata' => json_encode([
                 'midtrans_name' => $midtransData['name'] ?? null,
                 'amount' => $midtransData['amount'] ?? null,
@@ -510,10 +512,10 @@ class SubscriptionService
     private function calculatePeriodEnd(Carbon $startDate, string $interval = 'month', int $intervalCount = 1): Carbon
     {
         return match ($interval) {
-            'month' => $startDate->copy()->addMonths($intervalCount),
+            'month' => $startDate->copy()->addMonthsNoOverflow($intervalCount),
             'year' => $startDate->copy()->addYears($intervalCount),
             'day' => $startDate->copy()->addDays($intervalCount),
-            default => $startDate->copy()->addMonth(),
+            default => $startDate->copy()->addMonthsNoOverflow(1),
         };
     }
 }

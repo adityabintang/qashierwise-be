@@ -9,7 +9,7 @@
     sidebarOpen: window.innerWidth >= 1024,
     user: null,
     notifications: [],
-    
+
     initDashboard() {
         // Handle window resize
         window.addEventListener('resize', () => {
@@ -18,7 +18,7 @@
                 this.sidebarOpen = true;
             }
         });
-        
+
         // Load user info
         let storedUser = localStorage.getItem('user');
         if (storedUser) {
@@ -30,38 +30,38 @@
         } else {
             this.user = { name: 'User', email: 'user@example.com' };
         }
-        
+
         // Initialize subscription data
         this.init();
     },
-    
+
     clearNotifications() {
         this.notifications = [];
     },
-    
+
     removeNotification(id) {
         this.notifications = this.notifications.filter(n => n.id !== id);
     },
-    
+
     formatNotificationTime(time) {
         if (!time) return '';
         const date = new Date(time);
         const now = new Date();
         const diffMs = now - date;
         const diffMins = Math.floor(diffMs / 60000);
-        
+
         if (diffMins < 1) return 'Just now';
         if (diffMins < 60) return `${diffMins}m ago`;
-        
+
         const diffHours = Math.floor(diffMins / 60);
         if (diffHours < 24) return `${diffHours}h ago`;
-        
+
         const diffDays = Math.floor(diffHours / 24);
         if (diffDays < 7) return `${diffDays}d ago`;
-        
+
         return date.toLocaleDateString();
     },
-    
+
     logout() {
         let apiBaseUrl = window.location.origin + '/api';
         fetch(`${apiBaseUrl}/logout`, {
@@ -76,10 +76,10 @@
             window.location.href = '/login';
         });
     }
-}" x-init="initDashboard()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+}" x-init="initDashboard()" class="h-screen flex bg-[hsl(var(--muted)/0.4)]">
     @include('components.dashboard-sidebar', ['activePage' => 'subscription'])
 
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         @include('components.dashboard-header', ['title' => 'Manage Subscription', 'description' => 'View and manage your subscription plan'])
 
         <main class="flex-1 p-4 md:p-6">
@@ -133,7 +133,7 @@
                         <p class="text-gray-600 mb-6 max-w-md mx-auto">
                             You don't have an active subscription yet. Choose a plan to unlock all premium features and grow your business.
                         </p>
-                        <a href="/#pricing" 
+                        <a href="/#pricing"
                            class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all">
                             <i class="fas fa-star"></i>
                             View Plans & Pricing
@@ -230,14 +230,14 @@
                         <!-- Alerts -->
                         <div class="mt-6 space-y-3">
                             <!-- Trial Expiring Soon -->
-                            <div x-show="subscription?.status === 'trial' && subscription?.trial_days_remaining <= 3" 
+                            <div x-show="subscription?.status === 'trial' && subscription?.trial_days_remaining <= 3"
                                  class="p-4 bg-amber-50 border border-amber-200 rounded-lg">
                                 <div class="flex items-start gap-3">
                                     <i class="fas fa-exclamation-triangle text-amber-600 mt-1"></i>
                                     <div>
                                         <p class="font-semibold text-amber-900">Trial Ending Soon</p>
                                         <p class="text-sm text-amber-700 mt-1">
-                                            Your trial will expire in <span x-text="subscription?.trial_days_remaining || 0">0</span> days. 
+                                            Your trial will expire in <span x-text="subscription?.trial_days_remaining || 0">0</span> days.
                                             Upgrade now to continue using all features.
                                         </p>
                                     </div>
@@ -245,14 +245,14 @@
                             </div>
 
                             <!-- Subscription Cancelled -->
-                            <div x-show="subscription?.status === 'cancelled'" 
+                            <div x-show="subscription?.status === 'cancelled'"
                                  class="p-4 bg-orange-50 border border-orange-200 rounded-lg">
                                 <div class="flex items-start gap-3">
                                     <i class="fas fa-info-circle text-orange-600 mt-1"></i>
                                     <div>
                                         <p class="font-semibold text-orange-900">Subscription Cancelled</p>
                                         <p class="text-sm text-orange-700 mt-1">
-                                            Your subscription has been cancelled. You'll have access until 
+                                            Your subscription has been cancelled. You'll have access until
                                             <span x-text="formatDate(subscription?.period_end)">-</span>.
                                         </p>
                                     </div>
@@ -260,7 +260,7 @@
                             </div>
 
                             <!-- Trial Expired -->
-                            <div x-show="subscription?.status === 'trial_expired'" 
+                            <div x-show="subscription?.status === 'trial_expired'"
                                  class="p-4 bg-red-50 border border-red-200 rounded-lg">
                                 <div class="flex items-start gap-3">
                                     <i class="fas fa-times-circle text-red-600 mt-1"></i>
@@ -388,13 +388,13 @@
     </div>
 
     <!-- Cancel Confirmation Modal -->
-    <div x-show="showCancelModal" 
+    <div x-show="showCancelModal"
          x-cloak
          class="fixed inset-0 z-50 overflow-y-auto"
          @keydown.escape.window="showCancelModal = false">
         <div class="flex items-center justify-center min-h-screen px-4">
             <div class="fixed inset-0 bg-black/50 transition-opacity" @click="showCancelModal = false"></div>
-            
+
             <div class="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
                 <div class="text-center mb-6">
                     <div class="h-16 w-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
@@ -402,7 +402,7 @@
                     </div>
                     <h3 class="text-xl font-bold text-gray-900 mb-2">Cancel Subscription?</h3>
                     <p class="text-gray-600">
-                        Are you sure you want to cancel your subscription? You'll lose access to all premium features 
+                        Are you sure you want to cancel your subscription? You'll lose access to all premium features
                         at the end of your billing period.
                     </p>
                 </div>
@@ -457,7 +457,7 @@
                             'Accept': 'application/json'
                         }
                     });
-                    
+
                     if (response.ok) {
                         const data = await response.json();
                         this.subscription = data.data?.subscription || null;
@@ -478,7 +478,7 @@
                             'Accept': 'application/json'
                         }
                     });
-                    
+
                     if (response.ok) {
                         const data = await response.json();
                         this.billingHistory = data.data?.payments || [];
@@ -514,12 +514,16 @@
 
             formatDate(dateString) {
                 if (!dateString) return '-';
-                const date = new Date(dateString);
-                return date.toLocaleDateString('en-US', { 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                });
+                // Extract just the date part (YYYY-MM-DD) from ISO string
+                // This prevents JavaScript from doing any timezone conversion
+                const datePart = dateString.split('T')[0] || dateString.split(' ')[0];
+                const [year, month, day] = datePart.split('-').map(Number);
+
+                // Format manually to avoid any timezone issues
+                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'];
+
+                return `${monthNames[month - 1]} ${day}, ${year}`;
             },
 
             formatPrice(amount) {

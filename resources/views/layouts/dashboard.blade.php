@@ -15,16 +15,39 @@
             async fetchPermissions() {
                 try {
                     const token = localStorage.getItem('token');
+                    // CRITICAL: If no token, redirect to login immediately
+                    if (!token) {
+                        console.error('No token found, redirecting to login');
+                        window.location.replace('/login');
+                        return;
+                    }
+
+                    console.log('Fetching permissions with token for user:', localStorage.getItem('user'));
+
                     const res = await fetch(window.location.origin + '/api/user/permissions', {
                         headers: {
                             'Authorization': `Bearer ${token}`,
-                            'Accept': 'application/json'
+                            'Accept': 'application/json',
+                            'Cache-Control': 'no-cache'
                         }
                     });
+
+                    if (res.status === 401) {
+                        console.error('Unauthorized - token invalid');
+                        // Don't immediately redirect on 401 - token might still be initializing
+                        // Let the CheckWebAuth middleware handle the redirect if truly invalid
+                        this.isAdmin = true;
+                        this.userPermissions = ['*'];
+                        return;
+                    }
+
                     const data = await res.json();
                     if (data.success) {
                         this.isAdmin = data.data.is_admin || false;
                         this.userPermissions = data.data.permissions || [];
+                        console.log('Permissions fetched successfully:', this.userPermissions);
+                    } else {
+                        console.error('Failed to fetch permissions:', data);
                     }
                 } catch (e) {
                     console.error('Failed to fetch permissions:', e);
@@ -110,17 +133,29 @@
 
     logout() {
         let apiBaseUrl = window.location.origin + '/api';
-        fetch(`${apiBaseUrl}/logout`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                'Accept': 'application/json'
-            }
-        }).then(() => {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '/login';
-        });
+        let token = localStorage.getItem('token');
+
+        if (token) {
+            // CRITICAL: Call API logout FIRST before clearing storage
+            fetch(`${apiBaseUrl}/logout`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json'
+                }
+            }).finally(() => {
+                // Clear storage AFTER API call (success or fail)
+                localStorage.clear();
+                sessionStorage.clear();
+                // Force hard reload to clear any in-memory state
+                window.location.replace('/login');
+            });
+        } else {
+            // No token, just clear and redirect
+            localStorage.clear();
+            sessionStorage.clear();
+            window.location.replace('/login');
+        }
     }
 }" class="min-h-screen bg-gray-50">
     <!-- Sidebar -->

@@ -87,13 +87,13 @@ function authForm() {
             const urlParams = new URLSearchParams(window.location.search);
             const redirect = urlParams.get('redirect');
             const plan = urlParams.get('plan');
-            
+
             // If redirect=pricing and plan is specified, go to welcome page pricing section
             // and trigger checkout after login
             if (redirect === 'pricing' && plan) {
                 return `/?plan=${plan}&checkout=true#pricing`;
             }
-            
+
             return '/dashboard';
         },
 
@@ -112,12 +112,28 @@ function authForm() {
                 const data = await response.json();
 
                 if (data.success) {
+                    // CRITICAL: Store token BEFORE any redirects to prevent race conditions
+                    // with CheckWebAuth middleware
                     localStorage.setItem('token', data.data.access_token);
                     if (data.data.user) localStorage.setItem('user', JSON.stringify(data.data.user));
+
+                    // Verify token is stored before redirecting
+                    if (!localStorage.getItem('token')) {
+                        console.error('Token storage failed');
+                        this.error = 'Login failed. Please try again.';
+                        this.loading = false;
+                        return;
+                    }
+
                     this.success = '{{ __("auth.login_success") }}';
-                    
+
                     const redirectUrl = this.getRedirectUrl();
-                    setTimeout(() => window.location.href = redirectUrl, 1000);
+                    // Use replace instead of href to prevent back-button issues
+                    // Add small delay to ensure token is fully persisted
+                    setTimeout(() => {
+                        console.log('[Login] Redirecting to:', redirectUrl);
+                        window.location.replace(redirectUrl);
+                    }, 500);
                 } else {
                     this.error = data.message || '{{ __("auth.login_failed") }}';
                 }

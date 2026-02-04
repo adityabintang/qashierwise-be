@@ -32,28 +32,51 @@ class CheckWebAuth
                         window.location.href = '/login';
                         return;
                     }
-                    
-                    // Verify token with API
-                    fetch(window.location.origin + '/api/me', {
-                        headers: {
-                            'Authorization': 'Bearer ' + token,
-                            'Accept': 'application/json'
-                        }
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            // Token invalid or expired
+
+                    // Add retry logic and delay to prevent race conditions during login
+                    let retryCount = 0;
+                    const maxRetries = 3;
+                    const retryDelay = 500; // 500ms delay between retries
+
+                    function verifyToken() {
+                        fetch(window.location.origin + '/api/me', {
+                            headers: {
+                                'Authorization': 'Bearer ' + token,
+                                'Accept': 'application/json'
+                            }
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                if (response.status === 401 && retryCount < maxRetries) {
+                                    // Retry on 401 - token might still be initializing
+                                    retryCount++;
+                                    console.log('[CheckWebAuth] Token verification failed, retrying... (' + retryCount + '/' + maxRetries + ')');
+                                    setTimeout(verifyToken, retryDelay);
+                                    return;
+                                }
+                                // Token invalid or expired after retries
+                                localStorage.removeItem('token');
+                                localStorage.removeItem('user');
+                                window.location.href = '/login';
+                            }
+                        })
+                        .catch(() => {
+                            if (retryCount < maxRetries) {
+                                // Retry on network error
+                                retryCount++;
+                                console.log('[CheckWebAuth] Network error, retrying... (' + retryCount + '/' + maxRetries + ')');
+                                setTimeout(verifyToken, retryDelay);
+                                return;
+                            }
+                            // Network error or token invalid after retries
                             localStorage.removeItem('token');
                             localStorage.removeItem('user');
                             window.location.href = '/login';
-                        }
-                    })
-                    .catch(() => {
-                        // Network error or token invalid
-                        localStorage.removeItem('token');
-                        localStorage.removeItem('user');
-                        window.location.href = '/login';
-                    });
+                        });
+                    }
+
+                    // Delay initial check to allow token to be fully set after login
+                    setTimeout(verifyToken, 300);
                 })();
             </script>
             ";

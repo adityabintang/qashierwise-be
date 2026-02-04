@@ -100,6 +100,12 @@ Route::middleware(['web', 'check.web.auth'])->group(function () {
             ->name('pricing');
         Route::post('/checkout', [App\Http\Controllers\SubscriptionController::class, 'createCheckout'])
             ->name('checkout');
+        // Card tokenization for Midtrans Subscription API
+        Route::get('/tokenization', [App\Http\Controllers\SubscriptionController::class, 'tokenization'])
+            ->name('tokenization');
+        Route::post('/create-subscription', [App\Http\Controllers\SubscriptionController::class, 'createSubscription'])
+            ->name('create-subscription');
+        // Legacy payment route (kept for compatibility)
         Route::get('/payment', [App\Http\Controllers\SubscriptionController::class, 'payment'])
             ->name('payment');
         Route::get('/success', [App\Http\Controllers\SubscriptionController::class, 'success'])

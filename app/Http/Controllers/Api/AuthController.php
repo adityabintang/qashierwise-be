@@ -157,6 +157,10 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->firstOrFail();
 
+        // CRITICAL: Clear permission cache to prevent cross-tenant permission leakage
+        // This ensures each user session starts with fresh permission data
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+
         // Check if user is a POS user and if their account is active
         $posUser = PosUser::where('user_id', $user->id)->first();
         if ($posUser && ! $posUser->is_active) {
@@ -197,11 +201,25 @@ class AuthController extends Controller
             return ApiResponse::unauthorized('messages.error.unauthorized');
         }
 
-        $token = $user->currentAccessToken();
+        // CRITICAL: Delete ALL tokens for this user to prevent session leakage
+        // This ensures complete logout across all devices/sessions
+        $user->tokens()->delete();
 
-        if ($token) {
-            $token->delete();
-        }
+        // CRITICAL: Clear permission cache to prevent cross-tenant permission leakage
+        // This ensures no cached permission data persists after logout
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+
+        // Clear admin session cache if applicable
+        \App\Http\Middleware\AdminSessionValidation::invalidateSession($user->id);
+
+        // Clear Laravel session
+        $request->session()->flush();
+        $request->session()->regenerateToken();
+
+        \Log::info('User logged out - all tokens deleted', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+        ]);
 
         return ApiResponse::success(null, 'auth.logout_success');
     }
@@ -233,7 +251,12 @@ class AuthController extends Controller
      */
     public function getUserPermissions(Request $request)
     {
-        $user = $request->user();
+        // CRITICAL: Force reload user from database to prevent permission cache leakage
+        // This ensures fresh permission data for each request
+        $user = User::find($request->user()->id);
+
+        // Clear any Spatie permission cache
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
         \Log::info('=== getUserPermissions DEBUG ===');
         \Log::info('User ID: ' . $user->id);
@@ -251,24 +274,38 @@ class AuthController extends Controller
         // Super admin has full system access
         if ($user->isSuperAdmin()) {
             \Log::info('Super admin - granting all permissions');
-            return ApiResponse::success([
+            $response = ApiResponse::success([
                 'is_super_admin' => true,
                 'is_master_admin' => false,
                 'is_admin' => true,
                 'permissions' => $allPermissions, // All permissions from database
                 'role' => 'super_admin',
             ]);
+
+            return $response->withHeaders([
+                'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+                'Pragma' => 'no-cache',
+                'Expires' => 'Thu, 01 Jan 1970 00:00:00 GMT',
+                'X-User-ID' => $user->id,
+            ]);
         }
 
         // Master admin has full access to their merchant
         if ($user->isMasterAdmin()) {
             \Log::info('Master admin - granting all permissions');
-            return ApiResponse::success([
+            $response = ApiResponse::success([
                 'is_super_admin' => false,
                 'is_master_admin' => true,
                 'is_admin' => true,
                 'permissions' => $allPermissions, // All permissions from database
                 'role' => 'master_admin',
+            ]);
+
+            return $response->withHeaders([
+                'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+                'Pragma' => 'no-cache',
+                'Expires' => 'Thu, 01 Jan 1970 00:00:00 GMT',
+                'X-User-ID' => $user->id,
             ]);
         }
 
@@ -278,12 +315,19 @@ class AuthController extends Controller
         // If no POS user and not master admin, return minimal permissions
         if (!$posUser) {
             \Log::info('No POS user found - returning empty permissions');
-            return ApiResponse::success([
+            $response = ApiResponse::success([
                 'is_super_admin' => false,
                 'is_master_admin' => false,
                 'is_admin' => false,
                 'permissions' => [],
                 'role' => null,
+            ]);
+
+            return $response->withHeaders([
+                'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+                'Pragma' => 'no-cache',
+                'Expires' => 'Thu, 01 Jan 1970 00:00:00 GMT',
+                'X-User-ID' => $user->id,
             ]);
         }
 
@@ -297,12 +341,20 @@ class AuthController extends Controller
         \Log::info('Final permissions array: ' . json_encode($permissions));
         \Log::info('Final roles: ' . json_encode($roles));
 
-        return ApiResponse::success([
+        $response = ApiResponse::success([
             'is_super_admin' => false,
             'is_master_admin' => false,
             'is_admin' => false,
             'permissions' => $permissions,
             'roles' => $roles,
+        ]);
+
+        // Add cache-control headers to prevent browser/API caching
+        return $response->withHeaders([
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'Expires' => 'Thu, 01 Jan 1970 00:00:00 GMT',
+            'X-User-ID' => $user->id, // Debug header to verify correct user
         ]);
     }
 
