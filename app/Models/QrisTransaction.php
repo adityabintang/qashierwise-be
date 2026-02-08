@@ -16,9 +16,23 @@ class QrisTransaction extends Model
      * Transaction status constants.
      */
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_SETTLEMENT = 'settlement';
+
     public const STATUS_EXPIRE = 'expire';
+
     public const STATUS_CANCEL = 'cancel';
+
+    /**
+     * Payment provider constants.
+     */
+    public const PROVIDER_DOKU = 'doku';
+
+    public const PROVIDER_XENDIT = 'xendit';
+
+    public const PROVIDER_MIDTRANS = 'midtrans';
+
+    public const PROVIDER_DUITKU = 'duitku';
 
     /**
      * Platform fee percentage (2.5%).
@@ -37,15 +51,20 @@ class QrisTransaction extends Model
      */
     protected $fillable = [
         'sub_merchant_id',
+        'linked_order_id',
         'order_id',
         'amount',
         'platform_fee',
         'net_amount',
         'status',
+        'provider',
+        'provider_transaction_id',
+        'reference_id',
         'midtrans_transaction_id',
         'qr_code_url',
         'expires_at',
         'settled_at',
+        'paid_at',
     ];
 
     /**
@@ -61,6 +80,7 @@ class QrisTransaction extends Model
             'net_amount' => 'decimal:2',
             'expires_at' => 'datetime',
             'settled_at' => 'datetime',
+            'paid_at' => 'datetime',
         ];
     }
 
@@ -70,6 +90,22 @@ class QrisTransaction extends Model
     public function subMerchant(): BelongsTo
     {
         return $this->belongsTo(SubMerchant::class);
+    }
+
+    /**
+     * Get the order associated with this QRIS transaction.
+     */
+    public function linkedOrder(): BelongsTo
+    {
+        return $this->belongsTo(Order::class, 'linked_order_id');
+    }
+
+    /**
+     * Get the payment associated with this QRIS transaction.
+     */
+    public function payment(): HasOne
+    {
+        return $this->hasOne(Payment::class);
     }
 
     /**
@@ -87,6 +123,7 @@ class QrisTransaction extends Model
     {
         $timestamp = now()->format('YmdHis');
         $random = strtoupper(Str::random(8));
+
         return "QRIS-{$timestamp}-{$random}";
     }
 
@@ -114,7 +151,7 @@ class QrisTransaction extends Model
         if ($this->expires_at === null) {
             return false;
         }
-        
+
         return now()->isAfter($this->expires_at);
     }
 
@@ -123,7 +160,7 @@ class QrisTransaction extends Model
      */
     public function canBeUsed(): bool
     {
-        return $this->status === self::STATUS_PENDING && !$this->isExpired();
+        return $this->status === self::STATUS_PENDING && ! $this->isExpired();
     }
 
     /**
@@ -165,7 +202,7 @@ class QrisTransaction extends Model
     {
         $this->status = self::STATUS_SETTLEMENT;
         $this->settled_at = now();
-        
+
         if ($midtransTransactionId !== null) {
             $this->midtrans_transaction_id = $midtransTransactionId;
         }
@@ -195,7 +232,7 @@ class QrisTransaction extends Model
         if ($this->expires_at === null || $this->isExpired()) {
             return 0;
         }
-        
+
         return (int) now()->diffInSeconds($this->expires_at, false);
     }
 
@@ -222,5 +259,27 @@ class QrisTransaction extends Model
     {
         return $query->where('status', self::STATUS_PENDING)
             ->where('expires_at', '<', now());
+    }
+
+    /**
+     * Scope to filter transactions by provider.
+     */
+    public function scopeByProvider($query, string $provider)
+    {
+        return $query->where('provider', $provider);
+    }
+
+    /**
+     * Get the provider name for display.
+     */
+    public function getProviderDisplayName(): string
+    {
+        return match ($this->provider) {
+            self::PROVIDER_DOKU => 'Doku',
+            self::PROVIDER_XENDIT => 'Xendit',
+            self::PROVIDER_MIDTRANS => 'Midtrans',
+            self::PROVIDER_DUITKU => 'Duitku',
+            default => 'Unknown',
+        };
     }
 }

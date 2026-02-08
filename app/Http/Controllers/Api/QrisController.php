@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use App\Models\QrisTransaction;
 use App\Services\QrisService;
@@ -15,7 +16,7 @@ use RuntimeException;
 
 /**
  * Controller for QRIS generation and sharing API endpoints.
- * 
+ *
  * Handles QRIS code generation, retrieval, and sharing functionality.
  * Requirements: 2.1, 2.2, 2.3, 8.1, 8.2, 8.5
  */
@@ -28,13 +29,12 @@ class QrisController extends Controller
 
     /**
      * Generate a new QRIS code for a transaction.
-     * 
+     *
      * Requirement 2.1: Generate unique order_id for each transaction
-     * Requirement 2.2: Create QR code through Midtrans API
+     * Requirement 2.2: Create QR code through multi-provider API
      * Requirement 2.3: Provide both image and shareable link formats
-     * 
-     * @param Request $request
-     * @return JsonResponse
+     * Requirement 4.5: Prevent QRIS generation when no provider is active
+     * Requirement 7.5: Provide provider-specific error messages
      */
     public function generate(Request $request): JsonResponse
     {
@@ -49,37 +49,14 @@ class QrisController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'VALIDATION_ERROR',
-                    'message' => 'Invalid request data',
-                ],
-                'errors' => $validator->errors(),
-            ], 422);
+            return ApiResponse::validationError($validator->errors());
         }
 
         $user = $request->user();
         $subMerchant = $this->subMerchantService->findByUserId($user->id);
 
         if ($subMerchant === null) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'NOT_SUB_MERCHANT',
-                    'message' => 'User is not registered as a sub-merchant',
-                ],
-            ], 403);
-        }
-
-        if (!$subMerchant->is_active) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'MERCHANT_INACTIVE',
-                    'message' => 'Sub-merchant account is not active',
-                ],
-            ], 403);
+            return ApiResponse::forbidden('messages.error.forbidden');
         }
 
         try {
@@ -98,45 +75,37 @@ class QrisController extends Controller
                 'sub_merchant_id' => $subMerchant->id,
                 'order_id' => $transaction->order_id,
                 'amount' => $transaction->amount,
+                'provider' => $transaction->provider,
             ]);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'QRIS generated successfully',
-                'data' => [
-                    'transaction' => $this->formatTransactionResponse($transaction),
-                ],
-            ], 201);
+            return ApiResponse::success([
+                'transaction' => $this->formatTransactionResponse($transaction),
+            ], 'payments.qris_generated', 201);
         } catch (InvalidArgumentException $e) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'GENERATION_FAILED',
-                    'message' => $e->getMessage(),
-                ],
-            ], 422);
+            return ApiResponse::error('messages.error.invalid_data', 422);
         } catch (RuntimeException $e) {
             Log::error('QRIS generation failed', [
                 'user_id' => $user->id,
                 'error' => $e->getMessage(),
             ]);
 
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'MIDTRANS_ERROR',
-                    'message' => 'Failed to generate QRIS code. Please try again.',
-                ],
-            ], 500);
+            // Check if error is about no active provider (Requirement 4.5)
+            if (str_contains($e->getMessage(), 'No active payment provider')) {
+                return ApiResponse::error('payments.no_active_provider', 428);
+            }
+
+            // Check if error is about invalid provider configuration
+            if (str_contains($e->getMessage(), 'not properly configured')) {
+                return ApiResponse::error('payments.provider_invalid', 428);
+            }
+
+            // Generic provider error (Requirement 7.5)
+            return ApiResponse::serverError('messages.error.server');
         }
     }
 
     /**
      * Get QRIS transaction details by order ID.
-     * 
-     * @param Request $request
-     * @param string $orderId
-     * @return JsonResponse
      */
     public function show(Request $request, string $orderId): JsonResponse
     {
@@ -144,43 +113,24 @@ class QrisController extends Controller
         $subMerchant = $this->subMerchantService->findByUserId($user->id);
 
         if ($subMerchant === null) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'NOT_SUB_MERCHANT',
-                    'message' => 'User is not registered as a sub-merchant',
-                ],
-            ], 403);
+            return ApiResponse::forbidden('messages.error.forbidden');
         }
 
         $transaction = $this->qrisService->findByOrderId($orderId);
 
         if ($transaction === null || $transaction->sub_merchant_id !== $subMerchant->id) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'TRANSACTION_NOT_FOUND',
-                    'message' => 'QRIS transaction not found',
-                ],
-            ], 404);
+            return ApiResponse::notFound('messages.error.not_found');
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'transaction' => $this->formatTransactionResponse($transaction),
-            ],
+        return ApiResponse::success([
+            'transaction' => $this->formatTransactionResponse($transaction),
         ]);
     }
 
     /**
      * Get QR code image URL for a transaction.
-     * 
+     *
      * Requirement 8.1: Provide downloadable QR code image
-     * 
-     * @param Request $request
-     * @param string $orderId
-     * @return JsonResponse
      */
     public function getQrCode(Request $request, string $orderId): JsonResponse
     {
@@ -224,12 +174,8 @@ class QrisController extends Controller
 
     /**
      * Get shareable link for a QRIS transaction.
-     * 
+     *
      * Requirement 8.2: Generate shareable links for QRIS codes
-     * 
-     * @param Request $request
-     * @param string $orderId
-     * @return JsonResponse
      */
     public function getShareableLink(Request $request, string $orderId): JsonResponse
     {
@@ -274,12 +220,8 @@ class QrisController extends Controller
 
     /**
      * Check QRIS transaction status.
-     * 
+     *
      * Requirement 8.5: Display payment interface when QRIS is accessed
-     * 
-     * @param Request $request
-     * @param string $orderId
-     * @return JsonResponse
      */
     public function checkStatus(Request $request, string $orderId): JsonResponse
     {
@@ -326,9 +268,6 @@ class QrisController extends Controller
 
     /**
      * Get transaction history for the current sub-merchant.
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function history(Request $request): JsonResponse
     {
@@ -372,9 +311,6 @@ class QrisController extends Controller
 
     /**
      * Get pending transactions for the current sub-merchant.
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function pending(Request $request): JsonResponse
     {
@@ -404,10 +340,6 @@ class QrisController extends Controller
 
     /**
      * Cancel a pending QRIS transaction.
-     * 
-     * @param Request $request
-     * @param string $orderId
-     * @return JsonResponse
      */
     public function cancel(Request $request, string $orderId): JsonResponse
     {
@@ -461,9 +393,8 @@ class QrisController extends Controller
 
     /**
      * Format transaction data for API response.
-     * 
-     * @param QrisTransaction $transaction
-     * @return array
+     *
+     * Requirement 7.5: Include provider information in response
      */
     private function formatTransactionResponse(QrisTransaction $transaction): array
     {
@@ -473,6 +404,8 @@ class QrisController extends Controller
             'platform_fee' => (float) $transaction->platform_fee,
             'net_amount' => (float) $transaction->net_amount,
             'status' => $transaction->status,
+            'provider' => $transaction->provider,
+            'provider_transaction_id' => $transaction->provider_transaction_id,
             'qr_code_url' => $transaction->qr_code_url,
             'shareable_link' => $transaction->getShareableLink(),
             'is_expired' => $transaction->isExpired(),

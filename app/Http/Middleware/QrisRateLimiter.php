@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Rate limiting middleware for QRIS generation endpoints.
- * 
+ *
  * Implements user-specific rate limits to prevent abuse of QRIS generation.
  * Requirement 9.3: Implement rate limiting for QRIS generation
  */
@@ -48,7 +48,7 @@ class QrisRateLimiter
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
-        
+
         if ($user === null) {
             return response()->json([
                 'success' => false,
@@ -131,7 +131,7 @@ class QrisRateLimiter
             'success' => false,
             'error' => [
                 'code' => 'RATE_LIMIT_EXCEEDED',
-                'message' => "Too many QRIS generation requests. Please try again later.",
+                'message' => 'Too many QRIS generation requests. Please try again later.',
             ],
             'rate_limit' => [
                 'limit' => $maxAttempts,
@@ -170,6 +170,7 @@ class QrisRateLimiter
     public function getRemainingAttempts(int $userId): int
     {
         $key = $this->getMinuteRateLimitKey($userId);
+
         return $this->limiter->remaining($key, self::MAX_REQUESTS_PER_MINUTE);
     }
 

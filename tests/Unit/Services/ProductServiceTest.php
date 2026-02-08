@@ -11,7 +11,7 @@ use Tests\TestCase;
 
 /**
  * Unit tests for ProductService
- * 
+ *
  * Feature: point-of-sale
  */
 class ProductServiceTest extends TestCase
@@ -23,7 +23,7 @@ class ProductServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new ProductService();
+        $this->service = new ProductService;
     }
 
     #[Test]
@@ -68,7 +68,6 @@ class ProductServiceTest extends TestCase
 
         $this->assertEquals('CUSTOM-SKU-001', $product->sku);
     }
-
 
     #[Test]
     public function it_updates_a_product(): void
@@ -189,7 +188,7 @@ class ProductServiceTest extends TestCase
         ]);
 
         $sku1 = $this->service->generateSku('Test Product', $category->id);
-        
+
         // Create a product with this SKU
         Product::create([
             'name' => 'Test Product',

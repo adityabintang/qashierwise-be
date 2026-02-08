@@ -1,13 +1,13 @@
 @extends('layouts.app')
 
-@section('title', 'Generate QRIS - QashierWise')
+@section('title', __('submerchant.qris_title'))
 
 @section('content')
-<div x-data="qrisApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="qrisApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'sub-merchant-qris'])
 
-    <div class="flex-1 flex flex-col min-h-screen">
-        @include('components.dashboard-header', ['title' => 'Generate QRIS', 'description' => 'Create dynamic QR codes for payments'])
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
+        @include('components.dashboard-header', ['title' => __('submerchant.generate_qris'), 'description' => __('submerchant.qris_generation')])
 
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto space-y-6">
@@ -40,12 +40,12 @@
                                     <!-- Amount -->
                                     <div>
                                         <label class="text-sm font-medium mb-1.5 block">Amount (Rp) <span class="text-red-500">*</span></label>
-                                        <input 
-                                            type="text" 
-                                            x-model="form.amount" 
+                                        <input
+                                            type="text"
+                                            x-model="form.amount"
                                             @input="formatAmount()"
-                                            required 
-                                            class="input w-full min-h-[44px]" 
+                                            required
+                                            class="input w-full min-h-[44px]"
                                             placeholder="Enter amount"
                                         >
                                         <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Min: Rp 1,000 - Max: Rp 100,000,000</p>
@@ -54,10 +54,10 @@
                                     <!-- Description -->
                                     <div>
                                         <label class="text-sm font-medium mb-1.5 block">Description</label>
-                                        <input 
-                                            type="text" 
-                                            x-model="form.description" 
-                                            class="input w-full min-h-[44px]" 
+                                        <input
+                                            type="text"
+                                            x-model="form.description"
+                                            class="input w-full min-h-[44px]"
                                             placeholder="e.g., Payment for order #123"
                                             maxlength="255"
                                         >
@@ -66,10 +66,10 @@
                                     <!-- Customer Name -->
                                     <div>
                                         <label class="text-sm font-medium mb-1.5 block">Customer Name</label>
-                                        <input 
-                                            type="text" 
-                                            x-model="form.customer_name" 
-                                            class="input w-full min-h-[44px]" 
+                                        <input
+                                            type="text"
+                                            x-model="form.customer_name"
+                                            class="input w-full min-h-[44px]"
                                             placeholder="Optional"
                                             maxlength="100"
                                         >
@@ -102,21 +102,14 @@
                                     </template>
 
                                     <!-- Submit Button -->
-                                    <button 
-                                        type="submit" 
-                                        :disabled="generating || !subMerchant.is_active" 
+                                    <button
+                                        type="submit"
+                                        :disabled="generating"
                                         class="btn btn-primary btn-md w-full"
                                     >
                                         <i class="fas" :class="generating ? 'fa-spinner animate-spin' : 'fa-qrcode'"></i>
                                         <span x-text="generating ? 'Generating...' : 'Generate QRIS'"></span>
                                     </button>
-
-                                    <template x-if="!subMerchant.is_active">
-                                        <p class="text-sm text-amber-600 text-center">
-                                            <i class="fas fa-exclamation-triangle mr-1"></i>
-                                            Your account is inactive
-                                        </p>
-                                    </template>
                                 </form>
                             </div>
                         </div>
@@ -139,7 +132,7 @@
                                                 </div>
                                                 <p class="text-2xl font-bold mt-4" x-text="formatCurrency(generatedQris.amount)"></p>
                                                 <p class="text-sm text-[hsl(var(--muted-foreground))]" x-text="generatedQris.order_id"></p>
-                                                
+
                                                 <!-- Expiry Timer -->
                                                 <div class="mt-3" x-show="!generatedQris.is_expired">
                                                     <span class="badge bg-amber-100 text-amber-700">
@@ -158,13 +151,13 @@
                                             <!-- Share Options -->
                                             <div class="space-y-4">
                                                 <h3 class="font-semibold">Share Options</h3>
-                                                
+
                                                 <!-- Copy Link -->
                                                 <div class="flex gap-2">
-                                                    <input 
-                                                        type="text" 
-                                                        :value="generatedQris.shareable_link" 
-                                                        readonly 
+                                                    <input
+                                                        type="text"
+                                                        :value="generatedQris.shareable_link"
+                                                        readonly
                                                         class="input flex-1 text-sm"
                                                     >
                                                     <button @click="copyLink()" class="btn btn-outline btn-icon">
@@ -299,57 +292,59 @@
                 <h3 class="text-lg font-semibold">Transaction Details</h3>
                 <button @click="showDetailModal = false" class="btn btn-ghost btn-icon"><i class="fas fa-times"></i></button>
             </div>
-            <div class="p-4 overflow-y-auto space-y-4" x-show="selectedTransaction">
-                <!-- QR Code -->
-                <div class="text-center" x-show="selectedTransaction.can_be_used">
-                    <div class="bg-white p-3 rounded-lg inline-block shadow-sm border">
-                        <img :src="selectedTransaction.qr_code_url" alt="QRIS Code" class="w-32 h-32 mx-auto">
+            <template x-if="selectedTransaction">
+                <div class="p-4 overflow-y-auto space-y-4">
+                    <!-- QR Code -->
+                    <div class="text-center" x-show="selectedTransaction.can_be_used">
+                        <div class="bg-white p-3 rounded-lg inline-block shadow-sm border">
+                            <img :src="selectedTransaction.qr_code_url" alt="QRIS Code" class="w-32 h-32 mx-auto">
+                        </div>
                     </div>
-                </div>
 
-                <!-- Details -->
-                <div class="space-y-3">
-                    <div class="flex justify-between py-2 border-b border-[hsl(var(--border))]">
-                        <span class="text-sm text-[hsl(var(--muted-foreground))]">Order ID</span>
-                        <span class="text-sm font-medium" x-text="selectedTransaction.order_id"></span>
+                    <!-- Details -->
+                    <div class="space-y-3">
+                        <div class="flex justify-between py-2 border-b border-[hsl(var(--border))]">
+                            <span class="text-sm text-[hsl(var(--muted-foreground))]">Order ID</span>
+                            <span class="text-sm font-medium" x-text="selectedTransaction.order_id"></span>
+                        </div>
+                        <div class="flex justify-between py-2 border-b border-[hsl(var(--border))]">
+                            <span class="text-sm text-[hsl(var(--muted-foreground))]">Amount</span>
+                            <span class="text-sm font-medium" x-text="formatCurrency(selectedTransaction.amount)"></span>
+                        </div>
+                        <div class="flex justify-between py-2 border-b border-[hsl(var(--border))]">
+                            <span class="text-sm text-[hsl(var(--muted-foreground))]">Platform Fee</span>
+                            <span class="text-sm font-medium text-red-500" x-text="'-' + formatCurrency(selectedTransaction.platform_fee)"></span>
+                        </div>
+                        <div class="flex justify-between py-2 border-b border-[hsl(var(--border))]">
+                            <span class="text-sm text-[hsl(var(--muted-foreground))]">Net Amount</span>
+                            <span class="text-sm font-bold text-emerald-600" x-text="formatCurrency(selectedTransaction.net_amount)"></span>
+                        </div>
+                        <div class="flex justify-between py-2 border-b border-[hsl(var(--border))]">
+                            <span class="text-sm text-[hsl(var(--muted-foreground))]">Status</span>
+                            <span class="badge" :class="{
+                                'bg-amber-100 text-amber-700': selectedTransaction.status === 'pending',
+                                'bg-emerald-100 text-emerald-700': selectedTransaction.status === 'settlement',
+                                'bg-red-100 text-red-700': selectedTransaction.status === 'expire' || selectedTransaction.status === 'cancel'
+                            }" x-text="selectedTransaction.status"></span>
+                        </div>
+                        <div class="flex justify-between py-2">
+                            <span class="text-sm text-[hsl(var(--muted-foreground))]">Created</span>
+                            <span class="text-sm font-medium" x-text="formatDateTime(selectedTransaction.created_at)"></span>
+                        </div>
                     </div>
-                    <div class="flex justify-between py-2 border-b border-[hsl(var(--border))]">
-                        <span class="text-sm text-[hsl(var(--muted-foreground))]">Amount</span>
-                        <span class="text-sm font-medium" x-text="formatCurrency(selectedTransaction.amount)"></span>
-                    </div>
-                    <div class="flex justify-between py-2 border-b border-[hsl(var(--border))]">
-                        <span class="text-sm text-[hsl(var(--muted-foreground))]">Platform Fee</span>
-                        <span class="text-sm font-medium text-red-500" x-text="'-' + formatCurrency(selectedTransaction.platform_fee)"></span>
-                    </div>
-                    <div class="flex justify-between py-2 border-b border-[hsl(var(--border))]">
-                        <span class="text-sm text-[hsl(var(--muted-foreground))]">Net Amount</span>
-                        <span class="text-sm font-bold text-emerald-600" x-text="formatCurrency(selectedTransaction.net_amount)"></span>
-                    </div>
-                    <div class="flex justify-between py-2 border-b border-[hsl(var(--border))]">
-                        <span class="text-sm text-[hsl(var(--muted-foreground))]">Status</span>
-                        <span class="badge" :class="{
-                            'bg-amber-100 text-amber-700': selectedTransaction.status === 'pending',
-                            'bg-emerald-100 text-emerald-700': selectedTransaction.status === 'settlement',
-                            'bg-red-100 text-red-700': selectedTransaction.status === 'expire' || selectedTransaction.status === 'cancel'
-                        }" x-text="selectedTransaction.status"></span>
-                    </div>
-                    <div class="flex justify-between py-2">
-                        <span class="text-sm text-[hsl(var(--muted-foreground))]">Created</span>
-                        <span class="text-sm font-medium" x-text="formatDateTime(selectedTransaction.created_at)"></span>
-                    </div>
-                </div>
 
-                <!-- Actions -->
-                <div class="flex gap-2 pt-4" x-show="selectedTransaction.can_be_used">
-                    <button @click="copyLinkFromModal()" class="btn btn-outline btn-sm flex-1">
-                        <i class="fas fa-copy"></i> Copy Link
-                    </button>
-                    <button @click="cancelTransaction()" :disabled="cancelling" class="btn btn-outline btn-sm text-red-600 hover:bg-red-50">
-                        <i class="fas" :class="cancelling ? 'fa-spinner animate-spin' : 'fa-times'"></i>
-                        Cancel
-                    </button>
+                    <!-- Actions -->
+                    <div class="flex gap-2 pt-4" x-show="selectedTransaction.can_be_used">
+                        <button @click="copyLinkFromModal()" class="btn btn-outline btn-sm flex-1">
+                            <i class="fas fa-copy"></i> Copy Link
+                        </button>
+                        <button @click="cancelTransaction()" :disabled="cancelling" class="btn btn-outline btn-sm text-red-600 hover:bg-red-50">
+                            <i class="fas" :class="cancelling ? 'fa-spinner animate-spin' : 'fa-times'"></i>
+                            Cancel
+                        </button>
+                    </div>
                 </div>
-            </div>
+            </template>
         </div>
     </div>
 </div>
@@ -488,7 +483,7 @@ function qrisApp() {
 
         async cancelTransaction() {
             if (!confirm('Are you sure you want to cancel this QRIS?')) return;
-            
+
             this.cancelling = true;
             try {
                 const token = localStorage.getItem('token');

@@ -92,7 +92,11 @@
                         'Accept': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
                     }
-                }
+                },
+                // Auto-reconnect settings
+                activityTimeout: 120000,      // 2 minutes before sending ping
+                pongTimeout: 30000,           // 30 seconds to wait for pong
+                unavailableTimeout: 10000,    // 10 seconds before marking unavailable
             });
 
             console.log('✅ Pusher instance created');
@@ -110,7 +114,10 @@
                         'Accept': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
                     }
-                }
+                },
+                // Auto-reconnect settings
+                enabledTransports: ['ws', 'wss'],
+                disabledTransports: ['sockjs'],
             });
 
             console.log('✅ Echo instance created successfully');
@@ -130,6 +137,35 @@
 
             window.Echo.connector.pusher.connection.bind('error', function(err) {
                 console.error('❌ Pusher connection error:', err);
+                
+                // Handle specific error codes
+                if (err && err.data && err.data.code) {
+                    const code = err.data.code;
+                    console.log('📛 Pusher error code:', code);
+                    
+                    // 1006 = Abnormal closure, try to reconnect
+                    if (code === 1006) {
+                        console.log('🔄 Connection closed abnormally, will auto-reconnect...');
+                    }
+                    // 4001 = App not found
+                    else if (code === 4001) {
+                        console.error('❌ Pusher app not found - check credentials');
+                    }
+                    // 4004 = App disabled
+                    else if (code === 4004) {
+                        console.error('❌ Pusher app disabled');
+                    }
+                }
+            });
+            
+            // Handle unavailable state (connection lost)
+            window.Echo.connector.pusher.connection.bind('unavailable', function() {
+                console.warn('⚠️ Pusher connection unavailable, attempting reconnect...');
+            });
+            
+            // Handle reconnecting
+            window.Echo.connector.pusher.connection.bind('connecting', function() {
+                console.log('🔄 Pusher reconnecting...');
             });
 
             // Subscribe to private WhatsApp channel
@@ -193,6 +229,25 @@
         return window.echoReady === true &&
                window.Echo &&
                typeof window.Echo.private === 'function';
+    };
+    
+    // Expose function to manually reconnect Pusher
+    window.reconnectPusher = function() {
+        if (window.Echo && window.Echo.connector && window.Echo.connector.pusher) {
+            console.log('🔄 Manual Pusher reconnect triggered...');
+            window.Echo.connector.pusher.connect();
+            return true;
+        }
+        console.warn('⚠️ Echo not initialized, cannot reconnect');
+        return false;
+    };
+    
+    // Expose function to check Pusher connection state
+    window.getPusherState = function() {
+        if (window.Echo && window.Echo.connector && window.Echo.connector.pusher) {
+            return window.Echo.connector.pusher.connection.state;
+        }
+        return 'not_initialized';
     };
 
 })();

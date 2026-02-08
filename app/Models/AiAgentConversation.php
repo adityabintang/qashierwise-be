@@ -17,6 +17,10 @@ class AiAgentConversation extends Model
         'whatsapp_contact_id',
         'messages',
         'order_context',
+        'current_order_id',
+        'current_qris_transaction_id',
+        'cache_response_id',
+        'cache_expires_at',
         'expires_at',
     ];
 
@@ -31,6 +35,7 @@ class AiAgentConversation extends Model
             'messages' => 'array',
             'order_context' => 'array',
             'expires_at' => 'datetime',
+            'cache_expires_at' => 'datetime',
         ];
     }
 
@@ -53,13 +58,13 @@ class AiAgentConversation extends Model
     /**
      * Add a message to the conversation with sliding window (max 10 messages).
      */
-    public function addMessage(string $role, string $content): void
+    public function addMessage(string $type, string $content): void
     {
         $messages = $this->messages ?? [];
 
-        // Add new message
+        // Add new message with type (human/ai) instead of role
         $messages[] = [
-            'role' => $role,
+            'type' => $type, // 'human' or 'ai'
             'content' => $content,
             'timestamp' => now()->toIso8601String(),
         ];
@@ -72,7 +77,8 @@ class AiAgentConversation extends Model
         $this->messages = $messages;
 
         // Extend expiration by 24 hours from now
-        $this->expires_at = now()->addHours(24);
+        // $this->expires_at = now()->addHours(24);
+        $this->expires_at = now()->addHours(1);
 
         $this->save();
     }
@@ -149,6 +155,175 @@ class AiAgentConversation extends Model
         unset($orderContext['cart']);
 
         $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    /**
+     * Get the current order associated with this conversation.
+     */
+    public function currentOrder(): BelongsTo
+    {
+        return $this->belongsTo(Order::class, 'current_order_id');
+    }
+
+    /**
+     * Get the current QRIS transaction associated with this conversation.
+     */
+    public function currentQrisTransaction(): BelongsTo
+    {
+        return $this->belongsTo(QrisTransaction::class, 'current_qris_transaction_id');
+    }
+
+    /**
+     * Set the current order for this conversation.
+     */
+    public function setCurrentOrder(int $orderId): void
+    {
+        $this->current_order_id = $orderId;
+        $this->save();
+    }
+
+    /**
+     * Get the current order model.
+     */
+    public function getCurrentOrder(): ?Order
+    {
+        return $this->currentOrder;
+    }
+
+    /**
+     * Set the current QRIS transaction for this conversation.
+     */
+    public function setCurrentQrisTransaction(int $transactionId): void
+    {
+        $this->current_qris_transaction_id = $transactionId;
+        $this->save();
+    }
+
+    /**
+     * Get the current QRIS transaction model.
+     */
+    public function getCurrentQrisTransaction(): ?QrisTransaction
+    {
+        return $this->currentQrisTransaction;
+    }
+
+    /**
+     * Clear payment context (order and QRIS transaction).
+     */
+    public function clearPaymentContext(): void
+    {
+        $this->current_order_id = null;
+        $this->current_qris_transaction_id = null;
+        $this->save();
+    }
+
+    /**
+     * Get conversation summary from order_context.
+     */
+    public function getSummary(): ?array
+    {
+        return $this->order_context['summary'] ?? null;
+    }
+
+    /**
+     * Set conversation summary in order_context.
+     */
+    public function setSummary(array $summary): void
+    {
+        $orderContext = $this->order_context ?? [];
+        $orderContext['summary'] = $summary;
+        $orderContext['summarized_at'] = now()->toIso8601String();
+
+        $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    /**
+     * Check if conversation has summary.
+     */
+    public function hasSummary(): bool
+    {
+        return isset($this->order_context['summary']);
+    }
+
+    /**
+     * Clear summary from order_context.
+     */
+    public function clearSummary(): void
+    {
+        $orderContext = $this->order_context ?? [];
+        unset($orderContext['summary']);
+        unset($orderContext['summarized_at']);
+        unset($orderContext['last_intent']);
+
+        $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    /**
+     * Get message count.
+     */
+    public function getMessageCount(): int
+    {
+        return count($this->messages ?? []);
+    }
+
+    /**
+     * Get recent messages (last N messages).
+     */
+    public function getRecentMessages(int $count = 3): array
+    {
+        $messages = $this->messages ?? [];
+
+        if (empty($messages)) {
+            return [];
+        }
+
+        // Return last N messages
+        return array_slice($messages, -$count);
+    }
+
+    /**
+     * Set cache response ID from BytePlus Responses API.
+     * Cache expires in 72 hours (max allowed by BytePlus).
+     */
+    public function setCacheResponseId(string $responseId): void
+    {
+        $this->cache_response_id = $responseId;
+        // BytePlus cache max retention is 72 hours
+        $this->cache_expires_at = now()->addHours(72);
+        $this->save();
+    }
+
+    /**
+     * Get cache response ID if still valid.
+     */
+    public function getCacheResponseId(): ?string
+    {
+        // Return null if cache is expired
+        if ($this->cache_expires_at && $this->cache_expires_at->isPast()) {
+            return null;
+        }
+
+        return $this->cache_response_id;
+    }
+
+    /**
+     * Check if cache is valid and available.
+     */
+    public function hasCacheResponseId(): bool
+    {
+        return $this->getCacheResponseId() !== null;
+    }
+
+    /**
+     * Clear cache response ID.
+     */
+    public function clearCacheResponseId(): void
+    {
+        $this->cache_response_id = null;
+        $this->cache_expires_at = null;
         $this->save();
     }
 }

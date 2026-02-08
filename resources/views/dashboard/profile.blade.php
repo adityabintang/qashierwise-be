@@ -1,16 +1,16 @@
 @extends('layouts.app')
 
-@section('title', 'Business Profile - QashierWise')
+@section('title', __('dashboard.profile_title'))
 
 @section('content')
-<div x-data="profileApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="profileApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     <!-- Sidebar -->
     @include('components.dashboard-sidebar', ['activePage' => 'profile'])
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         <!-- Header -->
-        @include('components.dashboard-header', ['title' => 'Business Profile', 'description' => 'Manage your WhatsApp Business profile'])
+        @include('components.dashboard-header', ['title' => __('whatsapp.business_profile'), 'description' => __('dashboard.menu_business_profile')])
 
         <!-- Page Content -->
         <main class="flex-1 p-4 md:p-6">
@@ -24,12 +24,12 @@
                                     <i class="fas fa-building text-emerald-600"></i>
                                 </div>
                                 <div>
-                                    <h2 class="card-title">Profile Information</h2>
+                                    <h2 class="card-title">{{ __('whatsapp.profile_information') }}</h2>
                                 </div>
                             </div>
                             <button x-show="!loading" @click="toggleEdit" class="btn btn-sm" :class="editMode ? 'btn-outline' : 'btn-primary'">
                                 <i class="fas" :class="editMode ? 'fa-times' : 'fa-edit'"></i>
-                                <span x-text="editMode ? 'Cancel' : 'Edit'"></span>
+                                <span x-text="editMode ? '{{ __('whatsapp.cancel') }}' : '{{ __('whatsapp.edit') }}'"></span>
                             </button>
                         </div>
 
@@ -46,26 +46,26 @@
                         <!-- Form -->
                         <form x-show="!loading" @submit.prevent="saveProfile" class="p-6 space-y-4">
                             <div>
-                                <label class="text-sm font-medium mb-1.5 block">About</label>
-                                <textarea x-model="profile.about" :disabled="!editMode" rows="2" class="input w-full resize-none" placeholder="Tell customers about your business..."></textarea>
+                                <label class="text-sm font-medium mb-1.5 block">{{ __('whatsapp.about') }}</label>
+                                <textarea x-model="profile.about" :disabled="!editMode" rows="2" class="input w-full resize-none" placeholder="{{ __('whatsapp.tell_about_business') }}"></textarea>
                             </div>
                             <div>
-                                <label class="text-sm font-medium mb-1.5 block">Address</label>
-                                <input type="text" x-model="profile.address" :disabled="!editMode" class="input w-full" placeholder="Business address">
+                                <label class="text-sm font-medium mb-1.5 block">{{ __('whatsapp.address') }}</label>
+                                <input type="text" x-model="profile.address" :disabled="!editMode" class="input w-full" placeholder="{{ __('whatsapp.business_address') }}">
                             </div>
                             <div>
-                                <label class="text-sm font-medium mb-1.5 block">Description</label>
-                                <textarea x-model="profile.description" :disabled="!editMode" rows="3" class="input w-full resize-none" placeholder="Detailed description..."></textarea>
+                                <label class="text-sm font-medium mb-1.5 block">{{ __('whatsapp.description') }}</label>
+                                <textarea x-model="profile.description" :disabled="!editMode" rows="3" class="input w-full resize-none" placeholder="{{ __('whatsapp.detailed_description') }}"></textarea>
                             </div>
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label class="text-sm font-medium mb-1.5 block">Email</label>
+                                    <label class="text-sm font-medium mb-1.5 block">{{ __('whatsapp.email') }}</label>
                                     <input type="email" x-model="profile.email" :disabled="!editMode" class="input w-full" placeholder="business@example.com">
                                 </div>
                                 <div>
-                                    <label class="text-sm font-medium mb-1.5 block">Industry</label>
+                                    <label class="text-sm font-medium mb-1.5 block">{{ __('whatsapp.industry') }}</label>
                                     <select x-model="profile.vertical" :disabled="!editMode" class="input w-full">
-                                        <option value="">Select industry...</option>
+                                        <option value="">{{ __('whatsapp.select_industry') }}</option>
                                         <option value="AUTO">Automotive</option>
                                         <option value="BEAUTY">Beauty & Salon</option>
                                         <option value="APPAREL">Clothing</option>
@@ -80,7 +80,7 @@
                                 </div>
                             </div>
                             <div>
-                                <label class="text-sm font-medium mb-1.5 block">Websites</label>
+                                <label class="text-sm font-medium mb-1.5 block">{{ __('whatsapp.websites') }}</label>
                                 <div class="space-y-2">
                                     <template x-for="(website, index) in profile.websites" :key="index">
                                         <div class="flex gap-2">
@@ -92,14 +92,14 @@
                                     </template>
                                     <button x-show="editMode" type="button" @click="addWebsite" class="btn btn-outline btn-sm w-full">
                                         <i class="fas fa-plus"></i>
-                                        <span>Add Website</span>
+                                        <span>{{ __('whatsapp.add_website') }}</span>
                                     </button>
                                 </div>
                             </div>
                             <div x-show="editMode" class="flex gap-3 pt-2">
                                 <button type="submit" :disabled="saving" class="btn btn-primary btn-md flex-1">
                                     <i class="fas" :class="saving ? 'fa-spinner animate-spin' : 'fa-save'"></i>
-                                    <span x-text="saving ? 'Saving...' : 'Save Changes'"></span>
+                                    <span x-text="saving ? '{{ __('whatsapp.saving') }}' : '{{ __('whatsapp.save_changes') }}'"></span>
                                 </button>
                             </div>
                         </form>
@@ -114,7 +114,7 @@
                                     <div class="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
                                         <i class="fas fa-phone-alt text-blue-600"></i>
                                     </div>
-                                    <h2 class="card-title">Phone Information</h2>
+                                    <h2 class="card-title">{{ __('whatsapp.phone_information') }}</h2>
                                 </div>
                             </div>
 
@@ -136,28 +136,28 @@
                                     <div class="bg-[hsl(var(--muted)/0.5)] rounded-lg p-4">
                                         <div class="flex items-center gap-2 mb-1">
                                             <i class="fas fa-phone text-emerald-500 text-sm"></i>
-                                            <span class="text-xs text-[hsl(var(--muted-foreground))]">Phone Number</span>
+                                            <span class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('whatsapp.phone_number') }}</span>
                                         </div>
                                         <p class="font-medium text-sm" x-text="phoneInfo.display_phone_number || '-'">-</p>
                                     </div>
                                     <div class="bg-[hsl(var(--muted)/0.5)] rounded-lg p-4">
                                         <div class="flex items-center gap-2 mb-1">
                                             <i class="fas fa-shield-alt text-blue-500 text-sm"></i>
-                                            <span class="text-xs text-[hsl(var(--muted-foreground))]">Verified</span>
+                                            <span class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('whatsapp.verified') }}</span>
                                         </div>
-                                        <p class="font-medium text-sm" :class="phoneInfo.verified_name ? 'text-emerald-600' : 'text-[hsl(var(--muted-foreground))]'" x-text="phoneInfo.verified_name || 'Not Verified'">-</p>
+                                        <p class="font-medium text-sm" :class="phoneInfo.verified_name ? 'text-emerald-600' : 'text-[hsl(var(--muted-foreground))]'" x-text="phoneInfo.verified_name || '{{ __('whatsapp.not_verified') }}'">-</p>
                                     </div>
                                     <div class="bg-[hsl(var(--muted)/0.5)] rounded-lg p-4">
                                         <div class="flex items-center gap-2 mb-1">
                                             <i class="fas fa-star text-purple-500 text-sm"></i>
-                                            <span class="text-xs text-[hsl(var(--muted-foreground))]">Quality</span>
+                                            <span class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('whatsapp.quality') }}</span>
                                         </div>
                                         <p class="font-medium text-sm capitalize" x-text="phoneInfo.quality_rating || '-'">-</p>
                                     </div>
                                     <div class="bg-[hsl(var(--muted)/0.5)] rounded-lg p-4">
                                         <div class="flex items-center gap-2 mb-1">
                                             <i class="fas fa-envelope text-orange-500 text-sm"></i>
-                                            <span class="text-xs text-[hsl(var(--muted-foreground))]">Msg Limit</span>
+                                            <span class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('whatsapp.msg_limit') }}</span>
                                         </div>
                                         <p class="font-medium text-sm" x-text="phoneInfo.messaging_limit || '-'">-</p>
                                     </div>
@@ -172,7 +172,7 @@
                                     <div class="h-10 w-10 rounded-lg bg-purple-100 flex items-center justify-center">
                                         <i class="fas fa-image text-purple-600"></i>
                                     </div>
-                                    <h2 class="card-title">Profile Picture</h2>
+                                    <h2 class="card-title">{{ __('whatsapp.profile_picture') }}</h2>
                                 </div>
                             </div>
                             <div class="p-6">
@@ -186,11 +186,11 @@
                                         </template>
                                     </div>
                                     <div>
-                                        <p class="text-sm text-[hsl(var(--muted-foreground))] mb-2">Upload your business profile picture</p>
+                                        <p class="text-sm text-[hsl(var(--muted-foreground))] mb-2">{{ __('whatsapp.upload_profile_picture') }}</p>
                                         <input type="file" x-ref="profilePictureInput" @change="uploadProfilePicture" accept="image/jpeg,image/png,image/jpg" class="hidden">
                                         <button x-show="editMode" @click="$refs.profilePictureInput.click()" :disabled="uploadingPicture" class="btn btn-outline btn-sm">
                                             <i class="fas" :class="uploadingPicture ? 'fa-spinner animate-spin' : 'fa-camera'"></i>
-                                            <span x-text="uploadingPicture ? 'Uploading...' : 'Change'"></span>
+                                            <span x-text="uploadingPicture ? '{{ __('whatsapp.uploading') }}' : '{{ __('whatsapp.change') }}'"></span>
                                         </button>
                                     </div>
                                 </div>
@@ -234,9 +234,9 @@
 <script>
 function profileApp() {
     return {
-        sidebarOpen: window.innerWidth >= 1024, 
+        sidebarOpen: window.innerWidth >= 1024,
         isMobile: window.innerWidth < 768,
-        user: null, 
+        user: null,
         notifications: [],
         init() {
             this.isMobile = window.innerWidth < 768;
@@ -377,7 +377,7 @@ function profileManager() {
                 const token = localStorage.getItem('token');
                 const cleanProfile = { ...this.profile, websites: this.profile.websites.filter(w => w?.trim()) };
                 if (!cleanProfile.websites.length) cleanProfile.websites = [];
-                
+
                 const res = await fetch(`${this.API_BASE_URL}/whatsapp/profile`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },

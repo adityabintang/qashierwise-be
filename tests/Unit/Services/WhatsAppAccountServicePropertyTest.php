@@ -17,13 +17,13 @@ use Tests\TestCase;
 
 /**
  * Property-based tests for WhatsAppAccountService
- * 
+ *
  * Feature: whatsapp-embedded-signup
  */
 class WhatsAppAccountServicePropertyTest extends TestCase
 {
-    use TestTrait;
     use RefreshDatabase;
+    use TestTrait;
 
     /**
      * Generate a valid phone number ID (numeric string).
@@ -51,16 +51,16 @@ class WhatsAppAccountServicePropertyTest extends TestCase
         for ($i = 0; $i < 100; $i++) {
             $token .= $chars[rand(0, strlen($chars) - 1)];
         }
+
         return $token;
     }
-
 
     /**
      * Feature: whatsapp-embedded-signup, Property 4: Dynamic Credential Usage
      * Validates: Requirements 3.1, 3.3
-     * 
-     * For any authenticated user with a connected WhatsApp account, creating a 
-     * WhatsApp client SHALL use the user's stored phone_number_id and access_token, 
+     *
+     * For any authenticated user with a connected WhatsApp account, creating a
+     * WhatsApp client SHALL use the user's stored phone_number_id and access_token,
      * not the global configuration values.
      */
     #[Test]
@@ -72,7 +72,7 @@ class WhatsAppAccountServicePropertyTest extends TestCase
                 Generators::choose(1, 10) // Number of users to test
             )
             ->then(function (int $userCount) {
-                $service = new WhatsAppAccountService();
+                $service = new WhatsAppAccountService;
                 $users = [];
                 $accounts = [];
 
@@ -108,13 +108,13 @@ class WhatsAppAccountServicePropertyTest extends TestCase
                     // The client should be configured with user's credentials
                     // We verify this by checking the active account matches
                     $activeAccount = $service->getActiveAccount($user->id);
-                    
+
                     $this->assertEquals(
                         $data['phone_number_id'],
                         $activeAccount->phone_number_id,
                         'Client should use user\'s phone_number_id'
                     );
-                    
+
                     $this->assertEquals(
                         $data['access_token'],
                         $activeAccount->access_token,
@@ -135,8 +135,8 @@ class WhatsAppAccountServicePropertyTest extends TestCase
     /**
      * Feature: whatsapp-embedded-signup, Property 5: Missing Account Error
      * Validates: Requirements 3.2
-     * 
-     * For any authenticated user without a connected WhatsApp account, 
+     *
+     * For any authenticated user without a connected WhatsApp account,
      * attempting to get a client SHALL throw WhatsAppNotConnectedException.
      */
     #[Test]
@@ -148,7 +148,7 @@ class WhatsAppAccountServicePropertyTest extends TestCase
                 Generators::choose(1, 5) // Number of users to test
             )
             ->then(function (int $userCount) {
-                $service = new WhatsAppAccountService();
+                $service = new WhatsAppAccountService;
                 $users = [];
 
                 // Create users WITHOUT WhatsApp accounts
@@ -159,7 +159,7 @@ class WhatsAppAccountServicePropertyTest extends TestCase
                 // Property: Each user without account should throw exception
                 foreach ($users as $user) {
                     $exceptionThrown = false;
-                    
+
                     try {
                         $service->getClientForUser($user->id);
                     } catch (WhatsAppNotConnectedException $e) {
@@ -184,11 +184,10 @@ class WhatsAppAccountServicePropertyTest extends TestCase
             });
     }
 
-
     /**
      * Feature: whatsapp-embedded-signup, Property 4: Dynamic Credential Usage
      * Validates: Requirements 3.1, 3.3
-     * 
+     *
      * Test that hasConnectedAccount correctly identifies users with/without accounts.
      */
     #[Test]
@@ -200,7 +199,7 @@ class WhatsAppAccountServicePropertyTest extends TestCase
                 Generators::bool() // Whether user has account
             )
             ->then(function (bool $hasAccount) {
-                $service = new WhatsAppAccountService();
+                $service = new WhatsAppAccountService;
                 $user = User::factory()->create();
 
                 if ($hasAccount) {
@@ -217,11 +216,11 @@ class WhatsAppAccountServicePropertyTest extends TestCase
 
                 // Property: hasConnectedAccount should match actual state
                 $result = $service->hasConnectedAccount($user->id);
-                
+
                 $this->assertEquals(
                     $hasAccount,
                     $result,
-                    'hasConnectedAccount should return ' . ($hasAccount ? 'true' : 'false')
+                    'hasConnectedAccount should return '.($hasAccount ? 'true' : 'false')
                 );
 
                 // Clean up
@@ -235,7 +234,7 @@ class WhatsAppAccountServicePropertyTest extends TestCase
     /**
      * Feature: whatsapp-embedded-signup, Property 5: Missing Account Error
      * Validates: Requirements 3.2
-     * 
+     *
      * Test that inactive accounts are treated as not connected.
      */
     #[Test]
@@ -247,7 +246,7 @@ class WhatsAppAccountServicePropertyTest extends TestCase
                 Generators::choose(1, 5) // Number of users to test
             )
             ->then(function (int $userCount) {
-                $service = new WhatsAppAccountService();
+                $service = new WhatsAppAccountService;
                 $users = [];
                 $accounts = [];
 
@@ -294,8 +293,8 @@ class WhatsAppAccountServicePropertyTest extends TestCase
     /**
      * Feature: whatsapp-embedded-signup, Property 6: Invalid Token Error
      * Validates: Requirements 3.4
-     * 
-     * For any WhatsApp API call with an expired or invalid access token, 
+     *
+     * For any WhatsApp API call with an expired or invalid access token,
      * the system SHALL return an error indicating re-authentication is required.
      */
     #[Test]
@@ -307,7 +306,7 @@ class WhatsAppAccountServicePropertyTest extends TestCase
                 Generators::choose(1, 30) // Days in the past for expiration
             )
             ->then(function (int $daysAgo) {
-                $service = new WhatsAppAccountService();
+                $service = new WhatsAppAccountService;
                 $user = User::factory()->create();
 
                 // Create account with expired token
@@ -324,7 +323,7 @@ class WhatsAppAccountServicePropertyTest extends TestCase
 
                 // Property: Expired token should throw WhatsAppTokenExpiredException
                 $exceptionThrown = false;
-                
+
                 try {
                     $service->validateAccountToken($user->id);
                 } catch (WhatsAppTokenExpiredException $e) {
@@ -355,10 +354,10 @@ class WhatsAppAccountServicePropertyTest extends TestCase
     /**
      * Feature: whatsapp-embedded-signup, Property 6: Invalid Token Error
      * Validates: Requirements 3.4
-     * 
+     *
      * For any WhatsApp account with an empty access token,
      * the system SHALL throw WhatsAppTokenInvalidException.
-     * 
+     *
      * Note: Since access_token is encrypted in the model, we create an account
      * with an empty string token (which gets encrypted) and verify the validation
      * correctly identifies it as invalid.
@@ -372,7 +371,7 @@ class WhatsAppAccountServicePropertyTest extends TestCase
                 Generators::choose(1, 10) // Number of iterations
             )
             ->then(function (int $iteration) {
-                $service = new WhatsAppAccountService();
+                $service = new WhatsAppAccountService;
                 $user = User::factory()->create();
 
                 // Create account with empty token (will be encrypted as empty string)
@@ -388,7 +387,7 @@ class WhatsAppAccountServicePropertyTest extends TestCase
 
                 // Property: Invalid (empty) token should throw WhatsAppTokenInvalidException
                 $exceptionThrown = false;
-                
+
                 try {
                     $service->validateAccountToken($user->id);
                 } catch (WhatsAppTokenInvalidException $e) {
@@ -419,7 +418,7 @@ class WhatsAppAccountServicePropertyTest extends TestCase
     /**
      * Feature: whatsapp-embedded-signup, Property 6: Invalid Token Error
      * Validates: Requirements 3.4
-     * 
+     *
      * Test handleTokenValidationResult throws correct exceptions.
      */
     #[Test]
@@ -432,10 +431,10 @@ class WhatsAppAccountServicePropertyTest extends TestCase
                 Generators::bool()  // isExpired
             )
             ->then(function (bool $isValid, bool $isExpired) {
-                $service = new WhatsAppAccountService();
+                $service = new WhatsAppAccountService;
 
                 // Skip the case where token is valid and not expired (no exception)
-                if ($isValid && !$isExpired) {
+                if ($isValid && ! $isExpired) {
                     // Should not throw any exception
                     $exceptionThrown = false;
                     try {
@@ -444,6 +443,7 @@ class WhatsAppAccountServicePropertyTest extends TestCase
                         $exceptionThrown = true;
                     }
                     $this->assertFalse($exceptionThrown, 'No exception should be thrown for valid, non-expired token');
+
                     return;
                 }
 
@@ -451,11 +451,12 @@ class WhatsAppAccountServicePropertyTest extends TestCase
                 if ($isExpired) {
                     $this->expectException(WhatsAppTokenExpiredException::class);
                     $service->handleTokenValidationResult($isValid, $isExpired);
+
                     return;
                 }
 
                 // Property: Invalid token should throw WhatsAppTokenInvalidException
-                if (!$isValid) {
+                if (! $isValid) {
                     $this->expectException(WhatsAppTokenInvalidException::class);
                     $service->handleTokenValidationResult($isValid, $isExpired);
                 }
@@ -465,7 +466,7 @@ class WhatsAppAccountServicePropertyTest extends TestCase
     /**
      * Feature: whatsapp-embedded-signup, Property 6: Invalid Token Error
      * Validates: Requirements 3.4
-     * 
+     *
      * Test that valid, non-expired tokens pass validation.
      */
     #[Test]
@@ -477,7 +478,7 @@ class WhatsAppAccountServicePropertyTest extends TestCase
                 Generators::choose(1, 365) // Days in the future for expiration
             )
             ->then(function (int $daysInFuture) {
-                $service = new WhatsAppAccountService();
+                $service = new WhatsAppAccountService;
                 $user = User::factory()->create();
 
                 // Create account with valid, non-expired token
@@ -494,13 +495,13 @@ class WhatsAppAccountServicePropertyTest extends TestCase
 
                 // Property: Valid token should not throw any exception
                 $validatedAccount = $service->validateAccountToken($user->id);
-                
+
                 $this->assertInstanceOf(
                     WhatsAppAccount::class,
                     $validatedAccount,
                     'validateAccountToken should return WhatsAppAccount for valid token'
                 );
-                
+
                 $this->assertEquals(
                     $account->id,
                     $validatedAccount->id,

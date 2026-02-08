@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Property-based tests for Order model
- * 
+ *
  * Feature: point-of-sale
  */
 class OrderPropertyTest extends TestCase
@@ -20,7 +20,7 @@ class OrderPropertyTest extends TestCase
     /**
      * Feature: point-of-sale, Property 4: Order Serialization Round-Trip
      * Validates: Requirements 3.7, 3.8
-     * 
+     *
      * For any valid Order object with items, serializing to JSON and then deserializing back
      * SHALL produce an equivalent Order object with identical calculated totals.
      */
@@ -29,9 +29,8 @@ class OrderPropertyTest extends TestCase
     {
         $statuses = [
             Order::STATUS_PENDING,
-            Order::STATUS_COMPLETED,
-            Order::STATUS_CANCELLED,
             Order::STATUS_PAID,
+            Order::STATUS_CANCELLED,
         ];
 
         $this
@@ -40,7 +39,7 @@ class OrderPropertyTest extends TestCase
                 Generators::pos(),
                 Generators::pos(),
                 Generators::suchThat(
-                    fn($s) => strlen($s) > 0 && strlen($s) <= 20,
+                    fn ($s) => strlen($s) > 0 && strlen($s) <= 20,
                     Generators::string()
                 ),
                 Generators::elements($statuses),

@@ -19,24 +19,29 @@ class StoreController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $user = $request->user();
 
-        if (!$userId) {
+        if (!$user) {
             return response()->json([
                 'success' => false,
                 'message' => 'Authentication required',
             ], 401);
         }
 
+        // Use effective user ID (master admin ID for sub-accounts)
+        $effectiveUserId = $user->getEffectiveUserId();
+
         $stores = Store::withCount(['orders', 'tables', 'posUsers'])
-            ->where('user_id', $userId)
+            ->where('user_id', $effectiveUserId)
             ->when($request->boolean('active_only', false), fn($q) => $q->where('is_active', true))
             ->orderBy('name')
             ->get();
 
         return response()->json([
             'success' => true,
-            'data' => $stores,
+            'data' => [
+                'data' => $stores,
+            ],
         ]);
     }
 
@@ -74,10 +79,19 @@ class StoreController extends Controller
     }
 
     /**
-     * Display the specified store with statistics.
+     * Display specified store with statistics.
      */
-    public function show(Store $store): JsonResponse
+    public function show(Store $store, Request $request): JsonResponse
     {
+        $effectiveUserId = $request->user()->getEffectiveUserId();
+
+        if ($store->user_id !== $effectiveUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this resource.',
+            ], 403);
+        }
+
         $statistics = $this->storeService->getWithStatistics($store);
 
         return response()->json([
@@ -87,10 +101,19 @@ class StoreController extends Controller
     }
 
     /**
-     * Update the specified store.
+     * Update specified store.
      */
     public function update(Request $request, Store $store): JsonResponse
     {
+        $effectiveUserId = auth()->user()->getEffectiveUserId();
+
+        if ($store->user_id !== $effectiveUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this resource.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'code' => 'sometimes|string|max:50|unique:stores,code,' . $store->id,
@@ -109,10 +132,19 @@ class StoreController extends Controller
     }
 
     /**
-     * Deactivate the specified store.
+     * Deactivate specified store.
      */
-    public function deactivate(Store $store): JsonResponse
+    public function deactivate(Store $store, Request $request): JsonResponse
     {
+        $effectiveUserId = $request->user()->getEffectiveUserId();
+
+        if ($store->user_id !== $effectiveUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this resource.',
+            ], 403);
+        }
+
         $store = $this->storeService->deactivate($store);
 
         return response()->json([
@@ -123,10 +155,19 @@ class StoreController extends Controller
     }
 
     /**
-     * Activate the specified store.
+     * Activate specified store.
      */
-    public function activate(Store $store): JsonResponse
+    public function activate(Store $store, Request $request): JsonResponse
     {
+        $effectiveUserId = $request->user()->getEffectiveUserId();
+
+        if ($store->user_id !== $effectiveUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this resource.',
+            ], 403);
+        }
+
         $store = $this->storeService->activate($store);
 
         return response()->json([

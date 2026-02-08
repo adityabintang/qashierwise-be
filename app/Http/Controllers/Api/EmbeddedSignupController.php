@@ -51,7 +51,7 @@ class EmbeddedSignupController extends Controller
             'business_id' => 'nullable|string',
         ]);
 
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
         $code = $request->input('code');
 
         // Get session info from embedded signup response (waba_id, phone_number_id, business_id)
@@ -114,7 +114,13 @@ class EmbeddedSignupController extends Controller
     {
         // Check if Embedded Signup is enabled
         if (! $this->embeddedSignupService->isEnabled()) {
-            throw new EmbeddedSignupDisabledException;
+            // Return a more graceful response instead of throwing exception
+            return response()->json([
+                'success' => false,
+                'error_code' => 'EMBEDDED_SIGNUP_DISABLED',
+                'message' => 'Embedded Signup feature is not configured. Please add WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID to your .env file.',
+                'data' => null,
+            ], 200); // Return 200 instead of 503 so frontend can handle it gracefully
         }
 
         return response()->json([
@@ -135,7 +141,7 @@ class EmbeddedSignupController extends Controller
      */
     public function disconnect(): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
         $deactivated = $this->whatsAppAccountService->deactivateAccount($userId);
 
@@ -161,7 +167,7 @@ class EmbeddedSignupController extends Controller
      */
     public function getAccountStatus(): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
         $status = $this->whatsAppAccountService->getAccountStatus($userId);
 
@@ -187,7 +193,7 @@ class EmbeddedSignupController extends Controller
      */
     public function subscribeToWebhooks(): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
         $account = $this->whatsAppAccountService->getActiveAccount($userId);
 
@@ -229,7 +235,7 @@ class EmbeddedSignupController extends Controller
      */
     public function getWebhookStatus(): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
         $account = $this->whatsAppAccountService->getActiveAccount($userId);
 

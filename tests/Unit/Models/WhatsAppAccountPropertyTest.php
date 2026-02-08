@@ -13,18 +13,18 @@ use Tests\TestCase;
 
 /**
  * Property-based tests for WhatsAppAccount model
- * 
+ *
  * Feature: whatsapp-embedded-signup
  */
 class WhatsAppAccountPropertyTest extends TestCase
 {
-    use TestTrait;
     use RefreshDatabase;
+    use TestTrait;
 
     /**
      * Feature: whatsapp-embedded-signup, Property 2: Access Token Encryption
      * Validates: Requirements 2.2
-     * 
+     *
      * For any access token string stored in the database, the raw database value
      * SHALL NOT equal the original plaintext token (encryption is applied).
      */
@@ -35,7 +35,7 @@ class WhatsAppAccountPropertyTest extends TestCase
             ->limitTo(100)
             ->forAll(
                 Generators::suchThat(
-                    fn($s) => strlen($s) >= 10 && strlen($s) <= 200,
+                    fn ($s) => strlen($s) >= 10 && strlen($s) <= 200,
                     Generators::string()
                 )
             )
@@ -46,8 +46,8 @@ class WhatsAppAccountPropertyTest extends TestCase
                 // Create a WhatsApp account with the generated access token
                 $account = WhatsAppAccount::create([
                     'user_id' => $user->id,
-                    'phone_number_id' => 'test_' . uniqid(),
-                    'business_account_id' => 'test_business_' . uniqid(),
+                    'phone_number_id' => 'test_'.uniqid(),
+                    'business_account_id' => 'test_business_'.uniqid(),
                     'access_token' => $accessToken,
                     'is_active' => true,
                 ]);

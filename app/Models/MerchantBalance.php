@@ -58,7 +58,7 @@ class MerchantBalance extends Model
      */
     public function canWithdraw(float $amount): bool
     {
-        return $amount >= self::MINIMUM_WITHDRAWAL 
+        return $amount >= self::MINIMUM_WITHDRAWAL
             && $amount <= (float) $this->available_balance;
     }
 
@@ -94,7 +94,7 @@ class MerchantBalance extends Model
         if ($amount < 0) {
             throw new \InvalidArgumentException('Amount must be non-negative');
         }
-        
+
         $this->available_balance = (float) $this->available_balance + $amount;
         $this->total_earned = (float) $this->total_earned + $amount;
         $this->last_updated = now();
@@ -108,7 +108,7 @@ class MerchantBalance extends Model
         if ($amount < 0) {
             throw new \InvalidArgumentException('Amount must be non-negative');
         }
-        
+
         $this->pending_balance = (float) $this->pending_balance + $amount;
         $this->last_updated = now();
     }
@@ -121,11 +121,11 @@ class MerchantBalance extends Model
         if ($amount < 0) {
             throw new \InvalidArgumentException('Amount must be non-negative');
         }
-        
+
         if ($amount > (float) $this->pending_balance) {
             throw new \InvalidArgumentException('Insufficient pending balance');
         }
-        
+
         $this->pending_balance = (float) $this->pending_balance - $amount;
         $this->available_balance = (float) $this->available_balance + $amount;
         $this->last_updated = now();
@@ -139,11 +139,11 @@ class MerchantBalance extends Model
         if ($amount < 0) {
             throw new \InvalidArgumentException('Amount must be non-negative');
         }
-        
+
         if ($amount > (float) $this->available_balance) {
             throw new \InvalidArgumentException('Insufficient available balance');
         }
-        
+
         $this->available_balance = (float) $this->available_balance - $amount;
         $this->total_withdrawn = (float) $this->total_withdrawn + $amount;
         $this->last_updated = now();
@@ -157,7 +157,7 @@ class MerchantBalance extends Model
         if ($amount < 0) {
             throw new \InvalidArgumentException('Amount must be non-negative');
         }
-        
+
         $this->available_balance = (float) $this->available_balance + $amount;
         $this->total_withdrawn = (float) $this->total_withdrawn - $amount;
         $this->last_updated = now();
@@ -168,7 +168,7 @@ class MerchantBalance extends Model
      */
     public function isValid(): bool
     {
-        return (float) $this->available_balance >= 0 
+        return (float) $this->available_balance >= 0
             && (float) $this->pending_balance >= 0;
     }
 }

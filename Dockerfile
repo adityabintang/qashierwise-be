@@ -1,22 +1,24 @@
-FROM php:8.2-fpm-alpine
+FROM php:8.2-fpm
 
 # Install system dependencies
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
     supervisor \
     curl \
     libpng-dev \
-    libjpeg-turbo-dev \
-    freetype-dev \
+    libjpeg62-turbo-dev \
+    libfreetype6-dev \
     libzip-dev \
     zip \
     unzip \
     git \
-    oniguruma-dev \
-    icu-dev \
+    libonig-dev \
+    libicu-dev \
+    libpq-dev \
     nodejs \
     npm \
-    postgresql-dev
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
@@ -32,10 +34,7 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     intl
 
 # Install Redis extension
-RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
-    && apk del .build-deps
+RUN pecl install redis && docker-php-ext-enable redis
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -43,20 +42,36 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www/html
 
+# Copy package files first for better caching
+COPY package*.json ./
+
+# Install Node dependencies with retry and timeout settings
+RUN npm config set fetch-retry-mintimeout 20000 \
+    && npm config set fetch-retry-maxtimeout 120000 \
+    && npm config set fetch-retries 5 \
+    && npm config set fetch-timeout 300000 \
+    && npm install --prefer-offline --no-audit --progress=false
+
+# Copy composer files for better caching
+COPY composer.json composer.lock ./
+
+# Install PHP dependencies
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+
 # Copy application files
 COPY . .
 
 # Copy nginx config
-COPY docker/nginx.conf /etc/nginx/http.d/default.conf
+COPY docker/nginx.conf /etc/nginx/sites-available/default
 
 # Copy supervisor config
-COPY docker/supervisord.conf /etc/supervisord.conf
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+# Build assets
+RUN npm run build && rm -rf node_modules
 
-# Install Node dependencies and build assets
-RUN npm install && npm run build && rm -rf node_modules
+# Run composer scripts after copying all files
+RUN composer dump-autoload --optimize
 
 # Create required directories
 RUN mkdir -p /run/nginx \
@@ -79,4 +94,4 @@ RUN php artisan config:clear \
 EXPOSE 80
 
 # Start supervisor directly
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

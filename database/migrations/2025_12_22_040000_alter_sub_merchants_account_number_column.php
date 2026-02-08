@@ -8,7 +8,7 @@ return new class extends Migration
 {
     /**
      * Run the migrations.
-     * 
+     *
      * The account_number column needs to store encrypted values which are much
      * longer than the original 50 character limit. Encrypted values using
      * Laravel's Crypt facade are base64-encoded JSON strings that can be

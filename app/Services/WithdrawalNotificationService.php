@@ -14,8 +14,7 @@ class WithdrawalNotificationService
     /**
      * Notify admins about a new withdrawal request.
      *
-     * @param WithdrawalRequest $withdrawalRequest The new withdrawal request
-     * @return void
+     * @param  WithdrawalRequest  $withdrawalRequest  The new withdrawal request
      */
     public function notifyAdminsOfNewRequest(WithdrawalRequest $withdrawalRequest): void
     {
@@ -25,6 +24,7 @@ class WithdrawalNotificationService
             Log::warning('No admin users found to notify about withdrawal request', [
                 'withdrawal_id' => $withdrawalRequest->id,
             ]);
+
             return;
         }
 
@@ -39,18 +39,18 @@ class WithdrawalNotificationService
     /**
      * Notify the sub-merchant about withdrawal status change.
      *
-     * @param WithdrawalRequest $withdrawalRequest The withdrawal request
-     * @param string $previousStatus The previous status before the change
-     * @return void
+     * @param  WithdrawalRequest  $withdrawalRequest  The withdrawal request
+     * @param  string  $previousStatus  The previous status before the change
      */
     public function notifyMerchantOfStatusChange(WithdrawalRequest $withdrawalRequest, string $previousStatus): void
     {
         $merchant = $withdrawalRequest->subMerchant;
-        
+
         if ($merchant === null || $merchant->user === null) {
             Log::warning('Cannot notify merchant - no user found', [
                 'withdrawal_id' => $withdrawalRequest->id,
             ]);
+
             return;
         }
 
@@ -68,8 +68,7 @@ class WithdrawalNotificationService
     /**
      * Send notification when withdrawal is approved.
      *
-     * @param WithdrawalRequest $withdrawalRequest The approved withdrawal request
-     * @return void
+     * @param  WithdrawalRequest  $withdrawalRequest  The approved withdrawal request
      */
     public function notifyWithdrawalApproved(WithdrawalRequest $withdrawalRequest): void
     {
@@ -79,8 +78,7 @@ class WithdrawalNotificationService
     /**
      * Send notification when withdrawal is rejected.
      *
-     * @param WithdrawalRequest $withdrawalRequest The rejected withdrawal request
-     * @return void
+     * @param  WithdrawalRequest  $withdrawalRequest  The rejected withdrawal request
      */
     public function notifyWithdrawalRejected(WithdrawalRequest $withdrawalRequest): void
     {
@@ -90,8 +88,7 @@ class WithdrawalNotificationService
     /**
      * Send notification when withdrawal is processed.
      *
-     * @param WithdrawalRequest $withdrawalRequest The processed withdrawal request
-     * @return void
+     * @param  WithdrawalRequest  $withdrawalRequest  The processed withdrawal request
      */
     public function notifyWithdrawalProcessed(WithdrawalRequest $withdrawalRequest): void
     {
@@ -100,8 +97,6 @@ class WithdrawalNotificationService
 
     /**
      * Get all admin users who should receive withdrawal notifications.
-     *
-     * @return \Illuminate\Database\Eloquent\Collection
      */
     protected function getAdminUsers(): \Illuminate\Database\Eloquent\Collection
     {
@@ -110,15 +105,14 @@ class WithdrawalNotificationService
         // You may want to add an 'is_admin' column or use a roles system
         return User::where(function ($query) {
             $query->where('email', 'like', '%admin%')
-                  ->orWhere('email', config('app.admin_email'));
+                ->orWhere('email', config('app.admin_email'));
         })->get();
     }
 
     /**
      * Send all notifications for a newly created withdrawal request.
      *
-     * @param WithdrawalRequest $withdrawalRequest The new withdrawal request
-     * @return void
+     * @param  WithdrawalRequest  $withdrawalRequest  The new withdrawal request
      */
     public function sendNewRequestNotifications(WithdrawalRequest $withdrawalRequest): void
     {
@@ -128,8 +122,7 @@ class WithdrawalNotificationService
     /**
      * Send all notifications for an approved withdrawal.
      *
-     * @param WithdrawalRequest $withdrawalRequest The approved withdrawal request
-     * @return void
+     * @param  WithdrawalRequest  $withdrawalRequest  The approved withdrawal request
      */
     public function sendApprovalNotifications(WithdrawalRequest $withdrawalRequest): void
     {
@@ -139,8 +132,7 @@ class WithdrawalNotificationService
     /**
      * Send all notifications for a rejected withdrawal.
      *
-     * @param WithdrawalRequest $withdrawalRequest The rejected withdrawal request
-     * @return void
+     * @param  WithdrawalRequest  $withdrawalRequest  The rejected withdrawal request
      */
     public function sendRejectionNotifications(WithdrawalRequest $withdrawalRequest): void
     {
@@ -150,8 +142,7 @@ class WithdrawalNotificationService
     /**
      * Send all notifications for a processed withdrawal.
      *
-     * @param WithdrawalRequest $withdrawalRequest The processed withdrawal request
-     * @return void
+     * @param  WithdrawalRequest  $withdrawalRequest  The processed withdrawal request
      */
     public function sendProcessedNotifications(WithdrawalRequest $withdrawalRequest): void
     {

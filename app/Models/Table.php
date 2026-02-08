@@ -15,8 +15,11 @@ class Table extends Model
      * Table status constants.
      */
     const STATUS_AVAILABLE = 'available';
+
     const STATUS_OCCUPIED = 'occupied';
+
     const STATUS_RESERVED = 'reserved';
+
     const STATUS_UNAVAILABLE = 'unavailable';
 
     /**

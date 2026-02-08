@@ -4,29 +4,40 @@ namespace App\Services;
 
 use App\Models\Order;
 use App\Models\Payment;
+use App\Models\PlatformFee;
+use App\Models\QrisTransaction;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 
 class PaymentService
 {
+    public function __construct(
+        protected OrderService $orderService,
+        protected SubMerchantService $subMerchantService,
+        protected BalanceService $balanceService
+    ) {}
+
     /**
      * Process a payment for an order
      *
      * @param  Order  $order  Order to pay for
      * @param  array  $paymentData  Payment data (method, amount, reference, metadata)
+     * @param  bool  $autoComplete  Whether to auto-complete order after full payment
      *
      * @throws InvalidArgumentException If payment is invalid
      */
-    public function processPayment(Order $order, array $paymentData): Payment
+    public function processPayment(Order $order, array $paymentData, bool $autoComplete = false): Payment
     {
         // Validate order status
         if ($order->status === Order::STATUS_CANCELLED) {
             throw new InvalidArgumentException('Cannot process payment for cancelled order');
         }
 
-        if ($order->status === Order::STATUS_COMPLETED) {
-            throw new InvalidArgumentException('Order is already completed');
+        if ($order->status === Order::STATUS_PAID) {
+            throw new InvalidArgumentException('Order is already paid');
         }
 
         // Validate payment amount
@@ -49,7 +60,7 @@ class PaymentService
             throw new InvalidArgumentException('Invalid payment method');
         }
 
-        return DB::transaction(function () use ($order, $paymentData, $amount, $method) {
+        return DB::transaction(function () use ($order, $paymentData, $amount, $method, $autoComplete) {
             // Create payment record
             $payment = Payment::create([
                 'order_id' => $order->id,
@@ -66,8 +77,20 @@ class PaymentService
 
             // bccomp returns 0 if equal, 1 if first > second, -1 if first < second
             if (bccomp((string) $totalPaid, (string) $orderTotal, 2) >= 0) {
-                $order->status = Order::STATUS_PAID;
-                $order->save();
+                if ($autoComplete) {
+                    // Auto-complete order when fully paid (from payment menu)
+                    $order->refresh();
+                    $this->orderService->complete($order);
+                } else {
+                    // Just mark as paid (e.g., from external QRIS payment)
+                    $order->status = Order::STATUS_PAID;
+                    $order->save();
+                }
+
+                // If payment method is QRIS and payment was created via POS, create QrisTransaction
+                if ($method === Payment::METHOD_QRIS && $autoComplete) {
+                    $this->createQrisTransactionForPayment($order, $payment);
+                }
             }
 
             return $payment;
@@ -105,19 +128,20 @@ class PaymentService
      *
      * @param  Order  $order  Order to pay for
      * @param  array  $payments  Array of payment data [{method, amount, reference?, metadata?}, ...]
+     * @param  bool  $autoComplete  Whether to auto-complete order after full payment
      * @return Collection Collection of Payment records
      *
      * @throws InvalidArgumentException If payments are invalid
      */
-    public function splitPayment(Order $order, array $payments): Collection
+    public function splitPayment(Order $order, array $payments, bool $autoComplete = false): Collection
     {
         // Validate order status
         if ($order->status === Order::STATUS_CANCELLED) {
             throw new InvalidArgumentException('Cannot process payment for cancelled order');
         }
 
-        if ($order->status === Order::STATUS_COMPLETED) {
-            throw new InvalidArgumentException('Order is already completed');
+        if ($order->status === Order::STATUS_PAID) {
+            throw new InvalidArgumentException('Order is already paid');
         }
 
         if (empty($payments)) {
@@ -146,7 +170,7 @@ class PaymentService
             );
         }
 
-        return DB::transaction(function () use ($order, $payments, $totalPaymentAmount, $existingPaymentsTotal) {
+        return DB::transaction(function () use ($order, $payments, $totalPaymentAmount, $existingPaymentsTotal, $autoComplete) {
             $createdPayments = [];
 
             foreach ($payments as $paymentData) {
@@ -167,12 +191,109 @@ class PaymentService
 
             // bccomp returns 0 if equal, 1 if first > second, -1 if first < second
             if (bccomp((string) $newTotalPaid, (string) $orderTotal, 2) >= 0) {
-                $order->status = Order::STATUS_PAID;
-                $order->save();
+                if ($autoComplete) {
+                    // Auto-complete order when fully paid (from payment menu)
+                    $order->refresh();
+                    $this->orderService->complete($order);
+                } else {
+                    // Just mark as paid (e.g., from external QRIS payment)
+                    $order->status = Order::STATUS_PAID;
+                    $order->save();
+                }
+
+                // Check if any payment method is QRIS and create QRIS transaction
+                $qrisPayment = null;
+                foreach ($createdPayments as $createdPayment) {
+                    if ($createdPayment->method === Payment::METHOD_QRIS) {
+                        $qrisPayment = $createdPayment;
+                        break;
+                    }
+                }
+
+                if ($qrisPayment) {
+                    $this->createQrisTransactionForPayment($order, $qrisPayment);
+                }
             }
 
             return new Collection($createdPayments);
         });
+    }
+
+    /**
+     * Create QRIS transaction for payment made via POS.
+     *
+     * @param  Order  $order  The order
+     * @param  Payment  $payment  The payment record
+     */
+    protected function createQrisTransactionForPayment(Order $order, Payment $payment): void
+    {
+        try {
+            // Get order's store owner
+            $store = $order->store;
+            $user = $store->user;
+
+            // Find sub-merchant for this user
+            $subMerchant = $this->subMerchantService->findByUserId($user->id);
+
+            if (! $subMerchant) {
+                Log::info('No sub-merchant found for user, skipping QRIS transaction creation', [
+                    'order_id' => $order->id,
+                    'user_id' => $user->id,
+                ]);
+
+                return;
+            }
+
+            // Calculate platform fee
+            $platformFee = QrisTransaction::calculatePlatformFee($payment->amount);
+            $netAmount = QrisTransaction::calculateNetAmount($payment->amount);
+
+            // Create QRIS transaction record linked to order
+            $qrisTransaction = QrisTransaction::create([
+                'sub_merchant_id' => $subMerchant->id,
+                'order_id' => $order->order_number,
+                'amount' => $payment->amount,
+                'platform_fee' => $platformFee,
+                'net_amount' => $netAmount,
+                'status' => QrisTransaction::STATUS_SETTLEMENT,
+                'provider' => 'pos',
+                'provider_transaction_id' => $payment->id,
+                'paid_at' => now(),
+                'settled_at' => now(),
+                'created_at' => $order->created_at,
+            ]);
+
+            // Link QRIS transaction to payment
+            $payment->update([
+                'qris_transaction_id' => $qrisTransaction->id,
+            ]);
+
+            // Update order with linked order_id to QRIS transaction
+            $qrisTransaction->update(['linked_order_id' => $order->id]);
+
+            // Process payment success to update sub-merchant balance
+            $this->balanceService->processPaymentSuccess($qrisTransaction);
+
+            // Create platform fee record
+            PlatformFee::createForTransaction($qrisTransaction);
+
+            Log::info('QRIS transaction created for POS payment', [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'payment_id' => $payment->id,
+                'sub_merchant_id' => $subMerchant->id,
+                'amount' => $payment->amount,
+                'platform_fee' => $platformFee,
+                'net_amount' => $netAmount,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to create QRIS transaction for POS payment', [
+                'order_id' => $order->id,
+                'payment_id' => $payment->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
     }
 
     /**

@@ -16,7 +16,9 @@ class MidtransWebhookControllerTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private SubMerchant $subMerchant;
+
     private QrisTransaction $transaction;
 
     protected function setUp(): void
@@ -25,12 +27,10 @@ class MidtransWebhookControllerTest extends TestCase
 
         // Create user and sub-merchant
         $this->user = User::factory()->create();
-        
+
         $this->subMerchant = SubMerchant::create([
             'user_id' => $this->user->id,
-            'bank_name' => 'BCA',
-            'account_number' => '1234567890',
-            'account_holder_name' => 'Test User',
+            'business_name' => 'Test User',
             'is_active' => true,
         ]);
 
@@ -45,7 +45,7 @@ class MidtransWebhookControllerTest extends TestCase
         // Create a pending transaction
         $this->transaction = QrisTransaction::create([
             'sub_merchant_id' => $this->subMerchant->id,
-            'order_id' => 'QRIS-' . now()->format('YmdHis') . '-TEST1234',
+            'order_id' => 'QRIS-'.now()->format('YmdHis').'-TEST1234',
             'amount' => 100000,
             'platform_fee' => 2500,
             'net_amount' => 97500,
@@ -168,10 +168,10 @@ class MidtransWebhookControllerTest extends TestCase
     {
         $grossAmount = '100000.00';
         $statusCode = $status === 'settlement' ? '200' : ($status === 'pending' ? '201' : '202');
-        
+
         // Build signature (without server key in test mode)
         $serverKey = config('services.midtrans.server_key') ?? '';
-        $signatureString = $orderId . $statusCode . $grossAmount . $serverKey;
+        $signatureString = $orderId.$statusCode.$grossAmount.$serverKey;
         $signatureKey = hash('sha512', $signatureString);
 
         return [
@@ -180,7 +180,7 @@ class MidtransWebhookControllerTest extends TestCase
             'status_code' => $statusCode,
             'gross_amount' => $grossAmount,
             'signature_key' => $signatureKey,
-            'transaction_id' => 'midtrans-' . uniqid(),
+            'transaction_id' => 'midtrans-'.uniqid(),
             'payment_type' => 'qris',
             'fraud_status' => 'accept',
             'transaction_time' => now()->toDateTimeString(),

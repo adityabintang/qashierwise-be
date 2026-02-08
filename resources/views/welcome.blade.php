@@ -1,12 +1,13 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <!-- Primary Meta Tags -->
-    <title>QashierWise - AI Chatbot WhatsApp untuk Restoran | Reservasi & Order Otomatis</title>
-    <meta name="title" content="QashierWise - AI Chatbot WhatsApp untuk Restoran | Reservasi & Order Otomatis">
-    <meta name="description" content="Platform AI Chatbot WhatsApp untuk restoran dengan integrasi QRIS. Kelola reservasi, pesanan, delivery, dan pembayaran dalam satu dashboard. Coba gratis 14 hari!">
+    <title>QashierWise - AI Chatbot WhatsApp Restoran</title>
+    <meta name="title" content="QashierWise - AI Chatbot WhatsApp Restoran">
+    <meta name="description" content="Platform AI Chatbot WhatsApp untuk restoran dengan integrasi QRIS. Kelola reservasi, pesanan, dan pembayaran. Coba gratis 14 hari!">
     <meta name="keywords" content="chatbot whatsapp restoran, AI chatbot restoran, reservasi restoran otomatis, order whatsapp, QRIS restoran, POS restoran, manajemen restoran, WhatsApp Business API restoran">
     <meta name="author" content="Aditya Bintang Fadila">
     <meta name="robots" content="index, follow">
@@ -61,6 +62,10 @@
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"></noscript>
 
+    <!-- Preload Font Awesome with lower priority -->
+    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'" fetchpriority="low">
+    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"></noscript>
+
     <!-- Additional SEO Meta -->
     <meta name="geo.region" content="ID-JT">
     <meta name="geo.placename" content="Salatiga">
@@ -112,12 +117,75 @@
         @media(min-width:1024px){.lg\\:grid{display:grid}.lg\\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.lg\\:text-left{text-align:left}.lg\\:text-6xl{font-size:3.75rem;line-height:1}}
         [x-cloak]{display:none!important}
         body{font-family:'Inter',sans-serif}
+
+        /* Prevent layout shifts */
+        body { margin-bottom: 0; overflow-x: hidden; }
+        /* Reserve space for elements */
+        img { max-width: 100%; height: auto; }
+        /* Ensure consistent spacing */
+        .hero-gradient { min-height: 600px; contain: layout style; }
+        /* Navigation stability */
+        nav { height: 64px; contain: layout; }
+        /* Hero image container */
+        .hero-image-container { aspect-ratio: 665/444; min-height: 300px; }
+        /* Floating elements stability */
+        .floating-card { contain: layout style; will-change: transform; }
+        /* Font loading stability */
+        @font-face { font-display: swap; }
+        /* Additional critical CSS for less CLS */
+        .absolute{position:absolute}
+        .relative{position:relative}
+        .w-full{width:100%}
+        .grid{display:grid}
+        .gap-4{gap:1rem}
+        .gap-6{gap:1.5rem}
+        .gap-8{gap:2rem}
+        .py-12{padding-top:3rem;padding-bottom:3rem}
+        .py-20{padding-top:5rem;padding-bottom:5rem}
+        .px-6{padding-left:1.5rem;padding-right:1.5rem}
+        .px-8{padding-left:2rem;padding-right:2rem}
+        .mt-8{margin-top:2rem}
+        .mb-2{margin-bottom:.5rem}
+        .mb-3{margin-bottom:.75rem}
+        .mb-10{margin-bottom:2.5rem}
+        .mb-16{margin-bottom:4rem}
+        .text-sm{font-size:.875rem;line-height:1.25rem}
+        .text-base{font-size:1rem;line-height:1.5rem}
+        .text-lg{font-size:1.125rem;line-height:1.75rem}
+        .text-2xl{font-size:1.5rem;line-height:2rem}
+        .text-4xl{font-size:2.25rem;line-height:2.5rem}
+        .text-5xl{font-size:3rem;line-height:1}
+        .text-6xl{font-size:3.75rem;line-height:1}
+        .text-xs{font-size:.75rem;line-height:1rem}
+        .shadow-xl{box-shadow:0 20px 25px -5px rgba(0,0,0,.1),0 10px 10px -5px rgba(0,0,0,.04)}
+        .shadow-2xl{box-shadow:0 25px 50px -12px rgba(0,0,0,.25)}
+        .order-1{order:1}
+        .order-2{order:2}
+        .backdrop-blur-md{backdrop-filter:blur(12px)}
+        .transition{transition-property:all;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}
+        .hover\\:text-primary:hover{color:#4910ce}
+        .border-b{border-bottom-width:1px}
+        .border-gray-100{border-color:#f3f4f6}
+        .bg-gray-50{background-color:#f9fafb}
+        .bg-green-100{background-color:#dcfce7}
+        .bg-purple-100{background-color:#f3e8ff}
+        .text-green-600{color:#16a34a}
+        .text-gray-500{color:#6b7280}
+        .space-x-3>:not([hidden])~:not([hidden]){margin-left:.75rem}
+        .space-x-4>:not([hidden])~:not([hidden]){margin-left:1rem}
+        .space-x-8>:not([hidden])~:not([hidden]){margin-left:2rem}
+        .whitespace-nowrap{white-space:nowrap}
+        .flex-shrink-0{flex-shrink:0}
+        .max-w-md{max-width:28rem}
+        .max-w-2xl{max-width:42rem}
+        @media(min-width:640px){.sm\\:block{display:block}.sm\\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.sm\\:text-3xl{font-size:1.875rem;line-height:2.25rem}}
+        @media(min-width:1024px){.lg\\:max-w-none{max-width:none}.lg\\:gap-12{gap:3rem}.lg\\:mt-0{margin-top:0}.lg\\:order-1{order:1}.lg\\:order-2{order:2}}
     </style>
 
-    <!-- Tailwind CSS - Deferred loading -->
+    <!-- Tailwind CSS - Deferred loading with requestIdleCallback -->
     <script>
-        // Load Tailwind CSS asynchronously after critical content
-        (function() {
+        // Load Tailwind CSS when browser is idle
+        function loadTailwind() {
             var tw = document.createElement('script');
             tw.src = 'https://cdn.tailwindcss.com';
             tw.onload = function() {
@@ -132,12 +200,13 @@
                 }
             };
             document.head.appendChild(tw);
-        })();
+        }
+        if ('requestIdleCallback' in window) {
+            requestIdleCallback(loadTailwind);
+        } else {
+            setTimeout(loadTailwind, 1);
+        }
     </script>
-
-    <!-- Font Awesome - Deferred loading (non-critical icons) -->
-    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
 
     <!-- Alpine.js - Deferred -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -260,12 +329,14 @@
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",
         "itemListElement": [
+            @foreach(App\Helpers\SeoHelper::getBreadcrumbItems(__('landing.meta_title')) as $index => $item)
             {
                 "@type": "ListItem",
-                "position": 1,
-                "name": "Home",
-                "item": "https://qashierwise.com"
-            }
+                "position": {{ $index + 1 }},
+                "name": "{{ $item['label'] }}",
+                "item": "{{ $item['url'] }}"
+            }{{ !$loop->last ? ',' : '' }}
+            @endforeach
         ]
     }
     </script>
@@ -287,10 +358,10 @@
         },
         "aggregateRating": {
             "@type": "AggregateRating",
-            "ratingValue": "4.8",
-            "reviewCount": "24",
-            "bestRating": "5",
-            "worstRating": "1"
+            "ratingValue": 4.8,
+            "reviewCount": 24,
+            "bestRating": 5,
+            "worstRating": 1
         },
         "review": [
             {
@@ -303,8 +374,8 @@
                 "reviewBody": "QashierWise sangat membantu restoran kami. Reservasi jadi lebih teratur dan otomatis, pelanggan puas dengan respons cepat.",
                 "reviewRating": {
                     "@type": "Rating",
-                    "ratingValue": "5",
-                    "bestRating": "5"
+                    "ratingValue": 5,
+                    "bestRating": 5
                 }
             },
             {
@@ -317,8 +388,8 @@
                 "reviewBody": "Fitur QRIS dan order via WhatsApp sangat praktis. Dashboard mudah digunakan dan laporan lengkap.",
                 "reviewRating": {
                     "@type": "Rating",
-                    "ratingValue": "5",
-                    "bestRating": "5"
+                    "ratingValue": 5,
+                    "bestRating": 5
                 }
             },
             {
@@ -331,14 +402,14 @@
                 "reviewBody": "Sistem yang bagus untuk restoran. AI chatbot cukup pintar dalam merespons pelanggan. Recommended!",
                 "reviewRating": {
                     "@type": "Rating",
-                    "ratingValue": "4",
-                    "bestRating": "5"
+                    "ratingValue": 4,
+                    "bestRating": 5
                 }
             }
         ],
         "offers": {
             "@type": "Offer",
-            "price": "249000",
+            "price": 249000,
             "priceCurrency": "IDR",
             "priceValidUntil": "2025-12-31",
             "availability": "https://schema.org/InStock",
@@ -347,7 +418,7 @@
                 "@type": "OfferShippingDetails",
                 "shippingRate": {
                     "@type": "MonetaryAmount",
-                    "value": "0",
+                    "value": 0,
                     "currency": "IDR"
                 },
                 "shippingDestination": {
@@ -358,14 +429,14 @@
                     "@type": "ShippingDeliveryTime",
                     "handlingTime": {
                         "@type": "QuantitativeValue",
-                        "minValue": "0",
-                        "maxValue": "1",
+                        "minValue": 0,
+                        "maxValue": 1,
                         "unitCode": "DAY"
                     },
                     "transitTime": {
                         "@type": "QuantitativeValue",
-                        "minValue": "0",
-                        "maxValue": "0",
+                        "minValue": 0,
+                        "maxValue": 0,
                         "unitCode": "DAY"
                     }
                 }
@@ -397,41 +468,62 @@
         .card-shadow {
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
+        /* Composited animations for better performance */
+        .feature-card {
+            will-change: transform;
+            transform: translateZ(0);
+        }
         .feature-card:hover {
-            transform: translateY(-4px);
+            transform: translateY(-4px) translateZ(0);
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
+        /* Reduce motion for accessibility */
+        @media (prefers-reduced-motion: reduce) {
+            .feature-card, .floating-card, .transition {
+                transition: none !important;
+                animation: none !important;
+            }
+        }
     </style>
+
+    <!-- Google Analytics 4 -->
+    <x-google-analytics />
 </head>
 <body class="bg-white">
+    <!-- Breadcrumb Navigation -->
+    <x-breadcrumb :items="App\Helpers\SeoHelper::getBreadcrumbItems(__('landing.meta_title'))" />
+
     <!-- Navigation -->
-    <nav x-data="{ menuOpen: false }" class="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
+    <nav x-data="{ menuOpen: false }" class="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100" style="height: 64px; contain: layout;">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <!-- Logo -->
                 <div class="flex items-center space-x-2">
-                    <img src="{{ asset('images/logo-48.png') }}" class="h-7 rounded-xl" alt="Logo" width="28" height="28" loading="eager">
+                    <img src="{{ asset('images/logo-48.png') }}" class="h-7 rounded-xl" alt="Logo" width="28" height="28" loading="eager" style="width: 28px; height: 28px;">
                     <span class="text-xl font-bold text-primary">QashierWise</span>
                 </div>
 
                 <!-- Desktop Menu -->
                 <div class="hidden md:flex items-center space-x-8">
-                    <a href="#features" class="text-gray-600 hover:text-primary transition">Cara Kerja</a>
-                    <a href="#fitur" class="text-gray-600 hover:text-primary transition">Fitur</a>
-                    <a href="#pricing" class="text-gray-600 hover:text-primary transition">Harga</a>
-                    <a href="#about" class="text-gray-600 hover:text-primary transition">Tentang Kami</a>
-                    <a href="#faq" class="text-gray-600 hover:text-primary transition">FAQ</a>
+                    <a href="#features" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.how_it_works') }}</a>
+                    <a href="#fitur" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.features') }}</a>
+                    <a href="#pricing" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.pricing') }}</a>
+                    <a href="#about" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.about') }}</a>
+                    <a href="#faq" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.faq') }}</a>
                 </div>
 
                 <!-- CTA Buttons (Desktop) -->
                 <div class="hidden md:flex items-center space-x-4">
+                    <!-- Language Switcher -->
+                    <x-language-switcher />
+
                     @if (Route::has('login'))
                         @auth
-                            <a href="{{ url('/dashboard') }}" class="text-gray-600 hover:text-primary font-medium transition">Dashboard</a>
+                            <a href="{{ url('/dashboard') }}" class="text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.dashboard') }}</a>
                         @else
-                            <a href="/login" class="text-gray-600 hover:text-primary font-medium transition">Lihat Demo</a>
+                            <a href="https://youtu.be/knoL8c0CJs8?si=N8RBGATUSK940ZF4" target="_blank" rel="noopener noreferrer" class="text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.view_demo') }}</a>
                             <a href="/login" class="bg-primary text-white px-5 py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-all">
-                                Coba Gratis 14 Hari
+                                {{ __('landing.nav.try_free') }}
                             </a>
                         @endauth
                     @endif
@@ -463,21 +555,26 @@
             class="md:hidden bg-white border-t border-gray-100 shadow-lg"
         >
             <div class="px-4 py-4 space-y-3">
-                <a href="#features" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">Cara Kerja</a>
-                <a href="#fitur" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">Fitur</a>
-                <a href="#pricing" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">Harga</a>
-                <a href="#about" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">Tentang Kami</a>
-                <a href="#faq" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">FAQ</a>
+                <a href="#features" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.how_it_works') }}</a>
+                <a href="#fitur" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.features') }}</a>
+                <a href="#pricing" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.pricing') }}</a>
+                <a href="#about" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.about') }}</a>
+                <a href="#faq" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.faq') }}</a>
 
                 <!-- Mobile CTA Buttons -->
                 <div class="pt-4 border-t border-gray-100 space-y-3">
+                    <!-- Language Switcher for Mobile -->
+                    <div class="flex justify-center">
+                        <x-language-switcher />
+                    </div>
+
                     @if (Route::has('login'))
                         @auth
-                            <a href="{{ url('/dashboard') }}" class="block py-3 px-4 text-center text-gray-600 hover:text-primary font-medium transition">Dashboard</a>
+                            <a href="{{ url('/dashboard') }}" class="block py-3 px-4 text-center text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.dashboard') }}</a>
                         @else
-                            <a href="/login" class="block py-3 px-4 text-center text-gray-600 hover:text-primary font-medium transition">Lihat Demo</a>
+                            <a href="https://youtu.be/knoL8c0CJs8?si=N8RBGATUSK940ZF4" target="_blank" rel="noopener noreferrer" class="block py-3 px-4 text-center text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.view_demo') }}</a>
                             <a href="/login" class="block py-3 px-4 text-center bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-all">
-                                Coba Gratis 14 Hari
+                                {{ __('landing.nav.try_free') }}
                             </a>
                         @endauth
                     @endif
@@ -512,52 +609,52 @@
                 <div class="text-center lg:text-left order-1">
                     <div class="inline-flex items-center px-3 md:px-4 py-2 bg-purple-100 rounded-full text-primary text-xs md:text-sm font-medium mb-4 md:mb-6">
                         <i class="fas fa-sparkles mr-2"></i>
-                        Didukung AI + Terintegrasi QRIS
+                        {{ __('landing.hero.badge') }}
                     </div>
 
-                    <p class="text-gray-500 mb-3 md:mb-4 text-sm md:text-base">Chatbot untuk WhatsApp + Sistem QRIS</p>
+                    <p class="text-gray-500 mb-3 md:mb-4 text-sm md:text-base">{{ __('landing.hero.subtitle') }}</p>
 
                     <!-- Responsive heading: smaller on mobile -->
                     <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-4 md:mb-6">
-                        Respon lebih cepat, jual lebih <span class="gradient-text">banyak</span>
+                        {{ __('landing.hero.title') }} <span class="gradient-text">{{ __('landing.hero.title_highlight') }}</span>
                     </h1>
 
                     <p class="text-base md:text-lg text-gray-600 mb-6 md:mb-8 leading-relaxed">
-                        QashierWise menghadirkan Chatbot WhatsApp yang restoran-first dengan satu layar admin: Inbox, Pesanan, Reservasi, Menu, dan CRM.
+                        {{ __('landing.hero.description') }}
                     </p>
 
                     <div class="flex flex-col sm:flex-row gap-3 md:gap-4 mb-6 md:mb-8 justify-center lg:justify-start">
                         <a href="/login" class="inline-flex items-center justify-center px-6 md:px-8 py-3 md:py-4 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all text-sm md:text-base">
-                            <span>Coba Gratis 14 Hari</span>
+                            <span>{{ __('landing.hero.cta_primary') }}</span>
                         </a>
-                        <a href="#demo" class="inline-flex items-center justify-center px-6 md:px-8 py-3 md:py-4 bg-white text-primary rounded-xl font-semibold border-2 border-primary/30 hover:border-primary transition-all text-sm md:text-base">
+                        <a href="https://youtu.be/knoL8c0CJs8?si=N8RBGATUSK940ZF4" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center px-6 md:px-8 py-3 md:py-4 bg-white text-primary rounded-xl font-semibold border-2 border-primary/30 hover:border-primary transition-all text-sm md:text-base">
                             <i class="fas fa-play-circle mr-2"></i>
-                            <span>Lihat Demo</span>
+                            <span>{{ __('landing.hero.cta_secondary') }}</span>
                         </a>
                     </div>
 
                     <div class="flex flex-col gap-2 text-xs md:text-sm text-gray-500 items-center lg:items-start">
                         <div class="flex items-center">
                             <i class="fas fa-check text-green-600 mr-2"></i>
-                            <span>Reservasi & Order via WhatsApp tanpa ribet</span>
+                            <span>{{ __('landing.hero.benefits.reservations_orders') }}</span>
                         </div>
                         <div class="flex items-center">
                             <i class="fas fa-check text-green-600 mr-2"></i>
-                            <span>Kelola pesanan + laporan dengan mudah</span>
+                            <span>{{ __('landing.hero.benefits.manage_orders') }}</span>
                         </div>
                         <div class="flex items-center">
                             <i class="fas fa-check text-green-600 mr-2"></i>
-                            <span>Tanpa perubahan workflow (bayar di tempat)</span>
+                            <span>{{ __('landing.hero.benefits.no_workflow_change') }}</span>
                         </div>
                         <div class="flex items-center">
                             <i class="fas fa-check text-green-600 mr-2"></i>
-                            <span>Laporan Order & penjualan otomatis</span>
+                            <span>{{ __('landing.hero.benefits.auto_reports') }}</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Right Content - Hero Image -->
-                <div class="relative order-2 w-full max-w-md lg:max-w-none mx-auto mt-8 lg:mt-0">
+                <div class="relative order-2 w-full max-w-md lg:max-w-none mx-auto mt-8 lg:mt-0" style="aspect-ratio: 665/444; min-height: 300px;">
                     <img
                         src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=665&q=75"
                         srcset="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=75 400w,
@@ -568,29 +665,30 @@
                         class="rounded-2xl shadow-2xl w-full"
                         width="665"
                         height="444"
+                        style="aspect-ratio: 665/444; object-fit: cover; width: 100%; height: auto;"
                         fetchpriority="high"
                         decoding="async"
                         loading="eager">
                     <!-- Floating Elements - Hidden on small mobile, visible on larger screens -->
-                    <div class="hidden sm:block absolute -bottom-4 md:-bottom-6 -left-2 md:-left-6 bg-white rounded-xl p-3 md:p-4 shadow-xl">
+                    <div class="hidden sm:block absolute -bottom-4 md:-bottom-6 -left-2 md:-left-6 bg-white rounded-xl p-3 md:p-4 shadow-xl floating-card" style="contain: layout style; will-change: transform; width: 180px; height: 60px;">
                         <div class="flex items-center space-x-2 md:space-x-3">
-                            <div class="w-8 h-8 md:w-10 md:h-10 bg-green-100 rounded-full flex items-center justify-center">
+                            <div class="w-8 h-8 md:w-10 md:h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
                                 <i class="fab fa-whatsapp text-green-600 text-lg md:text-xl"></i>
                             </div>
-                            <div>
-                                <p class="text-xs md:text-sm font-semibold text-gray-900">Pesan Masuk</p>
-                                <p class="text-xs text-gray-500">+128 hari ini</p>
+                            <div style="min-width: 100px;">
+                                <p class="text-xs md:text-sm font-semibold text-gray-900 whitespace-nowrap">{{ __('landing.hero.floating_messages') }}</p>
+                                <p class="text-xs text-gray-500 whitespace-nowrap">{{ __('landing.hero.floating_messages_count') }}</p>
                             </div>
                         </div>
                     </div>
-                    <div class="hidden sm:block absolute -top-2 md:-top-4 -right-2 md:-right-4 bg-white rounded-xl p-3 md:p-4 shadow-xl">
+                    <div class="hidden sm:block absolute -top-2 md:-top-4 -right-2 md:-right-4 bg-white rounded-xl p-3 md:p-4 shadow-xl floating-card" style="contain: layout style; will-change: transform; width: 180px; height: 60px;">
                         <div class="flex items-center space-x-2 md:space-x-3">
-                            <div class="w-8 h-8 md:w-10 md:h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                            <div class="w-8 h-8 md:w-10 md:h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
                                 <i class="fas fa-chart-line text-primary text-lg md:text-xl"></i>
                             </div>
-                            <div>
-                                <p class="text-xs md:text-sm font-semibold text-gray-900">Penjualan</p>
-                                <p class="text-xs text-green-600">↑ 24% bulan ini</p>
+                            <div style="min-width: 100px;">
+                                <p class="text-xs md:text-sm font-semibold text-gray-900 whitespace-nowrap">{{ __('landing.hero.floating_sales') }}</p>
+                                <p class="text-xs text-green-600 whitespace-nowrap">{{ __('landing.hero.floating_sales_trend') }}</p>
                             </div>
                         </div>
                     </div>
@@ -603,8 +701,8 @@
     <section id="features" class="py-12 md:py-20 bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-10 md:mb-16">
-                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 md:mb-4">Cara kerja otomatis dengan AI + QRIS</h2>
-                <p class="text-sm md:text-base text-gray-600 max-w-2xl mx-auto">Semuanya untuk bisnis restoran: cepat, ringkas, dan akurat.</p>
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 md:mb-4">{{ __('landing.how_it_works.title') }}</h2>
+                <p class="text-sm md:text-base text-gray-600 max-w-2xl mx-auto">{{ __('landing.how_it_works.subtitle') }}</p>
             </div>
 
             <!-- Responsive: 1 col mobile, 2 cols tablet, 4 cols desktop -->
@@ -614,8 +712,8 @@
                     <div class="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-green-500/30">
                         <i class="fab fa-whatsapp text-white text-2xl"></i>
                     </div>
-                    <h3 class="font-semibold text-gray-900 mb-2">Terima chat di WhatsApp</h3>
-                    <p class="text-sm text-gray-500">Balas manual atau otomatis, sesuaikan auto-reply, jam operasional, dan menu.</p>
+                    <h3 class="font-semibold text-gray-900 mb-2">{{ __('landing.how_it_works.steps.0.title') }}</h3>
+                    <p class="text-sm text-gray-500">{{ __('landing.how_it_works.steps.0.description') }}</p>
                 </div>
 
                 <!-- Step 2 -->
@@ -623,8 +721,8 @@
                     <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-primary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-500/30">
                         <i class="fas fa-robot text-white text-2xl"></i>
                     </div>
-                    <h3 class="font-semibold text-gray-900 mb-2">AI merespons otomatis</h3>
-                    <p class="text-sm text-gray-500">Terkirim konfirmasi & menu, dan pelanggan terkelola dengan baik.</p>
+                    <h3 class="font-semibold text-gray-900 mb-2">{{ __('landing.how_it_works.steps.1.title') }}</h3>
+                    <p class="text-sm text-gray-500">{{ __('landing.how_it_works.steps.1.description') }}</p>
                 </div>
 
                 <!-- Step 3 -->
@@ -632,8 +730,8 @@
                     <div class="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/30">
                         <i class="fas fa-qrcode text-white text-2xl"></i>
                     </div>
-                    <h3 class="font-semibold text-gray-900 mb-2">Bayar dengan QRIS</h3>
-                    <p class="text-sm text-gray-500">Kirim link QRIS statis. Semua disimpan, status berubah otomatis.</p>
+                    <h3 class="font-semibold text-gray-900 mb-2">{{ __('landing.how_it_works.steps.2.title') }}</h3>
+                    <p class="text-sm text-gray-500">{{ __('landing.how_it_works.steps.2.description') }}</p>
                 </div>
 
                 <!-- Step 4 -->
@@ -641,8 +739,8 @@
                     <div class="w-16 h-16 bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-orange-500/30">
                         <i class="fas fa-user-tie text-white text-2xl"></i>
                     </div>
-                    <h3 class="font-semibold text-gray-900 mb-2">Karyawan pantau di Console</h3>
-                    <p class="text-sm text-gray-500">Lihat inbox pesan pesanan, dan kelola semuanya dalam satu layar.</p>
+                    <h3 class="font-semibold text-gray-900 mb-2">{{ __('landing.how_it_works.steps.3.title') }}</h3>
+                    <p class="text-sm text-gray-500">{{ __('landing.how_it_works.steps.3.description') }}</p>
                 </div>
             </div>
         </div>
@@ -652,8 +750,8 @@
     <section id="fitur" class="py-12 md:py-20 bg-gray-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-10 md:mb-16">
-                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 md:mb-4">Fitur utama yang restoran butuhkan</h2>
-                <p class="text-sm md:text-base text-gray-600 max-w-2xl mx-auto">Semua alat & aplikasi dibuat untuk memaksimalkan pemasukan restoran</p>
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 md:mb-4">{{ __('landing.features.title') }}</h2>
+                <p class="text-sm md:text-base text-gray-600 max-w-2xl mx-auto">{{ __('landing.features.subtitle') }}</p>
             </div>
 
             <!-- Responsive: 1 col mobile, 2 cols tablet, 3 cols desktop -->
@@ -663,8 +761,8 @@
                     <div class="w-10 h-10 md:w-12 md:h-12 bg-green-100 rounded-xl flex items-center justify-center mb-3 md:mb-4">
                         <i class="fab fa-whatsapp text-green-600 text-lg md:text-xl"></i>
                     </div>
-                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">AI Chatbot WhatsApp</h3>
-                    <p class="text-sm md:text-base text-gray-600">Balas cerdas dengan model AI, terima order, Talk to Staff, handover ke live agent langsung.</p>
+                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">{{ __('landing.features.list.0.title') }}</h3>
+                    <p class="text-sm md:text-base text-gray-600">{{ __('landing.features.list.0.description') }}</p>
                 </div>
 
                 <!-- Feature 2 -->
@@ -672,8 +770,8 @@
                     <div class="w-10 h-10 md:w-12 md:h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-3 md:mb-4">
                         <i class="fas fa-desktop text-primary text-lg md:text-xl"></i>
                     </div>
-                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">Console Satu Layar</h3>
-                    <p class="text-sm md:text-base text-gray-600">Inbox pesan, pesanan, kelola reservasi, dan semuanya dalam satu dashboard.</p>
+                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">{{ __('landing.features.list.1.title') }}</h3>
+                    <p class="text-sm md:text-base text-gray-600">{{ __('landing.features.list.1.description') }}</p>
                 </div>
 
                 <!-- Feature 3 -->
@@ -681,8 +779,8 @@
                     <div class="w-10 h-10 md:w-12 md:h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-3 md:mb-4">
                         <i class="fas fa-motorcycle text-blue-600 text-lg md:text-xl"></i>
                     </div>
-                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">Order Delivery & Pickup</h3>
-                    <p class="text-sm md:text-base text-gray-600">Penjadwalan, order & delivery bisa terhubung, pembayaran QRIS terintegrasi.</p>
+                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">{{ __('landing.features.list.2.title') }}</h3>
+                    <p class="text-sm md:text-base text-gray-600">{{ __('landing.features.list.2.description') }}</p>
                 </div>
 
                 <!-- Feature 4 -->
@@ -690,8 +788,8 @@
                     <div class="w-10 h-10 md:w-12 md:h-12 bg-amber-100 rounded-xl flex items-center justify-center mb-3 md:mb-4">
                         <i class="fas fa-calendar-check text-amber-600 text-lg md:text-xl"></i>
                     </div>
-                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">Reservasi Pintar</h3>
-                    <p class="text-sm md:text-base text-gray-600">Slot ketersediaan, jam buka, kapasitas, dan notifikasi staff. Pengingat T-24h & T+7hr.</p>
+                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">{{ __('landing.features.list.3.title') }}</h3>
+                    <p class="text-sm md:text-base text-gray-600">{{ __('landing.features.list.3.description') }}</p>
                 </div>
 
                 <!-- Feature 5 -->
@@ -699,8 +797,8 @@
                     <div class="w-10 h-10 md:w-12 md:h-12 bg-emerald-100 rounded-xl flex items-center justify-center mb-3 md:mb-4">
                         <i class="fas fa-qrcode text-emerald-600 text-lg md:text-xl"></i>
                     </div>
-                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">Pembayaran QRIS</h3>
-                    <p class="text-sm md:text-base text-gray-600">Kirim invoice QRIS atau berikan QR statis via chat, semua tercatat otomatis.</p>
+                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">{{ __('landing.features.list.4.title') }}</h3>
+                    <p class="text-sm md:text-base text-gray-600">{{ __('landing.features.list.4.description') }}</p>
                 </div>
 
                 <!-- Feature 6 -->
@@ -708,8 +806,8 @@
                     <div class="w-10 h-10 md:w-12 md:h-12 bg-rose-100 rounded-xl flex items-center justify-center mb-3 md:mb-4">
                         <i class="fas fa-chart-pie text-rose-600 text-lg md:text-xl"></i>
                     </div>
-                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">Laporan & CRM</h3>
-                    <p class="text-sm md:text-base text-gray-600">CRM, repeat rate, tag pelanggan, dan export CSV (Pro).</p>
+                    <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">{{ __('landing.features.list.5.title') }}</h3>
+                    <p class="text-sm md:text-base text-gray-600">{{ __('landing.features.list.5.description') }}</p>
                 </div>
             </div>
         </div>
@@ -719,8 +817,8 @@
     <section class="py-20 bg-gradient-to-b from-primary to-purple-800 overflow-hidden">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
-                <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Satu dashboard untuk semua</h2>
-                <p class="text-purple-200 max-w-2xl mx-auto">Kelola chat, pesanan, reservasi, dan laporan dalam satu tampilan yang simpel</p>
+                <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">{{ __('landing.app_preview.title') }}</h2>
+                <p class="text-purple-200 max-w-2xl mx-auto">{{ __('landing.app_preview.subtitle') }}</p>
             </div>
 
             <!-- App Preview Image Placeholder -->
@@ -824,8 +922,89 @@
     <section id="pricing" class="py-12 md:py-20 bg-gray-50" x-data="pricingSection()">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-10 md:mb-16">
-                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 md:mb-4">Harga sederhana, tumbuh bersama Anda</h2>
-                <p class="text-sm md:text-base text-gray-600">Mulai gratis - upgrade kapan saja.</p>
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 md:mb-4">{{ __('landing.pricing.title') }}</h2>
+                <p class="text-sm md:text-base text-gray-600 mb-6">{{ __('landing.pricing.subtitle') }}</p>
+
+                <!-- Duration Toggle -->
+                <div class="inline-flex items-center bg-white rounded-full p-1 shadow-md">
+                    <button
+                        @click="selectedDuration = '1_month'"
+                        :class="selectedDuration === '1_month' ? 'bg-primary text-white' : 'text-gray-600 hover:text-gray-900'"
+                        class="px-4 md:px-6 py-2 rounded-full font-semibold transition-all text-xs md:text-sm"
+                    >
+                        1 Bulan
+                    </button>
+                    <button
+                        @click="selectedDuration = '3_months'"
+                        :class="selectedDuration === '3_months' ? 'bg-primary text-white' : 'text-gray-600 hover:text-gray-900'"
+                        class="px-4 md:px-6 py-2 rounded-full font-semibold transition-all text-xs md:text-sm"
+                    >
+                        3 Bulan
+                    </button>
+                    <button
+                        @click="selectedDuration = '1_year'"
+                        :class="selectedDuration === '1_year' ? 'bg-primary text-white' : 'text-gray-600 hover:text-gray-900'"
+                        class="px-4 md:px-6 py-2 rounded-full font-semibold transition-all text-xs md:text-sm relative"
+                    >
+                        1 Tahun
+                        <span class="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">-10%</span>
+                    </button>
+                </div>
+
+                <!-- Promo Code Input (only show if logged in) -->
+                <template x-if="token">
+                    <div class="mt-6 max-w-md mx-auto">
+                        <div class="bg-white rounded-xl p-4 shadow-md">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-tag mr-1"></i> Punya Kode Promo?
+                            </label>
+                            <div class="flex gap-2">
+                                <input
+                                    type="text"
+                                    x-model="promoCode"
+                                    @input="promoError = null; promoSuccess = null"
+                                    placeholder="Masukkan kode promo"
+                                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm uppercase"
+                                    :disabled="promoValidating"
+                                >
+                                <button
+                                    @click="validatePromoCode()"
+                                    :disabled="!promoCode || promoValidating"
+                                    class="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <span x-show="!promoValidating">Terapkan</span>
+                                    <span x-show="promoValidating" x-cloak>
+                                        <i class="fas fa-spinner fa-spin"></i>
+                                    </span>
+                                </button>
+                            </div>
+                            <!-- Promo Success Message -->
+                            <div x-show="promoSuccess" x-cloak class="mt-2 p-2 bg-green-100 border border-green-400 text-green-700 rounded-lg text-xs">
+                                <i class="fas fa-check-circle mr-1"></i>
+                                <span x-text="promoSuccess"></span>
+                            </div>
+                            <!-- Promo Error Message -->
+                            <div x-show="promoError" x-cloak class="mt-2 p-2 bg-red-100 border border-red-400 text-red-700 rounded-lg text-xs">
+                                <i class="fas fa-exclamation-circle mr-1"></i>
+                                <span x-text="promoError"></span>
+                            </div>
+                            <!-- Applied Promo Display -->
+                            <div x-show="appliedPromo" x-cloak class="mt-2 flex items-center justify-between p-2 bg-purple-50 border border-purple-200 rounded-lg">
+                                <div class="text-xs">
+                                    <span class="font-semibold text-purple-900" x-text="appliedPromo?.code"></span>
+                                    <span class="text-purple-700"> - Hemat </span>
+                                    <span class="font-semibold text-purple-900" x-text="'Rp' + formatPrice(appliedPromo?.discount || 0)"></span>
+                                </div>
+                                <button
+                                    @click="removePromoCode()"
+                                    class="text-purple-600 hover:text-purple-800 text-xs"
+                                >
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
             </div>
 
             <!-- Error Message -->
@@ -855,28 +1034,33 @@
                             <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>Tanpa pembayaran online</li>
                             <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>1 user staf + Email support</li>
                         </ul>
-                        <a href="/register" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition text-sm">
+                        <a href="/register" onclick="trackSignup('cta_button')" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition text-sm">
                             Mulai Gratis
                         </a>
                     </div>
 
-                    <!-- Standard Plan (Mobile) -->
+                    <!-- Pro Plan (Mobile) -->
                     <div class="bg-white rounded-2xl p-5 border-2 border-primary relative w-72 flex-shrink-0">
-                        <template x-if="token && isCurrentPlan('standard')">
+                        <template x-if="token && isCurrentPlan('pro')">
                             <div class="absolute -top-3 right-4 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
                                 Paket Saat Ini
                             </div>
                         </template>
-                        <template x-if="!token || !isCurrentPlan('standard')">
+                        <template x-if="!token || !isCurrentPlan('pro')">
                             <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary text-white px-3 py-1 rounded-full text-xs font-semibold">
                                 POPULER
                             </div>
                         </template>
-                        <h3 class="text-lg font-bold text-gray-900 mb-2 mt-2">Standard</h3>
+                        <h3 class="text-lg font-bold text-gray-900 mb-2 mt-2">Pro</h3>
                         <p class="text-gray-500 text-xs mb-3">Hingga 2 outlet, delivery + QRIS</p>
                         <div class="mb-4">
-                            <span class="text-2xl font-bold text-gray-900">Rp249.000</span>
-                            <span class="text-gray-500 text-sm">/bln</span>
+                            <span class="text-2xl font-bold text-gray-900" x-text="'Rp' + formatPrice(getPrice('pro'))">Rp350.000</span>
+                            <span class="text-gray-500 text-sm" x-show="selectedDuration === '1_month'">/bln</span>
+                            <span class="text-gray-500 text-sm" x-show="selectedDuration === '3_months'">/3bln</span>
+                            <span class="text-gray-500 text-sm" x-show="selectedDuration === '1_year'">/thn</span>
+                            <div x-show="selectedDuration !== '1_month'" class="text-xs text-gray-600 mt-1">
+                                <span x-text="'Rp' + formatPrice(getPricePerMonth('pro'))">Rp350.000</span>/bln
+                            </div>
                         </div>
                         <ul class="space-y-2 mb-6 text-xs text-gray-600">
                             <li class="flex items-start"><i class="fas fa-check text-primary mr-2 mt-0.5"></i>Delivery + antrean & biaya</li>
@@ -884,54 +1068,14 @@
                             <li class="flex items-start"><i class="fas fa-check text-primary mr-2 mt-0.5"></i>Pengingat & auto confirm</li>
                             <li class="flex items-start"><i class="fas fa-check text-primary mr-2 mt-0.5"></i>XX pesan/bulan + Chat support</li>
                             <li class="flex items-start"><i class="fas fa-check text-primary mr-2 mt-0.5"></i>Customer Base</li>
-                        </ul>
-                        <template x-if="token">
-                            <button
-                                @click="checkout('standard')"
-                                :disabled="loading || isCurrentPlan('standard')"
-                                class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <span x-show="!loading || selectedPlan !== 'standard'">
-                                    <span x-show="isCurrentPlan('standard')">Paket Aktif</span>
-                                    <span x-show="!isCurrentPlan('standard')">Pilih Standard</span>
-                                </span>
-                                <span x-show="loading && selectedPlan === 'standard'" x-cloak>
-                                    <i class="fas fa-spinner fa-spin mr-2"></i>Memproses...
-                                </span>
-                            </button>
-                        </template>
-                        <template x-if="!token">
-                            <a href="/login?redirect=pricing&plan=standard" class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all text-sm">
-                                Pilih Standard
-                            </a>
-                        </template>
-                    </div>
-
-                    <!-- Pro Plan (Mobile) -->
-                    <div class="bg-white rounded-2xl p-5 border border-gray-200 w-72 flex-shrink-0 relative">
-                        <template x-if="token && isCurrentPlan('pro')">
-                            <div class="absolute -top-3 right-4 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                                Paket Saat Ini
-                            </div>
-                        </template>
-                        <h3 class="text-lg font-bold text-gray-900 mb-2">Pro</h3>
-                        <p class="text-gray-500 text-xs mb-3">Tim unlimited, Analytic & API</p>
-                        <div class="mb-4">
-                            <span class="text-2xl font-bold text-gray-900">Rp2.990.000</span>
-                            <span class="text-gray-500 text-sm">/bln</span>
-                        </div>
-                        <ul class="space-y-2 mb-6 text-xs text-gray-600">
-                            <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>Analytic + ekspor CSV</li>
-                            <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>Webhook & API</li>
-                            <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>Multi-outlet & branding</li>
-                            <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>Priority routing & handover</li>
-                            <li class="flex items-start"><i class="fas fa-check text-green-600 mr-2 mt-0.5"></i>SLA + dedicated support</li>
+                            <li class="flex items-start"><i class="fas fa-check text-primary mr-2 mt-0.5"></i>Analytic + ekspor CSV</li>
+                            <li class="flex items-start"><i class="fas fa-check text-primary mr-2 mt-0.5"></i>Webhook & API</li>
                         </ul>
                         <template x-if="token">
                             <button
                                 @click="checkout('pro')"
                                 :disabled="loading || isCurrentPlan('pro')"
-                                class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <span x-show="!loading || selectedPlan !== 'pro'">
                                     <span x-show="isCurrentPlan('pro')">Paket Aktif</span>
@@ -943,7 +1087,7 @@
                             </button>
                         </template>
                         <template x-if="!token">
-                            <a href="/login?redirect=pricing&plan=pro" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition text-sm">
+                            <a href="/login?redirect=pricing&plan=pro" class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all text-sm">
                                 Pilih Pro
                             </a>
                         </template>
@@ -952,7 +1096,7 @@
             </div>
 
             <!-- Tablet/Desktop: grid layout -->
-            <div class="hidden md:grid md:grid-cols-3 gap-6 lg:gap-8 max-w-5xl mx-auto">
+            <div class="hidden md:grid md:grid-cols-2 gap-6 lg:gap-8 max-w-4xl mx-auto">
                 <!-- Basic Plan -->
                 <div class="bg-white rounded-2xl p-6 lg:p-8 border border-gray-200 relative">
                     <template x-if="token && isCurrentPlan('free_trial')">
@@ -972,28 +1116,33 @@
                         <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>Tanpa pembayaran online (bayar di tempat)</li>
                         <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>1 user staf + Email support (48hr)</li>
                     </ul>
-                    <a href="/register" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition">
+                    <a href="/register" onclick="trackSignup('cta_button')" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition">
                         Mulai Gratis
                     </a>
                 </div>
 
-                <!-- Standard Plan -->
+                <!-- Pro Plan -->
                 <div class="bg-white rounded-2xl p-6 lg:p-8 border-2 border-primary relative">
-                    <template x-if="token && isCurrentPlan('standard')">
+                    <template x-if="token && isCurrentPlan('pro')">
                         <div class="absolute -top-3 right-4 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
                             Paket Saat Ini
                         </div>
                     </template>
-                    <template x-if="!token || !isCurrentPlan('standard')">
+                    <template x-if="!token || !isCurrentPlan('pro')">
                         <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary text-white px-4 py-1 rounded-full text-xs font-semibold">
                             POPULER
                         </div>
                     </template>
-                    <h3 class="text-xl font-bold text-gray-900 mb-2">Standard</h3>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">Pro</h3>
                     <p class="text-gray-500 text-sm mb-4">Hingga 2 outlet, delivery + QRIS</p>
                     <div class="mb-6">
-                        <span class="text-3xl font-bold text-gray-900">Rp249.000</span>
-                        <span class="text-gray-500">/bln</span>
+                        <span class="text-3xl font-bold text-gray-900" x-text="'Rp' + formatPrice(getPrice('pro'))">Rp350.000</span>
+                        <span class="text-gray-500" x-show="selectedDuration === '1_month'">/bln</span>
+                        <span class="text-gray-500" x-show="selectedDuration === '3_months'">/3bln</span>
+                        <span class="text-gray-500" x-show="selectedDuration === '1_year'">/thn</span>
+                        <div x-show="selectedDuration !== '1_month'" class="text-sm text-gray-600 mt-1">
+                            <span x-text="'Rp' + formatPrice(getPricePerMonth('pro'))">Rp350.000</span>/bln
+                        </div>
                     </div>
                     <ul class="space-y-3 mb-8 text-sm text-gray-600">
                         <li class="flex items-center"><i class="fas fa-check text-primary mr-2"></i>Delivery + antrean & biaya</li>
@@ -1001,54 +1150,14 @@
                         <li class="flex items-center"><i class="fas fa-check text-primary mr-2"></i>Pengingat & auto confirm</li>
                         <li class="flex items-center"><i class="fas fa-check text-primary mr-2"></i>XX pesan/bulan + Chat support (2hr)</li>
                         <li class="flex items-center"><i class="fas fa-check text-primary mr-2"></i>Customer Base</li>
-                    </ul>
-                    <template x-if="token">
-                        <button
-                            @click="checkout('standard')"
-                            :disabled="loading || isCurrentPlan('standard')"
-                            class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <span x-show="!loading || selectedPlan !== 'standard'">
-                                <span x-show="isCurrentPlan('standard')">Paket Aktif</span>
-                                <span x-show="!isCurrentPlan('standard')">Pilih Standard</span>
-                            </span>
-                            <span x-show="loading && selectedPlan === 'standard'" x-cloak>
-                                <i class="fas fa-spinner fa-spin mr-2"></i>Memproses...
-                            </span>
-                        </button>
-                    </template>
-                    <template x-if="!token">
-                        <a href="/login?redirect=pricing&plan=standard" class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all">
-                            Pilih Standard
-                        </a>
-                    </template>
-                </div>
-
-                <!-- Pro Plan -->
-                <div class="bg-white rounded-2xl p-6 lg:p-8 border border-gray-200 relative">
-                    <template x-if="token && isCurrentPlan('pro')">
-                        <div class="absolute -top-3 right-4 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                            Paket Saat Ini
-                        </div>
-                    </template>
-                    <h3 class="text-xl font-bold text-gray-900 mb-2">Pro</h3>
-                    <p class="text-gray-500 text-sm mb-4">Tim unlimited, Analytic & API</p>
-                    <div class="mb-6">
-                        <span class="text-3xl font-bold text-gray-900">Rp2.990.000</span>
-                        <span class="text-gray-500">/bln</span>
-                    </div>
-                    <ul class="space-y-3 mb-8 text-sm text-gray-600">
-                        <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>Analytic + ekspor CSV</li>
-                        <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>Webhook & API</li>
-                        <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>Multi-outlet & branding</li>
-                        <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>Priority routing & handover</li>
-                        <li class="flex items-center"><i class="fas fa-check text-green-600 mr-2"></i>SLA + dedicated support</li>
+                        <li class="flex items-center"><i class="fas fa-check text-primary mr-2"></i>Analytic + ekspor CSV</li>
+                        <li class="flex items-center"><i class="fas fa-check text-primary mr-2"></i>Webhook & API</li>
                     </ul>
                     <template x-if="token">
                         <button
                             @click="checkout('pro')"
                             :disabled="loading || isCurrentPlan('pro')"
-                            class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <span x-show="!loading || selectedPlan !== 'pro'">
                                 <span x-show="isCurrentPlan('pro')">Paket Aktif</span>
@@ -1060,7 +1169,7 @@
                         </button>
                     </template>
                     <template x-if="!token">
-                        <a href="/login?redirect=pricing&plan=pro" class="block w-full text-center py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition">
+                        <a href="/login?redirect=pricing&plan=pro" class="block w-full text-center py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all">
                             Pilih Pro
                         </a>
                     </template>
@@ -1073,37 +1182,37 @@
     <section id="about" class="py-20 bg-white">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
-                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Tentang Kami</h2>
-                <p class="text-gray-600">Kenali lebih dekat QashierWise dan tim di belaknya</p>
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">{{ __('landing.about.title') }}</h2>
+                <p class="text-gray-600">{{ __('landing.about.subtitle') }}</p>
             </div>
 
             <div class="prose prose-lg max-w-none text-gray-600 mb-12">
-                <h3 class="text-xl font-semibold text-gray-900">Apa itu QashierWise?</h3>
+                <h3 class="text-xl font-semibold text-gray-900">{{ __('landing.about.what_is_title') }}</h3>
                 <p>
-                    QashierWise adalah solusi modern yang menghadirkan AI Chatbot WhatsApp dengan sistem POS (Point of Sale) untuk restoran dan manajemen untuk proses reservasi dan pemesanan melalui WhatsApp. Serta menyajikan operasional bisnis dengan integrasi QRIS.
+                    {{ __('landing.about.what_is_description_1') }}
                 </p>
                 <p>
-                    Dengan QashierWise restoran dapat mengelola operasional lewat API, mengubah pesan secara otomatis, memiliki pembayaran QRIS, dan meningkatkan bisnis yang kompetitif - semua dalam satu platform yang mudah digunakan.
+                    {{ __('landing.about.what_is_description_2') }}
                 </p>
             </div>
 
             <div class="bg-gray-50 rounded-2xl p-8">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Pengelola</h3>
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ __('landing.about.founder_title') }}</h3>
                 <div class="flex items-center space-x-4">
                     <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-primary rounded-full flex items-center justify-center text-white text-2xl font-bold">
                         AB
                     </div>
                     <div>
-                        <h3 class="font-semibold text-gray-900 text-base">Aditya Bintang Fadila</h3>
-                        <p class="text-gray-600 text-sm">QashierWise dibuat oleh Aditya Bintang Fadila, yang berkomitmen untuk menghadirkan solusi teknologi terbaik bagi industri F&B di Indonesia.</p>
+                        <h3 class="font-semibold text-gray-900 text-base">{{ __('landing.about.founder_name') }}</h3>
+                        <p class="text-gray-600 text-sm">{{ __('landing.about.founder_description') }}</p>
                     </div>
                 </div>
             </div>
 
             <div class="mt-12">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Visi Kami</h3>
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ __('landing.about.vision_title') }}</h3>
                 <p class="text-gray-600">
-                    Menjadi platform terdepan dalam transformasi digital restoran di Indonesia, membantu bisnis F&B berkembang dengan teknologi yang mudah, modern dan terjangkau.
+                    {{ __('landing.about.vision_description') }}
                 </p>
             </div>
         </div>
@@ -1113,52 +1222,52 @@
     <section id="faq" class="py-20 bg-gray-50">
         <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
-                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Pertanyaan yang sering diajukan</h2>
-                <p class="text-gray-600">Semua dalam Bahasa Indonesia.</p>
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">{{ __('landing.faq.title') }}</h2>
+                <p class="text-gray-600">{{ __('landing.faq.subtitle') }}</p>
             </div>
 
             <div class="space-y-4" x-data="{ open: null }">
                 <!-- FAQ Item 1 -->
                 <div class="bg-white rounded-xl border border-gray-200">
                     <button @click="open = open === 1 ? null : 1" class="w-full px-6 py-4 text-left flex items-center justify-between">
-                        <span class="font-medium text-gray-900">Apa itu QashierWise?</span>
+                        <span class="font-medium text-gray-900">{{ __('landing.faq.items.0.question') }}</span>
                         <i class="fas fa-chevron-down text-gray-500 transform transition-transform" :class="{ 'rotate-180': open === 1 }"></i>
                     </button>
                     <div x-show="open === 1" x-transition class="px-6 pb-4 text-gray-600">
-                        QashierWise adalah platform AI Chatbot WhatsApp yang dirancang khusus untuk restoran, membantu mengelola reservasi, pesanan, dan pembayaran QRIS dalam satu dashboard.
+                        {{ __('landing.faq.items.0.answer') }}
                     </div>
                 </div>
 
                 <!-- FAQ Item 2 -->
                 <div class="bg-white rounded-xl border border-gray-200">
                     <button @click="open = open === 2 ? null : 2" class="w-full px-6 py-4 text-left flex items-center justify-between">
-                        <span class="font-medium text-gray-900">Apakah perlu aplikasi terpisah untuk pelanggan?</span>
+                        <span class="font-medium text-gray-900">{{ __('landing.faq.items.1.question') }}</span>
                         <i class="fas fa-chevron-down text-gray-500 transform transition-transform" :class="{ 'rotate-180': open === 2 }"></i>
                     </button>
                     <div x-show="open === 2" x-transition class="px-6 pb-4 text-gray-600">
-                        Tidak! Pelanggan cukup menggunakan WhatsApp yang sudah mereka miliki. Tidak perlu download aplikasi tambahan.
+                        {{ __('landing.faq.items.1.answer') }}
                     </div>
                 </div>
 
                 <!-- FAQ Item 3 -->
                 <div class="bg-white rounded-xl border border-gray-200">
                     <button @click="open = open === 3 ? null : 3" class="w-full px-6 py-4 text-left flex items-center justify-between">
-                        <span class="font-medium text-gray-900">Bagaimana pembayaran dilakukan?</span>
+                        <span class="font-medium text-gray-900">{{ __('landing.faq.items.2.question') }}</span>
                         <i class="fas fa-chevron-down text-gray-500 transform transition-transform" :class="{ 'rotate-180': open === 3 }"></i>
                     </button>
                     <div x-show="open === 3" x-transition class="px-6 pb-4 text-gray-600">
-                        Pembayaran bisa dilakukan melalui QRIS yang terintegrasi dengan Midtrans, Xendit, atau penyedia QRIS lainnya. Pelanggan juga bisa bayar di tempat.
+                        {{ __('landing.faq.items.2.answer') }}
                     </div>
                 </div>
 
                 <!-- FAQ Item 4 -->
                 <div class="bg-white rounded-xl border border-gray-200">
                     <button @click="open = open === 4 ? null : 4" class="w-full px-6 py-4 text-left flex items-center justify-between">
-                        <span class="font-medium text-gray-900">Apakah bisa multi-outlet dan multi nomor?</span>
+                        <span class="font-medium text-gray-900">{{ __('landing.faq.items.3.question') }}</span>
                         <i class="fas fa-chevron-down text-gray-500 transform transition-transform" :class="{ 'rotate-180': open === 4 }"></i>
                     </button>
                     <div x-show="open === 4" x-transition class="px-6 pb-4 text-gray-600">
-                        Ya! Paket Standard mendukung hingga 2 outlet, dan paket Pro mendukung unlimited outlet dengan fitur multi-branding.
+                        {{ __('landing.faq.items.3.answer') }}
                     </div>
                 </div>
             </div>
@@ -1174,50 +1283,58 @@
                 <!-- Company Info -->
                 <div>
                     <div class="flex items-center space-x-2 mb-4">
-                        <img src="{{ asset('images/logo-48.png') }}" class="h-7 rounded-xl" alt="Logo" width="28" height="28" loading="lazy">
+                        <img src="{{ asset('images/logo-48.png') }}" class="h-7 rounded-xl" alt="Logo" width="28" height="28" loading="lazy" style="width: 28px; height: 28px;">
                         <span class="text-xl font-bold text-primary">QashierWise</span>
                     </div>
                     <p class="text-sm text-gray-600 mb-4">
-                        Coba gratis 14 hari, QashierWise membantu restoran menerima reservasi & order via WhatsApp dengan cepat.
+                        {{ __('landing.footer.company_description') }}
                     </p>
                     <div class="text-sm text-gray-600">
-                        <p class="font-semibold text-gray-900 mb-1">Alamat</p>
-                        <p>Jl. Widosari No. 55, Tegalrejo Raya<br>Salatiga, Jawa Tengah, Indonesia<br>50733</p>
+                        <p class="font-semibold text-gray-900 mb-1">{{ __('landing.footer.address_title') }}</p>
+                        <p>{!! __('landing.footer.address') !!}</p>
                     </div>
                 </div>
 
                 <!-- Navigation -->
                 <div>
-                    <h3 class="text-gray-900 font-semibold mb-4 text-base">Navigasi</h3>
+                    <h3 class="text-gray-900 font-semibold mb-4 text-base">{{ __('landing.footer.navigation_title') }}</h3>
                     <ul class="space-y-2 text-sm">
-                        <li><a href="#fitur" class="text-gray-600 hover:text-primary transition">Fitur</a></li>
-                        <li><a href="#pricing" class="text-gray-600 hover:text-primary transition">Harga</a></li>
-                        <li><a href="#about" class="text-gray-600 hover:text-primary transition">Tentang Kami</a></li>
-                        <li><a href="#faq" class="text-gray-600 hover:text-primary transition">FAQ</a></li>
+                        <li><a href="#fitur" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.features') }}</a></li>
+                        <li><a href="#pricing" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.pricing') }}</a></li>
+                        <li><a href="#about" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.about') }}</a></li>
+                        <li><a href="#faq" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.faq') }}</a></li>
                     </ul>
                 </div>
 
                 <!-- Legal -->
                 <div>
-                    <h3 class="text-gray-900 font-semibold mb-4 text-base">Legal</h3>
+                    <h3 class="text-gray-900 font-semibold mb-4 text-base">{{ __('landing.footer.legal_title') }}</h3>
                     <ul class="space-y-2 text-sm">
-                        <li><a href="/privacy-policy" class="text-gray-600 hover:text-primary transition">Kebijakan Privasi</a></li>
-                        <li><a href="/terms-of-service" class="text-gray-600 hover:text-primary transition">Ketentuan Layanan</a></li>
+                        <li><a href="/privacy-policy" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.privacy_policy') }}</a></li>
+                        <li><a href="/terms-of-service" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.terms_of_service') }}</a></li>
+                        <li><a href="/refund-policy" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.refund_policy') }}</a></li>
                     </ul>
                 </div>
 
-                <!-- Product -->
-                <div>
-                    <h3 class="text-gray-900 font-semibold mb-4 text-base">Produk</h3>
-                    <ul class="space-y-2 text-sm">
-                        <li><a href="#" class="text-gray-600 hover:text-primary transition">QashierWise Console</a></li>
-                        <li><a href="#" class="text-gray-600 hover:text-primary transition">Chatbot WhatsApp</a></li>
-                    </ul>
-                </div>
-            </div>
+                 <!-- Product -->
+                 <div>
+                     <h3 class="text-gray-900 font-semibold mb-4 text-base">{{ __('landing.footer.product_title') }}</h3>
+                     <ul class="space-y-2 text-sm">
+                         <li><a href="#" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.console') }}</a></li>
+                         <li><a href="#" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.chatbot') }}</a></li>
+                     </ul>
+                 </div>
+
+                 <!-- Social Media -->
+                 <div>
+                     <h3 class="text-gray-900 font-semibold mb-4 text-base">{{ __('landing.footer.follow_us') }}</h3>
+                     <p class="text-sm text-gray-600 mb-4">{{ __('landing.footer.follow_us_desc') }}</p>
+                     <x-social-links :size="'md'" :showLabels="false" />
+                 </div>
+             </div>
 
             <div class="border-t border-gray-200 pt-8 text-center text-sm text-gray-600">
-                <p>&copy; 2025 QashierWise by Aditya Bintang Fadila. All Rights Reserved.</p>
+                <p>{!! __('landing.footer.copyright') !!}</p>
             </div>
         </div>
     </footer>
@@ -1229,8 +1346,25 @@
                 loading: false,
                 error: null,
                 selectedPlan: null,
+                selectedDuration: '1_month', // Default to monthly
                 currentPlan: null,
                 token: null,
+
+                // Promo code state
+                promoCode: '',
+                promoValidating: false,
+                promoError: null,
+                promoSuccess: null,
+                appliedPromo: null,
+
+                // Pricing data from config
+                plans: {
+                    pro: {
+                        '1_month': { price: 350000, perMonth: 350000, discount: 0, label: '1 Bulan' },
+                        '3_months': { price: 1050000, perMonth: 350000, discount: 0, label: '3 Bulan' },
+                        '1_year': { price: 3780000, perMonth: 315000, discount: 10, label: '1 Tahun' }
+                    }
+                },
 
                 init() {
                     // Get auth token from localStorage (stored as 'token' during login)
@@ -1240,6 +1374,93 @@
                         // Check if we need to auto-checkout after login redirect
                         this.checkAutoCheckout();
                     }
+
+                    // Watch for duration changes and reset promo code
+                    this.$watch('selectedDuration', () => {
+                        if (this.appliedPromo) {
+                            this.removePromoCode();
+                        }
+                    });
+                },
+
+                getPrice(plan) {
+                    const basePrice = this.plans[plan][this.selectedDuration].price;
+                    // If promo is applied and matches this plan, show discounted price
+                    if (this.appliedPromo && this.appliedPromo.plan === plan) {
+                        return this.appliedPromo.final_amount;
+                    }
+                    return basePrice;
+                },
+
+                getPricePerMonth(plan) {
+                    const finalPrice = this.getPrice(plan);
+                    const months = this.selectedDuration === '1_month' ? 1 :
+                                   this.selectedDuration === '3_months' ? 3 : 12;
+                    return Math.round(finalPrice / months);
+                },
+
+                getDiscount(plan) {
+                    return this.plans[plan][this.selectedDuration].discount;
+                },
+
+                formatPrice(amount) {
+                    return new Intl.NumberFormat('id-ID').format(amount);
+                },
+
+                async validatePromoCode() {
+                    if (!this.promoCode || this.promoValidating) return;
+
+                    this.promoValidating = true;
+                    this.promoError = null;
+                    this.promoSuccess = null;
+
+                    try {
+                        // We need to validate against a specific plan
+                        // For now, validate against standard plan
+                        // In real scenario, you might want to validate when user clicks checkout
+                        const response = await fetch('/api/promo-codes/validate', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${this.token}`,
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                code: this.promoCode.toUpperCase(),
+                                plan_id: 'pro', // Validate for pro plan
+                                duration: this.selectedDuration
+                            })
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok && data.success) {
+                            this.promoSuccess = data.data.message;
+                            this.appliedPromo = {
+                                code: data.data.code,
+                                discount: data.data.discount,
+                                final_amount: data.data.final_amount,
+                                original_amount: data.data.original_amount,
+                                plan: 'pro' // Store which plan this was validated for
+                            };
+                        } else {
+                            this.promoError = data.error?.message || 'Kode promo tidak valid';
+                            this.appliedPromo = null;
+                        }
+                    } catch (e) {
+                        console.error('Promo validation error:', e);
+                        this.promoError = 'Terjadi kesalahan. Silakan coba lagi.';
+                        this.appliedPromo = null;
+                    } finally {
+                        this.promoValidating = false;
+                    }
+                },
+
+                removePromoCode() {
+                    this.promoCode = '';
+                    this.appliedPromo = null;
+                    this.promoError = null;
+                    this.promoSuccess = null;
                 },
 
                 checkAutoCheckout() {
@@ -1292,21 +1513,36 @@
                     this.selectedPlan = planId;
 
                     try {
+                        const requestBody = {
+                            plan_id: planId,
+                            duration: this.selectedDuration
+                        };
+
+                        // Add promo code if applied
+                        if (this.appliedPromo && this.appliedPromo.code) {
+                            requestBody.promo_code = this.appliedPromo.code;
+                        }
+
                         const response = await fetch('/api/subscription/checkout', {
                             method: 'POST',
                             headers: {
                                 'Authorization': `Bearer ${this.token}`,
                                 'Content-Type': 'application/json',
-                                'Accept': 'application/json',
+                                'Accept': 'application/json'
                             },
-                            body: JSON.stringify({ plan_id: planId })
+                            body: JSON.stringify(requestBody)
                         });
+
+                        if (!response.ok) {
+                            const errorData = await response.json().catch(() => ({ error: { message: 'Terjadi kesalahan pada server' } }));
+                            throw new Error(errorData.error?.message || 'Gagal membuat sesi checkout');
+                        }
 
                         const data = await response.json();
 
-                        if (data.success && data.data.checkout_url) {
-                            // Redirect to Polar.sh checkout
-                            window.location.href = data.data.checkout_url;
+                        if (response.ok && data.data?.redirect_url) {
+                            // Redirect to Midtrans payment page
+                            window.location.href = data.data.redirect_url;
                         } else {
                             this.error = data.error?.message || 'Gagal membuat sesi checkout. Silakan coba lagi.';
                         }
@@ -1320,6 +1556,14 @@
                 }
             };
         }
+    </script>
+
+    <!-- Cookie Consent Banner -->
+    <x-cookie-consent />
+
+    <!-- LocalBusiness Schema for Google Business Profile -->
+    <script type="application/ld+json">
+{!! json_encode(App\Helpers\SeoHelper::getLocalBusinessStructuredData(), JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) !!}
     </script>
 </body>
 </html>

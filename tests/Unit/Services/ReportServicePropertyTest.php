@@ -4,8 +4,6 @@ namespace Tests\Unit\Services;
 
 use App\Models\Category;
 use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Payment;
 use App\Models\PosUser;
 use App\Models\Product;
 use App\Models\Role;
@@ -22,33 +20,38 @@ use Tests\TestCase;
 
 /**
  * Property-based tests for ReportService
- * 
+ *
  * Feature: point-of-sale
  */
 class ReportServicePropertyTest extends TestCase
 {
-    use TestTrait;
     use RefreshDatabase;
+    use TestTrait;
 
     protected ReportService $reportService;
+
     protected OrderService $orderService;
+
     protected Store $store;
+
     protected Store $store2;
+
     protected PosUser $posUser;
+
     protected Category $category;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->reportService = new ReportService();
-        $this->orderService = new OrderService();
-        
+        $this->reportService = new ReportService;
+        $this->orderService = new OrderService;
+
         $uniqueId = uniqid();
-        
+
         // Create first store
         $this->store = Store::create([
             'name' => 'Test Store 1',
-            'code' => 'TST1-' . $uniqueId,
+            'code' => 'TST1-'.$uniqueId,
             'address' => 'Test Address 1',
             'is_active' => true,
         ]);
@@ -56,7 +59,7 @@ class ReportServicePropertyTest extends TestCase
         // Create second store for filtering tests
         $this->store2 = Store::create([
             'name' => 'Test Store 2',
-            'code' => 'TST2-' . $uniqueId,
+            'code' => 'TST2-'.$uniqueId,
             'address' => 'Test Address 2',
             'is_active' => true,
         ]);
@@ -67,10 +70,14 @@ class ReportServicePropertyTest extends TestCase
             'password' => bcrypt('password'),
         ]);
 
-        $role = Role::create([
-            'name' => 'Cashier-' . $uniqueId,
-            'permissions' => ['orders.create', 'orders.update'],
-        ]);
+        // Get or create Spatie role
+        $role = \Spatie\Permission\Models\Role::firstOrCreate(
+            ['name' => 'Cashier', 'guard_name' => 'sanctum'],
+            []
+        );
+
+        // Assign role to user
+        $user->syncRoles([$role->name]);
 
         $this->posUser = PosUser::create([
             'user_id' => $user->id,
@@ -81,7 +88,7 @@ class ReportServicePropertyTest extends TestCase
 
         $this->category = Category::create([
             'name' => 'Test Category',
-            'slug' => 'test-category-' . $uniqueId,
+            'slug' => 'test-category-'.$uniqueId,
             'is_active' => true,
         ]);
     }
@@ -93,11 +100,11 @@ class ReportServicePropertyTest extends TestCase
     {
         static $counter = 0;
         $counter++;
-        
+
         return Product::create([
             'category_id' => $this->category->id,
             'name' => "Product {$counter}",
-            'sku' => "SKU-{$counter}-" . uniqid(),
+            'sku' => "SKU-{$counter}-".uniqid(),
             'price' => $price,
             'stock_quantity' => $stock,
             'is_active' => true,
@@ -112,14 +119,14 @@ class ReportServicePropertyTest extends TestCase
         $order = new Order([
             'store_id' => $store->id,
             'pos_user_id' => $this->posUser->id,
-            'order_number' => 'ORD-' . uniqid(),
-            'status' => Order::STATUS_COMPLETED,
+            'order_number' => 'ORD-'.uniqid(),
+            'status' => Order::STATUS_PAID,
             'subtotal' => $total,
             'tax_amount' => 0,
             'discount_amount' => 0,
             'total' => $total,
         ]);
-        
+
         // Manually set timestamps to the desired date
         $order->created_at = $date;
         $order->updated_at = $date;
@@ -131,8 +138,8 @@ class ReportServicePropertyTest extends TestCase
     /**
      * Feature: point-of-sale, Property 15: Report Date Range Aggregation
      * Validates: Requirements 8.1, 8.2
-     * 
-     * For any date range report, the total sales SHALL equal the sum of all 
+     *
+     * For any date range report, the total sales SHALL equal the sum of all
      * individual daily totals within that range.
      */
     #[Test]
@@ -149,12 +156,12 @@ class ReportServicePropertyTest extends TestCase
             ->then(function (int $numDays, int $ordersPerDay) {
                 // Clear any existing orders
                 Order::query()->delete();
-                
+
                 $startDate = Carbon::now()->subDays($numDays + 1);
                 $endDate = $startDate->copy()->addDays($numDays - 1);
-                
+
                 $expectedTotalSales = 0.0;
-                
+
                 // Create orders for each day in the range
                 $currentDate = $startDate->copy();
                 while ($currentDate->lte($endDate)) {
@@ -181,7 +188,7 @@ class ReportServicePropertyTest extends TestCase
                     $rangeReport['total_sales'],
                     $sumOfDailyTotals,
                     0.01,
-                    "Range total sales should equal sum of daily totals"
+                    'Range total sales should equal sum of daily totals'
                 );
 
                 // Also verify against expected total
@@ -189,17 +196,16 @@ class ReportServicePropertyTest extends TestCase
                     $expectedTotalSales,
                     $rangeReport['total_sales'],
                     0.01,
-                    "Range total sales should equal expected total from created orders"
+                    'Range total sales should equal expected total from created orders'
                 );
             });
     }
 
-
     /**
      * Feature: point-of-sale, Property 16: Report Store Filter Consistency
      * Validates: Requirements 8.3
-     * 
-     * For any report filtered by store_id, all included transactions SHALL 
+     *
+     * For any report filtered by store_id, all included transactions SHALL
      * belong to that store.
      */
     #[Test]
@@ -216,19 +222,19 @@ class ReportServicePropertyTest extends TestCase
             ->then(function (int $ordersStore1, int $ordersStore2) {
                 // Clear any existing orders
                 Order::query()->delete();
-                
+
                 $testDate = Carbon::now();
-                
+
                 $store1Total = 0.0;
                 $store2Total = 0.0;
-                
+
                 // Create orders for store 1
                 for ($i = 0; $i < $ordersStore1; $i++) {
                     $orderTotal = rand(1000, 50000) / 100;
                     $this->createCompletedOrder($this->store, $testDate, $orderTotal);
                     $store1Total += $orderTotal;
                 }
-                
+
                 // Create orders for store 2
                 for ($i = 0; $i < $ordersStore2; $i++) {
                     $orderTotal = rand(1000, 50000) / 100;
@@ -238,10 +244,10 @@ class ReportServicePropertyTest extends TestCase
 
                 // Get report filtered by store 1
                 $store1Report = $this->reportService->dailySales($testDate, $this->store->id);
-                
+
                 // Get report filtered by store 2
                 $store2Report = $this->reportService->dailySales($testDate, $this->store2->id);
-                
+
                 // Get unfiltered report
                 $allStoresReport = $this->reportService->dailySales($testDate);
 
@@ -250,13 +256,13 @@ class ReportServicePropertyTest extends TestCase
                     $store1Total,
                     $store1Report['total_sales'],
                     0.01,
-                    "Store 1 filtered report should only include store 1 sales"
+                    'Store 1 filtered report should only include store 1 sales'
                 );
-                
+
                 $this->assertEquals(
                     $this->store->id,
                     $store1Report['store_id'],
-                    "Store 1 report should have store_id set to store 1"
+                    'Store 1 report should have store_id set to store 1'
                 );
 
                 // Property: Store 2 filtered report should only include store 2 sales
@@ -264,13 +270,13 @@ class ReportServicePropertyTest extends TestCase
                     $store2Total,
                     $store2Report['total_sales'],
                     0.01,
-                    "Store 2 filtered report should only include store 2 sales"
+                    'Store 2 filtered report should only include store 2 sales'
                 );
-                
+
                 $this->assertEquals(
                     $this->store2->id,
                     $store2Report['store_id'],
-                    "Store 2 report should have store_id set to store 2"
+                    'Store 2 report should have store_id set to store 2'
                 );
 
                 // Property: Unfiltered report should include all stores
@@ -278,12 +284,12 @@ class ReportServicePropertyTest extends TestCase
                     $store1Total + $store2Total,
                     $allStoresReport['total_sales'],
                     0.01,
-                    "Unfiltered report should include sales from all stores"
+                    'Unfiltered report should include sales from all stores'
                 );
-                
+
                 $this->assertNull(
                     $allStoresReport['store_id'],
-                    "Unfiltered report should have null store_id"
+                    'Unfiltered report should have null store_id'
                 );
 
                 // Property: Sum of filtered reports should equal unfiltered total
@@ -291,7 +297,7 @@ class ReportServicePropertyTest extends TestCase
                     $store1Report['total_sales'] + $store2Report['total_sales'],
                     $allStoresReport['total_sales'],
                     0.01,
-                    "Sum of store-filtered reports should equal unfiltered total"
+                    'Sum of store-filtered reports should equal unfiltered total'
                 );
             });
     }

@@ -1,16 +1,16 @@
 @extends('layouts.app')
 
-@section('title', 'AI Agent - QashierWise')
+@section('title', __('dashboard.ai_agent_title'))
 
 @section('content')
-<div x-data="aiAgentApp()" x-init="init()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="aiAgentApp()" x-init="init()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     <!-- Sidebar -->
     @include('components.dashboard-sidebar', ['activePage' => 'ai-agent'])
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         <!-- Header -->
-        @include('components.dashboard-header', ['title' => 'AI Agent', 'description' => 'Configure your WhatsApp AI Assistant'])
+        @include('components.dashboard-header', ['title' => __('dashboard.menu_ai_agent'), 'description' => __('ai_agent.configure_assistant')])
 
         <!-- Page Content -->
         <main class="flex-1 p-4 md:p-6">
@@ -292,6 +292,72 @@
                             </div>
                         </div>
 
+                        <!-- QRIS Payment Feature Card -->
+                        <div class="card" x-show="config.order_enabled && form.default_store_id">
+                            <div class="card-header border-b border-[hsl(var(--border))]">
+                                <h3 class="card-title flex items-center gap-2">
+                                    <i class="fas fa-qrcode text-blue-500"></i>
+                                    QRIS Payment
+                                </h3>
+                                <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                                    Aktifkan pembayaran QRIS otomatis saat pelanggan konfirmasi pembelian
+                                </p>
+                            </div>
+                            <div class="p-4 sm:p-6 space-y-5">
+                                <!-- QRIS Toggle -->
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl" :class="config.qris_enabled ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50 border border-gray-200'">
+                                    <div class="flex-1">
+                                        <p class="font-medium" :class="config.qris_enabled ? 'text-blue-900' : 'text-gray-600'">Enable QRIS Payment</p>
+                                        <p class="text-sm" :class="config.qris_enabled ? 'text-blue-700' : 'text-gray-500'">
+                                            <span x-show="config.qris_enabled">QRIS akan otomatis di-generate saat pelanggan konfirmasi pembelian</span>
+                                            <span x-show="!config.qris_enabled">Pembayaran manual - pelanggan akan diarahkan ke kasir</span>
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        @click="config.qris_enabled = !config.qris_enabled"
+                                        :class="config.qris_enabled ? 'bg-blue-500' : 'bg-gray-300'"
+                                        class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex-shrink-0 cursor-pointer"
+                                    >
+                                        <span
+                                            :class="config.qris_enabled ? 'translate-x-6' : 'translate-x-1'"
+                                            class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md"
+                                        ></span>
+                                    </button>
+                                </div>
+
+                                <!-- QRIS Enabled Info -->
+                                <div x-show="config.qris_enabled" x-transition class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                                    <p class="text-sm text-blue-800 font-medium">
+                                        <i class="fas fa-check-circle mr-2"></i>
+                                        QRIS Payment aktif! Saat pelanggan konfirmasi pembelian:
+                                    </p>
+                                    <ul class="text-sm text-blue-700 mt-2 ml-6 list-disc space-y-1">
+                                        <li>QRIS akan otomatis di-generate dengan total harga pesanan</li>
+                                        <li>Pelanggan dapat scan QR code untuk bayar</li>
+                                        <li>Setelah pembayaran sukses, AI akan mengirim konfirmasi dengan Order ID, nama produk, dan total harga</li>
+                                    </ul>
+                                    <p class="text-xs text-blue-600 mt-3 flex items-center gap-1">
+                                        <i class="fas fa-info-circle"></i>
+                                        Pastikan payment provider sudah dikonfigurasi di <a href="/dashboard/sub-merchant/provider-settings" class="underline hover:no-underline">Provider Settings</a>
+                                    </p>
+                                </div>
+
+                                <!-- QRIS Disabled Info -->
+                                <div x-show="!config.qris_enabled" x-transition class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                                    <p class="text-sm text-amber-800 font-medium">
+                                        <i class="fas fa-info-circle mr-2"></i>
+                                        Mode Manual - Saat pelanggan konfirmasi pembelian:
+                                    </p>
+                                    <ul class="text-sm text-amber-700 mt-2 ml-6 list-disc space-y-1">
+                                        <li>AI akan mengirim ringkasan pesanan (Order ID, nama produk, total harga)</li>
+                                        <li>Status pembayaran: <span class="font-medium">Pending</span></li>
+                                        <li>Pelanggan diminta menunjukkan pesan tersebut ke kasir untuk diproses</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Action Buttons -->
                         <div class="card">
                             <div class="p-4 sm:p-6">
@@ -364,13 +430,36 @@
                     <i class="fas fa-flask text-purple-500"></i>
                     Test AI Agent
                 </h3>
-                <button @click="showTestModal = false" class="btn btn-ghost btn-icon">
-                    <i class="fas fa-times"></i>
-                </button>
+                <div class="flex items-center gap-2">
+                    <button
+                        @click="resetTestConversation()"
+                        class="btn btn-ghost btn-sm text-gray-600 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Reset conversation"
+                        :disabled="testMessages.length === 0"
+                    >
+                        <i class="fas fa-redo-alt mr-1.5"></i>
+                        <span class="text-sm">Reset</span>
+                    </button>
+                    <button @click="showTestModal = false" class="btn btn-ghost btn-icon">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
             </div>
 
             <!-- Chat Area -->
             <div class="flex-1 overflow-y-auto p-4 space-y-4 min-h-[300px] max-h-[400px]" id="testChatArea">
+                <!-- Empty State -->
+                <div x-show="testMessages.length === 0 && !testLoading" class="flex flex-col items-center justify-center h-full text-center py-12">
+                    <div class="h-16 w-16 rounded-full bg-purple-100 flex items-center justify-center mb-4">
+                        <i class="fas fa-comments text-purple-500 text-2xl"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold text-gray-700 mb-2">Mulai Percakapan</h4>
+                    <p class="text-sm text-gray-500 max-w-xs">
+                        Ketik pesan di bawah untuk mulai test AI Agent Anda
+                    </p>
+                </div>
+
+                <!-- Messages -->
                 <template x-for="(msg, index) in testMessages" :key="index">
                     <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
                         <div :class="msg.role === 'user' ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-800'" class="rounded-lg px-4 py-2 max-w-[80%]">
@@ -378,6 +467,8 @@
                         </div>
                     </div>
                 </template>
+
+                <!-- Loading State -->
                 <div x-show="testLoading" class="flex justify-start">
                     <div class="bg-gray-100 rounded-lg px-4 py-2">
                         <i class="fas fa-spinner animate-spin text-gray-500"></i>
@@ -432,6 +523,7 @@ function aiAgentApp() {
             id: null,
             is_active: false,
             order_enabled: false,
+            qris_enabled: false,
         },
         form: {
             bot_name: '',
@@ -510,6 +602,7 @@ function aiAgentApp() {
                         id: data.data.id,
                         is_active: data.data.is_active,
                         order_enabled: data.data.order_enabled,
+                        qris_enabled: data.data.qris_enabled || false,
                     };
                     this.form = {
                         bot_name: data.data.bot_name || '',
@@ -555,6 +648,7 @@ function aiAgentApp() {
                         default_store_id: this.form.default_store_id || null,
                         is_active: this.config.is_active,
                         order_enabled: this.config.order_enabled,
+                        qris_enabled: this.config.qris_enabled,
                     }),
                 });
 
@@ -652,6 +746,41 @@ function aiAgentApp() {
             this.showTestModal = true;
             this.testMessages = [];
             this.testInput = '';
+        },
+
+        resetTestConversation() {
+            if (this.testMessages.length === 0) {
+                return;
+            }
+
+            if (confirm('Apakah Anda yakin ingin mereset percakapan? Semua pesan akan dihapus.')) {
+                // Clear messages in UI
+                this.testMessages = [];
+                this.testInput = '';
+
+                // Clear conversation in database
+                const token = localStorage.getItem('token');
+
+                // Call API to clear conversation in database
+                fetch(`/api/ai-agent/conversations/test`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json',
+                    },
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        this.showNotification('Percakapan berhasil direset', 'success');
+                    }
+                })
+                .catch(error => {
+                    console.error('Failed to clear conversation:', error);
+                    // Still show success since UI is already cleared
+                    this.showNotification('Percakapan berhasil direset', 'success');
+                });
+            }
         },
 
         async sendTestMessage() {

@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AiAgent extends Model
 {
+    use HasFactory;
+
     /**
      * The attributes that are mass assignable.
      *
@@ -20,8 +23,13 @@ class AiAgent extends Model
         'system_prompt',
         'business_info',
         'order_enabled',
+        'qris_enabled',
         'is_active',
         'settings',
+        'use_optimized_prompt',
+        'enable_prompt_caching',
+        'use_toon_format',
+        'product_sample_limit',
     ];
 
     /**
@@ -34,8 +42,13 @@ class AiAgent extends Model
         return [
             'business_info' => 'array',
             'order_enabled' => 'boolean',
+            'qris_enabled' => 'boolean',
             'is_active' => 'boolean',
             'settings' => 'array',
+            'use_optimized_prompt' => 'boolean',
+            'enable_prompt_caching' => 'boolean',
+            'use_toon_format' => 'boolean',
+            'product_sample_limit' => 'integer',
         ];
     }
 
@@ -72,85 +85,92 @@ class AiAgent extends Model
     }
 
     /**
-     * Build the system prompt with business info and product context.
+     * Check if QRIS feature is properly enabled.
+     * Requires qris_enabled flag, active SubMerchant, and active payment provider.
      */
-    public function buildSystemPrompt(int $userId): string
+    public function isQrisEnabled(): bool
     {
-        $prompt = $this->system_prompt;
+        return $this->qris_enabled
+            && $this->hasActiveSubMerchant()
+            && $this->hasActivePaymentProvider();
+    }
 
-        // Add strict context boundaries
-        $prompt .= "\n\n## BATASAN PENTING - WAJIB DIPATUHI:
-Kamu HANYA boleh menjawab pertanyaan yang berkaitan dengan:
-- Menu, produk, dan harga
-- Pemesanan (order) dan cara memesan
-- Informasi bisnis (jam buka, alamat, kontak)
-- Reservasi dan booking
-- Promo dan diskon yang tersedia
-- Metode pembayaran yang diterima
-- Layanan delivery/pengantaran
-- Stok dan ketersediaan produk
+    /**
+     * Get the user associated with this AI Agent.
+     */
+    public function getUser(): ?User
+    {
+        return $this->whatsappAccount?->user;
+    }
 
-TOLAK dengan sopan jika user bertanya tentang:
-- Pengetahuan umum (sejarah, geografi, sains, matematika, dll)
-- Berita dan politik
-- Gosip atau selebriti
-- Coding, programming, atau teknologi
-- Pertanyaan pribadi tentang AI
-- Topik sensitif (agama, SARA, politik)
-- Permintaan untuk menulis esai, cerita, atau konten kreatif
-- Hal-hal yang tidak berhubungan dengan bisnis ini
-
-Jika user bertanya di luar konteks, jawab dengan ramah:
-'Maaf, saya adalah asisten virtual untuk [nama bisnis]. Saya hanya bisa membantu Anda dengan informasi menu, pemesanan, dan layanan kami. Ada yang bisa saya bantu terkait produk atau layanan kami? 😊'
-
-JANGAN PERNAH:
-- Berpura-pura menjadi AI lain (seperti ChatGPT, Claude, dll)
-- Menjawab pertanyaan di luar konteks bisnis
-- Memberikan saran medis, hukum, atau keuangan
-- Membahas topik kontroversial";
-
-        // Add business information
-        if (! empty($this->business_info)) {
-            $prompt .= "\n\n## Informasi Bisnis:\n";
-
-            if (isset($this->business_info['operating_hours'])) {
-                $prompt .= "Jam Operasional: {$this->business_info['operating_hours']}\n";
-            }
-
-            if (isset($this->business_info['address'])) {
-                $prompt .= "Alamat: {$this->business_info['address']}\n";
-            }
-
-            if (isset($this->business_info['description'])) {
-                $prompt .= "Deskripsi: {$this->business_info['description']}\n";
-            }
-
-            if (isset($this->business_info['phone'])) {
-                $prompt .= "Telepon: {$this->business_info['phone']}\n";
-            }
+    /**
+     * Get the user's active SubMerchant.
+     */
+    public function getSubMerchant(): ?SubMerchant
+    {
+        $user = $this->getUser();
+        if (! $user) {
+            return null;
         }
 
-        // Add top 20 products if order is enabled
-        if ($this->isOrderEnabled()) {
-            $products = Product::where('user_id', $userId)
-                ->where('is_active', true)
-                ->orderBy('created_at', 'desc')
-                ->limit(20)
-                ->get(['id', 'name', 'price', 'stock_quantity', 'description']);
+        return SubMerchant::where('user_id', $user->id)
+            ->where('is_active', true)
+            ->first();
+    }
 
-            if ($products->isNotEmpty()) {
-                $prompt .= "\n\n## Produk Tersedia (Top 20):\n";
-                foreach ($products as $product) {
-                    $prompt .= "- {$product->name} (ID: {$product->id}) - Rp ".number_format($product->price, 0, ',', '.')." - Stok: {$product->stock_quantity}";
-                    if ($product->description) {
-                        $prompt .= " - {$product->description}";
-                    }
-                    $prompt .= "\n";
-                }
-                $prompt .= "\nUntuk produk lainnya, gunakan function 'search_products' untuk mencari.";
-            }
+    /**
+     * Check if user has an active SubMerchant.
+     */
+    public function hasActiveSubMerchant(): bool
+    {
+        return $this->getSubMerchant() !== null;
+    }
+
+    /**
+     * Check if user has active payment provider credentials.
+     */
+    public function hasActivePaymentProvider(): bool
+    {
+        $user = $this->getUser();
+        if (! $user) {
+            return false;
         }
 
-        return $prompt;
+        return PaymentProviderCredential::where('user_id', $user->id)
+            ->where('is_active', true)
+            ->where('connection_status', 'valid')
+            ->exists();
+    }
+
+    /**
+     * Validate QRIS configuration and return error messages if invalid.
+     */
+    public function validateQrisConfiguration(): array
+    {
+        $errors = [];
+
+        if (! $this->hasActiveSubMerchant()) {
+            $errors[] = 'Sub-merchant belum dikonfigurasi atau tidak aktif. Silakan daftarkan sub-merchant terlebih dahulu.';
+        }
+
+        if (! $this->hasActivePaymentProvider()) {
+            $errors[] = 'Payment provider belum dikonfigurasi atau tidak valid. Silakan konfigurasi provider di menu Provider Settings.';
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Build the system prompt with business info and product context.
+     *
+     * @param  string|null  $userMessage  For intent detection (optional)
+     */
+    public function buildSystemPrompt(int $userId, ?string $userMessage = null): string
+    {
+        // Always use optimized prompt builder (TOON format supported)
+        $intent = $userMessage ? \App\Enums\UserIntent::detect($userMessage) : null;
+        $builder = new \App\Services\AiAgentPromptBuilder($this, $userId, $intent);
+
+        return $builder->build();
     }
 }

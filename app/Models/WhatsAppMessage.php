@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -11,8 +12,39 @@ class WhatsAppMessage extends Model
 
     protected $table = 'whatsapp_messages';
 
+    /**
+     * The "booted" method of the model.
+     * Apply Row Level Security - only show messages for authenticated user with ACTIVE WhatsApp account
+     */
+    protected static function booted(): void
+    {
+        static::addGlobalScope('userMessages', function (Builder $builder) {
+            if (auth()->check()) {
+                $userId = auth()->id();
+
+                // Get user's active WhatsApp account
+                $activeAccount = WhatsAppAccount::where('user_id', $userId)
+                    ->where('is_active', true)
+                    ->first();
+
+                if ($activeAccount) {
+                    // Only show messages for this user AND this specific phone number
+                    $builder->where('user_id', $userId)
+                        ->where('phone_number_id', $activeAccount->phone_number_id);
+                } else {
+                    // No active account = no data shown
+                    $builder->whereRaw('1 = 0');
+                }
+            } else {
+                // If not authenticated, return no results
+                $builder->whereRaw('1 = 0');
+            }
+        });
+    }
+
     protected $fillable = [
         'user_id',
+        'phone_number_id',
         'contact_id',
         'message_id',
         'direction',
@@ -37,6 +69,11 @@ class WhatsAppMessage extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function account()
+    {
+        return $this->belongsTo(WhatsAppAccount::class, 'phone_number_id', 'phone_number_id');
     }
 
     public function contact()

@@ -3,11 +3,15 @@
 namespace App\Models;
 
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Subscription extends Model
 {
+    use HasFactory;
+
     /**
      * The attributes that are mass assignable.
      *
@@ -15,13 +19,14 @@ class Subscription extends Model
      */
     protected $fillable = [
         'user_id',
-        'polar_subscription_id',
-        'polar_customer_id',
+        'midtrans_subscription_id',
+        'midtrans_customer_id',
         'plan_name',
         'status',
         'current_period_start',
         'current_period_end',
         'cancelled_at',
+        'metadata',
     ];
 
     /**
@@ -47,16 +52,24 @@ class Subscription extends Model
     }
 
     /**
+     * Get the payments for this subscription.
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(SubscriptionPayment::class);
+    }
+
+    /**
      * Get the current period end as a Carbon instance.
      */
     protected function getPeriodEnd(): Carbon
     {
         $value = $this->current_period_end;
-        
+
         if ($value instanceof Carbon) {
             return $value;
         }
-        
+
         return Carbon::parse($value);
     }
 
@@ -66,15 +79,15 @@ class Subscription extends Model
     protected function getCancelledAtValue(): ?Carbon
     {
         $value = $this->cancelled_at;
-        
+
         if ($value === null) {
             return null;
         }
-        
+
         if ($value instanceof Carbon) {
             return $value;
         }
-        
+
         return Carbon::parse($value);
     }
 

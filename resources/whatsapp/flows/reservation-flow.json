@@ -1,0 +1,449 @@
+{
+    "version": "7.3",
+    "data_api_version": "3.0",
+    "routing_model": {
+        "WELCOME_SCREEN": ["DETAILS", "SUMMARY"],
+        "DETAILS": ["SUMMARY"],
+        "SUMMARY": ["PAYMENT", "SUCCESS"],
+        "PAYMENT": ["SUCCESS"],
+        "SUCCESS": []
+    },
+    "screens": [
+        {
+            "id": "WELCOME_SCREEN",
+            "title": "Reservasi",
+            "data": {
+                "dates": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": { "type": "string" },
+                            "title": { "type": "string" }
+                        }
+                    },
+                    "__example__": [
+                        { "id": "2026-01-20", "title": "Sen, 20 Jan 2026" },
+                        { "id": "2026-01-21", "title": "Sel, 21 Jan 2026" }
+                    ]
+                },
+                "times": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": { "type": "string" },
+                            "title": { "type": "string" }
+                        }
+                    },
+                    "__example__": [
+                        { "id": "12:00", "title": "12:00 WIB" },
+                        { "id": "13:00", "title": "13:00 WIB" }
+                    ]
+                },
+                "is_time_enabled": {
+                    "type": "boolean",
+                    "__example__": false
+                },
+                "guest_options": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": { "type": "string" },
+                            "title": { "type": "string" }
+                        }
+                    },
+                    "__example__": [
+                        { "id": "2", "title": "2 orang" },
+                        { "id": "4", "title": "4 orang" }
+                    ]
+                }
+            },
+            "layout": {
+                "type": "SingleColumnLayout",
+                "children": [
+                    {
+                        "type": "Form",
+                        "name": "welcome_form",
+                        "children": [
+                            {
+                                "type": "TextSubheading",
+                                "text": "📅 Pilih Waktu Reservasi"
+                            },
+                            {
+                                "type": "Dropdown",
+                                "name": "reservation_date",
+                                "label": "Tanggal Reservasi",
+                                "required": true,
+                                "data-source": "${data.dates}",
+                                "on-select-action": {
+                                    "name": "data_exchange",
+                                    "payload": {
+                                        "trigger": "date_selected",
+                                        "reservation_date": "${form.reservation_date}"
+                                    }
+                                }
+                            },
+                            {
+                                "type": "Dropdown",
+                                "name": "reservation_time",
+                                "label": "Jam Reservasi",
+                                "required": "${data.is_time_enabled}",
+                                "enabled": "${data.is_time_enabled}",
+                                "data-source": "${data.times}"
+                            },
+                            {
+                                "type": "TextSubheading",
+                                "text": "👤 Data Pemesan"
+                            },
+                            {
+                                "type": "TextInput",
+                                "name": "customer_name",
+                                "label": "Nama Lengkap",
+                                "required": true,
+                                "input-type": "text"
+                            },
+                            {
+                                "type": "TextInput",
+                                "name": "phone",
+                                "label": "Nomor WhatsApp",
+                                "required": true,
+                                "input-type": "phone"
+                            },
+                            {
+                                "type": "Dropdown",
+                                "name": "guest_count",
+                                "label": "Jumlah Tamu",
+                                "required": true,
+                                "data-source": "${data.guest_options}"
+                            },
+                            {
+                                "type": "Footer",
+                                "label": "Lanjutkan",
+                                "on-click-action": {
+                                    "name": "data_exchange",
+                                    "payload": {
+                                        "trigger": "welcome_submitted",
+                                        "reservation_date": "${form.reservation_date}",
+                                        "reservation_time": "${form.reservation_time}",
+                                        "customer_name": "${form.customer_name}",
+                                        "phone": "${form.phone}",
+                                        "guest_count": "${form.guest_count}"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "DETAILS",
+            "title": "Detail Reservasi",
+            "data": {
+                "tables": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": { "type": "string" },
+                            "title": { "type": "string" }
+                        }
+                    },
+                    "__example__": [
+                        { "id": "1", "title": "Meja 1 (4 orang)" }
+                    ]
+                },
+                "products": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": { "type": "string" },
+                            "title": { "type": "string" }
+                        }
+                    },
+                    "__example__": [
+                        { "id": "1", "title": "Nasi Goreng - Rp25.000" }
+                    ]
+                },
+                "event_types": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": { "type": "string" },
+                            "title": { "type": "string" }
+                        }
+                    },
+                    "__example__": [
+                        { "id": "regular", "title": "Makan biasa" }
+                    ]
+                }
+            },
+            "layout": {
+                "type": "SingleColumnLayout",
+                "children": [
+                    {
+                        "type": "Form",
+                        "name": "details_form",
+                        "children": [
+                            {
+                                "type": "TextSubheading",
+                                "text": "📝 Detail Reservasi"
+                            },
+                            {
+                                "type": "Dropdown",
+                                "name": "table_id",
+                                "label": "Pilih Meja",
+                                "required": false,
+                                "data-source": "${data.tables}"
+                            },
+                            {
+                                "type": "CheckboxGroup",
+                                "name": "selected_products",
+                                "label": "Pilih Menu (Opsional)",
+                                "required": false,
+                                "data-source": "${data.products}"
+                            },
+                            {
+                                "type": "Dropdown",
+                                "name": "event_type",
+                                "label": "Tipe Acara",
+                                "required": false,
+                                "data-source": "${data.event_types}"
+                            },
+                            {
+                                "type": "TextInput",
+                                "name": "email",
+                                "label": "Email (Opsional)",
+                                "required": false,
+                                "input-type": "email"
+                            },
+                            {
+                                "type": "TextArea",
+                                "name": "special_notes",
+                                "label": "Catatan Khusus (Opsional)",
+                                "required": false
+                            },
+                            {
+                                "type": "Footer",
+                                "label": "Lihat Ringkasan",
+                                "on-click-action": {
+                                    "name": "data_exchange",
+                                    "payload": {
+                                        "trigger": "details_submitted",
+                                        "table_id": "${form.table_id}",
+                                        "selected_products": "${form.selected_products}",
+                                        "event_type": "${form.event_type}",
+                                        "email": "${form.email}",
+                                        "special_notes": "${form.special_notes}"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "SUMMARY",
+            "title": "Ringkasan",
+            "data": {
+                "appointment_summary": {
+                    "type": "string",
+                    "__example__": "📅 Senin, 20 Jan 2026 jam 12:00 WIB\n👤 John Doe (+6281234567890)\n👥 4 tamu"
+                },
+                "table_summary": {
+                    "type": "string",
+                    "__example__": "🪑 Meja 1 (4 orang)"
+                },
+                "menu_summary": {
+                    "type": "string",
+                    "__example__": "🍽️ Menu yang dipilih:\n• Nasi Goreng - Rp25.000"
+                },
+                "price_breakdown": {
+                    "type": "string",
+                    "__example__": "💰 Total: Rp125.000\nDP (50%): Rp62.500"
+                }
+            },
+            "layout": {
+                "type": "SingleColumnLayout",
+                "children": [
+                    {
+                        "type": "Form",
+                        "name": "summary_form",
+                        "children": [
+                            {
+                                "type": "TextHeading",
+                                "text": "📋 Ringkasan Reservasi"
+                            },
+                            {
+                                "type": "TextBody",
+                                "text": "${data.appointment_summary}"
+                            },
+                            {
+                                "type": "TextBody",
+                                "text": "${data.table_summary}"
+                            },
+                            {
+                                "type": "TextBody",
+                                "text": "${data.menu_summary}"
+                            },
+                            {
+                                "type": "TextBody",
+                                "text": "${data.price_breakdown}"
+                            },
+                            {
+                                "type": "Footer",
+                                "label": "Lanjut ke Pembayaran",
+                                "on-click-action": {
+                                    "name": "data_exchange",
+                                    "payload": {
+                                        "trigger": "summary_confirmed"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "PAYMENT",
+            "title": "Pembayaran",
+            "data": {
+                "payment_types": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": { "type": "string" },
+                            "title": { "type": "string" }
+                        }
+                    },
+                    "__example__": [
+                        { "id": "dp", "title": "DP (50%) - Rp62.500" },
+                        { "id": "lunas", "title": "Lunas - Rp125.000" }
+                    ]
+                },
+                "payment_methods": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": { "type": "string" },
+                            "title": { "type": "string" }
+                        }
+                    },
+                    "__example__": [
+                        { "id": "qris", "title": "QRIS" },
+                        { "id": "cash", "title": "Bayar di Tempat" }
+                    ]
+                },
+                "is_payment_method_enabled": {
+                    "type": "boolean",
+                    "__example__": false
+                },
+                "payment_instruction": {
+                    "type": "string",
+                    "__example__": "Silakan pilih jenis pembayaran"
+                }
+            },
+            "layout": {
+                "type": "SingleColumnLayout",
+                "children": [
+                    {
+                        "type": "Form",
+                        "name": "payment_form",
+                        "children": [
+                            {
+                                "type": "TextHeading",
+                                "text": "💳 Pembayaran"
+                            },
+                            {
+                                "type": "TextBody",
+                                "text": "${data.payment_instruction}"
+                            },
+                            {
+                                "type": "Dropdown",
+                                "name": "payment_type",
+                                "label": "Tipe Pembayaran",
+                                "required": true,
+                                "data-source": "${data.payment_types}",
+                                "on-select-action": {
+                                    "name": "data_exchange",
+                                    "payload": {
+                                        "trigger": "payment_type_selected",
+                                        "payment_type": "${form.payment_type}"
+                                    }
+                                }
+                            },
+                            {
+                                "type": "Dropdown",
+                                "name": "payment_method",
+                                "label": "Metode Pembayaran",
+                                "required": "${data.is_payment_method_enabled}",
+                                "enabled": "${data.is_payment_method_enabled}",
+                                "data-source": "${data.payment_methods}"
+                            },
+                            {
+                                "type": "Footer",
+                                "label": "Konfirmasi Pembayaran",
+                                "on-click-action": {
+                                    "name": "complete",
+                                    "payload": {
+                                        "payment_type": "${form.payment_type}",
+                                        "payment_method": "${form.payment_method}"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "SUCCESS",
+            "title": "Reservasi Berhasil",
+            "terminal": true,
+            "success": true,
+            "data": {
+                "confirmation_message": {
+                    "type": "string",
+                    "__example__": "Reservasi Anda telah berhasil dibuat!"
+                },
+                "reservation_code": {
+                    "type": "string",
+                    "__example__": "RES-000001"
+                }
+            },
+            "layout": {
+                "type": "SingleColumnLayout",
+                "children": [
+                    {
+                        "type": "TextHeading",
+                        "text": "✅ Reservasi Berhasil!"
+                    },
+                    {
+                        "type": "TextBody",
+                        "text": "${data.confirmation_message}"
+                    },
+                    {
+                        "type": "TextSubheading",
+                        "text": "Kode Reservasi:"
+                    },
+                    {
+                        "type": "TextHeading",
+                        "text": "${data.reservation_code}"
+                    },
+                    {
+                        "type": "TextCaption",
+                        "text": "Kami akan menghubungi Anda untuk konfirmasi. Terima kasih!"
+                    }
+                ]
+            }
+        }
+    ]
+}

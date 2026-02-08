@@ -53,7 +53,7 @@ class WhatsAppController extends Controller
      */
     protected function getWhatsAppClient(): WhatsAppCloudApi
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
         if (! $userId) {
             throw new WhatsAppNotConnectedException('Authentication required to access WhatsApp features.');
         }
@@ -68,7 +68,7 @@ class WhatsAppController extends Controller
      */
     protected function getUserWhatsAppAccount(): WhatsAppAccount
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
         if (! $userId) {
             throw new WhatsAppNotConnectedException('Authentication required to access WhatsApp features.');
         }
@@ -134,7 +134,8 @@ class WhatsAppController extends Controller
     {
         // Clean phone number (remove +, spaces, etc)
         $cleanNumber = preg_replace('/[^0-9]/', '', $phoneNumber);
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
+        $account = $this->getWhatsAppAccount();
 
         if (! $userId) {
             throw new WhatsAppNotConnectedException('Authentication required');
@@ -143,6 +144,7 @@ class WhatsAppController extends Controller
         return WhatsAppContact::firstOrCreate(
             [
                 'user_id' => $userId,
+                'phone_number_id' => $account->phone_number_id,
                 'wa_id' => $cleanNumber,
             ],
             [
@@ -158,6 +160,7 @@ class WhatsAppController extends Controller
     {
         $responseBody = $response->decodedBody();
         $userId = auth()->id() ?? $contact->user_id ?? 1;
+        $account = $this->getWhatsAppAccount();
 
         // For template messages, include template_name in content
         if ($type === 'template' && $templateName) {
@@ -177,6 +180,7 @@ class WhatsAppController extends Controller
 
         $message = WhatsAppMessage::create([
             'user_id' => $userId,
+            'phone_number_id' => $account->phone_number_id,
             'contact_id' => $contact->id,
             'message_id' => $responseBody['messages'][0]['id'] ?? null,
             'direction' => 'outgoing',
@@ -1131,7 +1135,7 @@ class WhatsAppController extends Controller
             ]);
 
             // Broadcast profile update event
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
             if ($userId) {
                 broadcast(new \App\Events\ProfileUpdated($userId, $data, 'business_profile'));
             }
@@ -1378,7 +1382,7 @@ class WhatsAppController extends Controller
     public function getDashboardStats()
     {
         try {
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
 
             if (! $userId) {
                 return response()->json([
@@ -1449,7 +1453,7 @@ class WhatsAppController extends Controller
     public function getWeeklyChartData()
     {
         try {
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
 
             if (! $userId) {
                 return response()->json([
@@ -1503,7 +1507,7 @@ class WhatsAppController extends Controller
     public function getMessages(Request $request)
     {
         try {
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
 
             if (! $userId) {
                 return response()->json([
@@ -1515,8 +1519,8 @@ class WhatsAppController extends Controller
             $perPage = $request->get('per_page', 15);
             $limit = $request->get('limit');
 
+            // RLS in model automatically filters by user_id
             $query = WhatsAppMessage::with(['contact', 'user'])
-                ->where('user_id', $userId)
                 ->orderBy('created_at', 'desc');
 
             // If limit is specified, get that many without pagination
@@ -1557,8 +1561,8 @@ class WhatsAppController extends Controller
     public function getMessage($id)
     {
         try {
+            // RLS in model automatically filters by user_id
             $message = WhatsAppMessage::with(['contact', 'user'])
-                ->where('user_id', auth()->id())
                 ->findOrFail($id);
 
             return response()->json([
@@ -1580,7 +1584,7 @@ class WhatsAppController extends Controller
     public function getContacts(Request $request)
     {
         try {
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
 
             if (! $userId) {
                 return response()->json([
@@ -1591,8 +1595,8 @@ class WhatsAppController extends Controller
 
             $perPage = $request->get('per_page', 15);
 
-            $contacts = WhatsAppContact::where('user_id', $userId)
-                ->withCount('messages')
+            // RLS in model automatically filters by user_id
+            $contacts = WhatsAppContact::withCount('messages')
                 ->orderBy('last_message_at', 'desc')
                 ->paginate($perPage);
 
@@ -1621,7 +1625,7 @@ class WhatsAppController extends Controller
     public function getContactMessages($contactId, Request $request)
     {
         try {
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
 
             if (! $userId) {
                 return response()->json([
@@ -1630,10 +1634,13 @@ class WhatsAppController extends Controller
                 ], 401);
             }
 
+            // Verify contact belongs to user (RLS will handle this)
+            $contact = WhatsAppContact::findOrFail($contactId);
+
             $perPage = $request->get('per_page', 100);
 
+            // RLS in model automatically filters by user_id
             $messages = WhatsAppMessage::with(['contact'])
-                ->where('user_id', $userId)
                 ->where('contact_id', $contactId)
                 ->orderBy('created_at', 'asc')
                 ->get();
@@ -1657,7 +1664,7 @@ class WhatsAppController extends Controller
     public function markContactMessagesAsRead($contactId)
     {
         try {
-            $userId = auth()->id();
+            $userId = auth()->user()->getEffectiveUserId();
 
             if (! $userId) {
                 return response()->json([
@@ -1666,11 +1673,14 @@ class WhatsAppController extends Controller
                 ], 401);
             }
 
+            // Verify contact belongs to user (RLS will handle this)
+            $contact = WhatsAppContact::findOrFail($contactId);
+
             $whatsapp = $this->getWhatsAppClient();
 
             // Get all unread incoming messages from this contact
-            $unreadMessages = WhatsAppMessage::where('user_id', $userId)
-                ->where('contact_id', $contactId)
+            // RLS in model automatically filters by user_id
+            $unreadMessages = WhatsAppMessage::where('contact_id', $contactId)
                 ->where('direction', 'incoming')
                 ->where('is_read', false)
                 ->get();
@@ -1838,11 +1848,12 @@ class WhatsAppController extends Controller
 
             WhatsAppTemplate::updateOrCreate(
                 [
-                    'whatsapp_account_id' => $account->id,
+                    'phone_number_id' => $account->phone_number_id,
                     'name' => $templateData['name'],
                     'language' => $templateData['language'],
                 ],
                 [
+                    'whatsapp_account_id' => $account->id,
                     'template_id' => $templateData['id'] ?? null,
                     'status' => $templateData['status'],
                     'category' => $templateData['category'],
@@ -2021,6 +2032,7 @@ class WhatsAppController extends Controller
 
             $template = WhatsAppTemplate::create([
                 'whatsapp_account_id' => $account->id,
+                'phone_number_id' => $account->phone_number_id,
                 'template_id' => $result['data']['id'] ?? null,
                 'name' => $data['name'],
                 'language' => $data['language'],

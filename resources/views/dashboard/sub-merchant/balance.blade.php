@@ -1,13 +1,13 @@
 @extends('layouts.app')
 
-@section('title', 'Balance & Transactions - QashierWise')
+@section('title', __('submerchant.balance_title'))
 
 @section('content')
-<div x-data="balanceApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="balanceApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'sub-merchant-balance'])
 
-    <div class="flex-1 flex flex-col min-h-screen">
-        @include('components.dashboard-header', ['title' => 'Balance & Transactions', 'description' => 'Track your earnings and transaction history'])
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
+        @include('components.dashboard-header', ['title' => __('submerchant.balance'), 'description' => __('submerchant.balance_overview')])
 
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto space-y-6">
@@ -17,11 +17,11 @@
                         <div class="h-16 w-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
                             <i class="fas fa-exclamation-triangle text-3xl text-amber-500"></i>
                         </div>
-                        <h2 class="text-xl font-bold mb-2">Not Registered</h2>
-                        <p class="text-[hsl(var(--muted-foreground))] mb-6">You need to register as a sub-merchant to view your balance.</p>
+                        <h2 class="text-xl font-bold mb-2">{{ __('submerchant.not_registered') }}</h2>
+                        <p class="text-[hsl(var(--muted-foreground))] mb-6">{{ __('submerchant.not_registered_message') }}</p>
                         <a href="/dashboard/sub-merchant/register" class="btn btn-primary">
                             <i class="fas fa-user-plus mr-2"></i>
-                            Register Now
+                            {{ __('submerchant.register_now') }}
                         </a>
                     </div>
                 </template>
@@ -34,156 +34,108 @@
                             <div class="card p-5 hover:shadow-md transition-shadow">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Available Balance</p>
+                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('submerchant.available_balance') }}</p>
                                         <p class="text-2xl font-bold mt-1 text-emerald-600" x-text="formatCurrency(balance.available)">Rp 0</p>
                                     </div>
                                     <div class="h-12 w-12 rounded-xl bg-emerald-50 flex items-center justify-center">
                                         <i class="fas fa-wallet text-xl text-emerald-500"></i>
                                     </div>
                                 </div>
-                                <p class="text-xs text-[hsl(var(--muted-foreground))] mt-3">Ready for withdrawal</p>
                             </div>
 
                             <div class="card p-5 hover:shadow-md transition-shadow">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Pending Balance</p>
+                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('submerchant.pending_balance') }}</p>
                                         <p class="text-2xl font-bold mt-1 text-amber-600" x-text="formatCurrency(balance.pending)">Rp 0</p>
                                     </div>
                                     <div class="h-12 w-12 rounded-xl bg-amber-50 flex items-center justify-center">
                                         <i class="fas fa-clock text-xl text-amber-500"></i>
                                     </div>
                                 </div>
-                                <p class="text-xs text-[hsl(var(--muted-foreground))] mt-3">Being processed</p>
+                                <p class="text-xs text-[hsl(var(--muted-foreground))] mt-3">{{ __('submerchant.being_processed') }}</p>
                             </div>
 
                             <div class="card p-5 hover:shadow-md transition-shadow">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Total Earned</p>
+                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('submerchant.total_earned') }}</p>
                                         <p class="text-2xl font-bold mt-1" x-text="formatCurrency(balance.total_earned)">Rp 0</p>
                                     </div>
                                     <div class="h-12 w-12 rounded-xl bg-blue-50 flex items-center justify-center">
                                         <i class="fas fa-chart-line text-xl text-blue-500"></i>
                                     </div>
                                 </div>
-                                <p class="text-xs text-[hsl(var(--muted-foreground))] mt-3">All time earnings</p>
+                                <p class="text-xs text-[hsl(var(--muted-foreground))] mt-3">{{ __('submerchant.all_time_earnings') }}</p>
                             </div>
 
                             <div class="card p-5 hover:shadow-md transition-shadow">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Total Withdrawn</p>
-                                        <p class="text-2xl font-bold mt-1" x-text="formatCurrency(balance.total_withdrawn)">Rp 0</p>
+                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('submerchant.total_transactions') }}</p>
+                                        <p class="text-2xl font-bold mt-1" x-text="balance.total_transactions || 0">0</p>
                                     </div>
                                     <div class="h-12 w-12 rounded-xl bg-purple-50 flex items-center justify-center">
-                                        <i class="fas fa-money-bill-transfer text-xl text-purple-500"></i>
+                                        <i class="fas fa-receipt text-xl text-purple-500"></i>
                                     </div>
                                 </div>
-                                <p class="text-xs text-[hsl(var(--muted-foreground))] mt-3">Successfully withdrawn</p>
                             </div>
                         </div>
 
-                        <!-- Withdrawal Info & Quick Action -->
-                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <div class="lg:col-span-2">
-                                <!-- Earnings Summary -->
-                                <div class="card">
-                                    <div class="card-header !flex-row items-center justify-between">
-                                        <div>
-                                            <h2 class="card-title">Earnings Summary</h2>
-                                            <p class="card-description">Monthly breakdown</p>
-                                        </div>
-                                        <div class="flex gap-2">
-                                            <select x-model="selectedMonth" @change="fetchDailyEarnings()" class="input w-auto text-sm">
-                                                <template x-for="m in months" :key="m.value">
-                                                    <option :value="m.value" x-text="m.label"></option>
-                                                </template>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="card-content">
-                                        <!-- Summary Stats -->
-                                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                                            <div class="text-center p-3 bg-[hsl(var(--muted)/0.5)] rounded-lg">
-                                                <p class="text-2xl font-bold" x-text="earningsSummary.transaction_count">0</p>
-                                                <p class="text-xs text-[hsl(var(--muted-foreground))]">Transactions</p>
-                                            </div>
-                                            <div class="text-center p-3 bg-[hsl(var(--muted)/0.5)] rounded-lg">
-                                                <p class="text-2xl font-bold" x-text="formatCurrencyShort(earningsSummary.gross_earnings)">Rp 0</p>
-                                                <p class="text-xs text-[hsl(var(--muted-foreground))]">Gross</p>
-                                            </div>
-                                            <div class="text-center p-3 bg-[hsl(var(--muted)/0.5)] rounded-lg">
-                                                <p class="text-2xl font-bold text-red-500" x-text="formatCurrencyShort(earningsSummary.total_fees)">Rp 0</p>
-                                                <p class="text-xs text-[hsl(var(--muted-foreground))]">Fees (2.5%)</p>
-                                            </div>
-                                            <div class="text-center p-3 bg-emerald-50 rounded-lg">
-                                                <p class="text-2xl font-bold text-emerald-600" x-text="formatCurrencyShort(earningsSummary.net_earnings)">Rp 0</p>
-                                                <p class="text-xs text-[hsl(var(--muted-foreground))]">Net Earnings</p>
-                                            </div>
-                                        </div>
-
-                                        <!-- Daily Chart Placeholder -->
-                                        <div class="h-64 flex items-center justify-center bg-[hsl(var(--muted)/0.3)] rounded-lg">
-                                            <template x-if="loadingDaily">
-                                                <div class="text-center">
-                                                    <i class="fas fa-spinner animate-spin text-2xl text-[hsl(var(--muted-foreground))]"></i>
-                                                    <p class="text-sm text-[hsl(var(--muted-foreground))] mt-2">Loading...</p>
-                                                </div>
-                                            </template>
-                                            <template x-if="!loadingDaily && dailyEarnings.length === 0">
-                                                <div class="text-center">
-                                                    <i class="fas fa-chart-bar text-4xl text-[hsl(var(--muted-foreground))]"></i>
-                                                    <p class="text-sm text-[hsl(var(--muted-foreground))] mt-2">No data for this period</p>
-                                                </div>
-                                            </template>
-                                            <template x-if="!loadingDaily && dailyEarnings.length > 0">
-                                                <div class="w-full h-full p-4">
-                                                    <div id="earningsChart" class="w-full h-full"></div>
-                                                </div>
-                                            </template>
-                                        </div>
-                                    </div>
+                        <!-- Earnings Summary -->
+                        <div class="card">
+                            <div class="card-header !flex-row items-center justify-between">
+                                <div>
+                                    <h2 class="card-title">{{ __('submerchant.earnings_summary') }}</h2>
+                                    <p class="card-description">{{ __('submerchant.monthly_breakdown') }}</p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <select x-model="selectedMonth" @change="fetchDailyEarnings()" class="input w-auto text-sm">
+                                        <template x-for="m in months" :key="m.value">
+                                            <option :value="m.value" x-text="m.label"></option>
+                                        </template>
+                                    </select>
                                 </div>
                             </div>
-
-                            <!-- Withdrawal Card -->
-                            <div class="card">
-                                <div class="card-header">
-                                    <h2 class="card-title">Withdraw Funds</h2>
-                                    <p class="card-description">Transfer to your bank account</p>
+                            <div class="card-content">
+                                <!-- Summary Stats -->
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                                    <div class="text-center p-3 bg-[hsl(var(--muted)/0.5)] rounded-lg">
+                                        <p class="text-2xl font-bold" x-text="earningsSummary.transaction_count">0</p>
+                                        <p class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('submerchant.transactions') }}</p>
+                                    </div>
+                                    <div class="text-center p-3 bg-[hsl(var(--muted)/0.5)] rounded-lg">
+                                        <p class="text-2xl font-bold" x-text="formatCurrencyShort(earningsSummary.gross_earnings)">Rp 0</p>
+                                        <p class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('submerchant.gross') }}</p>
+                                    </div>
+                                    <div class="text-center p-3 bg-[hsl(var(--muted)/0.5)] rounded-lg">
+                                        <p class="text-2xl font-bold text-red-500" x-text="formatCurrencyShort(earningsSummary.total_fees)">Rp 0</p>
+                                        <p class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('submerchant.fee') }} (2.5%)</p>
+                                    </div>
+                                    <div class="text-center p-3 bg-emerald-50 rounded-lg">
+                                        <p class="text-2xl font-bold text-emerald-600" x-text="formatCurrencyShort(earningsSummary.net_earnings)">Rp 0</p>
+                                        <p class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('submerchant.net_amount') }}</p>
+                                    </div>
                                 </div>
-                                <div class="card-content space-y-4">
-                                    <div class="bg-emerald-50 rounded-lg p-4 text-center">
-                                        <p class="text-sm text-[hsl(var(--muted-foreground))]">Available for withdrawal</p>
-                                        <p class="text-3xl font-bold text-emerald-600 mt-1" x-text="formatCurrency(balance.available)">Rp 0</p>
-                                    </div>
 
-                                    <div class="space-y-2 text-sm">
-                                        <div class="flex justify-between">
-                                            <span class="text-[hsl(var(--muted-foreground))]">Minimum withdrawal</span>
-                                            <span class="font-medium">Rp 10,000</span>
+                                <!-- Daily Chart Placeholder -->
+                                <div class="h-64 flex items-center justify-center bg-[hsl(var(--muted)/0.3)] rounded-lg">
+                                    <template x-if="loadingDaily">
+                                        <div class="text-center">
+                                            <i class="fas fa-spinner animate-spin text-2xl text-[hsl(var(--muted-foreground))]"></i>
+                                            <p class="text-sm text-[hsl(var(--muted-foreground))] mt-2">{{ __('submerchant.loading') }}</p>
                                         </div>
-                                        <div class="flex justify-between">
-                                            <span class="text-[hsl(var(--muted-foreground))]">Bank account</span>
-                                            <span class="font-medium" x-text="subMerchant.bank_name"></span>
+                                    </template>
+                                    <template x-if="!loadingDaily && dailyEarnings.length === 0">
+                                        <div class="text-center">
+                                            <i class="fas fa-chart-bar text-4xl text-[hsl(var(--muted-foreground))]"></i>
+                                            <p class="text-sm text-[hsl(var(--muted-foreground))] mt-2">{{ __('submerchant.no_data_for_period') }}</p>
                                         </div>
-                                    </div>
-
-                                    <a 
-                                        href="/dashboard/sub-merchant/withdrawals" 
-                                        class="btn btn-primary btn-md w-full"
-                                        :class="{ 'opacity-50 pointer-events-none': balance.available < 10000 }"
-                                    >
-                                        <i class="fas fa-money-bill-transfer mr-2"></i>
-                                        Request Withdrawal
-                                    </a>
-
-                                    <template x-if="balance.available < 10000">
-                                        <p class="text-xs text-amber-600 text-center">
-                                            <i class="fas fa-info-circle mr-1"></i>
-                                            Minimum balance required: Rp 10,000
-                                        </p>
+                                    </template>
+                                    <template x-if="!loadingDaily && dailyEarnings.length > 0">
+                                        <div class="w-full h-full p-4">
+                                            <div id="earningsChart" class="w-full h-full"></div>
+                                        </div>
                                     </template>
                                 </div>
                             </div>
@@ -193,8 +145,8 @@
                         <div class="card">
                             <div class="card-header !flex-row items-center justify-between">
                                 <div>
-                                    <h2 class="card-title">Transaction History</h2>
-                                    <p class="card-description">All settled transactions with fee breakdown</p>
+                                    <h2 class="card-title">{{ __('submerchant.transaction_history') }}</h2>
+                                    <p class="card-description">{{ __('submerchant.all_settled_transactions') }}</p>
                                 </div>
                             </div>
                             <div class="card-content">
@@ -220,12 +172,12 @@
                                         <table class="w-full">
                                             <thead>
                                                 <tr class="border-b border-[hsl(var(--border))]">
-                                                    <th class="text-left py-3 px-2 text-sm font-medium text-[hsl(var(--muted-foreground))]">Date</th>
-                                                    <th class="text-left py-3 px-2 text-sm font-medium text-[hsl(var(--muted-foreground))]">Order ID</th>
-                                                    <th class="text-right py-3 px-2 text-sm font-medium text-[hsl(var(--muted-foreground))]">Gross</th>
-                                                    <th class="text-right py-3 px-2 text-sm font-medium text-[hsl(var(--muted-foreground))]">Fee</th>
-                                                    <th class="text-right py-3 px-2 text-sm font-medium text-[hsl(var(--muted-foreground))]">Net</th>
-                                                    <th class="text-center py-3 px-2 text-sm font-medium text-[hsl(var(--muted-foreground))]">Status</th>
+                                                    <th class="text-left py-3 px-2 text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('submerchant.date') }}</th>
+                                                    <th class="text-left py-3 px-2 text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('submerchant.order_id') }}</th>
+                                                    <th class="text-right py-3 px-2 text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('submerchant.gross') }}</th>
+                                                    <th class="text-right py-3 px-2 text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('submerchant.fee') }}</th>
+                                                    <th class="text-right py-3 px-2 text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('submerchant.net') }}</th>
+                                                    <th class="text-center py-3 px-2 text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('submerchant.status') }}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -237,7 +189,7 @@
                                                         <td class="py-3 px-2 text-sm text-right text-red-500" x-text="'-' + formatCurrency(tx.platform_fee || tx.fee_amount)"></td>
                                                         <td class="py-3 px-2 text-sm text-right font-medium text-emerald-600" x-text="formatCurrency(tx.net_amount)"></td>
                                                         <td class="py-3 px-2 text-center">
-                                                            <span class="badge bg-emerald-100 text-emerald-700 text-xs">Settled</span>
+                                                            <span class="badge bg-emerald-100 text-emerald-700 text-xs">{{ __('submerchant.settled') }}</span>
                                                         </td>
                                                     </tr>
                                                 </template>
@@ -248,8 +200,8 @@
                                         <template x-if="transactions.length === 0">
                                             <div class="empty-state py-12">
                                                 <div class="empty-state-icon"><i class="fas fa-receipt text-xl"></i></div>
-                                                <p class="text-sm font-medium mt-2">No transactions yet</p>
-                                                <p class="text-xs text-[hsl(var(--muted-foreground))]">Settled transactions will appear here</p>
+                                                <p class="text-sm font-medium mt-2">{{ __('submerchant.no_transactions') }}</p>
+                                                <p class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('submerchant.settled_transactions_appear_here') }}</p>
                                             </div>
                                         </template>
                                     </div>
@@ -311,7 +263,20 @@ function balanceApp() {
         },
 
         initMonths() {
-            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            const monthNames = [
+                '{{ __("common.january") }}',
+                '{{ __("common.february") }}',
+                '{{ __("common.march") }}',
+                '{{ __("common.april") }}',
+                '{{ __("common.may") }}',
+                '{{ __("common.june") }}',
+                '{{ __("common.july") }}',
+                '{{ __("common.august") }}',
+                '{{ __("common.september") }}',
+                '{{ __("common.october") }}',
+                '{{ __("common.november") }}',
+                '{{ __("common.december") }}'
+            ];
             const currentMonth = new Date().getMonth();
             this.months = [];
             for (let i = 0; i <= currentMonth; i++) {
@@ -399,7 +364,7 @@ function balanceApp() {
 
         renderChart() {
             if (this.dailyEarnings.length === 0) return;
-            
+
             const chartEl = document.getElementById('earningsChart');
             if (!chartEl) return;
 

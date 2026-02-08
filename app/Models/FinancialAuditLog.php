@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
-use Illuminate\Support\Collection;
 
 class FinancialAuditLog extends Model
 {
@@ -16,37 +15,53 @@ class FinancialAuditLog extends Model
      * Action type constants.
      */
     public const ACTION_BALANCE_UPDATE = 'balance_update';
+
     public const ACTION_BALANCE_PAYMENT = 'balance_payment';
+
     public const ACTION_BALANCE_REFUND = 'balance_refund';
+
     public const ACTION_BALANCE_ADJUSTMENT = 'balance_adjustment';
-    
+
     public const ACTION_WITHDRAWAL_REQUEST = 'withdrawal_request';
+
     public const ACTION_WITHDRAWAL_APPROVAL = 'withdrawal_approval';
+
     public const ACTION_WITHDRAWAL_REJECTION = 'withdrawal_rejection';
+
     public const ACTION_WITHDRAWAL_PROCESSED = 'withdrawal_processed';
+
     public const ACTION_WITHDRAWAL_CANCELLED = 'withdrawal_cancelled';
-    
+
     public const ACTION_QRIS_GENERATED = 'qris_generated';
+
     public const ACTION_QRIS_SETTLED = 'qris_settled';
+
     public const ACTION_QRIS_EXPIRED = 'qris_expired';
+
     public const ACTION_QRIS_CANCELLED = 'qris_cancelled';
-    
+
     public const ACTION_FEE_COLLECTED = 'fee_collected';
+
     public const ACTION_FEE_CALCULATED = 'fee_calculated';
 
     /**
      * Action category constants.
      */
     public const CATEGORY_BALANCE = 'balance';
+
     public const CATEGORY_WITHDRAWAL = 'withdrawal';
+
     public const CATEGORY_TRANSACTION = 'transaction';
+
     public const CATEGORY_FEE = 'fee';
 
     /**
      * Status constants.
      */
     public const STATUS_SUCCESS = 'success';
+
     public const STATUS_FAILED = 'failed';
+
     public const STATUS_PENDING = 'pending';
 
     /**
@@ -73,7 +88,6 @@ class FinancialAuditLog extends Model
         'ip_address',
         'user_agent',
     ];
-
 
     /**
      * Get the attributes that should be cast.
@@ -203,7 +217,7 @@ class FinancialAuditLog extends Model
         if ($this->balance_before === null || $this->balance_after === null) {
             return null;
         }
-        
+
         return (float) $this->balance_after - (float) $this->balance_before;
     }
 
@@ -256,8 +270,8 @@ class FinancialAuditLog extends Model
         if ($this->amount === null) {
             return '-';
         }
-        
-        return 'Rp ' . number_format((float) $this->amount, 0, ',', '.');
+
+        return 'Rp '.number_format((float) $this->amount, 0, ',', '.');
     }
 
     /**
@@ -268,7 +282,7 @@ class FinancialAuditLog extends Model
         if ($this->fee_amount === null) {
             return '-';
         }
-        
-        return 'Rp ' . number_format((float) $this->fee_amount, 0, ',', '.');
+
+        return 'Rp '.number_format((float) $this->fee_amount, 0, ',', '.');
     }
 }

@@ -1,0 +1,222 @@
+<?php
+
+namespace Tests\Feature\Api;
+
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
+use Tests\TestCase;
+
+class ResendWebhookControllerTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_webhook_handles_email_delivered_event(): void
+    {
+        Log::spy();
+
+        $payload = [
+            'type' => 'email.delivered',
+            'created_at' => '2024-01-15T12:00:00.000Z',
+            'data' => [
+                'email_id' => 'test-email-123',
+                'to' => 'user@example.com',
+                'subject' => 'Test Email',
+                'from' => 'noreply@qashierwise.com',
+            ],
+        ];
+
+        $response = $this->postJson('/api/webhooks/resend', $payload, [
+            'svix-signature' => 'v1,fake-signature',
+            'svix-timestamp' => time(),
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['status' => 'ok']);
+
+        Log::shouldHaveReceived('info')
+            ->with('Resend webhook received', \Mockery::type('array'));
+    }
+
+    public function test_webhook_handles_email_bounced_event(): void
+    {
+        Log::spy();
+
+        $payload = [
+            'type' => 'email.bounced',
+            'created_at' => '2024-01-15T12:00:00.000Z',
+            'data' => [
+                'email_id' => 'test-email-456',
+                'to' => 'invalid@example.com',
+                'subject' => 'Test Email',
+                'bounce_type' => 'hard',
+            ],
+        ];
+
+        $response = $this->postJson('/api/webhooks/resend', $payload, [
+            'svix-signature' => 'v1,fake-signature',
+            'svix-timestamp' => time(),
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['status' => 'ok']);
+
+        Log::shouldHaveReceived('error')
+            ->with('Email bounced', \Mockery::type('array'));
+    }
+
+    public function test_webhook_handles_email_complained_event(): void
+    {
+        Log::spy();
+
+        $payload = [
+            'type' => 'email.complained',
+            'created_at' => '2024-01-15T12:00:00.000Z',
+            'data' => [
+                'email_id' => 'test-email-789',
+                'to' => 'spam@example.com',
+                'subject' => 'Test Email',
+            ],
+        ];
+
+        $response = $this->postJson('/api/webhooks/resend', $payload, [
+            'svix-signature' => 'v1,fake-signature',
+            'svix-timestamp' => time(),
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['status' => 'ok']);
+
+        Log::shouldHaveReceived('warning')
+            ->with('Email marked as spam', \Mockery::type('array'));
+    }
+
+    public function test_webhook_handles_email_opened_event(): void
+    {
+        Log::spy();
+
+        $payload = [
+            'type' => 'email.opened',
+            'created_at' => '2024-01-15T12:00:00.000Z',
+            'data' => [
+                'email_id' => 'test-email-101',
+                'to' => 'user@example.com',
+                'subject' => 'Test Email',
+            ],
+        ];
+
+        $response = $this->postJson('/api/webhooks/resend', $payload, [
+            'svix-signature' => 'v1,fake-signature',
+            'svix-timestamp' => time(),
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['status' => 'ok']);
+
+        Log::shouldHaveReceived('info')
+            ->with('Email opened', \Mockery::type('array'));
+    }
+
+    public function test_webhook_handles_email_clicked_event(): void
+    {
+        Log::spy();
+
+        $payload = [
+            'type' => 'email.clicked',
+            'created_at' => '2024-01-15T12:00:00.000Z',
+            'data' => [
+                'email_id' => 'test-email-102',
+                'to' => 'user@example.com',
+                'subject' => 'Test Email',
+                'link' => 'https://example.com/verify',
+            ],
+        ];
+
+        $response = $this->postJson('/api/webhooks/resend', $payload, [
+            'svix-signature' => 'v1,fake-signature',
+            'svix-timestamp' => time(),
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['status' => 'ok']);
+
+        Log::shouldHaveReceived('info')
+            ->with('Email link clicked', \Mockery::type('array'));
+    }
+
+    public function test_webhook_rejects_missing_required_fields(): void
+    {
+        $payload = [
+            'type' => 'email.delivered',
+            // Missing 'data' field
+        ];
+
+        $response = $this->postJson('/api/webhooks/resend', $payload, [
+            'svix-signature' => 'v1,fake-signature',
+            'svix-timestamp' => time(),
+        ]);
+
+        $response->assertStatus(400)
+            ->assertJson([
+                'status' => 'error',
+                'message' => 'Missing required fields',
+            ]);
+    }
+
+    public function test_webhook_handles_unknown_event_type(): void
+    {
+        Log::spy();
+
+        $payload = [
+            'type' => 'email.unknown_event',
+            'created_at' => '2024-01-15T12:00:00.000Z',
+            'data' => [
+                'email_id' => 'test-email-999',
+                'to' => 'user@example.com',
+            ],
+        ];
+
+        $response = $this->postJson('/api/webhooks/resend', $payload, [
+            'svix-signature' => 'v1,fake-signature',
+            'svix-timestamp' => time(),
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['status' => 'ok']);
+
+        Log::shouldHaveReceived('info')
+            ->with('Unhandled Resend webhook event type', \Mockery::type('array'));
+    }
+
+    public function test_webhook_respects_rate_limiting(): void
+    {
+        $payload = [
+            'type' => 'email.delivered',
+            'created_at' => '2024-01-15T12:00:00.000Z',
+            'data' => [
+                'email_id' => 'test-email-rate-limit',
+                'to' => 'user@example.com',
+                'subject' => 'Test Email',
+            ],
+        ];
+
+        // Make multiple requests and verify rate limiting works
+        $successCount = 0;
+        for ($i = 0; $i < 65; $i++) {
+            $response = $this->postJson('/api/webhooks/resend', $payload, [
+                'svix-signature' => 'v1,fake-signature',
+                'svix-timestamp' => time(),
+            ]);
+
+            if ($response->status() === 200) {
+                $successCount++;
+            } else {
+                // Rate limit hit, verify it's 429
+                $this->assertEquals(429, $response->status());
+                break;
+            }
+        }
+
+        // Should have hit rate limit before all 65 requests completed
+        $this->assertLessThan(65, $successCount, 'Rate limiting should block some requests');
+    }
+}

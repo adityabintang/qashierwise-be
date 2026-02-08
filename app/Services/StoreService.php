@@ -12,8 +12,7 @@ class StoreService
     /**
      * Create a new store with auto-generated code if not provided
      *
-     * @param array $data Store data (name, code, address, phone, is_active)
-     * @return Store
+     * @param  array  $data  Store data (name, code, address, phone, is_active)
      */
     public function create(array $data): Store
     {
@@ -31,62 +30,62 @@ class StoreService
     /**
      * Update an existing store
      *
-     * @param Store $store Store to update
-     * @param array $data Updated data
-     * @return Store
+     * @param  Store  $store  Store to update
+     * @param  array  $data  Updated data
      */
     public function update(Store $store, array $data): Store
     {
         $store->update($data);
+
         return $store->fresh();
     }
 
     /**
      * Deactivate a store (prevents new orders)
      *
-     * @param Store $store Store to deactivate
-     * @return Store
+     * @param  Store  $store  Store to deactivate
      */
     public function deactivate(Store $store): Store
     {
         $store->is_active = false;
         $store->save();
+
         return $store->fresh();
     }
 
     /**
      * Activate a store
      *
-     * @param Store $store Store to activate
-     * @return Store
+     * @param  Store  $store  Store to activate
      */
     public function activate(Store $store): Store
     {
         $store->is_active = true;
         $store->save();
+
         return $store->fresh();
     }
 
     /**
      * Validate if a store can accept new orders
      *
-     * @param Store $store Store to validate
-     * @return bool
+     * @param  Store  $store  Store to validate
+     *
      * @throws InvalidArgumentException If store is inactive
      */
     public function validateForOrderCreation(Store $store): bool
     {
-        if (!$store->is_active) {
+        if (! $store->is_active) {
             throw new InvalidArgumentException('Cannot create order at inactive store');
         }
+
         return true;
     }
 
     /**
      * Check if a store can accept new orders (non-throwing version)
      *
-     * @param Store $store Store to check
-     * @return bool
+     * @param  Store  $store  Store to check
      */
     public function canAcceptOrders(Store $store): bool
     {
@@ -96,14 +95,13 @@ class StoreService
     /**
      * Generate a unique store code
      *
-     * @param string $name Store name
-     * @return string
+     * @param  string  $name  Store name
      */
     protected function generateStoreCode(string $name): string
     {
         // Generate prefix from name (first 3 chars, uppercase)
         $namePrefix = strtoupper(substr(preg_replace('/[^a-zA-Z0-9]/', '', $name), 0, 3));
-        
+
         // Ensure we have at least 3 characters
         $namePrefix = str_pad($namePrefix, 3, 'X');
 
@@ -127,50 +125,67 @@ class StoreService
     /**
      * Find a store by ID
      *
-     * @param int $id Store ID
-     * @return Store|null
+     * @param  int  $id  Store ID
      */
-    public function find(int $id): ?Store
+    public function find(int $id, ?int $userId = null): ?Store
     {
-        return Store::find($id);
+        $query = Store::where('id', $id);
+
+        if ($userId !== null) {
+            $query->where('user_id', $userId);
+        }
+
+        return $query->first();
     }
 
     /**
      * Find a store by code
      *
-     * @param string $code Store code
-     * @return Store|null
+     * @param  string  $code  Store code
      */
-    public function findByCode(string $code): ?Store
+    public function findByCode(string $code, ?int $userId = null): ?Store
     {
-        return Store::where('code', $code)->first();
+        $query = Store::where('code', $code);
+
+        if ($userId !== null) {
+            $query->where('user_id', $userId);
+        }
+
+        return $query->first();
     }
 
     /**
      * Get all stores
-     *
-     * @return Collection
      */
-    public function getAll(): Collection
+    public function getAll(?int $userId = null): Collection
     {
-        return Store::all();
+        $query = Store::query();
+
+        if ($userId !== null) {
+            $query->where('user_id', $userId);
+        }
+
+        return $query->get();
     }
 
     /**
      * Get all active stores
-     *
-     * @return Collection
      */
-    public function getActive(): Collection
+    public function getActive(?int $userId = null): Collection
     {
-        return Store::where('is_active', true)->get();
+        $query = Store::where('is_active', true);
+
+        if ($userId !== null) {
+            $query->where('user_id', $userId);
+        }
+
+        return $query->get();
     }
 
     /**
      * Get store with order counts
      *
-     * @param Store $store Store to get statistics for
-     * @return array
+     * @param  Store  $store  Store to get statistics for
      */
     public function getWithStatistics(Store $store): array
     {

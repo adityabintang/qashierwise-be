@@ -16,10 +16,6 @@ class WhatsAppTokenInvalidException extends Exception
 
     /**
      * Create a new exception instance.
-     *
-     * @param string $message
-     * @param int $code
-     * @param \Throwable|null $previous
      */
     public function __construct(
         string $message = 'Your WhatsApp access token is invalid. Please re-authenticate.',

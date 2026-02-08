@@ -1,13 +1,13 @@
 @extends('layouts.app')
 
-@section('title', 'Orders - QashierWise POS')
+@section('title', __('pos.orders.title') . ' - QashierWise POS')
 
 @section('content')
-<div x-data="ordersApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="ordersApp()" x-init="initDashboard()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'pos-orders'])
 
-    <div class="flex-1 flex flex-col min-h-screen">
-        @include('components.dashboard-header', ['title' => 'Orders', 'description' => 'Manage sales orders'])
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
+        @include('components.dashboard-header', ['title' => __('pos.orders.title'), 'description' => __('pos.orders.description')])
 
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto space-y-6">
@@ -17,10 +17,12 @@
                         <h2 class="text-lg font-semibold">Sales Orders</h2>
                         <p class="text-sm text-[hsl(var(--muted-foreground))] hidden sm:block">Create and manage customer orders</p>
                     </div>
-                    <button @click="openCreateModal()" class="btn btn-primary btn-md">
-                        <i class="fas fa-plus"></i>
-                        <span>New Order</span>
-                    </button>
+                    <template x-if="hasPermission('create_orders') || hasPermission('manage_orders')">
+                        <button @click="openCreateModal()" class="btn btn-primary btn-md">
+                            <i class="fas fa-plus"></i>
+                            <span>New Order</span>
+                        </button>
+                    </template>
                 </div>
 
                 <!-- Filters -->
@@ -31,7 +33,6 @@
                             <select x-model="statusFilter" @change="fetchOrders()" class="input w-full min-h-[44px]">
                                 <option value="">All Status</option>
                                 <option value="pending">Pending</option>
-                                <option value="completed">Completed</option>
                                 <option value="paid">Paid</option>
                                 <option value="cancelled">Cancelled</option>
                             </select>
@@ -48,8 +49,8 @@
                         <div class="col-span-2 sm:col-span-2">
                             <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">Search</label>
                             <div class="relative">
-                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm"></i>
-                                <input type="text" x-model="search" @input.debounce.300ms="fetchOrders()" placeholder="Search order number..." class="input pl-10 w-full min-h-[44px]">
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none z-10"></i>
+                                <input type="text" x-model="search" @input="debounceSearch()" placeholder="Search order number..." class="input pl-10 w-full min-h-[44px]" style="padding-left: 2.5rem;">
                             </div>
                         </div>
                     </div>
@@ -85,7 +86,7 @@
                                     <div class="flex gap-2">
                                         <button @click.stop="viewOrder(order)" class="btn btn-outline btn-sm"><i class="fas fa-eye"></i></button>
                                         <template x-if="order.status === 'pending'">
-                                            <button @click.stop="completeOrder(order)" class="btn btn-primary btn-sm"><i class="fas fa-check"></i></button>
+                                            <button @click.stop="cancelOrder(order)" class="btn btn-outline btn-sm text-red-600"><i class="fas fa-times"></i></button>
                                         </template>
                                     </div>
                                 </div>
@@ -141,9 +142,6 @@
                                                 <div class="flex items-center justify-end gap-2">
                                                     <button @click="viewOrder(order)" class="btn btn-ghost btn-sm"><i class="fas fa-eye"></i></button>
                                                     <template x-if="order.status === 'pending'">
-                                                        <button @click="completeOrder(order)" class="btn btn-ghost btn-sm text-emerald-600"><i class="fas fa-check"></i></button>
-                                                    </template>
-                                                    <template x-if="order.status === 'pending'">
                                                         <button @click="cancelOrder(order)" class="btn btn-ghost btn-sm text-red-600"><i class="fas fa-times"></i></button>
                                                     </template>
                                                 </div>
@@ -162,7 +160,9 @@
                         <div class="empty-state-icon"><i class="fas fa-shopping-cart text-2xl"></i></div>
                         <h3 class="font-semibold mt-4">No orders found</h3>
                         <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">Create your first order to get started.</p>
-                        <button @click="openCreateModal()" class="btn btn-primary btn-md mt-4"><i class="fas fa-plus"></i> New Order</button>
+                        <template x-if="hasPermission('create_orders') || hasPermission('manage_orders')">
+                            <button @click="openCreateModal()" class="btn btn-primary btn-md mt-4"><i class="fas fa-plus"></i> New Order</button>
+                        </template>
                     </div>
                 </div>
 
@@ -217,16 +217,26 @@
                         <!-- Product Selection -->
                         <div>
                             <label class="text-sm font-medium mb-1.5 block">Add Products</label>
-                            <div class="relative">
-                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm"></i>
-                                <input type="text" x-model="productSearch" @input.debounce.300ms="searchProducts()" placeholder="Search products..." class="input pl-10 w-full min-h-[44px]">
+                            <div class="relative mb-2">
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none z-10"></i>
+                                <input type="text" x-model="productSearch" placeholder="Search products..." class="input pl-10 w-full min-h-[44px]" style="padding-left: 2.5rem;">
                             </div>
-                            <div x-show="searchResults.length > 0" class="mt-2 border border-[hsl(var(--border))] rounded-lg max-h-48 overflow-y-auto">
-                                <template x-for="product in searchResults" :key="product.id">
-                                    <button @click="addToOrder(product)" class="w-full p-3 text-left hover:bg-[hsl(var(--muted)/0.5)] flex justify-between items-center border-b border-[hsl(var(--border))] last:border-0">
-                                        <span x-text="product.name"></span>
-                                        <span class="text-sm text-[hsl(var(--primary))]" x-text="formatCurrency(product.price)"></span>
-                                    </button>
+                            <div class="border border-[hsl(var(--border))] rounded-lg max-h-48 overflow-y-auto">
+                                <template x-if="filteredProducts.length === 0">
+                                    <div class="p-4 text-center text-[hsl(var(--muted-foreground))]">
+                                        <p x-show="!products.length">No products found</p>
+                                        <p x-show="products.length && productSearch">No products match your search</p>
+                                    </div>
+                                </template>
+                                <template x-if="filteredProducts.length > 0">
+                                    <div class="divide-y divide-[hsl(var(--border))]">
+                                        <template x-for="product in filteredProducts" :key="product.id">
+                                            <button @click="addToOrder(product)" class="w-full p-3 text-left hover:bg-[hsl(var(--muted)/0.5)] flex justify-between items-center">
+                                                <span x-text="product.name"></span>
+                                                <span class="text-sm text-[hsl(var(--primary))]" x-text="formatCurrency(product.price)"></span>
+                                            </button>
+                                        </template>
+                                    </div>
                                 </template>
                             </div>
                         </div>
@@ -317,6 +327,22 @@
                         <div class="flex justify-between text-sm"><span>Discount</span><span x-text="'-' + formatCurrency(selectedOrder?.discount_amount || 0)"></span></div>
                         <div class="flex justify-between font-bold text-lg pt-2 border-t border-[hsl(var(--border))]"><span>Total</span><span x-text="formatCurrency(selectedOrder?.total)"></span></div>
                     </div>
+                    <div class="border-t border-[hsl(var(--border))] pt-4">
+                        <h5 class="font-medium mb-3">Payment Method</h5>
+                        <template x-if="selectedOrder?.payments && selectedOrder.payments.length > 0">
+                            <div class="space-y-2">
+                                <template x-for="payment in selectedOrder.payments" :key="payment.id">
+                                    <div class="flex justify-between text-sm">
+                                        <span class="capitalize" x-text="payment.method"></span>
+                                        <span x-text="formatCurrency(payment.amount)"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        <template x-if="!selectedOrder?.payments || selectedOrder.payments.length === 0">
+                            <p class="text-sm text-[hsl(var(--muted-foreground))]">No payment recorded</p>
+                        </template>
+                    </div>
                 </div>
             </div>
         </div>
@@ -328,20 +354,32 @@ function ordersApp() {
     return {
         API_BASE_URL: window.location.origin + '/api/pos',
         loading: true, creating: false,
-        orders: [], stores: [], tables: [], searchResults: [], orderItems: [],
+        orders: [], stores: [], tables: [], products: [], orderItems: [],
         search: '', statusFilter: '', storeFilter: '', productSearch: '',
         showCreateModal: false, showViewModal: false,
         selectedOrder: null,
         createForm: { store_id: '', table_id: '' },
         pagination: { currentPage: 1, lastPage: 1, from: 0, to: 0, total: 0 },
         sidebarOpen: window.innerWidth >= 1024, isMobile: window.innerWidth < 768, user: null, notifications: [],
+        searchTimeout: null,
+        // Permissions
+        userPermissions: [], isAdmin: true,
 
         async init() {
-            this.initSidebar();
-            await Promise.all([this.fetchOrders(), this.fetchStores()]);
+            this.initDashboard();
+            await this.fetchUserPermissions();
+            await Promise.all([this.fetchOrders(), this.fetchStores(), this.fetchProducts()]);
         },
 
-        initSidebar() {
+        debounceSearch() {
+            clearTimeout(this.searchTimeout);
+            this.searchTimeout = setTimeout(() => {
+                this.pagination.currentPage = 1;
+                this.fetchOrders();
+            }, 300);
+        },
+
+        initDashboard() {
             this.isMobile = window.innerWidth < 768;
             if (this.isMobile) { this.sidebarOpen = false; }
             else { let s = localStorage.getItem('sidebarOpen'); if (s !== null) this.sidebarOpen = JSON.parse(s); }
@@ -352,9 +390,38 @@ function ordersApp() {
                 else if (!was && this.isMobile) { this.sidebarOpen = false; }
             });
             let u = localStorage.getItem('user'); if (u) { try { this.user = JSON.parse(u); } catch (e) { this.user = { name: 'User' }; } } else { this.user = { name: 'User' }; }
+            this.fetchUserPermissions();
+            this.$watch('createForm.store_id', () => {
+                this.createForm.table_id = '';
+                this.fetchTables();
+            });
+        },
+
+        async fetchUserPermissions() {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) { this.isAdmin = true; this.userPermissions = []; return; }
+                const res = await fetch(`${window.location.origin}/api/user/permissions`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success) { this.isAdmin = data.data.is_admin || false; this.userPermissions = data.data.permissions || []; }
+                }
+            } catch (e) { console.error('Failed to fetch permissions:', e); }
+        },
+
+        hasPermission(permission) {
+            if (this.isAdmin) return true;
+            if (this.userPermissions.includes('*')) return true;
+            return this.userPermissions.includes(permission);
         },
 
         async fetchOrders() {
+            // Check permission first
+            if (!this.hasPermission('view_orders') && !this.hasPermission('manage_orders')) {
+                this.orders = []; this.loading = false; return;
+            }
             this.loading = true;
             try {
                 const token = localStorage.getItem('token');
@@ -390,35 +457,45 @@ function ordersApp() {
             } catch (e) { console.error('Error:', e); }
         },
 
-        async searchProducts() {
-            if (!this.productSearch) { this.searchResults = []; return; }
+        async fetchProducts() {
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${this.API_BASE_URL}/products?search=${this.productSearch}`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
+                const res = await fetch(`${this.API_BASE_URL}/products`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
                 const data = await res.json();
-                if (data.success) { this.searchResults = (data.data.data || data.data).slice(0, 5); }
+                if (data.success) { this.products = data.data.data || data.data; }
             } catch (e) { console.error('Error:', e); }
+        },
+
+        get filteredProducts() {
+            if (!this.productSearch) return this.products;
+            const search = this.productSearch.toLowerCase();
+            return this.products.filter(p => p.name.toLowerCase().includes(search));
         },
 
         get paginationPages() { const p = [], c = this.pagination.currentPage, l = this.pagination.lastPage; for (let i = Math.max(1, c - 2); i <= Math.min(l, c + 2); i++) p.push(i); return p; },
         goToPage(page) { if (page >= 1 && page <= this.pagination.lastPage) { this.pagination.currentPage = page; this.fetchOrders(); } },
         formatCurrency(a) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(a || 0); },
         formatDate(d) { return d ? new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'; },
-        getStatusClass(s) { return { 'pending': 'bg-amber-100 text-amber-700', 'completed': 'bg-blue-100 text-blue-700', 'paid': 'bg-emerald-100 text-emerald-700', 'cancelled': 'bg-red-100 text-red-700' }[s] || 'bg-gray-100 text-gray-700'; },
+        getStatusClass(s) { return { 'pending': 'bg-amber-100 text-amber-700', 'paid': 'bg-emerald-100 text-emerald-700', 'cancelled': 'bg-red-100 text-red-700' }[s] || 'bg-gray-100 text-gray-700'; },
 
         get orderSubtotal() { return this.orderItems.reduce((t, i) => t + (i.price * i.quantity), 0); },
         get orderTax() { return this.orderSubtotal * 0.1; },
         get orderTotal() { return this.orderSubtotal + this.orderTax; },
 
-        addToOrder(product) { const existing = this.orderItems.find(i => i.product_id === product.id); if (existing) { existing.quantity++; } else { this.orderItems.push({ product_id: product.id, name: product.name, price: product.price, quantity: 1 }); } this.productSearch = ''; this.searchResults = []; },
+        addToOrder(product) { const existing = this.orderItems.find(i => i.product_id === product.id); if (existing) { existing.quantity++; } else { this.orderItems.push({ product_id: product.id, name: product.name, price: product.price, quantity: 1 }); } },
         increaseQty(i) { this.orderItems[i].quantity++; },
         decreaseQty(i) { if (this.orderItems[i].quantity > 1) this.orderItems[i].quantity--; else this.removeItem(i); },
         removeItem(i) { this.orderItems.splice(i, 1); },
 
-        openCreateModal() { this.createForm = { store_id: '', table_id: '' }; this.orderItems = []; this.showCreateModal = true; },
+        async openCreateModal() { this.createForm = { store_id: '', table_id: '' }; this.orderItems = []; this.products = []; this.productSearch = ''; await this.fetchProducts(); this.showCreateModal = true; },
         closeCreateModal() { this.showCreateModal = false; },
 
         async createOrder() {
+            // Check permission before creating
+            if (!this.hasPermission('create_orders') && !this.hasPermission('manage_orders')) {
+                alert('You do not have permission to create orders');
+                return;
+            }
             if (!this.createForm.store_id || this.orderItems.length === 0) return;
             this.creating = true;
             try {
@@ -429,7 +506,19 @@ function ordersApp() {
             } catch (e) { console.error('Error:', e); alert('Failed'); } finally { this.creating = false; }
         },
 
-        viewOrder(order) { this.selectedOrder = order; this.showViewModal = true; },
+        async viewOrder(order) {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/orders/${order.id}`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
+                const data = await res.json();
+                if (data.success) {
+                    this.selectedOrder = data.data;
+                    this.showViewModal = true;
+                } else {
+                    alert(data.message || 'Failed to load order');
+                }
+            } catch (e) { console.error('Error:', e); alert('Failed to load order'); }
+        },
         closeViewModal() { this.showViewModal = false; this.selectedOrder = null; },
 
         async completeOrder(order) {
@@ -443,6 +532,11 @@ function ordersApp() {
         },
 
         async cancelOrder(order) {
+            // Check permission before canceling
+            if (!this.hasPermission('cancel_orders') && !this.hasPermission('manage_orders')) {
+                alert('You do not have permission to cancel orders');
+                return;
+            }
             if (!confirm('Cancel this order?')) return;
             try {
                 const token = localStorage.getItem('token');

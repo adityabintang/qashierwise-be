@@ -17,7 +17,7 @@ class PolarWebhookControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         config([
             'polar.api_token' => 'test_token',
             'polar.webhook_secret' => $this->webhookSecret,
@@ -33,9 +33,9 @@ class PolarWebhookControllerTest extends TestCase
     private function generateSignature(string $payload): string
     {
         $timestamp = time();
-        $signedPayload = $timestamp . '.' . $payload;
+        $signedPayload = $timestamp.'.'.$payload;
         $signature = hash_hmac('sha256', $signedPayload, $this->webhookSecret);
-        
+
         return "t={$timestamp},v1={$signature}";
     }
 
@@ -63,7 +63,7 @@ class PolarWebhookControllerTest extends TestCase
     public function test_webhook_accepts_valid_signature(): void
     {
         $user = User::factory()->create();
-        
+
         $payload = json_encode([
             'type' => 'subscription.created',
             'data' => [
@@ -104,7 +104,7 @@ class PolarWebhookControllerTest extends TestCase
     public function test_webhook_creates_subscription(): void
     {
         $user = User::factory()->create();
-        
+
         $payload = json_encode([
             'type' => 'subscription.created',
             'data' => [
@@ -153,7 +153,7 @@ class PolarWebhookControllerTest extends TestCase
     public function test_webhook_handles_cancellation(): void
     {
         $user = User::factory()->create();
-        
+
         $subscription = Subscription::create([
             'user_id' => $user->id,
             'polar_subscription_id' => 'sub_cancel_123',
@@ -165,7 +165,7 @@ class PolarWebhookControllerTest extends TestCase
         ]);
 
         $cancelledAt = Carbon::now()->toIso8601String();
-        
+
         $payload = json_encode([
             'type' => 'subscription.cancelled',
             'data' => [

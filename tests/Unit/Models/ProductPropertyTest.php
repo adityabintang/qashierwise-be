@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Property-based tests for Product model
- * 
+ *
  * Feature: point-of-sale
  */
 class ProductPropertyTest extends TestCase
@@ -20,7 +20,7 @@ class ProductPropertyTest extends TestCase
     /**
      * Feature: point-of-sale, Property 1: Product Serialization Round-Trip
      * Validates: Requirements 1.6, 1.7
-     * 
+     *
      * For any valid Product object, serializing to JSON and then deserializing back
      * SHALL produce an equivalent Product object with identical field values.
      */
@@ -33,7 +33,7 @@ class ProductPropertyTest extends TestCase
                 Generators::pos(),
                 Generators::string(),
                 Generators::suchThat(
-                    fn($s) => strlen($s) > 0 && strlen($s) <= 50,
+                    fn ($s) => strlen($s) > 0 && strlen($s) <= 50,
                     Generators::string()
                 ),
                 Generators::string(),

@@ -6,7 +6,6 @@ use App\Models\WhatsAppContact;
 use App\Models\WhatsAppMessage;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
@@ -17,6 +16,7 @@ class NewWhatsAppMessage implements ShouldBroadcastNow
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public $message;
+
     public $contact;
 
     /**
@@ -37,7 +37,7 @@ class NewWhatsAppMessage implements ShouldBroadcastNow
     {
         // Broadcast to user's private channel
         return [
-            new PrivateChannel('whatsapp.' . $this->message->user_id),
+            new PrivateChannel('whatsapp.'.$this->message->user_id),
         ];
     }
 

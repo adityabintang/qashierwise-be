@@ -1,13 +1,13 @@
 @extends('layouts.app')
 
-@section('title', 'Products - QashierWise POS')
+@section('title', __('pos.products.title') . ' - QashierWise POS')
 
 @section('content')
-<div x-data="productsApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="productsApp()" x-init="initDashboard()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'pos-products'])
 
-    <div class="flex-1 flex flex-col min-h-screen">
-        @include('components.dashboard-header', ['title' => 'Products', 'description' => 'Manage your product inventory'])
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
+        @include('components.dashboard-header', ['title' => __('pos.products.title'), 'description' => __('pos.products.description')])
 
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto space-y-6">
@@ -17,10 +17,12 @@
                         <h2 class="text-lg font-semibold">Product Inventory</h2>
                         <p class="text-sm text-[hsl(var(--muted-foreground))] hidden sm:block">Manage products, pricing, and stock levels</p>
                     </div>
-                    <button @click="openCreateModal()" class="btn btn-primary btn-md">
-                        <i class="fas fa-plus"></i>
-                        <span>Add Product</span>
-                    </button>
+                    <template x-if="hasPermission('create_products') || hasPermission('manage_products')">
+                        <button @click="openCreateModal()" class="btn btn-primary btn-md">
+                            <i class="fas fa-plus"></i>
+                            <span>Add Product</span>
+                        </button>
+                    </template>
                 </div>
 
                 <!-- Search and Filters -->
@@ -29,8 +31,8 @@
                         <div class="sm:col-span-2">
                             <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">Search</label>
                             <div class="relative">
-                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm"></i>
-                                <input type="text" x-model="search" @input.debounce.300ms="fetchProducts()" placeholder="Search by name or SKU..." class="input pl-10 w-full min-h-[44px]">
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none z-10"></i>
+                                <input type="text" x-model="search" @input.debounce.300ms="fetchProducts()" placeholder="Search by name or SKU..."  class="input w-full min-h-[44px]" style="padding-left: 2.5rem;" >
                             </div>
                         </div>
                         <div>
@@ -82,12 +84,16 @@
                                     </div>
                                 </div>
                                 <div class="flex gap-2 mt-3 pt-3 border-t border-[hsl(var(--border))]">
-                                    <button @click="openEditModal(product)" class="btn btn-outline btn-sm flex-1">
-                                        <i class="fas fa-edit"></i> Edit
-                                    </button>
-                                    <button @click="openDeleteModal(product)" class="btn btn-outline btn-sm text-red-600 hover:bg-red-50">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+                                    <template x-if="hasPermission('edit_products') || hasPermission('manage_products')">
+                                        <button @click="openEditModal(product)" class="btn btn-outline btn-sm flex-1">
+                                            <i class="fas fa-edit"></i> Edit
+                                        </button>
+                                    </template>
+                                    <template x-if="hasPermission('delete_products') || hasPermission('manage_products')">
+                                        <button @click="openDeleteModal(product)" class="btn btn-outline btn-sm text-red-600 hover:bg-red-50">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </template>
                                 </div>
                             </div>
                         </template>
@@ -146,12 +152,16 @@
                                             </td>
                                             <td class="p-4 text-right">
                                                 <div class="flex items-center justify-end gap-2">
-                                                    <button @click="openEditModal(product)" class="btn btn-ghost btn-sm">
-                                                        <i class="fas fa-edit"></i>
-                                                    </button>
-                                                    <button @click="openDeleteModal(product)" class="btn btn-ghost btn-sm text-red-600 hover:bg-red-50">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
+                                                    <template x-if="hasPermission('edit_products') || hasPermission('manage_products')">
+                                                        <button @click="openEditModal(product)" class="btn btn-ghost btn-sm">
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
+                                                    </template>
+                                                    <template x-if="hasPermission('delete_products') || hasPermission('manage_products')">
+                                                        <button @click="openDeleteModal(product)" class="btn btn-ghost btn-sm text-red-600 hover:bg-red-50">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </template>
                                                 </div>
                                             </td>
                                         </tr>
@@ -170,9 +180,11 @@
                         </div>
                         <h3 class="font-semibold mt-4">No products found</h3>
                         <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">Add your first product to get started.</p>
-                        <button @click="openCreateModal()" class="btn btn-primary btn-md mt-4">
-                            <i class="fas fa-plus"></i> Add Product
-                        </button>
+                        <template x-if="hasPermission('create_products') || hasPermission('manage_products')">
+                            <button @click="openCreateModal()" class="btn btn-primary btn-md mt-4">
+                                <i class="fas fa-plus"></i> Add Product
+                            </button>
+                        </template>
                     </div>
                 </div>
 
@@ -304,10 +316,74 @@ function productsApp() {
         isMobile: window.innerWidth < 768,
         user: null,
         notifications: [],
+        // Permissions
+        userPermissions: [],
+        isAdmin: true,
 
         async init() {
-            this.initSidebar();
+            this.initDashboard();
+            await this.fetchUserPermissions(); // Wait for permissions to load
             await Promise.all([this.fetchProducts(), this.fetchCategories()]);
+        },
+
+        /**
+         * Initialize dashboard base functionality (from dashboard-base.js)
+         */
+        initDashboard() {
+            // Set initial sidebar state based on viewport
+            this.isMobile = window.innerWidth < 768;
+            if (this.isMobile) {
+                this.sidebarOpen = false;
+            } else {
+                let savedState = localStorage.getItem('sidebarOpen');
+                if (savedState !== null) this.sidebarOpen = JSON.parse(savedState);
+            }
+            this.$watch('sidebarOpen', v => {
+                if (!this.isMobile) localStorage.setItem('sidebarOpen', JSON.stringify(v));
+            });
+            window.addEventListener('resize', () => {
+                const wasMobile = this.isMobile;
+                this.isMobile = window.innerWidth < 768;
+                if (wasMobile && !this.isMobile) {
+                    let savedState = localStorage.getItem('sidebarOpen');
+                    this.sidebarOpen = savedState !== null ? JSON.parse(savedState) : true;
+                } else if (!wasMobile && this.isMobile) {
+                    this.sidebarOpen = false;
+                }
+            });
+            let storedUser = localStorage.getItem('user');
+            if (storedUser) { try { this.user = JSON.parse(storedUser); } catch (e) { this.user = { name: 'User', email: 'user@example.com' }; } }
+            else { this.user = { name: 'User', email: 'user@example.com' }; }
+            this.fetchUserPermissions();
+        },
+
+        /**
+         * Fetch user permissions from API
+         */
+        async fetchUserPermissions() {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) { this.isAdmin = true; this.userPermissions = []; return; }
+                const res = await fetch(`${window.location.origin}/api/user/permissions`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success) {
+                        this.isAdmin = data.data.is_admin || false;
+                        this.userPermissions = data.data.permissions || [];
+                    }
+                }
+            } catch (e) { console.error('Failed to fetch permissions:', e); }
+        },
+
+        /**
+         * Check if user has a specific permission
+         */
+        hasPermission(permission) {
+            if (this.isAdmin) return true;
+            if (this.userPermissions.includes('*')) return true;
+            return this.userPermissions.includes(permission);
         },
 
         initSidebar() {
@@ -339,6 +415,13 @@ function productsApp() {
         async fetchProducts() {
             this.loading = true;
             try {
+                // Check permission first - if no view permission, skip API call
+                if (!this.hasPermission('view_products') && !this.hasPermission('manage_products')) {
+                    this.products = [];
+                    this.loading = false;
+                    return;
+                }
+
                 const token = localStorage.getItem('token');
                 const params = new URLSearchParams({
                     page: this.pagination.currentPage,
@@ -380,6 +463,12 @@ function productsApp() {
 
         async fetchCategories() {
             try {
+                // Check permission first
+                if (!this.hasPermission('view_categories') && !this.hasPermission('manage_categories')) {
+                    this.categories = [];
+                    return;
+                }
+
                 const token = localStorage.getItem('token');
                 const response = await fetch(`${this.API_BASE_URL}/categories`, {
                     headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
@@ -439,10 +528,18 @@ function productsApp() {
         },
 
         async saveProduct() {
+            // Check permission before saving
+            const canCreate = this.hasPermission('create_products') || this.hasPermission('manage_products');
+            const canEdit = this.hasPermission('edit_products') || this.hasPermission('manage_products');
+            if ((!this.editingProduct && !canCreate) || (this.editingProduct && !canEdit)) {
+                alert('You do not have permission to perform this action');
+                return;
+            }
+
             this.saving = true;
             try {
                 const token = localStorage.getItem('token');
-                const url = this.editingProduct 
+                const url = this.editingProduct
                     ? `${this.API_BASE_URL}/products/${this.editingProduct.id}`
                     : `${this.API_BASE_URL}/products`;
                 const method = this.editingProduct ? 'PUT' : 'POST';
@@ -482,6 +579,12 @@ function productsApp() {
         },
 
         async deleteProduct() {
+            // Check permission before deleting
+            if (!this.hasPermission('delete_products') && !this.hasPermission('manage_products')) {
+                alert('You do not have permission to delete products');
+                return;
+            }
+
             this.deleting = true;
             try {
                 const token = localStorage.getItem('token');

@@ -1,16 +1,16 @@
 @extends('layouts.app')
 
-@section('title', 'Contacts - QashierWise')
+@section('title', __('dashboard.contacts_title'))
 
 @section('content')
-<div x-data="contactsApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="contactsApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     <!-- Sidebar -->
     @include('components.dashboard-sidebar', ['activePage' => 'contacts'])
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         <!-- Header -->
-        @include('components.dashboard-header', ['title' => 'Contacts', 'description' => 'Manage your WhatsApp contacts'])
+        @include('components.dashboard-header', ['title' => __('whatsapp.contacts_title'), 'description' => __('whatsapp.contacts_subtitle')])
 
         <!-- Page Content -->
         <main class="flex-1 p-4 md:p-6">
@@ -18,21 +18,22 @@
                 <!-- Search & Filter -->
                 <div class="card p-3 md:p-4 -mx-4 md:mx-0 rounded-none md:rounded-lg">
                     <div class="flex flex-col sm:flex-row gap-3 md:gap-4">
-                        <div class="flex-1 relative">
-                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none"></i>
+                        <div class="relative" style="flex: 1 1 0%; min-width: 0;">
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none z-10"></i>
                             <input
                                 type="text"
                                 x-model="searchQuery"
                                 @input="filterContacts"
-                                placeholder="Search contacts..."
-                                class="input pl-10 w-full"
+                                placeholder="{{ __('whatsapp.search_contacts') }}"
+                                class="input w-full"
+                                style="padding-left: 2.5rem;"
                             >
                         </div>
-                        <select x-model="sortBy" @change="sortContacts" class="input w-full sm:w-48">
-                            <option value="name_asc">Name (A-Z)</option>
-                            <option value="name_desc">Name (Z-A)</option>
-                            <option value="recent">Recently Added</option>
-                            <option value="oldest">Oldest First</option>
+                        <select x-model="sortBy" @change="sortContacts" class="input w-full sm:w-auto" style="flex: 0 0 auto; min-width: 180px; max-width: 220px;">
+                            <option value="name_asc">{{ __('whatsapp.name_asc') }}</option>
+                            <option value="name_desc">{{ __('whatsapp.name_desc') }}</option>
+                            <option value="recent">{{ __('whatsapp.recently_added') }}</option>
+                            <option value="oldest">{{ __('whatsapp.oldest_first') }}</option>
                         </select>
                     </div>
                 </div>
@@ -70,14 +71,14 @@
                                 <div class="flex items-center gap-4 mb-4">
                                     <div class="relative">
                                         <!-- Avatar with name -->
-                                        <img 
+                                        <img
                                             x-show="contact.name && contact.name.trim()"
-                                            :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(contact.name || 'U')}&backgroundColor=a855f7`" 
+                                            :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(contact.name || 'U')}&backgroundColor=a855f7`"
                                             :alt="contact.name"
                                             class="avatar avatar-xl"
                                         >
                                         <!-- Avatar without name -->
-                                        <div 
+                                        <div
                                             x-show="!contact.name || !contact.name.trim()"
                                             class="avatar avatar-xl flex items-center justify-center text-white font-bold"
                                             style="background: linear-gradient(135deg, #a855f7, #9333ea); font-size: 1.25rem;"
@@ -129,28 +130,28 @@
                         <div class="empty-state-icon">
                             <i class="fas fa-address-book text-2xl"></i>
                         </div>
-                        <h3 class="font-semibold mt-4">No contacts found</h3>
-                        <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">Contacts will appear here when you receive or send messages.</p>
+                        <h3 class="font-semibold mt-4">{{ __('whatsapp.no_contacts_found') }}</h3>
+                        <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">{{ __('whatsapp.contacts_will_appear') }}</p>
                     </div>
                 </div>
 
                 <!-- Contact Details Modal -->
                 <div x-show="showModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <!-- Backdrop -->
-                    <div 
-                        x-show="showModal" 
+                    <div
+                        x-show="showModal"
                         x-transition:enter="transition ease-out duration-200"
                         x-transition:enter-start="opacity-0"
                         x-transition:enter-end="opacity-100"
                         x-transition:leave="transition ease-in duration-150"
                         x-transition:leave-start="opacity-100"
                         x-transition:leave-end="opacity-0"
-                        class="fixed inset-0 bg-black/50" 
+                        class="fixed inset-0 bg-black/50"
                         @click="closeModal"
                     ></div>
 
                     <!-- Modal -->
-                    <div 
+                    <div
                         x-show="showModal"
                         x-transition:enter="transition ease-out duration-200"
                         x-transition:enter-start="opacity-0 scale-95"
@@ -162,7 +163,7 @@
                     >
                         <!-- Header -->
                         <div class="flex items-center justify-between p-6 border-b border-[hsl(var(--border))]">
-                            <h3 class="text-lg font-semibold">Contact Details</h3>
+                            <h3 class="text-lg font-semibold">{{ __('whatsapp.contact_details') }}</h3>
                             <button @click="closeModal" class="btn btn-ghost btn-icon">
                                 <i class="fas fa-times"></i>
                             </button>
@@ -173,14 +174,14 @@
                             <!-- Avatar -->
                             <div class="flex justify-center mb-6">
                                 <!-- Avatar with name -->
-                                <img 
+                                <img
                                     x-show="selectedContact?.name && selectedContact.name.trim()"
-                                    :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(selectedContact?.name || 'U')}&backgroundColor=a855f7`" 
+                                    :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(selectedContact?.name || 'U')}&backgroundColor=a855f7`"
                                     :alt="selectedContact?.name"
                                     class="h-24 w-24 rounded-full"
                                 >
                                 <!-- Avatar without name -->
-                                <div 
+                                <div
                                     x-show="!selectedContact?.name || !selectedContact.name.trim()"
                                     class="h-24 w-24 rounded-full flex items-center justify-center text-white font-bold"
                                     style="background: linear-gradient(135deg, #a855f7, #9333ea); font-size: 2rem;"
@@ -192,24 +193,24 @@
                             <!-- Details -->
                             <div class="space-y-4">
                                 <div>
-                                    <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Name</label>
+                                    <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">{{ __('whatsapp.name') }}</label>
                                     <p class="text-lg font-semibold mt-1" x-text="selectedContact?.name || 'Unknown'">-</p>
                                 </div>
                                 <div>
-                                    <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Phone Number</label>
+                                    <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">{{ __('whatsapp.phone_number') }}</label>
                                     <p class="text-lg font-semibold mt-1" x-text="selectedContact?.phone_number">-</p>
                                 </div>
                                 <div x-show="selectedContact?.profile_name">
-                                    <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">WhatsApp Profile</label>
+                                    <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">{{ __('whatsapp.profile_name') }}</label>
                                     <p class="mt-1" x-text="selectedContact?.profile_name">-</p>
                                 </div>
                                 <div class="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Messages</label>
+                                        <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">{{ __('whatsapp.messages_count') }}</label>
                                         <p class="text-lg font-semibold mt-1" x-text="selectedContact?.messages_count || 0">0</p>
                                     </div>
                                     <div>
-                                        <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Last Activity</label>
+                                        <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">{{ __('whatsapp.last_activity') }}</label>
                                         <p class="mt-1" x-text="formatDate(selectedContact?.last_message_at || selectedContact?.created_at)">-</p>
                                     </div>
                                 </div>
@@ -220,13 +221,13 @@
                         <div class="flex gap-3 p-4 md:p-6 border-t border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)]">
                             <button @click="closeModal" class="btn btn-outline btn-md flex-1">
                                 <i class="fas fa-times md:hidden"></i>
-                                <span class="hidden md:inline">Close</span>
-                                <span class="md:hidden">Close</span>
+                                <span class="hidden md:inline">{{ __('whatsapp.close') }}</span>
+                                <span class="md:hidden">{{ __('whatsapp.close') }}</span>
                             </button>
                             <button @click="sendMessage(selectedContact)" class="btn btn-primary btn-md flex-1">
                                 <i class="fas fa-paper-plane"></i>
-                                <span class="hidden md:inline">Send Message</span>
-                                <span class="md:hidden">Message</span>
+                                <span class="hidden md:inline">{{ __('whatsapp.send_message') }}</span>
+                                <span class="md:hidden">{{ __('whatsapp.message') }}</span>
                             </button>
                         </div>
                     </div>
@@ -253,12 +254,12 @@ function contactsApp() {
                 let savedState = localStorage.getItem('sidebarOpen');
                 if (savedState !== null) this.sidebarOpen = JSON.parse(savedState);
             }
-            
+
             // Watch sidebar state changes (only save on desktop)
             this.$watch('sidebarOpen', v => {
                 if (!this.isMobile) localStorage.setItem('sidebarOpen', JSON.stringify(v));
             });
-            
+
             // Handle resize events with debounce
             let resizeTimeout;
             window.addEventListener('resize', () => {
@@ -266,7 +267,7 @@ function contactsApp() {
                 resizeTimeout = setTimeout(() => {
                     const wasMobile = this.isMobile;
                     this.isMobile = window.innerWidth < 768;
-                    
+
                     if (wasMobile && !this.isMobile) {
                         let savedState = localStorage.getItem('sidebarOpen');
                         this.sidebarOpen = savedState !== null ? JSON.parse(savedState) : true;
@@ -278,7 +279,7 @@ function contactsApp() {
 
             let storedUser = localStorage.getItem('user');
             if (storedUser) {
-                try { this.user = JSON.parse(storedUser); } 
+                try { this.user = JSON.parse(storedUser); }
                 catch (e) { this.user = { name: 'User', email: 'user@example.com' }; }
             } else {
                 this.user = { name: 'User', email: 'user@example.com' };

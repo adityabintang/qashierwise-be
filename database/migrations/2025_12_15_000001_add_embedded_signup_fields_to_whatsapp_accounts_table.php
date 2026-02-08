@@ -8,7 +8,7 @@ return new class extends Migration
 {
     /**
      * Run the migrations.
-     * 
+     *
      * Adds fields required for WhatsApp Embedded Signup v4 integration.
      * Requirements: 2.1, 2.2, 8.2
      */

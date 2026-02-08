@@ -1,21 +1,58 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+    <!-- Landing Page - English (Default) -->
     <url>
         <loc>https://qashierwise.com</loc>
         <lastmod>2025-01-01</lastmod>
         <changefreq>weekly</changefreq>
         <priority>1.0</priority>
+        <xhtml:link rel="alternate" hreflang="en" href="https://qashierwise.com"/>
+        <xhtml:link rel="alternate" hreflang="id" href="https://qashierwise.com"/>
+        <xhtml:link rel="alternate" hreflang="x-default" href="https://qashierwise.com"/>
     </url>
+    
+    <!-- Privacy Policy - English -->
     <url>
         <loc>https://qashierwise.com/privacy-policy</loc>
         <lastmod>2025-01-01</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.5</priority>
+        <xhtml:link rel="alternate" hreflang="en" href="https://qashierwise.com/privacy-policy"/>
+        <xhtml:link rel="alternate" hreflang="id" href="https://qashierwise.com/privacy-policy"/>
+        <xhtml:link rel="alternate" hreflang="x-default" href="https://qashierwise.com/privacy-policy"/>
     </url>
+    
+    <!-- Terms of Service - English -->
     <url>
         <loc>https://qashierwise.com/terms-of-service</loc>
         <lastmod>2025-01-01</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.5</priority>
+        <xhtml:link rel="alternate" hreflang="en" href="https://qashierwise.com/terms-of-service"/>
+        <xhtml:link rel="alternate" hreflang="id" href="https://qashierwise.com/terms-of-service"/>
+        <xhtml:link rel="alternate" hreflang="x-default" href="https://qashierwise.com/terms-of-service"/>
+    </url>
+    
+    <!-- Login Page -->
+    <url>
+        <loc>https://qashierwise.com/login</loc>
+        <lastmod>2025-01-01</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.8</priority>
+        <xhtml:link rel="alternate" hreflang="en" href="https://qashierwise.com/login"/>
+        <xhtml:link rel="alternate" hreflang="id" href="https://qashierwise.com/login"/>
+        <xhtml:link rel="alternate" hreflang="x-default" href="https://qashierwise.com/login"/>
+    </url>
+    
+    <!-- Register Page -->
+    <url>
+        <loc>https://qashierwise.com/register</loc>
+        <lastmod>2025-01-01</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.8</priority>
+        <xhtml:link rel="alternate" hreflang="en" href="https://qashierwise.com/register"/>
+        <xhtml:link rel="alternate" hreflang="id" href="https://qashierwise.com/register"/>
+        <xhtml:link rel="alternate" hreflang="x-default" href="https://qashierwise.com/register"/>
     </url>
 </urlset>

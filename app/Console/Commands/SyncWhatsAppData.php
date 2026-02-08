@@ -2,10 +2,10 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Http;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppTemplate;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Http;
 
 class SyncWhatsAppData extends Command
 {
@@ -33,19 +33,21 @@ class SyncWhatsAppData extends Command
         // Ensure WhatsApp account exists in DB
         $account = $this->ensureWhatsAppAccount();
 
-        if (!$account) {
+        if (! $account) {
             $this->error('❌ Failed to create WhatsApp account');
+
             return 1;
         }
 
         $this->info("✅ WhatsApp Account: {$account->phone_number_id}");
 
         // Sync templates
-        if ($this->option('templates') || !$this->option('templates')) {
+        if ($this->option('templates') || ! $this->option('templates')) {
             $this->syncTemplates($account);
         }
 
         $this->info('✅ Sync completed successfully!');
+
         return 0;
     }
 
@@ -73,12 +75,13 @@ class SyncWhatsAppData extends Command
             $response = Http::withToken($accessToken)
                 ->get("https://graph.facebook.com/v21.0/{$wabaId}/message_templates", [
                     'limit' => 100,
-                    'fields' => 'name,status,category,language,components,id,quality_score'
+                    'fields' => 'name,status,category,language,components,id,quality_score',
                 ]);
 
             if ($response->failed()) {
                 $this->error('❌ Failed to fetch templates from Meta API');
                 $this->error($response->body());
+
                 return;
             }
 
@@ -110,18 +113,19 @@ class SyncWhatsAppData extends Command
 
                 WhatsAppTemplate::updateOrCreate(
                     [
-                        'whatsapp_account_id' => $account->id,
+                        'phone_number_id' => $account->phone_number_id,
                         'name' => $templateData['name'],
+                        'language' => $templateData['language'],
                     ],
                     [
+                        'whatsapp_account_id' => $account->id,
                         'status' => $templateData['status'],
                         'category' => $templateData['category'],
-                        'language' => $templateData['language'],
                         'header' => $header,
                         'header_type' => $headerType,
                         'body' => $body,
                         'footer' => $footer,
-                        'buttons' => !empty($buttons) ? json_encode($buttons) : null,
+                        'buttons' => ! empty($buttons) ? json_encode($buttons) : null,
                         'components' => json_encode($components),
                         'quality_score' => $templateData['quality_score'] ?? null,
                     ]
@@ -133,7 +137,7 @@ class SyncWhatsAppData extends Command
             $this->info("✅ Synced {$count} templates");
 
         } catch (\Exception $e) {
-            $this->error('❌ Error syncing templates: ' . $e->getMessage());
+            $this->error('❌ Error syncing templates: '.$e->getMessage());
         }
     }
 }

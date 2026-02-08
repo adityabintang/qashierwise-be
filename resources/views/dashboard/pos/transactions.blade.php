@@ -1,13 +1,13 @@
 @extends('layouts.app')
 
-@section('title', 'Transactions - QashierWise POS')
+@section('title', __('dashboard.menu_transactions') . ' - QashierWise POS')
 
 @section('content')
-<div x-data="transactionsApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="transactionsApp()" x-init="initDashboard()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'pos-transactions'])
 
-    <div class="flex-1 flex flex-col min-h-screen">
-        @include('components.dashboard-header', ['title' => 'Transactions', 'description' => 'View transaction history'])
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
+        @include('components.dashboard-header', ['title' => __('dashboard.menu_transactions'), 'description' => __('submerchant.transaction_history')])
 
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto space-y-6">
@@ -17,8 +17,8 @@
                         <div class="sm:col-span-2">
                             <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">Search</label>
                             <div class="relative">
-                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm"></i>
-                                <input type="text" x-model="search" @input.debounce.300ms="fetchTransactions()" placeholder="Search order number..." class="input pl-10 w-full min-h-[44px]">
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none z-10"></i>
+                                <input type="text" x-model="search" @input.debounce.300ms="fetchTransactions()" placeholder="Search order number..."  class="input w-full min-h-[44px]" style="padding-left: 2.5rem;">
                             </div>
                         </div>
                         <div>
@@ -213,10 +213,11 @@ function transactionsApp() {
         search: '', startDate: '', endDate: '',
         pagination: { currentPage: 1, lastPage: 1, from: 0, to: 0, total: 0 },
         sidebarOpen: window.innerWidth >= 1024, isMobile: window.innerWidth < 768, user: null, notifications: [],
+        userPermissions: [], isAdmin: true,
 
-        async init() { this.initSidebar(); await this.fetchTransactions(); },
+        async init() { this.initDashboard(); await this.fetchUserPermissions(); await this.fetchTransactions(); },
 
-        initSidebar() {
+        initDashboard() {
             this.isMobile = window.innerWidth < 768;
             if (this.isMobile) { this.sidebarOpen = false; }
             else { let s = localStorage.getItem('sidebarOpen'); if (s !== null) this.sidebarOpen = JSON.parse(s); }
@@ -227,9 +228,34 @@ function transactionsApp() {
                 else if (!was && this.isMobile) { this.sidebarOpen = false; }
             });
             let u = localStorage.getItem('user'); if (u) { try { this.user = JSON.parse(u); } catch (e) { this.user = { name: 'User' }; } } else { this.user = { name: 'User' }; }
+            this.fetchUserPermissions();
+        },
+
+        async fetchUserPermissions() {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) { this.isAdmin = true; this.userPermissions = []; return; }
+                const res = await fetch(`${window.location.origin}/api/user/permissions`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success) { this.isAdmin = data.data.is_admin || false; this.userPermissions = data.data.permissions || []; }
+                }
+            } catch (e) { console.error('Failed to fetch permissions:', e); }
+        },
+
+        hasPermission(permission) {
+            if (this.isAdmin) return true;
+            if (this.userPermissions.includes('*')) return true;
+            return this.userPermissions.includes(permission);
         },
 
         async fetchTransactions() {
+            // Check permission first
+            if (!this.hasPermission('view_transactions') && !this.hasPermission('manage_transactions')) {
+                this.transactions = []; this.loading = false; return;
+            }
             this.loading = true;
             try {
                 const token = localStorage.getItem('token');
@@ -250,7 +276,7 @@ function transactionsApp() {
         goToPage(page) { if (page >= 1 && page <= this.pagination.lastPage) { this.pagination.currentPage = page; this.fetchTransactions(); } },
         formatCurrency(a) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(a || 0); },
         formatDate(d) { return d ? new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'; },
-        getStatusClass(s) { return { 'pending': 'bg-amber-100 text-amber-700', 'completed': 'bg-blue-100 text-blue-700', 'paid': 'bg-emerald-100 text-emerald-700', 'cancelled': 'bg-red-100 text-red-700' }[s] || 'bg-gray-100 text-gray-700'; },
+        getStatusClass(s) { return { 'pending': 'bg-amber-100 text-amber-700', 'paid': 'bg-emerald-100 text-emerald-700', 'cancelled': 'bg-red-100 text-red-700' }[s] || 'bg-gray-100 text-gray-700'; },
 
         viewTransaction(tx) { this.selectedTx = tx; this.showModal = true; },
         closeModal() { this.showModal = false; this.selectedTx = null; },

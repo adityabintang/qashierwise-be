@@ -86,6 +86,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Supported Locales
+    |--------------------------------------------------------------------------
+    |
+    | This array contains all the locales that are supported by the application.
+    | These locales will be available for users to select and will be used
+    | for validation when switching languages.
+    |
+    */
+
+    'supported_locales' => ['en', 'id'],
+
+    /*
+    |--------------------------------------------------------------------------
     | Encryption Key
     |--------------------------------------------------------------------------
     |

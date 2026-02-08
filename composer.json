@@ -13,8 +13,14 @@
         "laravel/tinker": "^2.10.1",
         "league/flysystem-aws-s3-v3": "^3.30",
         "netflie/whatsapp-cloud-api": "^2.2",
+        "phpseclib/phpseclib": "~3.0",
         "polar-sh/sdk": "^0.7.0",
-        "pusher/pusher-php-server": "^7.2"
+        "predis/predis": "^3.3",
+        "pusher/pusher-php-server": "^7.2",
+        "resend/resend-laravel": "^1.1",
+        "resend/resend-php": "*",
+        "sbsaga/toon": "*",
+        "spatie/laravel-permission": "^6.24"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

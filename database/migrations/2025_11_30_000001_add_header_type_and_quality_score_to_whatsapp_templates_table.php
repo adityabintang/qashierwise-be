@@ -12,10 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('whatsapp_templates', function (Blueprint $table) {
-            if (!Schema::hasColumn('whatsapp_templates', 'header_type')) {
+            if (! Schema::hasColumn('whatsapp_templates', 'header_type')) {
                 $table->string('header_type')->nullable()->after('header');
             }
-            if (!Schema::hasColumn('whatsapp_templates', 'quality_score')) {
+            if (! Schema::hasColumn('whatsapp_templates', 'quality_score')) {
                 $table->string('quality_score')->nullable()->after('buttons');
             }
         });

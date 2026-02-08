@@ -54,6 +54,121 @@ In order to ensure that the Laravel community is welcoming to all, please review
 
 If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
 
+## Multi-Provider QRIS Payment System
+
+This application includes a flexible multi-provider QRIS payment system that supports multiple payment providers:
+
+### Supported Providers
+
+- **Midtrans**: Established payment gateway with comprehensive features
+- **Xendit**: Modern payment platform with competitive rates and fast settlement
+
+### Key Features
+
+- 🔄 **Multiple Provider Support**: Configure and switch between Midtrans and Xendit
+- 🔒 **Secure Credential Storage**: All API credentials are encrypted at rest
+- 🔔 **Webhook Integration**: Automatic payment notifications from providers
+- 📊 **Transaction Tracking**: Monitor all QRIS transactions across providers
+- 🔁 **Backward Compatible**: Existing Midtrans integrations continue to work seamlessly
+- 🧪 **Comprehensive Testing**: Unit tests, property-based tests, and integration tests
+
+### Quick Start
+
+#### 1. Configure a Payment Provider
+
+```bash
+# Set up environment variables (optional)
+XENDIT_API_KEY=your_xendit_secret_api_key
+XENDIT_SECRET_KEY=your_xendit_webhook_verification_token
+```
+
+#### 2. Run Migrations
+
+```bash
+php artisan migrate
+```
+
+#### 3. Configure Provider via API
+
+```bash
+curl -X POST https://yourdomain.com/api/provider-credentials \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "xendit",
+    "api_key": "xnd_development_your_api_key",
+    "secret_key": "your_webhook_verification_token"
+  }'
+```
+
+#### 4. Generate QRIS Code
+
+```bash
+curl -X POST https://yourdomain.com/api/qris/generate \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 50000,
+    "order_id": "ORDER-2025-001"
+  }'
+```
+
+### Documentation
+
+Comprehensive documentation is available in the `docs/` directory:
+
+- **[Xendit Integration Guide](docs/XENDIT_INTEGRATION.md)**: Complete guide for integrating Xendit
+- **[Merchant Configuration Guide](docs/MERCHANT_CONFIGURATION_GUIDE.md)**: Step-by-step setup for merchants
+- **[Webhook Setup and Testing](docs/WEBHOOK_SETUP_AND_TESTING.md)**: Webhook configuration and testing guide
+- **[Multi-Provider Architecture](docs/MULTI_PROVIDER_ARCHITECTURE.md)**: Technical architecture documentation
+- **[Error Handling](docs/ERROR_HANDLING.md)**: Error handling and troubleshooting guide
+- **[Migration Guide](docs/MIGRATION_GUIDE.md)**: Guide for migrating from single to multi-provider
+
+### Testing
+
+Run the test suite:
+
+```bash
+# Run all tests
+php artisan test
+
+# Run specific test suites
+php artisan test --testsuite=Unit
+php artisan test --testsuite=Feature
+
+# Run with coverage
+php artisan test --coverage
+```
+
+### Architecture
+
+The system uses a provider factory pattern with a common interface:
+
+```
+QrisService → ProviderFactory → PaymentProviderInterface
+                                        ↓
+                        ┌───────────────┴───────────────┐
+                        ↓                               ↓
+                MidtransProvider                XenditProvider
+```
+
+All providers implement `PaymentProviderInterface`, ensuring consistent behavior and making it easy to add new providers.
+
+### Security
+
+- **Encrypted Credentials**: All API keys are encrypted using AES-256-CBC
+- **Webhook Verification**: All webhooks are verified using HMAC-SHA256 signatures
+- **Audit Logging**: All credential access and API calls are logged
+- **Error Sanitization**: Sensitive information is never exposed in error messages
+
+### Support
+
+For issues or questions:
+
+- Check the [documentation](docs/)
+- Review [error handling guide](docs/ERROR_HANDLING.md)
+- Check application logs: `storage/logs/laravel.log`
+
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).

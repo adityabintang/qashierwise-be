@@ -1,0 +1,537 @@
+@extends('layouts.app')
+
+@section('title', 'Manage Subscription - QashierWise')
+
+@section('content')
+<div x-data="{
+    ...manageSubscription(),
+    isMobile: window.innerWidth < 1024,
+    sidebarOpen: window.innerWidth >= 1024,
+    user: null,
+    notifications: [],
+
+    initDashboard() {
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            this.isMobile = window.innerWidth < 1024;
+            if (!this.isMobile) {
+                this.sidebarOpen = true;
+            }
+        });
+
+        // Load user info
+        let storedUser = localStorage.getItem('user');
+        if (storedUser) {
+            try {
+                this.user = JSON.parse(storedUser);
+            } catch (e) {
+                this.user = { name: 'User', email: 'user@example.com' };
+            }
+        } else {
+            this.user = { name: 'User', email: 'user@example.com' };
+        }
+
+        // Initialize subscription data
+        this.init();
+    },
+
+    clearNotifications() {
+        this.notifications = [];
+    },
+
+    removeNotification(id) {
+        this.notifications = this.notifications.filter(n => n.id !== id);
+    },
+
+    formatNotificationTime(time) {
+        if (!time) return '';
+        const date = new Date(time);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+
+        const diffHours = Math.floor(diffMins / 60);
+        if (diffHours < 24) return `${diffHours}h ago`;
+
+        const diffDays = Math.floor(diffHours / 24);
+        if (diffDays < 7) return `${diffDays}d ago`;
+
+        return date.toLocaleDateString();
+    },
+
+    logout() {
+        let apiBaseUrl = window.location.origin + '/api';
+        fetch(`${apiBaseUrl}/logout`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Accept': 'application/json'
+            }
+        }).then(() => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        });
+    }
+}" x-init="initDashboard()" class="h-screen flex bg-[hsl(var(--muted)/0.4)]">
+    @include('components.dashboard-sidebar', ['activePage' => 'subscription'])
+
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
+        @include('components.dashboard-header', ['title' => 'Manage Subscription', 'description' => 'View and manage your subscription plan'])
+
+        <main class="flex-1 p-4 md:p-6">
+            <div class="max-w-4xl mx-auto space-y-6">
+                <!-- Flash Messages -->
+                @if(session('success'))
+                    <div class="p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-green-600 mt-1"></i>
+                            <p class="text-green-800">{{ session('success') }}</p>
+                        </div>
+                    </div>
+                @endif
+
+                @if(session('error'))
+                    <div class="p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-red-600 mt-1"></i>
+                            <p class="text-red-800">{{ session('error') }}</p>
+                        </div>
+                    </div>
+                @endif
+
+                @if(session('info'))
+                    <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <p class="text-blue-800">{{ session('info') }}</p>
+                        </div>
+                    </div>
+                @endif
+
+                <!-- Loading State -->
+                <div x-show="loading" class="space-y-6">
+                    <div class="card p-6">
+                        <div class="animate-pulse space-y-4">
+                            <div class="h-6 bg-gray-200 rounded w-1/4"></div>
+                            <div class="h-4 bg-gray-200 rounded w-1/2"></div>
+                            <div class="h-32 bg-gray-200 rounded"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- No Subscription State -->
+                <div x-show="!loading && !subscription" class="card">
+                    <div class="card-content text-center py-12">
+                        <div class="h-20 w-20 rounded-full bg-purple-100 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-rocket text-4xl text-purple-600"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-2">No Active Subscription</h3>
+                        <p class="text-gray-600 mb-6 max-w-md mx-auto">
+                            You don't have an active subscription yet. Choose a plan to unlock all premium features and grow your business.
+                        </p>
+                        <a href="/#pricing"
+                           class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all">
+                            <i class="fas fa-star"></i>
+                            View Plans & Pricing
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Subscription Details Card -->
+                <div x-show="!loading && subscription" class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Current Plan</h2>
+                        <p class="card-description">Your subscription details and billing information</p>
+                    </div>
+                    <div class="card-content">
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6 p-6 bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl">
+                            <div class="flex items-center gap-4">
+                                <div class="h-16 w-16 rounded-xl flex items-center justify-center"
+                                     :class="{
+                                         'bg-gray-100': subscription?.plan_name === 'free_trial',
+                                         'bg-blue-100': subscription?.plan_name === 'standard',
+                                         'bg-purple-100': subscription?.plan_name === 'pro'
+                                     }">
+                                    <i class="fas text-3xl"
+                                       :class="{
+                                           'fa-gift text-gray-600': subscription?.plan_name === 'free_trial',
+                                           'fa-star text-blue-600': subscription?.plan_name === 'standard',
+                                           'fa-crown text-purple-600': subscription?.plan_name === 'pro'
+                                       }"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-2xl font-bold capitalize" x-text="getPlanDisplayName()">Loading...</h3>
+                                    <p class="text-sm text-gray-600" x-text="getStatusText()">Active</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-3xl font-bold text-gray-900" x-show="subscription?.plan_name !== 'free_trial'">
+                                    <span x-text="formatPrice(subscription?.amount)">Rp 0</span>
+                                </p>
+                                <p class="text-sm text-gray-600" x-show="subscription?.plan_name !== 'free_trial'">per month</p>
+                                <p class="text-lg font-semibold text-gray-700" x-show="subscription?.plan_name === 'free_trial'">
+                                    Free Trial
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Subscription Info -->
+                        <div class="mt-6 grid md:grid-cols-2 gap-4">
+                            <!-- Status -->
+                            <div class="p-4 bg-gray-50 rounded-lg">
+                                <p class="text-sm text-gray-600 mb-1">Status</p>
+                                <div class="flex items-center gap-2">
+                                    <span class="h-2 w-2 rounded-full"
+                                          :class="{
+                                              'bg-green-500': subscription?.status === 'active',
+                                              'bg-yellow-500': subscription?.status === 'trial',
+                                              'bg-orange-500': subscription?.status === 'cancelled',
+                                              'bg-red-500': subscription?.status === 'expired' || subscription?.status === 'trial_expired'
+                                          }"></span>
+                                    <span class="font-semibold capitalize" x-text="subscription?.status || '-'">-</span>
+                                </div>
+                            </div>
+
+                            <!-- Current Period -->
+                            <div class="p-4 bg-gray-50 rounded-lg" x-show="subscription?.period_start">
+                                <p class="text-sm text-gray-600 mb-1">Current Period</p>
+                                <p class="font-semibold">
+                                    <span x-text="formatDate(subscription?.period_start)">-</span>
+                                    <span class="text-gray-500">to</span>
+                                    <span x-text="formatDate(subscription?.period_end)">-</span>
+                                </p>
+                            </div>
+
+                            <!-- Next Billing Date -->
+                            <div class="p-4 bg-gray-50 rounded-lg" x-show="subscription?.status === 'active' && subscription?.period_end">
+                                <p class="text-sm text-gray-600 mb-1">Next Billing Date</p>
+                                <p class="font-semibold" x-text="formatDate(subscription?.period_end)">-</p>
+                            </div>
+
+                            <!-- Trial Days Remaining -->
+                            <div class="p-4 bg-amber-50 rounded-lg" x-show="subscription?.status === 'trial'">
+                                <p class="text-sm text-amber-700 mb-1">Trial Days Remaining</p>
+                                <p class="font-semibold text-amber-900">
+                                    <span x-text="subscription?.trial_days_remaining || 0">0</span> days
+                                </p>
+                            </div>
+
+                            <!-- Cancelled At -->
+                            <div class="p-4 bg-orange-50 rounded-lg" x-show="subscription?.cancelled_at">
+                                <p class="text-sm text-orange-700 mb-1">Cancelled On</p>
+                                <p class="font-semibold text-orange-900" x-text="formatDate(subscription?.cancelled_at)">-</p>
+                            </div>
+                        </div>
+
+                        <!-- Alerts -->
+                        <div class="mt-6 space-y-3">
+                            <!-- Trial Expiring Soon -->
+                            <div x-show="subscription?.status === 'trial' && subscription?.trial_days_remaining <= 3"
+                                 class="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                                <div class="flex items-start gap-3">
+                                    <i class="fas fa-exclamation-triangle text-amber-600 mt-1"></i>
+                                    <div>
+                                        <p class="font-semibold text-amber-900">Trial Ending Soon</p>
+                                        <p class="text-sm text-amber-700 mt-1">
+                                            Your trial will expire in <span x-text="subscription?.trial_days_remaining || 0">0</span> days.
+                                            Upgrade now to continue using all features.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Subscription Cancelled -->
+                            <div x-show="subscription?.status === 'cancelled'"
+                                 class="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                                <div class="flex items-start gap-3">
+                                    <i class="fas fa-info-circle text-orange-600 mt-1"></i>
+                                    <div>
+                                        <p class="font-semibold text-orange-900">Subscription Cancelled</p>
+                                        <p class="text-sm text-orange-700 mt-1">
+                                            Your subscription has been cancelled. You'll have access until
+                                            <span x-text="formatDate(subscription?.period_end)">-</span>.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Trial Expired -->
+                            <div x-show="subscription?.status === 'trial_expired'"
+                                 class="p-4 bg-red-50 border border-red-200 rounded-lg">
+                                <div class="flex items-start gap-3">
+                                    <i class="fas fa-times-circle text-red-600 mt-1"></i>
+                                    <div>
+                                        <p class="font-semibold text-red-900">Trial Expired</p>
+                                        <p class="text-sm text-red-700 mt-1">
+                                            Your trial has expired. Please upgrade to a paid plan to continue using QashierWise.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions Card -->
+                <div x-show="!loading && subscription" class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Actions</h2>
+                        <p class="card-description">Manage your subscription</p>
+                    </div>
+                    <div class="card-content space-y-3">
+                        <!-- Upgrade Button (for trial/expired users) -->
+                        <a x-show="subscription?.status === 'trial' || subscription?.status === 'trial_expired' || subscription?.status === 'expired'"
+                           href="/#pricing"
+                           class="flex items-center justify-between p-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-rocket text-2xl"></i>
+                                <div>
+                                    <p class="font-semibold">Upgrade to Premium</p>
+                                    <p class="text-sm text-white/80">Get access to all features</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-arrow-right"></i>
+                        </a>
+
+                        <!-- View Pricing -->
+                        <a href="/#pricing"
+                           class="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-tags text-xl text-gray-600"></i>
+                                <div>
+                                    <p class="font-semibold text-gray-900">View All Plans</p>
+                                    <p class="text-sm text-gray-600">Compare features and pricing</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-arrow-right text-gray-400"></i>
+                        </a>
+
+                        <!-- Cancel Subscription (for active subscriptions) -->
+                        <button x-show="subscription?.status === 'active' && subscription?.plan_name !== 'free_trial'"
+                                @click="showCancelModal = true"
+                                class="flex items-center justify-between w-full p-4 bg-red-50 hover:bg-red-100 rounded-xl transition-colors text-left">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-times-circle text-xl text-red-600"></i>
+                                <div>
+                                    <p class="font-semibold text-red-900">Cancel Subscription</p>
+                                    <p class="text-sm text-red-700">End your subscription</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-arrow-right text-red-400"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Billing History Card -->
+                <div x-show="!loading && subscription && subscription.plan_name !== 'free_trial'" class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Billing History</h2>
+                        <p class="card-description">Your payment history</p>
+                    </div>
+                    <div class="card-content">
+                        <!-- Loading State -->
+                        <div x-show="billingLoading" class="text-center py-8">
+                            <i class="fas fa-spinner fa-spin text-3xl text-gray-400 mb-3"></i>
+                            <p class="text-gray-500">Loading billing history...</p>
+                        </div>
+
+                        <!-- Empty State -->
+                        <div x-show="!billingLoading && billingHistory.length === 0" class="text-center py-8 text-gray-500">
+                            <i class="fas fa-receipt text-4xl mb-3"></i>
+                            <p>No billing history available yet</p>
+                        </div>
+
+                        <!-- Billing History List -->
+                        <div x-show="!billingLoading && billingHistory.length > 0" class="space-y-3">
+                            <template x-for="payment in billingHistory" :key="payment.id">
+                                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                    <div class="flex items-center gap-4">
+                                        <div class="h-10 w-10 rounded-full flex items-center justify-center"
+                                             :class="{
+                                                 'bg-green-100': payment.status === 'settlement' || payment.status === 'capture',
+                                                 'bg-yellow-100': payment.status === 'pending',
+                                                 'bg-red-100': payment.status === 'deny' || payment.status === 'cancel' || payment.status === 'expire'
+                                             }">
+                                            <i class="fas"
+                                               :class="{
+                                                   'fa-check text-green-600': payment.status === 'settlement' || payment.status === 'capture',
+                                                   'fa-clock text-yellow-600': payment.status === 'pending',
+                                                   'fa-times text-red-600': payment.status === 'deny' || payment.status === 'cancel' || payment.status === 'expire'
+                                               }"></i>
+                                        </div>
+                                        <div>
+                                            <p class="font-semibold text-gray-900" x-text="payment.plan_name"></p>
+                                            <p class="text-sm text-gray-600" x-text="formatDate(payment.transaction_time)"></p>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="font-semibold text-gray-900" x-text="formatPrice(payment.gross_amount)"></p>
+                                        <p class="text-xs capitalize"
+                                           :class="{
+                                               'text-green-600': payment.status === 'settlement' || payment.status === 'capture',
+                                               'text-yellow-600': payment.status === 'pending',
+                                               'text-red-600': payment.status === 'deny' || payment.status === 'cancel' || payment.status === 'expire'
+                                           }"
+                                           x-text="payment.status"></p>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Cancel Confirmation Modal -->
+    <div x-show="showCancelModal"
+         x-cloak
+         class="fixed inset-0 z-50 overflow-y-auto"
+         @keydown.escape.window="showCancelModal = false">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-black/50 transition-opacity" @click="showCancelModal = false"></div>
+
+            <div class="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+                <div class="text-center mb-6">
+                    <div class="h-16 w-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-exclamation-triangle text-3xl text-red-600"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">Cancel Subscription?</h3>
+                    <p class="text-gray-600">
+                        Are you sure you want to cancel your subscription? You'll lose access to all premium features
+                        at the end of your billing period.
+                    </p>
+                </div>
+
+                <div class="space-y-3">
+                    <form action="{{ route('subscription.cancel.post') }}" method="POST" @submit="cancelLoading = true">
+                        @csrf
+                        <button type="submit"
+                                :disabled="cancelLoading"
+                                class="w-full py-3 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-all disabled:opacity-50">
+                            <span x-show="!cancelLoading">Yes, Cancel Subscription</span>
+                            <span x-show="cancelLoading" class="flex items-center justify-center gap-2">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                Cancelling...
+                            </span>
+                        </button>
+                    </form>
+                    <button @click="showCancelModal = false"
+                            :disabled="cancelLoading"
+                            class="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-all disabled:opacity-50">
+                        Keep Subscription
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@push('scripts')
+<script>
+    function manageSubscription() {
+        return {
+            loading: true,
+            subscription: null,
+            showCancelModal: false,
+            cancelLoading: false,
+            billingLoading: false,
+            billingHistory: [],
+
+            async init() {
+                await this.fetchSubscription();
+                if (this.subscription && this.subscription.plan_name !== 'free_trial') {
+                    await this.fetchBillingHistory();
+                }
+            },
+
+            async fetchSubscription() {
+                try {
+                    const response = await fetch('/api/subscription/status', {
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                            'Accept': 'application/json'
+                        }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.subscription = data.data?.subscription || null;
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch subscription:', error);
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            async fetchBillingHistory() {
+                this.billingLoading = true;
+                try {
+                    const response = await fetch('/api/subscription/billing-history', {
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                            'Accept': 'application/json'
+                        }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.billingHistory = data.data?.payments || [];
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch billing history:', error);
+                } finally {
+                    this.billingLoading = false;
+                }
+            },
+
+            getPlanDisplayName() {
+                if (!this.subscription) return 'Unknown Plan';
+                const names = {
+                    'free_trial': 'Free Trial',
+                    'standard': 'Standard Plan',
+                    'pro': 'Pro Plan'
+                };
+                return names[this.subscription.plan_name] || 'Unknown Plan';
+            },
+
+            getStatusText() {
+                if (!this.subscription) return 'Unknown';
+                const statuses = {
+                    'active': 'Active',
+                    'trial': 'Trial Period',
+                    'cancelled': 'Cancelled',
+                    'expired': 'Expired',
+                    'trial_expired': 'Trial Expired'
+                };
+                return statuses[this.subscription.status] || 'Unknown';
+            },
+
+            formatDate(dateString) {
+                if (!dateString) return '-';
+                // Extract just the date part (YYYY-MM-DD) from ISO string
+                // This prevents JavaScript from doing any timezone conversion
+                const datePart = dateString.split('T')[0] || dateString.split(' ')[0];
+                const [year, month, day] = datePart.split('-').map(Number);
+
+                // Format manually to avoid any timezone issues
+                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'];
+
+                return `${monthNames[month - 1]} ${day}, ${year}`;
+            },
+
+            formatPrice(amount) {
+                if (!amount) return 'Rp 0';
+                return 'Rp ' + parseInt(amount).toLocaleString('id-ID');
+            }
+        }
+    }
+</script>
+@endpush
+@endsection

@@ -3,8 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\SubscriptionPayment;
+use App\Services\MidtransSnapService;
 use App\Services\PlanConfig;
-use App\Services\PolarService;
 use App\Services\SubscriptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,48 +14,120 @@ use Illuminate\Support\Facades\Validator;
 
 /**
  * Controller for subscription-related API endpoints.
- * 
+ *
  * Handles subscription status retrieval, checkout session creation,
- * and customer portal access.
+ * and subscription management.
  */
 class SubscriptionController extends Controller
 {
     public function __construct(
         private SubscriptionService $subscriptionService,
-        private PolarService $polarService,
+        private MidtransSnapService $midtransSnapService,
         private PlanConfig $planConfig,
     ) {}
 
     /**
-     * Get the current user's subscription status.
-     * 
-     * @param Request $request
-     * @return JsonResponse
+     * Get current user's subscription status.
      */
     public function status(Request $request): JsonResponse
     {
         $user = $request->user();
-        
+
         $status = $this->subscriptionService->getUserSubscriptionStatus($user);
+        $subscription = $user->subscription;
+
+        // Build subscription data
+        $subscriptionData = [
+            'status' => $status->status,
+            'plan_name' => $status->planName,
+            'trial_days_remaining' => $status->trialDaysRemaining,
+            'period_start' => $status->periodEnd ? $subscription?->current_period_start?->toIso8601String() : null,
+            'period_end' => $status->periodEnd?->toIso8601String(),
+            'cancelled_at' => $status->cancelledAt?->toIso8601String(),
+            'amount' => null,
+        ];
+
+        // Add amount if subscription exists
+        if ($subscription) {
+            // Try to get amount from subscription metadata first
+            $metadata = is_string($subscription->metadata)
+                ? json_decode($subscription->metadata, true)
+                : $subscription->metadata;
+
+            if (isset($metadata['price_per_month'])) {
+                // Use price_per_month from metadata
+                $subscriptionData['amount'] = $metadata['price_per_month'];
+            } elseif (isset($metadata['amount'])) {
+                // Fall back to amount from metadata
+                $months = $metadata['months'] ?? 1;
+                $subscriptionData['amount'] = $months > 0 ? ($metadata['amount'] / $months) : 0;
+            } else {
+                // Fall back to config
+                $plan = config("subscription.plans.{$subscription->plan_name}");
+                $subscriptionData['amount'] = $plan['price_monthly'] ?? 0;
+            }
+        }
 
         return response()->json([
             'success' => true,
             'data' => [
-                'subscription' => $status->toArray(),
+                'subscription' => $subscriptionData,
+            ],
+        ]);
+    }
+
+    /**
+     * Get billing history for current user.
+     * 
+     * POS users see their master admin's billing history since
+     * all payments are made by the merchant owner.
+     */
+    public function billingHistory(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        
+        // CRITICAL: Use effective user ID to get master admin's billing history
+        // POS users inherit billing history from their master admin
+        $effectiveUserId = $user->getEffectiveUserId();
+
+        // Get payment history from subscription_payments table
+        $payments = SubscriptionPayment::where('user_id', $effectiveUserId)
+            ->orderBy('transaction_time', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->limit(50)
+            ->get()
+            ->map(function ($payment) {
+                return [
+                    'id' => $payment->id,
+                    'order_id' => $payment->order_id,
+                    'transaction_id' => $payment->transaction_id,
+                    'plan_name' => $payment->plan_name,
+                    'gross_amount' => (float) $payment->gross_amount,
+                    'currency' => $payment->currency,
+                    'payment_type' => $payment->payment_type,
+                    'status' => $payment->status,
+                    'transaction_time' => $payment->transaction_time?->toIso8601String(),
+                    'created_at' => $payment->created_at?->toIso8601String(),
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'payments' => $payments,
             ],
         ]);
     }
 
     /**
      * Create a checkout session for a subscription plan.
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function createCheckout(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'plan_id' => 'required|string|in:standard,pro',
+            'plan_id' => 'required|string|in:pro',
+            'duration' => 'required|string|in:1_month,3_months,1_year',
+            'promo_code' => 'nullable|string|max:50',
         ]);
 
         if ($validator->fails()) {
@@ -62,7 +135,7 @@ class SubscriptionController extends Controller
                 'success' => false,
                 'error' => [
                     'code' => 'INVALID_PLAN',
-                    'message' => 'Invalid plan selected',
+                    'message' => 'Invalid plan or duration selected',
                 ],
                 'errors' => $validator->errors(),
             ], 422);
@@ -70,338 +143,209 @@ class SubscriptionController extends Controller
 
         $user = $request->user();
         $planId = $request->input('plan_id');
+        $duration = $request->input('duration');
+        $promoCode = $request->input('promo_code');
 
-        // Check if Polar service is configured
-        if (!$this->polarService->isConfigured()) {
+        Log::info('Checkout attempt', [
+            'userId' => $user->id,
+            'planId' => $planId,
+            'duration' => $duration,
+            'hasPromoCode' => ! empty($promoCode),
+        ]);
+
+        // Check if Midtrans Snap service is configured
+        if (! $this->midtransSnapService->isConfigured()) {
+            Log::error('Midtrans Snap not configured', [
+                'userId' => $user->id,
+                'planId' => $planId,
+                'duration' => $duration,
+            ]);
+
             return response()->json([
                 'success' => false,
                 'error' => [
-                    'code' => 'POLAR_CONFIG_MISSING',
+                    'code' => 'MIDTRANS_CONFIG_MISSING',
                     'message' => 'Subscription service is not configured',
                 ],
             ], 503);
         }
 
-        $result = $this->polarService->createCheckoutSessionWithError($user, $planId);
+        // Get plan price
+        $plan = config("subscription.plans.{$planId}");
+        if (! $plan || ! isset($plan['durations'][$duration])) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'INVALID_PLAN',
+                    'message' => 'Invalid plan or duration',
+                ],
+            ], 422);
+        }
 
-        if ($result['session'] === null) {
+        $originalAmount = $plan['durations'][$duration]['price'];
+        $finalAmount = $originalAmount;
+        $discountAmount = 0;
+        $promoCodeData = null;
+
+        // Validate and apply promo code if provided
+        if ($promoCode) {
+            $promoService = app(\App\Services\PromoCodeService::class);
+            $promoResult = $promoService->validateAndApply($promoCode, $planId, $originalAmount, $user);
+
+            if (! $promoResult['valid']) {
+                return response()->json([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'INVALID_PROMO_CODE',
+                        'message' => $promoResult['message'],
+                    ],
+                ], 422);
+            }
+
+            $finalAmount = $promoResult['final_amount'];
+            $discountAmount = $promoResult['discount'];
+            $promoCodeData = $promoResult['promo_code'];
+
+            Log::info('Promo code applied to checkout', [
+                'userId' => $user->id,
+                'promoCode' => $promoCode,
+                'originalAmount' => $originalAmount,
+                'discount' => $discountAmount,
+                'finalAmount' => $finalAmount,
+            ]);
+        }
+
+        // Create Snap token with final amount
+        $result = $this->midtransSnapService->createSubscriptionSnapToken(
+            $user,
+            $planId,
+            $duration,
+            $finalAmount,
+            $promoCodeData ? $promoCodeData->code : null
+        );
+
+        if ($result === null) {
+            Log::error('Failed to create Snap token', [
+                'userId' => $user->id,
+                'planId' => $planId,
+                'duration' => $duration,
+            ]);
+
             return response()->json([
                 'success' => false,
                 'error' => [
                     'code' => 'CHECKOUT_FAILED',
                     'message' => 'Failed to create checkout session',
-                    'detail' => config('app.debug') ? $result['error'] : null,
                 ],
             ], 500);
         }
 
-        $checkoutSession = $result['session'];
-
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'checkout_url' => $checkoutSession->url,
-                'session_id' => $checkoutSession->id,
-            ],
-        ]);
-    }
-
-    /**
-     * Get the customer portal URL for managing subscription.
-     * 
-     * Users should be able to access the portal even if their subscription
-     * is cancelled - they may want to view history or resubscribe.
-     * 
-     * @param Request $request
-     * @return JsonResponse
-     */
-    public function getPortalUrl(Request $request): JsonResponse
-    {
-        $user = $request->user();
-        $subscription = $user->subscription;
-
-        if ($subscription === null || $subscription->polar_customer_id === null) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'SUBSCRIPTION_NOT_FOUND',
-                    'message' => 'No subscription record found',
-                ],
-            ], 404);
-        }
-
-        // Check if Polar service is configured
-        if (!$this->polarService->isConfigured()) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'POLAR_CONFIG_MISSING',
-                    'message' => 'Subscription service is not configured',
-                ],
-            ], 503);
-        }
-
-        Log::debug('Fetching customer portal URL', [
+        Log::info('Checkout session created successfully', [
             'userId' => $user->id,
-            'polarCustomerId' => $subscription->polar_customer_id,
-            'subscriptionStatus' => $subscription->status,
+            'planId' => $planId,
+            'duration' => $duration,
+            'originalAmount' => $originalAmount,
+            'finalAmount' => $finalAmount,
+            'hasPromoCode' => ! empty($promoCode),
+            'hasSnapToken' => ! empty($result['snap_token']),
+            'hasRedirectUrl' => ! empty($result['redirect_url']),
         ]);
-
-        $result = $this->polarService->getCustomerPortalUrlWithError($subscription->polar_customer_id);
-
-        if ($result['url'] === null) {
-            // Customer may have been deleted in Polar entirely
-            Log::warning('Failed to get customer portal URL', [
-                'userId' => $user->id,
-                'polarCustomerId' => $subscription->polar_customer_id,
-                'subscriptionStatus' => $subscription->status,
-                'error' => $result['error'],
-            ]);
-            
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'PORTAL_URL_FAILED',
-                    'message' => 'Unable to access customer portal. The customer record may no longer exist.',
-                    'detail' => config('app.debug') ? $result['error'] : null,
-                ],
-            ], 500);
-        }
 
         return response()->json([
             'success' => true,
             'data' => [
-                'portal_url' => $result['url'],
+                'redirect_url' => $result['redirect_url'],
+                'snap_token' => $result['snap_token'],
+                'original_amount' => $originalAmount,
+                'final_amount' => $finalAmount,
+                'discount' => $discountAmount,
             ],
         ]);
     }
 
     /**
-     * Verify subscription after successful checkout.
+     * Cancel current subscription.
+     *
+     * Cancels the user's active subscription via Midtrans.
+     * Access remains until the end of the current billing period.
      * 
-     * This endpoint verifies a subscription using the customer_session_token
-     * provided by Polar on the success URL redirect. It serves as a fallback
-     * when webhook delivery fails.
-     * 
-     * @param Request $request
-     * @return JsonResponse
+     * CRITICAL: Only master admins can cancel subscriptions.
+     * POS users cannot cancel - they inherit from master admin.
      */
-    public function verifyCheckout(Request $request): JsonResponse
+    public function cancelSubscription(Request $request): JsonResponse
     {
-        // Task 2.1: Token validation logic
-        $token = $request->input('customer_session_token');
-
-        // Validate token is present and not empty
-        if (empty($token)) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'INVALID_TOKEN',
-                    'message' => 'Customer session token is required',
-                ],
-            ], 422);
-        }
-
-        // Validate token format matches polar_cst_[a-zA-Z0-9]+ pattern
-        if (!preg_match('/^polar_cst_[a-zA-Z0-9]+$/', $token)) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'INVALID_TOKEN_FORMAT',
-                    'message' => 'Invalid token format',
-                ],
-            ], 422);
-        }
-
-        // Task 2.3: Check if Polar service is configured (503)
-        if (!$this->polarService->isConfigured()) {
-            Log::error('Subscription verification failed: Polar service not configured', [
-                'userId' => $request->user()->id,
-            ]);
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'POLAR_CONFIG_MISSING',
-                    'message' => 'Subscription service is not configured',
-                ],
-            ], 503);
-        }
-
-        // Task 2.2: Verification flow
         $user = $request->user();
-
-        // Fetch checkout data from Polar
-        $checkoutData = $this->polarService->getCheckoutByToken($token);
-
-        // Task 2.3: Handle VERIFICATION_FAILED (500) - Checkout not found
-        if ($checkoutData === null) {
-            Log::error('Subscription verification failed: Checkout not found', [
-                'token' => substr($token, 0, 20) . '...',
-                'userId' => $user->id,
-            ]);
+        
+        // CRITICAL: Only master admins can cancel subscriptions
+        if (! $user->isMasterAdmin()) {
             return response()->json([
                 'success' => false,
                 'error' => [
-                    'code' => 'VERIFICATION_FAILED',
-                    'message' => 'Failed to verify checkout',
-                ],
-            ], 500);
-        }
-
-        // Task 2.3: Handle UNAUTHORIZED_USER (403) - User ownership validation
-        $metadataUserId = $checkoutData['metadata']['user_id'] ?? null;
-        if ($metadataUserId !== null && (string) $metadataUserId !== (string) $user->id) {
-            Log::warning('Subscription verification failed: User mismatch', [
-                'authenticatedUserId' => $user->id,
-                'metadataUserId' => $metadataUserId,
-                'checkoutId' => $checkoutData['id'] ?? 'unknown',
-            ]);
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'UNAUTHORIZED_USER',
-                    'message' => 'Subscription does not belong to this user',
+                    'code' => 'UNAUTHORIZED',
+                    'message' => 'Only merchant owners can cancel subscriptions',
                 ],
             ], 403);
         }
-
-        // Fetch full subscription details from Polar
-        $subscriptionId = $checkoutData['subscription_id'] ?? null;
         
-        // Task 2.3: Handle VERIFICATION_FAILED (500) - No subscription_id in checkout
-        if ($subscriptionId === null) {
-            Log::error('Subscription verification failed: No subscription_id in checkout', [
-                'checkoutId' => $checkoutData['id'] ?? 'unknown',
-                'userId' => $user->id,
-                'checkoutStatus' => $checkoutData['status'] ?? 'unknown',
-            ]);
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'VERIFICATION_FAILED',
-                    'message' => 'Failed to verify checkout',
-                ],
-            ], 500);
-        }
+        // Get the master admin's subscription directly
+        $subscription = $user->subscription;
 
-        $polarSubscription = $this->polarService->getSubscription($subscriptionId);
-
-        // Task 2.3: Handle VERIFICATION_FAILED (500) - Subscription not found in Polar
-        if ($polarSubscription === null) {
-            Log::error('Subscription verification failed: Subscription not found in Polar', [
-                'subscriptionId' => $subscriptionId,
-                'userId' => $user->id,
-                'checkoutId' => $checkoutData['id'] ?? 'unknown',
-            ]);
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'VERIFICATION_FAILED',
-                    'message' => 'Failed to fetch subscription details',
-                ],
-            ], 500);
-        }
-
-        // Determine plan name from product ID
-        $planName = $this->planConfig->getPlanNameFromProductId($polarSubscription['product_id']) 
-            ?? ($checkoutData['metadata']['plan_id'] ?? 'standard');
-
-        // Create or update subscription
-        $subscription = $this->subscriptionService->createOrUpdateSubscription($user, [
-            'polar_subscription_id' => $polarSubscription['id'],
-            'polar_customer_id' => $polarSubscription['customer_id'],
-            'plan_name' => $planName,
-            'status' => $polarSubscription['status'],
-            'current_period_start' => $polarSubscription['current_period_start'],
-            'current_period_end' => $polarSubscription['current_period_end'],
-        ]);
-
-        Log::info('Subscription verified successfully', [
-            'subscriptionId' => $subscription->id,
-            'userId' => $user->id,
-            'polarSubscriptionId' => $polarSubscription['id'],
-            'planName' => $planName,
-            'status' => $polarSubscription['status'],
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Subscription verified successfully',
-            'data' => [
-                'subscription' => [
-                    'id' => $subscription->id,
-                    'plan_name' => $subscription->plan_name,
-                    'status' => $subscription->status,
-                    'current_period_end' => $subscription->current_period_end?->toIso8601String(),
-                ],
-            ],
-        ]);
-    }
-
-    /**
-     * Manually sync subscription from Polar (for debugging/fallback).
-     * 
-     * This endpoint allows manually creating/updating a subscription
-     * when webhook delivery fails.
-     * 
-     * @param Request $request
-     * @return JsonResponse
-     */
-    public function syncFromPolar(Request $request): JsonResponse
-    {
-        $validator = Validator::make($request->all(), [
-            'polar_subscription_id' => 'required|string',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'VALIDATION_ERROR',
-                    'message' => 'Polar subscription ID is required',
-                ],
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        $user = $request->user();
-        $polarSubscriptionId = $request->input('polar_subscription_id');
-
-        // Fetch subscription from Polar API
-        $polarSubscription = $this->polarService->getSubscription($polarSubscriptionId);
-
-        if ($polarSubscription === null) {
+        if ($subscription === null) {
             return response()->json([
                 'success' => false,
                 'error' => [
                     'code' => 'SUBSCRIPTION_NOT_FOUND',
-                    'message' => 'Subscription not found in Polar',
+                    'message' => 'No active subscription found',
                 ],
             ], 404);
         }
 
-        // Determine plan name from product ID
-        $planName = $this->planConfig->getPlanNameFromProductId($polarSubscription['product_id']) ?? 'standard';
+        if ($subscription->midtrans_subscription_id === null) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'INVALID_SUBSCRIPTION',
+                    'message' => 'Subscription does not have a valid Midtrans subscription ID',
+                ],
+            ], 400);
+        }
 
-        // Create or update subscription
-        $subscription = $this->subscriptionService->createOrUpdateSubscription($user, [
-            'polar_subscription_id' => $polarSubscription['id'],
-            'polar_customer_id' => $polarSubscription['customer_id'],
-            'plan_name' => $planName,
-            'status' => $polarSubscription['status'],
-            'current_period_start' => $polarSubscription['current_period_start'],
-            'current_period_end' => $polarSubscription['current_period_end'],
-        ]);
+        $midtransSubscriptionService = app(\App\Services\MidtransSubscriptionService::class);
+
+        if (! $midtransSubscriptionService->isConfigured()) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'MIDTRANS_CONFIG_MISSING',
+                    'message' => 'Subscription service is not configured',
+                ],
+            ], 503);
+        }
+
+        $result = $midtransSubscriptionService->cancelSubscription($subscription->midtrans_subscription_id);
+
+        if (! $result) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'CANCELLATION_FAILED',
+                    'message' => 'Failed to cancel subscription with Midtrans',
+                ],
+            ], 500);
+        }
+
+        $this->subscriptionService->cancelSubscription($subscription, now());
 
         return response()->json([
             'success' => true,
-            'message' => 'Subscription synced successfully',
+            'message' => 'Subscription cancelled successfully',
             'data' => [
                 'subscription' => [
                     'id' => $subscription->id,
                     'plan_name' => $subscription->plan_name,
                     'status' => $subscription->status,
                     'current_period_end' => $subscription->current_period_end?->toIso8601String(),
+                    'cancelled_at' => $subscription->cancelled_at?->toIso8601String(),
                 ],
             ],
         ]);

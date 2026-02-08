@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Templates - QashierWise')
+@section('title', __('dashboard.templates_title'))
 
 @section('content')
 <!-- Toast Notification Container -->
@@ -39,14 +39,14 @@
     </template>
 </div>
 
-<div x-data="templatesApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="templatesApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     <!-- Sidebar -->
     @include('components.dashboard-sidebar', ['activePage' => 'templates'])
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col min-h-screen">
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         <!-- Header -->
-        @include('components.dashboard-header', ['title' => 'Templates', 'description' => 'Manage your WhatsApp message templates'])
+        @include('components.dashboard-header', ['title' => __('whatsapp.templates_title'), 'description' => __('whatsapp.templates_subtitle')])
 
         <!-- Page Content -->
         <main class="flex-1 p-4 md:p-6">
@@ -54,15 +54,15 @@
                 <!-- Header with Create Button -->
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
-                        <h2 class="text-lg font-semibold">Message Templates</h2>
-                        <p class="text-sm text-[hsl(var(--muted-foreground))] hidden sm:block">Create and manage your WhatsApp message templates</p>
+                        <h2 class="text-lg font-semibold">{{ __('whatsapp.message_templates') }}</h2>
+                        <p class="text-sm text-[hsl(var(--muted-foreground))] hidden sm:block">{{ __('whatsapp.create_manage_templates') }}</p>
                     </div>
                     <div class="flex gap-2">
                         @if(config('app.debug'))
                         <button @click="refreshTemplates()" :disabled="refreshing" class="btn btn-outline btn-md flex-1 sm:flex-none">
                             <i class="fas" :class="refreshing ? 'fa-spinner animate-spin' : 'fa-sync-alt'"></i>
-                            <span class="hidden sm:inline" x-text="refreshing ? 'Syncing...' : 'Sync from Meta'"></span>
-                            <span class="sm:hidden" x-text="refreshing ? '' : 'Sync'"></span>
+                            <span class="hidden sm:inline" x-text="refreshing ? '{{ __('whatsapp.syncing') }}' : '{{ __('whatsapp.sync_from_meta') }}'"></span>
+                            <span class="sm:hidden" x-text="refreshing ? '' : '{{ __('whatsapp.sync') }}'"></span>
                         </button>
                         @endif
                         <button @click="openCreateModal()" class="btn btn-primary btn-md flex-1 sm:flex-none">
@@ -77,28 +77,28 @@
                 <div class="card p-3 sm:p-4">
                     <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                         <div>
-                            <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">Status</label>
+                            <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">{{ __('dashboard.status') }}</label>
                             <select x-model="filters.status" @change="filterTemplates" class="input w-full min-h-[44px]">
-                                <option value="">All Statuses</option>
-                                <option value="APPROVED">Approved</option>
-                                <option value="PENDING">Pending</option>
-                                <option value="REJECTED">Rejected</option>
+                                <option value="">All Status</option>
+                                <option value="APPROVED">{{ __('whatsapp.approved') }}</option>
+                                <option value="PENDING">{{ __('whatsapp.pending') }}</option>
+                                <option value="REJECTED">{{ __('whatsapp.rejected') }}</option>
                             </select>
                         </div>
                         <div>
-                            <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">Category</label>
+                            <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">{{ __('whatsapp.category') }}</label>
                             <select x-model="filters.category" @change="filterTemplates" class="input w-full min-h-[44px]">
-                                <option value="">All Categories</option>
-                                <option value="MARKETING">Marketing</option>
-                                <option value="UTILITY">Utility</option>
-                                <option value="AUTHENTICATION">Authentication</option>
+                                <option value="">{{ __('whatsapp.all_categories') }}</option>
+                                <option value="MARKETING">{{ __('whatsapp.marketing') }}</option>
+                                <option value="UTILITY">{{ __('whatsapp.utility') }}</option>
+                                <option value="AUTHENTICATION">{{ __('whatsapp.authentication') }}</option>
                             </select>
                         </div>
                         <div class="col-span-2 sm:col-span-1">
-                            <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">Search</label>
+                            <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1.5 block">{{ __('dashboard.search') }}</label>
                             <div class="relative">
-                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none"></i>
-                                <input type="text" x-model="filters.search" @input="filterTemplates" placeholder="Search templates..." class="input pl-10 w-full min-h-[44px]">
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none z-10"></i>
+                                <input type="text" x-model="filters.search" @input="filterTemplates" placeholder="{{ __('whatsapp.search_templates') }}" class="input w-full min-h-[44px]" style="padding-left: 2.5rem;">
                             </div>
                         </div>
                     </div>
@@ -196,7 +196,7 @@
                                         <p x-show="template.body" class="text-[hsl(var(--muted-foreground))]" x-text="template.body"></p>
                                         <p x-show="template.footer" class="text-xs text-[hsl(var(--muted-foreground))] italic mt-2" x-text="template.footer"></p>
                                     </div>
-                                    
+
                                     <!-- Meta on mobile -->
                                     <div class="flex items-center gap-3 text-xs text-[hsl(var(--muted-foreground))] mb-4">
                                         <span class="flex items-center gap-1">
@@ -243,8 +243,8 @@
                         <div class="empty-state-icon">
                             <i class="fas fa-file-alt text-2xl"></i>
                         </div>
-                        <h3 class="font-semibold mt-4">No templates found</h3>
-                        <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">Your message templates will appear here.</p>
+                        <h3 class="font-semibold mt-4">{{ __('whatsapp.no_templates_found') }}</h3>
+                        <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">{{ __('whatsapp.templates_will_appear') }}</p>
                     </div>
                 </div>
 
@@ -333,13 +333,13 @@
                                 <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Creating template...</p>
                             </div>
                         </div>
-                        
+
                         <!-- Modal Header -->
                         <div class="p-4 sm:p-6 border-b border-[hsl(var(--border))] flex items-center justify-between flex-shrink-0">
                             <h3 class="text-base sm:text-lg font-semibold">Create New Template</h3>
                             <button @click="closeCreateModal" :disabled="creating" class="btn btn-ghost btn-icon min-h-[44px] min-w-[44px]"><i class="fas fa-times"></i></button>
                         </div>
-                        
+
                         <!-- Modal Body -->
                         <div class="flex-1 overflow-y-auto scroll-area">
                             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 p-4 sm:p-6">
@@ -348,7 +348,7 @@
                                     <!-- Basic Info -->
                                     <div class="space-y-4">
                                         <h4 class="font-medium text-sm text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Basic Information</h4>
-                                        
+
                                         <!-- Template Name -->
                                         <div>
                                             <label class="text-sm font-medium mb-1.5 block">Template Name <span class="text-red-500">*</span></label>
@@ -406,7 +406,7 @@
                                                 <span class="text-sm">Enable</span>
                                             </label>
                                         </div>
-                                        
+
                                         <div x-show="createForm.hasHeader" x-collapse class="space-y-3">
                                             <div>
                                                 <label class="text-sm font-medium mb-1.5 block">Header Type</label>
@@ -417,13 +417,13 @@
                                                     <option value="DOCUMENT">Document</option>
                                                 </select>
                                             </div>
-                                            
+
                                             <div x-show="createForm.header.type === 'TEXT'">
                                                 <label class="text-sm font-medium mb-1.5 block">Header Text</label>
                                                 <input type="text" x-model="createForm.header.text" placeholder="Enter header text..." class="input w-full" maxlength="60">
                                                 <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1"><span x-text="(createForm.header.text || '').length"></span>/60 characters</p>
                                             </div>
-                                            
+
                                             <div x-show="['IMAGE', 'VIDEO', 'DOCUMENT'].includes(createForm.header.type)">
                                                 <label class="text-sm font-medium mb-1.5 block">Example Media URL</label>
                                                 <input type="url" x-model="createForm.header.example" placeholder="https://example.com/media.jpg" class="input w-full">
@@ -435,7 +435,7 @@
                                     <!-- Body Component -->
                                     <div class="space-y-4">
                                         <h4 class="font-medium text-sm text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Body <span class="text-red-500">*</span></h4>
-                                        
+
                                         <div>
                                             <label class="text-sm font-medium mb-1.5 block">Body Text</label>
                                             <textarea x-model="createForm.body.text" @input="validateBody" placeholder="Enter your message body. Use {{1}}, {{2}}, etc. for variables..." class="input w-full min-h-[120px] resize-y" :class="{'border-red-500': errors.body}" maxlength="1024"></textarea>
@@ -456,7 +456,7 @@
                                                 <span class="text-sm">Enable</span>
                                             </label>
                                         </div>
-                                        
+
                                         <div x-show="createForm.hasFooter" x-collapse>
                                             <label class="text-sm font-medium mb-1.5 block">Footer Text</label>
                                             <input type="text" x-model="createForm.footer.text" @input="validateFooter" placeholder="Enter footer text..." class="input w-full" :class="{'border-red-500': errors.footer}" maxlength="60">
@@ -476,7 +476,7 @@
                                                 <span class="text-sm">Enable</span>
                                             </label>
                                         </div>
-                                        
+
                                         <div x-show="createForm.hasButtons" x-collapse class="space-y-3">
                                             <div>
                                                 <label class="text-sm font-medium mb-1.5 block">Button Type</label>
@@ -485,7 +485,7 @@
                                                     <option value="CTA">Call to Action (max 2)</option>
                                                 </select>
                                             </div>
-                                            
+
                                             <!-- Quick Reply Buttons -->
                                             <div x-show="createForm.buttonType === 'QUICK_REPLY'" class="space-y-2">
                                                 <template x-for="(btn, index) in createForm.buttons" :key="index">
@@ -500,7 +500,7 @@
                                                     <i class="fas fa-plus mr-2"></i>Add Quick Reply Button
                                                 </button>
                                             </div>
-                                            
+
                                             <!-- CTA Buttons -->
                                             <div x-show="createForm.buttonType === 'CTA'" class="space-y-3">
                                                 <template x-for="(btn, index) in createForm.buttons" :key="index">
@@ -524,7 +524,7 @@
                                                     <i class="fas fa-plus mr-2"></i>Add CTA Button
                                                 </button>
                                             </div>
-                                            
+
                                             <p x-show="errors.buttons" x-text="errors.buttons" class="text-xs text-red-500"></p>
                                         </div>
                                     </div>
@@ -554,17 +554,17 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                            
+
                                             <!-- Body Preview -->
                                             <div class="px-3 py-2">
                                                 <p class="text-sm whitespace-pre-wrap" x-html="getPreviewBody()"></p>
                                             </div>
-                                            
+
                                             <!-- Footer Preview -->
                                             <div x-show="createForm.hasFooter && createForm.footer.text" class="px-3 pb-2">
                                                 <p class="text-xs text-[hsl(var(--muted-foreground))]" x-text="createForm.footer.text"></p>
                                             </div>
-                                            
+
                                             <!-- Buttons Preview -->
                                             <div x-show="createForm.hasButtons && createForm.buttons.length > 0" class="border-t border-[hsl(var(--border))]">
                                                 <template x-for="(btn, index) in createForm.buttons" :key="'preview-btn-'+index">
@@ -579,7 +579,7 @@
                                                 </template>
                                             </div>
                                         </div>
-                                        
+
                                         <!-- Variable Legend -->
                                         <div x-show="getVariableCount() > 0" class="mt-4 p-3 bg-white/80 rounded-lg">
                                             <p class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-2">Variables in this template:</p>
@@ -596,7 +596,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Modal Footer -->
                         <div class="p-4 sm:p-6 border-t border-[hsl(var(--border))] flex-shrink-0 bg-[hsl(var(--card))]">
                             <!-- API Error Display -->
@@ -640,13 +640,13 @@
                                 <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Updating template...</p>
                             </div>
                         </div>
-                        
+
                         <!-- Modal Header -->
                         <div class="p-4 sm:p-6 border-b border-[hsl(var(--border))] flex items-center justify-between flex-shrink-0">
                             <h3 class="text-base sm:text-lg font-semibold">Edit Template</h3>
                             <button @click="closeEditModal" :disabled="updating" class="btn btn-ghost btn-icon min-h-[44px] min-w-[44px]"><i class="fas fa-times"></i></button>
                         </div>
-                        
+
                         <!-- Modal Body -->
                         <div class="flex-1 overflow-y-auto scroll-area">
                             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 p-4 sm:p-6">
@@ -655,7 +655,7 @@
                                     <!-- Basic Info -->
                                     <div class="space-y-4">
                                         <h4 class="font-medium text-sm text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Basic Information</h4>
-                                        
+
                                         <!-- Template Name (Read-only) -->
                                         <div>
                                             <label class="text-sm font-medium mb-1.5 block">Template Name</label>
@@ -685,7 +685,7 @@
                                                 <span class="text-sm">Enable</span>
                                             </label>
                                         </div>
-                                        
+
                                         <div x-show="editForm.hasHeader" x-collapse class="space-y-3">
                                             <div>
                                                 <label class="text-sm font-medium mb-1.5 block">Header Type</label>
@@ -696,13 +696,13 @@
                                                     <option value="DOCUMENT">Document</option>
                                                 </select>
                                             </div>
-                                            
+
                                             <div x-show="editForm.header.type === 'TEXT'">
                                                 <label class="text-sm font-medium mb-1.5 block">Header Text</label>
                                                 <input type="text" x-model="editForm.header.text" placeholder="Enter header text..." class="input w-full" maxlength="60">
                                                 <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1"><span x-text="(editForm.header.text || '').length"></span>/60 characters</p>
                                             </div>
-                                            
+
                                             <div x-show="['IMAGE', 'VIDEO', 'DOCUMENT'].includes(editForm.header.type)">
                                                 <label class="text-sm font-medium mb-1.5 block">Example Media URL</label>
                                                 <input type="url" x-model="editForm.header.example" placeholder="https://example.com/media.jpg" class="input w-full">
@@ -714,7 +714,7 @@
                                     <!-- Body Component -->
                                     <div class="space-y-4">
                                         <h4 class="font-medium text-sm text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Body <span class="text-red-500">*</span></h4>
-                                        
+
                                         <div>
                                             <label class="text-sm font-medium mb-1.5 block">Body Text</label>
                                             <textarea x-model="editForm.body.text" @input="validateEditBody" placeholder="Enter your message body. Use {{1}}, {{2}}, etc. for variables..." class="input w-full min-h-[120px] resize-y" :class="{'border-red-500': editErrors.body}" maxlength="1024"></textarea>
@@ -735,7 +735,7 @@
                                                 <span class="text-sm">Enable</span>
                                             </label>
                                         </div>
-                                        
+
                                         <div x-show="editForm.hasFooter" x-collapse>
                                             <label class="text-sm font-medium mb-1.5 block">Footer Text</label>
                                             <input type="text" x-model="editForm.footer.text" @input="validateEditFooter" placeholder="Enter footer text..." class="input w-full" :class="{'border-red-500': editErrors.footer}" maxlength="60">
@@ -755,7 +755,7 @@
                                                 <span class="text-sm">Enable</span>
                                             </label>
                                         </div>
-                                        
+
                                         <div x-show="editForm.hasButtons" x-collapse class="space-y-3">
                                             <div>
                                                 <label class="text-sm font-medium mb-1.5 block">Button Type</label>
@@ -764,7 +764,7 @@
                                                     <option value="CTA">Call to Action (max 2)</option>
                                                 </select>
                                             </div>
-                                            
+
                                             <!-- Quick Reply Buttons -->
                                             <div x-show="editForm.buttonType === 'QUICK_REPLY'" class="space-y-2">
                                                 <template x-for="(btn, index) in editForm.buttons" :key="'edit-qr-'+index">
@@ -779,7 +779,7 @@
                                                     <i class="fas fa-plus mr-2"></i>Add Quick Reply Button
                                                 </button>
                                             </div>
-                                            
+
                                             <!-- CTA Buttons -->
                                             <div x-show="editForm.buttonType === 'CTA'" class="space-y-3">
                                                 <template x-for="(btn, index) in editForm.buttons" :key="'edit-cta-'+index">
@@ -803,7 +803,7 @@
                                                     <i class="fas fa-plus mr-2"></i>Add CTA Button
                                                 </button>
                                             </div>
-                                            
+
                                             <p x-show="editErrors.buttons" x-text="editErrors.buttons" class="text-xs text-red-500"></p>
                                         </div>
                                     </div>
@@ -833,17 +833,17 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                            
+
                                             <!-- Body Preview -->
                                             <div class="px-3 py-2">
                                                 <p class="text-sm whitespace-pre-wrap" x-html="getEditPreviewBody()"></p>
                                             </div>
-                                            
+
                                             <!-- Footer Preview -->
                                             <div x-show="editForm.hasFooter && editForm.footer.text" class="px-3 pb-2">
                                                 <p class="text-xs text-[hsl(var(--muted-foreground))]" x-text="editForm.footer.text"></p>
                                             </div>
-                                            
+
                                             <!-- Buttons Preview -->
                                             <div x-show="editForm.hasButtons && editForm.buttons.length > 0" class="border-t border-[hsl(var(--border))]">
                                                 <template x-for="(btn, index) in editForm.buttons" :key="'edit-preview-btn-'+index">
@@ -858,7 +858,7 @@
                                                 </template>
                                             </div>
                                         </div>
-                                        
+
                                         <!-- Variable Legend -->
                                         <div x-show="getEditVariableCount() > 0" class="mt-4 p-3 bg-white/80 rounded-lg">
                                             <p class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-2">Variables in this template:</p>
@@ -875,7 +875,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Modal Footer -->
                         <div class="p-4 sm:p-6 border-t border-[hsl(var(--border))] flex-shrink-0 bg-[hsl(var(--card))]">
                             <!-- API Error Display -->
@@ -919,7 +919,7 @@
                                 <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Deleting template...</p>
                             </div>
                         </div>
-                        
+
                         <!-- Modal Header -->
                         <div class="p-6 border-b border-[hsl(var(--border))] flex items-center justify-between">
                             <h3 class="text-lg font-semibold text-red-600">
@@ -928,7 +928,7 @@
                             </h3>
                             <button @click="closeDeleteModal" :disabled="deleting" class="btn btn-ghost btn-icon"><i class="fas fa-times"></i></button>
                         </div>
-                        
+
                         <!-- Modal Body -->
                         <div class="p-6">
                             <p class="text-[hsl(var(--muted-foreground))] mb-4">
@@ -942,7 +942,7 @@
                                     <span class="badge badge-outline text-xs" x-text="templateToDelete?.language"></span>
                                 </div>
                             </div>
-                            
+
                             <!-- API Error Display -->
                             <div x-show="deleteApiError" x-transition class="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                                 <div class="flex items-start gap-2">
@@ -957,7 +957,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Modal Footer -->
                         <div class="p-6 border-t border-[hsl(var(--border))] flex gap-3 justify-end">
                             <button type="button" @click="closeDeleteModal" class="btn btn-outline btn-md" :disabled="deleting">
@@ -980,22 +980,22 @@
 function toastManager() {
     return {
         toasts: [],
-        
+
         addToast(message, type = 'info', duration = 5000) {
             const id = Date.now() + Math.random();
             const toast = { id, message, type, visible: true };
             this.toasts.push(toast);
-            
+
             // Auto-remove after duration
             if (duration > 0) {
                 setTimeout(() => {
                     this.removeToast(id);
                 }, duration);
             }
-            
+
             return id;
         },
-        
+
         removeToast(id) {
             const toast = this.toasts.find(t => t.id === id);
             if (toast) {
@@ -1005,19 +1005,19 @@ function toastManager() {
                 }, 300);
             }
         },
-        
+
         success(message, duration = 5000) {
             return this.addToast(message, 'success', duration);
         },
-        
+
         error(message, duration = 7000) {
             return this.addToast(message, 'error', duration);
         },
-        
+
         warning(message, duration = 6000) {
             return this.addToast(message, 'warning', duration);
         },
-        
+
         info(message, duration = 5000) {
             return this.addToast(message, 'info', duration);
         }
@@ -1034,9 +1034,9 @@ window.showToast = function(message, type = 'info', duration = 5000) {
 
 function templatesApp() {
     return {
-        sidebarOpen: window.innerWidth >= 1024, 
+        sidebarOpen: window.innerWidth >= 1024,
         isMobile: window.innerWidth < 768,
-        user: null, 
+        user: null,
         notifications: [],
         init() {
             this.isMobile = window.innerWidth < 768;
@@ -1128,7 +1128,7 @@ function templatesManager() {
             this.loading = true;
             try {
                 const token = localStorage.getItem('token');
-                const url = refresh 
+                const url = refresh
                     ? `${this.API_BASE_URL}/whatsapp/templates?refresh=true`
                     : `${this.API_BASE_URL}/whatsapp/templates`;
                 const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -1252,7 +1252,7 @@ function templatesManager() {
                 return false;
             }
             delete this.errors.body;
-            
+
             // Check variable sequence (warning only)
             this.validateVariableSequence();
             return true;
@@ -1265,11 +1265,11 @@ function templatesManager() {
                 delete this.warnings.body;
                 return;
             }
-            
+
             const numbers = matches.map(m => parseInt(m.replace(/[{}]/g, ''))).sort((a, b) => a - b);
             const unique = [...new Set(numbers)];
             const expected = Array.from({ length: unique.length }, (_, i) => i + 1);
-            
+
             if (JSON.stringify(unique) !== JSON.stringify(expected)) {
                 this.warnings.body = 'Variables should be sequential starting from {{1}}';
             } else {
@@ -1346,15 +1346,15 @@ function templatesManager() {
         async submitCreate() {
             // Clear previous API error
             this.apiError = null;
-            
+
             // Validate all fields
             this.validateName();
             this.validateBody();
             if (this.createForm.hasFooter) this.validateFooter();
-            
+
             if (!this.createForm.category) this.errors.category = 'Category is required';
             else delete this.errors.category;
-            
+
             if (!this.createForm.language) this.errors.language = 'Language is required';
             else delete this.errors.language;
 
@@ -1363,7 +1363,7 @@ function templatesManager() {
             this.creating = true;
             try {
                 const token = localStorage.getItem('token');
-                
+
                 // Build request payload
                 const payload = {
                     name: this.createForm.name,
@@ -1447,23 +1447,23 @@ function templatesManager() {
             this.editForm.name = template.name;
             this.editForm.category = template.category;
             this.editForm.language = template.language;
-            
+
             // Populate header
             if (template.header || template.header_type) {
                 this.editForm.hasHeader = true;
                 this.editForm.header.type = template.header_type || 'TEXT';
                 this.editForm.header.text = template.header || '';
             }
-            
+
             // Populate body
             this.editForm.body.text = template.body || '';
-            
+
             // Populate footer
             if (template.footer) {
                 this.editForm.hasFooter = true;
                 this.editForm.footer.text = template.footer;
             }
-            
+
             // Populate buttons
             if (template.buttons) {
                 let buttons = template.buttons;
@@ -1491,7 +1491,7 @@ function templatesManager() {
                     }));
                 }
             }
-            
+
             this.showEditModal = true;
         },
 
@@ -1532,7 +1532,7 @@ function templatesManager() {
                 return false;
             }
             delete this.editErrors.body;
-            
+
             // Check variable sequence (warning only)
             this.validateEditVariableSequence();
             return true;
@@ -1545,11 +1545,11 @@ function templatesManager() {
                 delete this.editWarnings.body;
                 return;
             }
-            
+
             const numbers = matches.map(m => parseInt(m.replace(/[{}]/g, ''))).sort((a, b) => a - b);
             const unique = [...new Set(numbers)];
             const expected = Array.from({ length: unique.length }, (_, i) => i + 1);
-            
+
             if (JSON.stringify(unique) !== JSON.stringify(expected)) {
                 this.editWarnings.body = 'Variables should be sequential starting from {{1}}';
             } else {
@@ -1626,7 +1626,7 @@ function templatesManager() {
         async submitEdit() {
             // Clear previous API error
             this.editApiError = null;
-            
+
             // Validate all fields
             this.validateEditBody();
             if (this.editForm.hasFooter) this.validateEditFooter();
@@ -1636,7 +1636,7 @@ function templatesManager() {
             this.updating = true;
             try {
                 const token = localStorage.getItem('token');
-                
+
                 // Build request payload
                 const payload = {
                     body: this.editForm.body.text
@@ -1719,7 +1719,7 @@ function templatesManager() {
 
             // Clear previous API error
             this.deleteApiError = null;
-            
+
             this.deleting = true;
             try {
                 const token = localStorage.getItem('token');

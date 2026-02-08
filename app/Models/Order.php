@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Order extends Model
 {
@@ -15,9 +16,17 @@ class Order extends Model
      * Order status constants.
      */
     const STATUS_PENDING = 'pending';
-    const STATUS_COMPLETED = 'completed';
-    const STATUS_CANCELLED = 'cancelled';
+
     const STATUS_PAID = 'paid';
+
+    const STATUS_CANCELLED = 'cancelled';
+
+    /**
+     * Order source constants.
+     */
+    const SOURCE_POS = 'pos';
+
+    const SOURCE_WHATSAPP_AI = 'whatsapp_ai';
 
     /**
      * The attributes that are mass assignable.
@@ -30,6 +39,9 @@ class Order extends Model
         'pos_user_id',
         'order_number',
         'status',
+        'source',
+        'customer_name',
+        'customer_phone',
         'subtotal',
         'tax_amount',
         'discount_amount',
@@ -89,5 +101,37 @@ class Order extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * Get the QRIS transaction linked to this order.
+     */
+    public function qrisTransaction(): HasOne
+    {
+        return $this->hasOne(QrisTransaction::class, 'linked_order_id');
+    }
+
+    /**
+     * Scope to filter orders from WhatsApp AI.
+     */
+    public function scopeFromWhatsAppAi($query)
+    {
+        return $query->where('source', self::SOURCE_WHATSAPP_AI);
+    }
+
+    /**
+     * Scope to filter orders from POS.
+     */
+    public function scopeFromPos($query)
+    {
+        return $query->where('source', self::SOURCE_POS);
+    }
+
+    /**
+     * Check if order is from WhatsApp AI.
+     */
+    public function isFromWhatsAppAi(): bool
+    {
+        return $this->source === self::SOURCE_WHATSAPP_AI;
     }
 }

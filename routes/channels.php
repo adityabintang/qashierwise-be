@@ -17,7 +17,7 @@ Broadcast::channel('whatsapp.{userId}', function ($user, $userId) {
     \Log::info('Broadcasting auth attempt', [
         'user_id' => $user ? $user->id : null,
         'requested_userId' => $userId,
-        'authorized' => $user ? ((int) $user->id === (int) $userId) : false
+        'authorized' => $user ? ((int) $user->id === (int) $userId) : false,
     ]);
 
     return (int) $user->id === (int) $userId;

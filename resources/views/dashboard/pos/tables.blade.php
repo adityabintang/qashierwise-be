@@ -1,13 +1,13 @@
 @extends('layouts.app')
 
-@section('title', 'Tables - QashierWise POS')
+@section('title', __('pos.tables.title') . ' - QashierWise POS')
 
 @section('content')
-<div x-data="tablesApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="tablesApp()" x-init="initDashboard()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'pos-tables'])
 
-    <div class="flex-1 flex flex-col min-h-screen">
-        @include('components.dashboard-header', ['title' => 'Tables', 'description' => 'Manage restaurant tables'])
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
+        @include('components.dashboard-header', ['title' => __('pos.tables.title'), 'description' => __('pos.tables.description')])
 
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto space-y-6">
@@ -24,10 +24,12 @@
                                 <option :value="store.id" x-text="store.name"></option>
                             </template>
                         </select>
-                        <button @click="openCreateModal()" class="btn btn-primary btn-md">
-                            <i class="fas fa-plus"></i>
-                            <span class="hidden sm:inline">Add Table</span>
-                        </button>
+                        <template x-if="hasPermission('create_tables') || hasPermission('manage_tables')">
+                            <button @click="openCreateModal()" class="btn btn-primary btn-md">
+                                <i class="fas fa-plus"></i>
+                                <span class="hidden sm:inline">Add Table</span>
+                            </button>
+                        </template>
                     </div>
                 </div>
 
@@ -72,7 +74,9 @@
                         <div class="empty-state-icon"><i class="fas fa-chair text-2xl"></i></div>
                         <h3 class="font-semibold mt-4">No tables found</h3>
                         <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">Add tables to manage seating.</p>
-                        <button @click="openCreateModal()" class="btn btn-primary btn-md mt-4"><i class="fas fa-plus"></i> Add Table</button>
+                        <template x-if="hasPermission('create_tables') || hasPermission('manage_tables')">
+                            <button @click="openCreateModal()" class="btn btn-primary btn-md mt-4"><i class="fas fa-plus"></i> Add Table</button>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -139,10 +143,11 @@ function tablesApp() {
         tables: [], stores: [], showModal: false, editingTable: null, storeFilter: '',
         form: { store_id: '', number: '', capacity: 4, status: 'available' },
         sidebarOpen: window.innerWidth >= 1024, isMobile: window.innerWidth < 768, user: null, notifications: [],
+        userPermissions: [], isAdmin: true,
 
-        async init() { this.initSidebar(); await Promise.all([this.fetchStores(), this.fetchTables()]); },
+        async init() { this.initDashboard(); await this.fetchUserPermissions(); await Promise.all([this.fetchStores(), this.fetchTables()]); },
 
-        initSidebar() {
+        initDashboard() {
             this.isMobile = window.innerWidth < 768;
             if (this.isMobile) { this.sidebarOpen = false; }
             else { let s = localStorage.getItem('sidebarOpen'); if (s !== null) this.sidebarOpen = JSON.parse(s); }
@@ -153,6 +158,27 @@ function tablesApp() {
                 else if (!was && this.isMobile) { this.sidebarOpen = false; }
             });
             let u = localStorage.getItem('user'); if (u) { try { this.user = JSON.parse(u); } catch (e) { this.user = { name: 'User' }; } } else { this.user = { name: 'User' }; }
+            this.fetchUserPermissions();
+        },
+
+        async fetchUserPermissions() {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) { this.isAdmin = true; this.userPermissions = []; return; }
+                const res = await fetch(`${window.location.origin}/api/user/permissions`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success) { this.isAdmin = data.data.is_admin || false; this.userPermissions = data.data.permissions || []; }
+                }
+            } catch (e) { console.error('Failed to fetch permissions:', e); }
+        },
+
+        hasPermission(permission) {
+            if (this.isAdmin) return true;
+            if (this.userPermissions.includes('*')) return true;
+            return this.userPermissions.includes(permission);
         },
 
         async fetchStores() {
@@ -165,6 +191,10 @@ function tablesApp() {
         },
 
         async fetchTables() {
+            // Check permission first
+            if (!this.hasPermission('view_tables') && !this.hasPermission('manage_tables')) {
+                this.tables = []; this.loading = false; return;
+            }
             this.loading = true;
             try {
                 const token = localStorage.getItem('token');
@@ -184,6 +214,13 @@ function tablesApp() {
         closeModal() { this.showModal = false; this.editingTable = null; },
 
         async saveTable() {
+            // Check permission before saving
+            const canCreate = this.hasPermission('create_tables') || this.hasPermission('manage_tables');
+            const canEdit = this.hasPermission('edit_tables') || this.hasPermission('manage_tables');
+            if ((!this.editingTable && !canCreate) || (this.editingTable && !canEdit)) {
+                alert('You do not have permission to perform this action');
+                return;
+            }
             this.saving = true;
             try {
                 const token = localStorage.getItem('token');
@@ -196,6 +233,11 @@ function tablesApp() {
         },
 
         async deleteTable() {
+            // Check permission before deleting
+            if (!this.hasPermission('delete_tables') && !this.hasPermission('manage_tables')) {
+                alert('You do not have permission to delete tables');
+                return;
+            }
             if (!confirm('Delete this table?')) return;
             this.deleting = true;
             try {

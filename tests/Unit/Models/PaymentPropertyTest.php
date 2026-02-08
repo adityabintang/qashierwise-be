@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Property-based tests for Payment model
- * 
+ *
  * Feature: point-of-sale
  */
 class PaymentPropertyTest extends TestCase
@@ -20,7 +20,7 @@ class PaymentPropertyTest extends TestCase
     /**
      * Feature: point-of-sale, Property 9: Payment Serialization Round-Trip
      * Validates: Requirements 4.6, 4.7
-     * 
+     *
      * For any valid Payment object, serializing to JSON and then deserializing back
      * SHALL produce an equivalent Payment object.
      */

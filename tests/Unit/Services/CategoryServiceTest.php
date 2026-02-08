@@ -2,7 +2,6 @@
 
 namespace Tests\Unit\Services;
 
-use App\Models\Category;
 use App\Models\Product;
 use App\Services\CategoryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -11,7 +10,7 @@ use Tests\TestCase;
 
 /**
  * Unit tests for CategoryService
- * 
+ *
  * Feature: point-of-sale
  */
 class CategoryServiceTest extends TestCase
@@ -23,7 +22,7 @@ class CategoryServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new CategoryService();
+        $this->service = new CategoryService;
     }
 
     #[Test]

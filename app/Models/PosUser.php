@@ -57,4 +57,32 @@ class PosUser extends Model
     {
         return $this->belongsTo(Role::class);
     }
+
+    /**
+     * Check if the POS user has a specific permission.
+     */
+    public function hasPermission(string $permission): bool
+    {
+        return $this->user?->hasPermissionTo($permission, 'sanctum') ?? false;
+    }
+
+    /**
+     * Check if the POS user has any of the given permissions.
+     *
+     * @param  array<int, string>  $permissions
+     */
+    public function hasAnyPermission(array $permissions): bool
+    {
+        return $this->user?->hasAnyPermission($permissions, 'sanctum') ?? false;
+    }
+
+    /**
+     * Check if the POS user has all of the given permissions.
+     *
+     * @param  array<int, string>  $permissions
+     */
+    public function hasAllPermissions(array $permissions): bool
+    {
+        return $this->user?->hasAllPermissions($permissions, 'sanctum') ?? false;
+    }
 }

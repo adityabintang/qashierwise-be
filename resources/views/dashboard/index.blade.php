@@ -1,19 +1,19 @@
 @extends('layouts.app')
 
-@section('title', 'Dashboard - QashierWise')
+@section('title', __('dashboard.dashboard_title'))
 
 @section('content')
-<div x-data="dashboardApp()" class="min-h-screen flex bg-[hsl(var(--muted)/0.4)]">
+<div x-data="dashboardApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'dashboard'])
 
-    <div class="flex-1 flex flex-col min-h-screen" :class="{ 'lg:ml-0': true }">
-        @include('components.dashboard-header', ['title' => 'Dashboard', 'description' => 'Welcome back! Here\'s your WhatsApp Business overview.'])
+    <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
+        @include('components.dashboard-header', ['title' => __('dashboard.menu_dashboard'), 'description' => __('dashboard.welcome_back')])
 
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto space-y-6">
                 <!-- Trial Expired Banner -->
                 <div x-data="subscriptionStatus()" x-init="init()">
-                    <div x-show="!loading && subscription.status === 'trial_expired'" x-cloak 
+                    <div x-show="!loading && subscription.status === 'trial_expired'" x-cloak
                          class="bg-gradient-to-r from-red-500 to-orange-500 rounded-xl p-4 md:p-6 text-white shadow-lg">
                         <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                             <div class="flex items-center gap-4">
@@ -21,12 +21,12 @@
                                     <i class="fas fa-exclamation-triangle text-2xl"></i>
                                 </div>
                                 <div>
-                                    <h3 class="text-lg font-bold">Trial Period Expired</h3>
-                                    <p class="text-white/90 text-sm">Your free trial has ended. Upgrade now to continue using all features.</p>
+                                    <h3 class="text-lg font-bold">{{ __('dashboard.trial_expired') }}</h3>
+                                    <p class="text-white/90 text-sm">{{ __('dashboard.trial_expired_message') }}</p>
                                 </div>
                             </div>
                             <a href="/#pricing" class="btn bg-white text-red-600 hover:bg-white/90 font-semibold px-6 py-2 rounded-lg transition-colors flex-shrink-0">
-                                <i class="fas fa-rocket mr-2"></i>Upgrade Now
+                                <i class="fas fa-rocket mr-2"></i>{{ __('dashboard.upgrade_now') }}
                             </a>
                         </div>
                     </div>
@@ -52,7 +52,7 @@
                     <div x-show="!loading" class="card stats-card p-5 hover:shadow-md transition-shadow">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Total Contacts</p>
+                                <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('dashboard.total_contacts') }}</p>
                                 <p class="text-3xl font-bold mt-1" x-text="stats.totalContacts || '0'">0</p>
                             </div>
                             <div class="h-12 w-12 rounded-xl bg-indigo-50 flex items-center justify-center">
@@ -64,7 +64,7 @@
                                 <i class="fas mr-1 text-xs" :class="stats.contactsGrowth >= 0 ? 'fa-arrow-up' : 'fa-arrow-down'"></i>
                                 <span x-text="(stats.contactsGrowth >= 0 ? '+' : '') + stats.contactsGrowth.toFixed(1) + '%'">0%</span>
                             </span>
-                            <span class="text-[hsl(var(--muted-foreground))]">from last month</span>
+                            <span class="text-[hsl(var(--muted-foreground))]">{{ __('dashboard.from_last_month') }}</span>
                         </div>
                     </div>
 
@@ -72,7 +72,7 @@
                     <div x-show="!loading" class="card stats-card p-5 hover:shadow-md transition-shadow">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Total Messages</p>
+                                <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('dashboard.total_messages') }}</p>
                                 <p class="text-3xl font-bold mt-1" x-text="stats.totalMessages || '0'">0</p>
                             </div>
                             <div class="h-12 w-12 rounded-xl bg-emerald-50 flex items-center justify-center">
@@ -84,7 +84,7 @@
                                 <i class="fas mr-1 text-xs" :class="stats.messagesGrowth >= 0 ? 'fa-arrow-up' : 'fa-arrow-down'"></i>
                                 <span x-text="(stats.messagesGrowth >= 0 ? '+' : '') + stats.messagesGrowth.toFixed(1) + '%'">0%</span>
                             </span>
-                            <span class="text-[hsl(var(--muted-foreground))]">from last week</span>
+                            <span class="text-[hsl(var(--muted-foreground))]">{{ __('dashboard.from_last_week') }}</span>
                         </div>
                     </div>
 
@@ -92,7 +92,7 @@
                     <div x-show="!loading" class="card stats-card p-5 hover:shadow-md transition-shadow">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Templates</p>
+                                <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('dashboard.templates') }}</p>
                                 <p class="text-3xl font-bold mt-1" x-text="stats.totalTemplates || '0'">0</p>
                             </div>
                             <div class="h-12 w-12 rounded-xl bg-cyan-50 flex items-center justify-center">
@@ -100,7 +100,7 @@
                             </div>
                         </div>
                         <div class="flex items-center gap-1 mt-3 text-sm text-[hsl(var(--muted-foreground))]">
-                            <span x-text="stats.approvedTemplates || '0'">0</span> approved
+                            <span x-text="stats.approvedTemplates || '0'">0</span> {{ __('dashboard.approved') }}
                         </div>
                     </div>
 
@@ -108,7 +108,7 @@
                     <div x-show="!loading" class="card stats-card p-5 hover:shadow-md transition-shadow">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">Unread Messages</p>
+                                <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('dashboard.unread_messages') }}</p>
                                 <p class="text-3xl font-bold mt-1" x-text="stats.unreadMessages || '0'">0</p>
                             </div>
                             <div class="h-12 w-12 rounded-xl bg-orange-50 flex items-center justify-center">
@@ -116,7 +116,7 @@
                             </div>
                         </div>
                         <div class="mt-3">
-                            <a href="/dashboard/messages" class="text-sm text-[hsl(var(--primary))] hover:underline font-medium">View all messages →</a>
+                            <a href="/dashboard/messages" class="text-sm text-[hsl(var(--primary))] hover:underline font-medium">{{ __('dashboard.view_all_messages') }} →</a>
                         </div>
                     </div>
                 </div>
@@ -125,17 +125,17 @@
                 <div class="card p-6" x-data="weeklyChart()">
                     <div class="flex items-center justify-between mb-6">
                         <div>
-                            <h2 class="text-lg font-semibold">Weekly Messages</h2>
-                            <p class="text-sm text-[hsl(var(--muted-foreground))]">Message statistics for the past 7 days</p>
+                            <h2 class="text-lg font-semibold">{{ __('dashboard.weekly_messages') }}</h2>
+                            <p class="text-sm text-[hsl(var(--muted-foreground))]">{{ __('dashboard.message_statistics') }}</p>
                         </div>
                         <div class="flex items-center gap-4 text-sm">
                             <span class="flex items-center gap-2">
                                 <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
-                                <span class="text-[hsl(var(--muted-foreground))]">Incoming</span>
+                                <span class="text-[hsl(var(--muted-foreground))]">{{ __('dashboard.incoming') }}</span>
                             </span>
                             <span class="flex items-center gap-2">
                                 <span class="w-3 h-3 rounded-full bg-blue-500"></span>
-                                <span class="text-[hsl(var(--muted-foreground))]">Outgoing</span>
+                                <span class="text-[hsl(var(--muted-foreground))]">{{ __('dashboard.outgoing') }}</span>
                             </span>
                         </div>
                     </div>
@@ -192,15 +192,15 @@
                         <!-- Actual Stats -->
                         <div x-show="!loading" class="text-center">
                             <p class="text-2xl font-bold" x-text="chartSummary.totalIncoming">0</p>
-                            <p class="text-sm text-[hsl(var(--muted-foreground))]">Incoming</p>
+                            <p class="text-sm text-[hsl(var(--muted-foreground))]">{{ __('dashboard.incoming') }}</p>
                         </div>
                         <div x-show="!loading" class="text-center">
                             <p class="text-2xl font-bold" x-text="chartSummary.totalOutgoing">0</p>
-                            <p class="text-sm text-[hsl(var(--muted-foreground))]">Outgoing</p>
+                            <p class="text-sm text-[hsl(var(--muted-foreground))]">{{ __('dashboard.outgoing') }}</p>
                         </div>
                         <div x-show="!loading" class="text-center">
                             <p class="text-2xl font-bold" x-text="chartSummary.total">0</p>
-                            <p class="text-sm text-[hsl(var(--muted-foreground))]">Total</p>
+                            <p class="text-sm text-[hsl(var(--muted-foreground))]">{{ __('dashboard.total') }}</p>
                         </div>
                     </div>
                 </div>
@@ -211,10 +211,10 @@
                     <div class="lg:col-span-2 card" x-data="recentMessages()">
                         <div class="card-header !flex-row items-center justify-between">
                             <div>
-                                <h2 class="card-title">Recent Messages</h2>
-                                <p class="card-description">Latest conversations</p>
+                                <h2 class="card-title">{{ __('dashboard.recent_messages') }}</h2>
+                                <p class="card-description">{{ __('dashboard.latest_conversations') }}</p>
                             </div>
-                            <a href="/dashboard/messages" class="text-sm text-[hsl(var(--primary))] hover:underline font-medium">View all →</a>
+                            <a href="/dashboard/messages" class="text-sm text-[hsl(var(--primary))] hover:underline font-medium">{{ __('dashboard.view_all') }} →</a>
                         </div>
                         <div class="card-content">
                             <div x-show="loading" class="space-y-3">
@@ -233,14 +233,14 @@
                                 <template x-for="message in messages" :key="message.id">
                                     <div @click="viewMessage(message)" class="flex items-start gap-3 p-3 rounded-lg hover:bg-[hsl(var(--muted)/0.5)] transition-colors cursor-pointer">
                                         <!-- Avatar with name -->
-                                        <img 
+                                        <img
                                             x-show="message.contact_name && message.contact_name.trim()"
-                                            :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(message.contact_name || 'U')}&backgroundColor=a855f7`" 
+                                            :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(message.contact_name || 'U')}&backgroundColor=a855f7`"
                                             :alt="message.contact_name"
                                             class="avatar"
                                         >
                                         <!-- Avatar without name -->
-                                        <div 
+                                        <div
                                             x-show="!message.contact_name || !message.contact_name.trim()"
                                             class="avatar flex items-center justify-center text-white font-bold"
                                             style="background: linear-gradient(135deg, #a855f7, #9333ea); font-size: 0.75rem;"
@@ -265,8 +265,8 @@
                                 </template>
                                 <div x-show="!messages || messages.length === 0" class="empty-state">
                                     <div class="empty-state-icon"><i class="fas fa-inbox text-xl"></i></div>
-                                    <p class="text-sm font-medium">No messages yet</p>
-                                    <p class="text-xs text-[hsl(var(--muted-foreground))]">Messages will appear here</p>
+                                    <p class="text-sm font-medium">{{ __('dashboard.no_messages_yet') }}</p>
+                                    <p class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('dashboard.messages_will_appear') }}</p>
                                 </div>
                             </div>
                         </div>
@@ -277,7 +277,7 @@
                         <!-- Subscription Status Card -->
                         <div class="card" x-data="subscriptionStatus()" x-init="init()">
                             <div class="card-header">
-                                <h2 class="card-title">Subscription</h2>
+                                <h2 class="card-title">{{ __('dashboard.subscription') }}</h2>
                             </div>
                             <div class="card-content">
                                 <!-- Always show content, no loading state -->
@@ -333,22 +333,12 @@
 
                                     <!-- Action Buttons -->
                                     <div class="pt-2 space-y-2">
-                                        <!-- Upgrade Button (for trial/expired users) -->
-                                        <a x-show="subscription.status === 'trial' || subscription.status === 'trial_expired' || subscription.status === 'expired'"
-                                           href="/#pricing"
-                                           class="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all font-medium text-sm">
-                                            <i class="fas fa-rocket"></i>
-                                            <span>Upgrade Plan</span>
+                                        <!-- Manage Subscription Button (for all users) -->
+                                        <a href="{{ route('subscription.manage') }}"
+                                           class="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted)/0.8)] text-[hsl(var(--foreground))] rounded-lg transition-colors font-medium text-sm">
+                                            <i class="fas fa-cog"></i>
+                                            <span>Manage Subscription</span>
                                         </a>
-
-                                        <!-- Manage Subscription Button (for active/cancelled subscriptions) -->
-                                        <button x-show="subscription.status === 'active' || subscription.status === 'cancelled'"
-                                                @click="openCustomerPortal()"
-                                                :disabled="portalLoading"
-                                                class="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted)/0.8)] text-[hsl(var(--foreground))] rounded-lg transition-colors font-medium text-sm disabled:opacity-50">
-                                            <i class="fas" :class="portalLoading ? 'fa-spinner fa-spin' : 'fa-cog'"></i>
-                                            <span x-text="portalLoading ? 'Loading...' : 'Manage Subscription'"></span>
-                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -356,37 +346,37 @@
 
                         <!-- Phone Info -->
                         <div class="card" x-data="phoneInfo()">
-                            <div class="card-header"><h2 class="card-title">Phone Information</h2></div>
+                            <div class="card-header"><h2 class="card-title">{{ __('dashboard.phone_information') }}</h2></div>
                             <div class="card-content space-y-4">
                                 <div class="flex items-center gap-3">
                                     <div class="h-9 w-9 rounded-lg bg-[hsl(var(--primary)/0.1)] flex items-center justify-center"><i class="fas fa-phone text-[hsl(var(--primary))]"></i></div>
-                                    <div><p class="text-xs text-[hsl(var(--muted-foreground))]">Phone Number</p><p class="text-sm font-medium" x-text="info.display_phone_number || '-'">-</p></div>
+                                    <div><p class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('dashboard.phone_number') }}</p><p class="text-sm font-medium" x-text="info.display_phone_number || '-'">-</p></div>
                                 </div>
                                 <div class="flex items-center gap-3">
                                     <div class="h-9 w-9 rounded-lg bg-blue-50 flex items-center justify-center"><i class="fas fa-shield-alt text-blue-500"></i></div>
-                                    <div><p class="text-xs text-[hsl(var(--muted-foreground))]">Verified</p><p class="text-sm font-medium" :class="info.verified_name ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--muted-foreground))]'" x-text="info.verified_name || 'Not Verified'">-</p></div>
+                                    <div><p class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('dashboard.verified') }}</p><p class="text-sm font-medium" :class="info.verified_name ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--muted-foreground))]'" x-text="info.verified_name || '{{ __('dashboard.not_verified') }}'">-</p></div>
                                 </div>
                                 <div class="flex items-center gap-3">
                                     <div class="h-9 w-9 rounded-lg bg-purple-50 flex items-center justify-center"><i class="fas fa-star text-purple-500"></i></div>
-                                    <div><p class="text-xs text-[hsl(var(--muted-foreground))]">Quality</p><p class="text-sm font-medium capitalize" x-text="info.quality_rating || '-'">-</p></div>
+                                    <div><p class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('dashboard.quality') }}</p><p class="text-sm font-medium capitalize" x-text="info.quality_rating || '-'">-</p></div>
                                 </div>
                             </div>
                         </div>
                         <!-- Quick Actions -->
                         <div class="card">
-                            <div class="card-header"><h2 class="card-title">Quick Actions</h2></div>
+                            <div class="card-header"><h2 class="card-title">{{ __('dashboard.quick_actions') }}</h2></div>
                             <div class="card-content space-y-2">
                                 <a href="/dashboard/contacts" class="flex items-center gap-3 p-3 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors">
                                     <div class="h-9 w-9 rounded-lg bg-blue-500 flex items-center justify-center"><i class="fas fa-users text-white"></i></div>
-                                    <div><p class="text-sm font-medium">Manage Contacts</p><p class="text-xs text-[hsl(var(--muted-foreground))]">View and organize</p></div>
+                                    <div><p class="text-sm font-medium">{{ __('dashboard.manage_contacts') }}</p><p class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('dashboard.view_and_organize') }}</p></div>
                                 </a>
                                 <a href="/dashboard/messages" class="flex items-center gap-3 p-3 rounded-lg bg-[hsl(var(--primary)/0.1)] hover:bg-[hsl(var(--primary)/0.15)] transition-colors">
                                     <div class="h-9 w-9 rounded-lg bg-[hsl(var(--primary))] flex items-center justify-center"><i class="fas fa-paper-plane text-white"></i></div>
-                                    <div><p class="text-sm font-medium">Send Message</p><p class="text-xs text-[hsl(var(--muted-foreground))]">Start a conversation</p></div>
+                                    <div><p class="text-sm font-medium">{{ __('dashboard.send_message') }}</p><p class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('dashboard.start_conversation') }}</p></div>
                                 </a>
                                 <a href="/dashboard/templates" class="flex items-center gap-3 p-3 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors">
                                     <div class="h-9 w-9 rounded-lg bg-purple-500 flex items-center justify-center"><i class="fas fa-file-alt text-white"></i></div>
-                                    <div><p class="text-sm font-medium">Templates</p><p class="text-xs text-[hsl(var(--muted-foreground))]">Manage templates</p></div>
+                                    <div><p class="text-sm font-medium">{{ __('dashboard.templates') }}</p><p class="text-xs text-[hsl(var(--muted-foreground))]">{{ __('dashboard.manage_templates') }}</p></div>
                                 </a>
                             </div>
                         </div>
@@ -401,9 +391,9 @@
 <script>
 function dashboardApp() {
     return {
-        sidebarOpen: true, 
+        sidebarOpen: true,
         isMobile: window.innerWidth < 768,
-        user: null, 
+        user: null,
         notifications: [],
         init() {
             // Set initial sidebar state based on viewport
@@ -415,12 +405,12 @@ function dashboardApp() {
                 this.sidebarOpen = true;
                 localStorage.setItem('sidebarOpen', 'true');
             }
-            
+
             // Watch sidebar state changes (only save on desktop)
             this.$watch('sidebarOpen', v => {
                 if (!this.isMobile) localStorage.setItem('sidebarOpen', JSON.stringify(v));
             });
-            
+
             // Handle resize events with debounce
             let resizeTimeout;
             window.addEventListener('resize', () => {
@@ -428,7 +418,7 @@ function dashboardApp() {
                 resizeTimeout = setTimeout(() => {
                     const wasMobile = this.isMobile;
                     this.isMobile = window.innerWidth < 768;
-                    
+
                     // Auto-adjust sidebar when crossing breakpoint
                     if (wasMobile && !this.isMobile) {
                         // Switched from mobile to desktop
@@ -440,7 +430,7 @@ function dashboardApp() {
                     }
                 }, 150);
             });
-            
+
             let storedUser = localStorage.getItem('user');
             if (storedUser) { try { this.user = JSON.parse(storedUser); } catch (e) { this.user = { name: 'User', email: 'user@example.com' }; } }
             else { this.user = { name: 'User', email: 'user@example.com' }; }
@@ -454,8 +444,26 @@ function dashboardApp() {
         clearNotifications() { this.notifications = []; localStorage.removeItem('notifications'); },
         removeNotification(id) { this.notifications = this.notifications.filter(n => n.id !== id); localStorage.setItem('notifications', JSON.stringify(this.notifications)); },
         formatNotificationTime(timestamp) { let date = new Date(timestamp), diff = Math.floor((new Date() - date) / 1000); if (diff < 60) return 'Just now'; if (diff < 3600) return Math.floor(diff / 60) + 'm ago'; if (diff < 86400) return Math.floor(diff / 3600) + 'h ago'; return date.toLocaleDateString(); },
-        logout() { let token = localStorage.getItem('token'); if (token) { fetch(`${window.location.origin}/api/logout`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } }).finally(() => this.clearAndRedirect()); } else { this.clearAndRedirect(); } },
-        clearAndRedirect() { localStorage.removeItem('token'); localStorage.removeItem('user'); localStorage.removeItem('sidebarOpen'); localStorage.removeItem('notifications'); window.location.href = '/login'; }
+        logout() {
+            let token = localStorage.getItem('token');
+            if (token) {
+                // CRITICAL: Call API logout FIRST before clearing storage
+                fetch(`${window.location.origin}/api/logout`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                }).finally(() => {
+                    // Clear storage AFTER API call (success or fail)
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    window.location.replace('/login');
+                });
+            } else {
+                // No token, just clear and redirect
+                localStorage.clear();
+                sessionStorage.clear();
+                window.location.replace('/login');
+            }
+        },
     }
 }
 
@@ -497,11 +505,11 @@ function weeklyChart() {
         chart: null,
         chartData: [],
         chartSummary: { totalIncoming: 0, totalOutgoing: 0, total: 0 },
-        
+
         init() {
             this.fetchChartData();
         },
-        
+
         async fetchChartData() {
             this.loading = true;
             try {
@@ -510,7 +518,7 @@ function weeklyChart() {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const result = await response.json();
-                
+
                 if (result.success && result.data) {
                     this.chartData = result.data;
                     console.log('Chart Data:', this.chartData);
@@ -518,7 +526,7 @@ function weeklyChart() {
                     this.chartSummary.totalOutgoing = this.chartData.reduce((sum, d) => sum + (d.outgoing || 0), 0);
                     this.chartSummary.total = this.chartSummary.totalIncoming + this.chartSummary.totalOutgoing;
                     console.log('Chart Summary:', this.chartSummary);
-                    
+
                     this.loading = false;
                     // Give more time for DOM and ApexCharts to be ready
                     setTimeout(() => this.renderChart(), 300);
@@ -528,29 +536,29 @@ function weeklyChart() {
                 this.loading = false;
             }
         },
-        
+
         renderChart() {
             if (this.chartData.length === 0) return;
-            
+
             // Check if ApexCharts is loaded
             if (typeof ApexCharts === 'undefined') {
                 console.warn('ApexCharts not loaded yet, retrying...');
                 setTimeout(() => this.renderChart(), 100);
                 return;
             }
-            
+
             const chartElement = document.querySelector("#weeklyMessagesChart");
             if (!chartElement) {
                 console.warn('Chart element not found, retrying...');
                 setTimeout(() => this.renderChart(), 100);
                 return;
             }
-            
+
             const incomingData = this.chartData.map(d => d.incoming || 0);
             const outgoingData = this.chartData.map(d => d.outgoing || 0);
             console.log('Incoming Data:', incomingData);
             console.log('Outgoing Data:', outgoingData);
-            
+
             const options = {
                 series: [
                     {
@@ -612,11 +620,11 @@ function weeklyChart() {
                     }
                 }
             };
-            
+
             if (this.chart) {
                 this.chart.destroy();
             }
-            
+
             this.chart = new ApexCharts(document.querySelector("#weeklyMessagesChart"), options);
             this.chart.render();
         }
@@ -681,6 +689,7 @@ function subscriptionStatus() {
 
         async init() {
             console.log('[Subscription] Initializing...');
+
             // Set timeout to prevent infinite loading
             setTimeout(() => {
                 if (this.loading) {
@@ -688,7 +697,33 @@ function subscriptionStatus() {
                     this.loading = false;
                 }
             }, 5000);
+
             await this.fetchSubscriptionStatus();
+
+            // If still on trial/expired after initial fetch, start polling
+            // This handles the case where user just completed payment
+            if (this.subscription.status === 'trial' || this.subscription.status === 'trial_expired') {
+                console.log('[Subscription] Starting polling for updates...');
+                this.startPolling();
+            }
+        },
+
+        startPolling() {
+            let pollCount = 0;
+            const maxPolls = 6; // Poll for 30 seconds (6 * 5 seconds)
+
+            const pollInterval = setInterval(async () => {
+                pollCount++;
+                console.log(`[Subscription] Polling for updates (${pollCount}/${maxPolls})`);
+
+                await this.fetchSubscriptionStatus();
+
+                // Stop polling if subscription is active or max polls reached
+                if (this.subscription.status === 'active' || pollCount >= maxPolls) {
+                    clearInterval(pollInterval);
+                    console.log('[Subscription] Polling stopped. Final status:', this.subscription.status);
+                }
+            }, 5000); // Poll every 5 seconds
         },
 
         async fetchSubscriptionStatus() {
@@ -706,6 +741,14 @@ function subscriptionStatus() {
                     headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
                 });
                 console.log('[Subscription] API response status:', response.status);
+
+                // Handle 401 Unauthorized - don't redirect, just stop polling
+                if (response.status === 401) {
+                    console.warn('[Subscription] Unauthorized - token may be invalid');
+                    this.loading = false;
+                    return;
+                }
+
                 const data = await response.json();
                 console.log('[Subscription] API data:', data);
                 if (data.success && data.data?.subscription) {
@@ -745,8 +788,16 @@ function subscriptionStatus() {
 
         formatDate(dateString) {
             if (!dateString) return '-';
-            const date = new Date(dateString);
-            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            // Extract just the date part (YYYY-MM-DD) from ISO string
+            // This prevents JavaScript from doing any timezone conversion
+            const datePart = dateString.split('T')[0] || dateString.split(' ')[0];
+            const [year, month, day] = datePart.split('-').map(Number);
+
+            // Format manually to avoid any timezone issues
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+            return `${monthNames[month - 1]} ${day}, ${year}`;
         },
 
         async openCustomerPortal() {

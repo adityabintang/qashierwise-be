@@ -10,7 +10,7 @@ use Tests\TestCase;
 
 /**
  * Property-based tests for TemplateService
- * 
+ *
  * Feature: template-management
  */
 class TemplateServicePropertyTest extends TestCase
@@ -22,15 +22,15 @@ class TemplateServicePropertyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new TemplateService();
+        $this->service = new TemplateService;
     }
 
     /**
      * Feature: template-management, Property 1: Template Name Validation
      * Validates: Requirements 1.3, 5.2
-     * 
-     * For any string input as template name, the validation function SHALL accept 
-     * the string if and only if it contains only lowercase letters (a-z), digits (0-9), 
+     *
+     * For any string input as template name, the validation function SHALL accept
+     * the string if and only if it contains only lowercase letters (a-z), digits (0-9),
      * and underscores (_), and reject all other strings with an appropriate error message.
      */
     #[Test]
@@ -43,13 +43,13 @@ class TemplateServicePropertyTest extends TestCase
             )
             ->then(function (string $name) {
                 $result = $this->service->validateTemplateName($name);
-                
+
                 // Determine expected validity based on the property definition
                 // Valid names: non-empty strings containing only [a-z0-9_]
                 // Note: Use strict empty check ($name !== '') instead of empty() because
                 // PHP's empty('0') returns true, but '0' is a valid template name
                 $shouldBeValid = $name !== '' && preg_match('/^[a-z0-9_]+$/', $name) === 1;
-                
+
                 $this->assertEquals(
                     $shouldBeValid,
                     $result['valid'],
@@ -61,20 +61,20 @@ class TemplateServicePropertyTest extends TestCase
                         $result['error'] ?? 'none'
                     )
                 );
-                
+
                 // If invalid, should have an error message
-                if (!$result['valid']) {
+                if (! $result['valid']) {
                     $this->assertNotNull(
                         $result['error'],
-                        "Invalid template name should have an error message"
+                        'Invalid template name should have an error message'
                     );
                 }
-                
+
                 // If valid, should not have an error message
                 if ($result['valid']) {
                     $this->assertNull(
                         $result['error'],
-                        "Valid template name should not have an error message"
+                        'Valid template name should not have an error message'
                     );
                 }
             });
@@ -83,7 +83,7 @@ class TemplateServicePropertyTest extends TestCase
     /**
      * Feature: template-management, Property 1: Template Name Validation (Valid Names)
      * Validates: Requirements 1.3, 5.2
-     * 
+     *
      * For any string composed only of valid characters (lowercase letters, digits, underscores),
      * the validation function SHALL accept it.
      */
@@ -92,7 +92,7 @@ class TemplateServicePropertyTest extends TestCase
     {
         // Valid character set for template names
         $validChars = 'abcdefghijklmnopqrstuvwxyz0123456789_';
-        
+
         $this
             ->limitTo(100)
             ->forAll(
@@ -105,9 +105,9 @@ class TemplateServicePropertyTest extends TestCase
                 for ($i = 0; $i < $length; $i++) {
                     $name .= $validChars[random_int(0, strlen($validChars) - 1)];
                 }
-                
+
                 $result = $this->service->validateTemplateName($name);
-                
+
                 $this->assertTrue(
                     $result['valid'],
                     sprintf(
@@ -116,10 +116,10 @@ class TemplateServicePropertyTest extends TestCase
                         $result['error'] ?? 'none'
                     )
                 );
-                
+
                 $this->assertNull(
                     $result['error'],
-                    "Valid template name should not have an error message"
+                    'Valid template name should not have an error message'
                 );
             });
     }
@@ -127,9 +127,9 @@ class TemplateServicePropertyTest extends TestCase
     /**
      * Feature: template-management, Property 2: Footer Length Validation
      * Validates: Requirements 1.7
-     * 
-     * For any string input as footer text, the validation function SHALL accept strings 
-     * with 60 or fewer characters and reject strings exceeding 60 characters with an 
+     *
+     * For any string input as footer text, the validation function SHALL accept strings
+     * with 60 or fewer characters and reject strings exceeding 60 characters with an
      * appropriate error message.
      */
     #[Test]
@@ -142,38 +142,38 @@ class TemplateServicePropertyTest extends TestCase
             )
             ->then(function (string $footer) {
                 $result = $this->service->validateFooter($footer);
-                
+
                 // Determine expected validity based on the property definition
                 // Valid footers: strings with 60 or fewer characters (empty is also valid)
                 $length = mb_strlen($footer);
                 $shouldBeValid = $length <= 60;
-                
+
                 $this->assertEquals(
                     $shouldBeValid,
                     $result['valid'],
                     sprintf(
                         "Footer '%s' (length: %d) validation mismatch. Expected %s but got %s. Error: %s",
-                        substr($footer, 0, 100) . (strlen($footer) > 100 ? '...' : ''),
+                        substr($footer, 0, 100).(strlen($footer) > 100 ? '...' : ''),
                         $length,
                         $shouldBeValid ? 'valid' : 'invalid',
                         $result['valid'] ? 'valid' : 'invalid',
                         $result['error'] ?? 'none'
                     )
                 );
-                
+
                 // If invalid (exceeds 60 chars), should have an error message
-                if (!$result['valid']) {
+                if (! $result['valid']) {
                     $this->assertNotNull(
                         $result['error'],
-                        "Invalid footer should have an error message"
+                        'Invalid footer should have an error message'
                     );
                 }
-                
+
                 // If valid, should not have an error message
                 if ($result['valid']) {
                     $this->assertNull(
                         $result['error'],
-                        "Valid footer should not have an error message"
+                        'Valid footer should not have an error message'
                     );
                 }
             });
@@ -182,7 +182,7 @@ class TemplateServicePropertyTest extends TestCase
     /**
      * Feature: template-management, Property 2: Footer Length Validation (Boundary)
      * Validates: Requirements 1.7
-     * 
+     *
      * For any string of exactly 60 characters, the validation SHALL accept it.
      * For any string of exactly 61 characters, the validation SHALL reject it.
      */
@@ -197,31 +197,31 @@ class TemplateServicePropertyTest extends TestCase
             )
             ->then(function (int $charCode) {
                 $char = chr($charCode);
-                
+
                 // Test exactly 60 characters (should be valid)
                 $footer60 = str_repeat($char, 60);
                 $result60 = $this->service->validateFooter($footer60);
-                
+
                 $this->assertTrue(
                     $result60['valid'],
                     sprintf(
-                        "Footer with exactly 60 characters should be valid. Got error: %s",
+                        'Footer with exactly 60 characters should be valid. Got error: %s',
                         $result60['error'] ?? 'none'
                     )
                 );
-                
+
                 // Test exactly 61 characters (should be invalid)
                 $footer61 = str_repeat($char, 61);
                 $result61 = $this->service->validateFooter($footer61);
-                
+
                 $this->assertFalse(
                     $result61['valid'],
-                    "Footer with exactly 61 characters should be invalid"
+                    'Footer with exactly 61 characters should be invalid'
                 );
-                
+
                 $this->assertNotNull(
                     $result61['error'],
-                    "Invalid footer should have an error message"
+                    'Invalid footer should have an error message'
                 );
             });
     }
@@ -229,9 +229,9 @@ class TemplateServicePropertyTest extends TestCase
     /**
      * Feature: template-management, Property 4: Body Length Validation
      * Validates: Requirements 5.3
-     * 
-     * For any string input as body text, the validation function SHALL accept strings 
-     * with 1024 or fewer characters and reject strings exceeding 1024 characters with 
+     *
+     * For any string input as body text, the validation function SHALL accept strings
+     * with 1024 or fewer characters and reject strings exceeding 1024 characters with
      * an appropriate error message.
      */
     #[Test]
@@ -247,39 +247,39 @@ class TemplateServicePropertyTest extends TestCase
                 if (empty($body)) {
                     return;
                 }
-                
+
                 $result = $this->service->validateBody($body);
-                
+
                 // Determine expected validity based on the property definition
                 // Valid body: non-empty strings with 1024 or fewer characters
                 $length = mb_strlen($body);
                 $shouldBeValid = $length <= 1024;
-                
+
                 $this->assertEquals(
                     $shouldBeValid,
                     $result['valid'],
                     sprintf(
-                        "Body (length: %d) validation mismatch. Expected %s but got %s. Error: %s",
+                        'Body (length: %d) validation mismatch. Expected %s but got %s. Error: %s',
                         $length,
                         $shouldBeValid ? 'valid' : 'invalid',
                         $result['valid'] ? 'valid' : 'invalid',
                         $result['error'] ?? 'none'
                     )
                 );
-                
+
                 // If invalid (exceeds 1024 chars), should have an error message
-                if (!$result['valid']) {
+                if (! $result['valid']) {
                     $this->assertNotNull(
                         $result['error'],
-                        "Invalid body should have an error message"
+                        'Invalid body should have an error message'
                     );
                 }
-                
+
                 // If valid, should not have an error message
                 if ($result['valid']) {
                     $this->assertNull(
                         $result['error'],
-                        "Valid body should not have an error message"
+                        'Valid body should not have an error message'
                     );
                 }
             });
@@ -288,7 +288,7 @@ class TemplateServicePropertyTest extends TestCase
     /**
      * Feature: template-management, Property 4: Body Length Validation (Boundary)
      * Validates: Requirements 5.3
-     * 
+     *
      * For any string of exactly 1024 characters, the validation SHALL accept it.
      * For any string of exactly 1025 characters, the validation SHALL reject it.
      */
@@ -303,36 +303,36 @@ class TemplateServicePropertyTest extends TestCase
             )
             ->then(function (int $charCode) {
                 $char = chr($charCode);
-                
+
                 // Test exactly 1024 characters (should be valid)
                 $body1024 = str_repeat($char, 1024);
                 $result1024 = $this->service->validateBody($body1024);
-                
+
                 $this->assertTrue(
                     $result1024['valid'],
                     sprintf(
-                        "Body with exactly 1024 characters should be valid. Got error: %s",
+                        'Body with exactly 1024 characters should be valid. Got error: %s',
                         $result1024['error'] ?? 'none'
                     )
                 );
-                
+
                 $this->assertNull(
                     $result1024['error'],
-                    "Valid body should not have an error message"
+                    'Valid body should not have an error message'
                 );
-                
+
                 // Test exactly 1025 characters (should be invalid)
                 $body1025 = str_repeat($char, 1025);
                 $result1025 = $this->service->validateBody($body1025);
-                
+
                 $this->assertFalse(
                     $result1025['valid'],
-                    "Body with exactly 1025 characters should be invalid"
+                    'Body with exactly 1025 characters should be invalid'
                 );
-                
+
                 $this->assertNotNull(
                     $result1025['error'],
-                    "Invalid body should have an error message"
+                    'Invalid body should have an error message'
                 );
             });
     }
@@ -340,31 +340,31 @@ class TemplateServicePropertyTest extends TestCase
     /**
      * Feature: template-management, Property 4: Body Length Validation (Empty Body)
      * Validates: Requirements 5.3
-     * 
+     *
      * Empty body text should be rejected as body is a required field.
      */
     #[Test]
     public function body_length_validation_rejects_empty_body(): void
     {
         $result = $this->service->validateBody('');
-        
+
         $this->assertFalse(
             $result['valid'],
-            "Empty body should be invalid"
+            'Empty body should be invalid'
         );
-        
+
         $this->assertNotNull(
             $result['error'],
-            "Empty body should have an error message"
+            'Empty body should have an error message'
         );
     }
 
     /**
      * Feature: template-management, Property 3: Button Limit Validation
      * Validates: Requirements 1.8
-     * 
-     * For any array of buttons, the validation function SHALL accept configurations 
-     * with up to 10 quick reply buttons OR up to 2 call-to-action buttons, 
+     *
+     * For any array of buttons, the validation function SHALL accept configurations
+     * with up to 10 quick reply buttons OR up to 2 call-to-action buttons,
      * and reject configurations exceeding these limits.
      */
     #[Test]
@@ -382,32 +382,32 @@ class TemplateServicePropertyTest extends TestCase
                 for ($i = 0; $i < $buttonCount; $i++) {
                     $buttons[] = [
                         'type' => 'QUICK_REPLY',
-                        'text' => 'Button ' . ($i + 1)
+                        'text' => 'Button '.($i + 1),
                     ];
                 }
-                
+
                 $result = $this->service->validateButtons($buttons);
-                
+
                 // Valid if 10 or fewer quick reply buttons
                 $shouldBeValid = $buttonCount <= 10;
-                
+
                 $this->assertEquals(
                     $shouldBeValid,
                     $result['valid'],
                     sprintf(
-                        "Quick reply buttons count %d validation mismatch. Expected %s but got %s. Error: %s",
+                        'Quick reply buttons count %d validation mismatch. Expected %s but got %s. Error: %s',
                         $buttonCount,
                         $shouldBeValid ? 'valid' : 'invalid',
                         $result['valid'] ? 'valid' : 'invalid',
                         $result['error'] ?? 'none'
                     )
                 );
-                
+
                 // If invalid, should have an error message
-                if (!$result['valid']) {
+                if (! $result['valid']) {
                     $this->assertNotNull(
                         $result['error'],
-                        "Invalid button configuration should have an error message"
+                        'Invalid button configuration should have an error message'
                     );
                 }
             });
@@ -416,16 +416,16 @@ class TemplateServicePropertyTest extends TestCase
     /**
      * Feature: template-management, Property 3: Button Limit Validation (CTA Buttons)
      * Validates: Requirements 1.8
-     * 
-     * For any array of CTA buttons (URL or PHONE_NUMBER), the validation function 
-     * SHALL accept configurations with up to 2 buttons and reject configurations 
+     *
+     * For any array of CTA buttons (URL or PHONE_NUMBER), the validation function
+     * SHALL accept configurations with up to 2 buttons and reject configurations
      * exceeding this limit.
      */
     #[Test]
     public function button_limit_validation_cta_buttons(): void
     {
         $ctaTypes = ['URL', 'PHONE_NUMBER'];
-        
+
         $this
             ->limitTo(100)
             ->forAll(
@@ -439,40 +439,40 @@ class TemplateServicePropertyTest extends TestCase
                     $type = $ctaTypes[array_rand($ctaTypes)];
                     $button = [
                         'type' => $type,
-                        'text' => 'Button ' . ($i + 1)
+                        'text' => 'Button '.($i + 1),
                     ];
-                    
+
                     if ($type === 'URL') {
-                        $button['url'] = 'https://example.com/' . ($i + 1);
+                        $button['url'] = 'https://example.com/'.($i + 1);
                     } else {
-                        $button['phone_number'] = '+1234567890' . $i;
+                        $button['phone_number'] = '+1234567890'.$i;
                     }
-                    
+
                     $buttons[] = $button;
                 }
-                
+
                 $result = $this->service->validateButtons($buttons);
-                
+
                 // Valid if 2 or fewer CTA buttons
                 $shouldBeValid = $buttonCount <= 2;
-                
+
                 $this->assertEquals(
                     $shouldBeValid,
                     $result['valid'],
                     sprintf(
-                        "CTA buttons count %d validation mismatch. Expected %s but got %s. Error: %s",
+                        'CTA buttons count %d validation mismatch. Expected %s but got %s. Error: %s',
                         $buttonCount,
                         $shouldBeValid ? 'valid' : 'invalid',
                         $result['valid'] ? 'valid' : 'invalid',
                         $result['error'] ?? 'none'
                     )
                 );
-                
+
                 // If invalid, should have an error message
-                if (!$result['valid']) {
+                if (! $result['valid']) {
                     $this->assertNotNull(
                         $result['error'],
-                        "Invalid button configuration should have an error message"
+                        'Invalid button configuration should have an error message'
                     );
                 }
             });
@@ -481,8 +481,8 @@ class TemplateServicePropertyTest extends TestCase
     /**
      * Feature: template-management, Property 3: Button Limit Validation (Mixed Buttons)
      * Validates: Requirements 1.8
-     * 
-     * For any configuration mixing quick reply and CTA buttons, the validation 
+     *
+     * For any configuration mixing quick reply and CTA buttons, the validation
      * function SHALL reject the configuration.
      */
     #[Test]
@@ -498,39 +498,39 @@ class TemplateServicePropertyTest extends TestCase
             )
             ->then(function (int $quickReplyCount, int $ctaCount) {
                 $buttons = [];
-                
+
                 // Add quick reply buttons
                 for ($i = 0; $i < $quickReplyCount; $i++) {
                     $buttons[] = [
                         'type' => 'QUICK_REPLY',
-                        'text' => 'Quick Reply ' . ($i + 1)
+                        'text' => 'Quick Reply '.($i + 1),
                     ];
                 }
-                
+
                 // Add CTA buttons
                 for ($i = 0; $i < $ctaCount; $i++) {
                     $buttons[] = [
                         'type' => 'URL',
-                        'text' => 'CTA ' . ($i + 1),
-                        'url' => 'https://example.com/' . ($i + 1)
+                        'text' => 'CTA '.($i + 1),
+                        'url' => 'https://example.com/'.($i + 1),
                     ];
                 }
-                
+
                 $result = $this->service->validateButtons($buttons);
-                
+
                 // Mixed buttons should always be invalid
                 $this->assertFalse(
                     $result['valid'],
                     sprintf(
-                        "Mixed buttons (%d quick reply + %d CTA) should be invalid",
+                        'Mixed buttons (%d quick reply + %d CTA) should be invalid',
                         $quickReplyCount,
                         $ctaCount
                     )
                 );
-                
+
                 $this->assertNotNull(
                     $result['error'],
-                    "Mixed button configuration should have an error message"
+                    'Mixed button configuration should have an error message'
                 );
             });
     }
@@ -538,7 +538,7 @@ class TemplateServicePropertyTest extends TestCase
     /**
      * Feature: template-management, Property 3: Button Limit Validation (Empty/Null)
      * Validates: Requirements 1.8
-     * 
+     *
      * Empty or null button arrays should be valid (buttons are optional).
      */
     #[Test]
@@ -548,21 +548,21 @@ class TemplateServicePropertyTest extends TestCase
         $resultNull = $this->service->validateButtons(null);
         $this->assertTrue(
             $resultNull['valid'],
-            "Null buttons should be valid"
+            'Null buttons should be valid'
         );
-        
+
         // Test empty array
         $resultEmpty = $this->service->validateButtons([]);
         $this->assertTrue(
             $resultEmpty['valid'],
-            "Empty buttons array should be valid"
+            'Empty buttons array should be valid'
         );
     }
 
     /**
      * Feature: template-management, Property 3: Button Limit Validation (Boundary)
      * Validates: Requirements 1.8
-     * 
+     *
      * Boundary test: exactly 10 quick reply buttons should be valid,
      * exactly 11 should be invalid. Exactly 2 CTA buttons should be valid,
      * exactly 3 should be invalid.
@@ -573,57 +573,57 @@ class TemplateServicePropertyTest extends TestCase
         // Test exactly 10 quick reply buttons (should be valid)
         $buttons10 = [];
         for ($i = 0; $i < 10; $i++) {
-            $buttons10[] = ['type' => 'QUICK_REPLY', 'text' => 'Button ' . ($i + 1)];
+            $buttons10[] = ['type' => 'QUICK_REPLY', 'text' => 'Button '.($i + 1)];
         }
         $result10 = $this->service->validateButtons($buttons10);
         $this->assertTrue(
             $result10['valid'],
-            "Exactly 10 quick reply buttons should be valid"
+            'Exactly 10 quick reply buttons should be valid'
         );
-        
+
         // Test exactly 11 quick reply buttons (should be invalid)
         $buttons11 = $buttons10;
         $buttons11[] = ['type' => 'QUICK_REPLY', 'text' => 'Button 11'];
         $result11 = $this->service->validateButtons($buttons11);
         $this->assertFalse(
             $result11['valid'],
-            "Exactly 11 quick reply buttons should be invalid"
+            'Exactly 11 quick reply buttons should be invalid'
         );
-        
+
         // Test exactly 2 CTA buttons (should be valid)
         $cta2 = [
             ['type' => 'URL', 'text' => 'URL 1', 'url' => 'https://example.com/1'],
-            ['type' => 'PHONE_NUMBER', 'text' => 'Call', 'phone_number' => '+1234567890']
+            ['type' => 'PHONE_NUMBER', 'text' => 'Call', 'phone_number' => '+1234567890'],
         ];
         $resultCta2 = $this->service->validateButtons($cta2);
         $this->assertTrue(
             $resultCta2['valid'],
-            "Exactly 2 CTA buttons should be valid"
+            'Exactly 2 CTA buttons should be valid'
         );
-        
+
         // Test exactly 3 CTA buttons (should be invalid)
         $cta3 = $cta2;
         $cta3[] = ['type' => 'URL', 'text' => 'URL 2', 'url' => 'https://example.com/2'];
         $resultCta3 = $this->service->validateButtons($cta3);
         $this->assertFalse(
             $resultCta3['valid'],
-            "Exactly 3 CTA buttons should be invalid"
+            'Exactly 3 CTA buttons should be invalid'
         );
     }
 
     /**
      * Feature: template-management, Property 5: Required Field Validation
      * Validates: Requirements 5.4
-     * 
-     * For any template form submission, the validation function SHALL reject submissions 
-     * where required fields (name, category, language, body) are empty and return specific 
+     *
+     * For any template form submission, the validation function SHALL reject submissions
+     * where required fields (name, category, language, body) are empty and return specific
      * error messages for each missing field.
      */
     #[Test]
     public function required_field_validation_rejects_missing_fields(): void
     {
         $requiredFields = ['name', 'category', 'language', 'body'];
-        
+
         $this
             ->limitTo(100)
             ->forAll(
@@ -633,12 +633,12 @@ class TemplateServicePropertyTest extends TestCase
             ->then(function (int $fieldMask) use ($requiredFields) {
                 $data = [];
                 $missingFields = [];
-                
+
                 // Build data array based on bitmask
                 foreach ($requiredFields as $index => $field) {
                     if ($fieldMask & (1 << $index)) {
                         // Include this field with a valid value
-                        $data[$field] = match($field) {
+                        $data[$field] = match ($field) {
                             'name' => 'valid_template_name',
                             'category' => 'MARKETING',
                             'language' => 'en',
@@ -649,25 +649,25 @@ class TemplateServicePropertyTest extends TestCase
                         $missingFields[] = $field;
                     }
                 }
-                
+
                 $result = $this->service->validateRequiredFields($data);
-                
+
                 // Should be valid only if all fields are present (bitmask = 15)
                 $shouldBeValid = $fieldMask === 15;
-                
+
                 $this->assertEquals(
                     $shouldBeValid,
                     $result['valid'],
                     sprintf(
-                        "Required fields validation mismatch. Missing fields: [%s]. Expected %s but got %s",
+                        'Required fields validation mismatch. Missing fields: [%s]. Expected %s but got %s',
                         implode(', ', $missingFields),
                         $shouldBeValid ? 'valid' : 'invalid',
                         $result['valid'] ? 'valid' : 'invalid'
                     )
                 );
-                
+
                 // If invalid, should have error messages for each missing field
-                if (!$result['valid']) {
+                if (! $result['valid']) {
                     foreach ($missingFields as $field) {
                         $this->assertArrayHasKey(
                             $field,
@@ -680,12 +680,12 @@ class TemplateServicePropertyTest extends TestCase
                         );
                     }
                 }
-                
+
                 // If valid, should have no errors
                 if ($result['valid']) {
                     $this->assertEmpty(
                         $result['errors'],
-                        "Valid submission should have no errors"
+                        'Valid submission should have no errors'
                     );
                 }
             });
@@ -694,7 +694,7 @@ class TemplateServicePropertyTest extends TestCase
     /**
      * Feature: template-management, Property 5: Required Field Validation (Empty Values)
      * Validates: Requirements 5.4
-     * 
+     *
      * For any template form submission with empty string values for required fields,
      * the validation function SHALL treat them as missing and return appropriate errors.
      */
@@ -702,7 +702,7 @@ class TemplateServicePropertyTest extends TestCase
     public function required_field_validation_rejects_empty_string_values(): void
     {
         $requiredFields = ['name', 'category', 'language', 'body'];
-        
+
         $this
             ->limitTo(100)
             ->forAll(
@@ -712,12 +712,12 @@ class TemplateServicePropertyTest extends TestCase
             ->then(function (int $emptyMask) use ($requiredFields) {
                 $data = [];
                 $emptyFields = [];
-                
+
                 // Build data array - all fields present but some are empty strings
                 foreach ($requiredFields as $index => $field) {
                     if ($emptyMask & (1 << $index)) {
                         // This field has a valid value
-                        $data[$field] = match($field) {
+                        $data[$field] = match ($field) {
                             'name' => 'valid_template_name',
                             'category' => 'UTILITY',
                             'language' => 'id',
@@ -729,25 +729,25 @@ class TemplateServicePropertyTest extends TestCase
                         $emptyFields[] = $field;
                     }
                 }
-                
+
                 $result = $this->service->validateRequiredFields($data);
-                
+
                 // Should be valid only if all fields have values (emptyMask = 15)
                 $shouldBeValid = $emptyMask === 15;
-                
+
                 $this->assertEquals(
                     $shouldBeValid,
                     $result['valid'],
                     sprintf(
-                        "Required fields validation mismatch. Empty fields: [%s]. Expected %s but got %s",
+                        'Required fields validation mismatch. Empty fields: [%s]. Expected %s but got %s',
                         implode(', ', $emptyFields),
                         $shouldBeValid ? 'valid' : 'invalid',
                         $result['valid'] ? 'valid' : 'invalid'
                     )
                 );
-                
+
                 // If invalid, should have error messages for each empty field
-                if (!$result['valid']) {
+                if (! $result['valid']) {
                     foreach ($emptyFields as $field) {
                         $this->assertArrayHasKey(
                             $field,
@@ -762,7 +762,7 @@ class TemplateServicePropertyTest extends TestCase
     /**
      * Feature: template-management, Property 5: Required Field Validation (All Present)
      * Validates: Requirements 5.4
-     * 
+     *
      * For any template form submission with all required fields present and non-empty,
      * the validation function SHALL accept it.
      */
@@ -772,7 +772,7 @@ class TemplateServicePropertyTest extends TestCase
         $categories = ['MARKETING', 'UTILITY', 'AUTHENTICATION'];
         $languages = ['en', 'id', 'en_US', 'id_ID', 'es', 'fr', 'de'];
         $validChars = 'abcdefghijklmnopqrstuvwxyz0123456789_';
-        
+
         $this
             ->limitTo(100)
             ->forAll(
@@ -783,9 +783,8 @@ class TemplateServicePropertyTest extends TestCase
                 // Generate random body length (1-100 to ensure non-empty)
                 Generators::choose(1, 100)
             )
-            ->then(function (int $categoryIndex, int $languageIndex, int $bodyLength) 
-                use ($categories, $languages, $validChars) {
-                
+            ->then(function (int $categoryIndex, int $languageIndex, int $bodyLength) use ($categories, $languages, $validChars) {
+
                 // Generate valid template name (always at least 1 character)
                 // Start with a letter to avoid PHP empty('0') edge case
                 $letters = 'abcdefghijklmnopqrstuvwxyz';
@@ -794,30 +793,30 @@ class TemplateServicePropertyTest extends TestCase
                 for ($i = 1; $i < $nameLength; $i++) {
                     $name .= $validChars[random_int(0, strlen($validChars) - 1)];
                 }
-                
+
                 // Generate body text (always at least 1 character)
                 $body = str_repeat('a', $bodyLength);
-                
+
                 $data = [
                     'name' => $name,
                     'category' => $categories[$categoryIndex],
                     'language' => $languages[$languageIndex],
                     'body' => $body,
                 ];
-                
+
                 $result = $this->service->validateRequiredFields($data);
-                
+
                 $this->assertTrue(
                     $result['valid'],
                     sprintf(
-                        "Complete data should be valid. Got errors: %s",
+                        'Complete data should be valid. Got errors: %s',
                         json_encode($result['errors'])
                     )
                 );
-                
+
                 $this->assertEmpty(
                     $result['errors'],
-                    "Valid submission should have no errors"
+                    'Valid submission should have no errors'
                 );
             });
     }
@@ -825,9 +824,9 @@ class TemplateServicePropertyTest extends TestCase
     /**
      * Feature: template-management, Property 8: Template Data Round-Trip
      * Validates: Requirements 6.1, 6.2, 6.3
-     * 
-     * For any valid template data object, serializing to JSON for storage and then 
-     * deserializing back SHALL produce an object equivalent to the original, 
+     *
+     * For any valid template data object, serializing to JSON for storage and then
+     * deserializing back SHALL produce an object equivalent to the original,
      * preserving all component data including nested button configurations.
      */
     #[Test]
@@ -841,13 +840,13 @@ class TemplateServicePropertyTest extends TestCase
             )
             ->then(function (int $componentMask) {
                 $templateData = $this->generateRandomTemplateData($componentMask);
-                
+
                 // Serialize the template data
                 $serialized = $this->service->serializeTemplate($templateData);
-                
+
                 // Deserialize back
                 $deserialized = $this->service->deserializeTemplate($serialized);
-                
+
                 // Verify round-trip preserves all data
                 $this->assertEquals(
                     $templateData,
@@ -864,7 +863,7 @@ class TemplateServicePropertyTest extends TestCase
     /**
      * Feature: template-management, Property 8: Template Data Round-Trip (Components)
      * Validates: Requirements 6.1, 6.2, 6.3
-     * 
+     *
      * For any valid components array with nested button configurations,
      * serializing and deserializing SHALL preserve the exact structure.
      */
@@ -872,7 +871,7 @@ class TemplateServicePropertyTest extends TestCase
     public function template_data_round_trip_preserves_nested_buttons(): void
     {
         $buttonTypes = ['QUICK_REPLY', 'URL', 'PHONE_NUMBER'];
-        
+
         $this
             ->limitTo(100)
             ->forAll(
@@ -885,25 +884,25 @@ class TemplateServicePropertyTest extends TestCase
                 // Generate buttons of a single type (no mixing)
                 $buttons = [];
                 $buttonType = $buttonTypes[$buttonTypeIndex];
-                
+
                 // Limit CTA buttons to 2, quick reply to 10
                 $maxButtons = $buttonType === 'QUICK_REPLY' ? min($buttonCount, 10) : min($buttonCount, 2);
-                
+
                 for ($i = 0; $i < $maxButtons; $i++) {
                     $button = [
                         'type' => $buttonType,
-                        'text' => 'Button ' . ($i + 1),
+                        'text' => 'Button '.($i + 1),
                     ];
-                    
+
                     if ($buttonType === 'URL') {
-                        $button['url'] = 'https://example.com/path/' . ($i + 1);
+                        $button['url'] = 'https://example.com/path/'.($i + 1);
                     } elseif ($buttonType === 'PHONE_NUMBER') {
-                        $button['phone_number'] = '+1234567890' . $i;
+                        $button['phone_number'] = '+1234567890'.$i;
                     }
-                    
+
                     $buttons[] = $button;
                 }
-                
+
                 $templateData = [
                     'name' => 'test_template',
                     'category' => 'MARKETING',
@@ -916,28 +915,28 @@ class TemplateServicePropertyTest extends TestCase
                     ],
                     'buttons' => $buttons,
                 ];
-                
+
                 // Serialize the template data
                 $serialized = $this->service->serializeTemplate($templateData);
-                
+
                 // Verify components and buttons are JSON strings after serialization
-                if (!empty($templateData['components'])) {
+                if (! empty($templateData['components'])) {
                     $this->assertIsString(
                         $serialized['components'],
-                        "Components should be serialized to JSON string"
+                        'Components should be serialized to JSON string'
                     );
                 }
-                
-                if (!empty($templateData['buttons'])) {
+
+                if (! empty($templateData['buttons'])) {
                     $this->assertIsString(
                         $serialized['buttons'],
-                        "Buttons should be serialized to JSON string"
+                        'Buttons should be serialized to JSON string'
                     );
                 }
-                
+
                 // Deserialize back
                 $deserialized = $this->service->deserializeTemplate($serialized);
-                
+
                 // Verify round-trip preserves all data including nested buttons
                 $this->assertEquals(
                     $templateData,
@@ -954,7 +953,7 @@ class TemplateServicePropertyTest extends TestCase
     /**
      * Feature: template-management, Property 8: Template Data Round-Trip (Complex Components)
      * Validates: Requirements 6.1, 6.2, 6.3
-     * 
+     *
      * For any valid template with all component types (HEADER, BODY, FOOTER, BUTTONS),
      * serializing and deserializing SHALL preserve the complete structure.
      */
@@ -963,7 +962,7 @@ class TemplateServicePropertyTest extends TestCase
     {
         $headerTypes = ['TEXT', 'IMAGE', 'VIDEO', 'DOCUMENT'];
         $categories = ['MARKETING', 'UTILITY', 'AUTHENTICATION'];
-        
+
         $this
             ->limitTo(100)
             ->forAll(
@@ -974,21 +973,20 @@ class TemplateServicePropertyTest extends TestCase
                 // Generate random number of variables (0-5)
                 Generators::choose(0, 5)
             )
-            ->then(function (int $headerTypeIndex, int $categoryIndex, int $variableCount) 
-                use ($headerTypes, $categories) {
-                
+            ->then(function (int $headerTypeIndex, int $categoryIndex, int $variableCount) use ($headerTypes, $categories) {
+
                 $headerType = $headerTypes[$headerTypeIndex];
                 $category = $categories[$categoryIndex];
-                
+
                 // Build body text with variables
                 $bodyText = 'Hello';
                 for ($i = 1; $i <= $variableCount; $i++) {
-                    $bodyText .= " {{" . $i . "}}";
+                    $bodyText .= ' {{'.$i.'}}';
                 }
-                
+
                 // Build complex components array
                 $components = [];
-                
+
                 // Add HEADER component
                 $headerComponent = [
                     'type' => 'HEADER',
@@ -998,11 +996,11 @@ class TemplateServicePropertyTest extends TestCase
                     $headerComponent['text'] = 'Header text';
                 } else {
                     $headerComponent['example'] = [
-                        'header_handle' => ['https://example.com/media.jpg']
+                        'header_handle' => ['https://example.com/media.jpg'],
                     ];
                 }
                 $components[] = $headerComponent;
-                
+
                 // Add BODY component
                 $bodyComponent = [
                     'type' => 'BODY',
@@ -1011,20 +1009,20 @@ class TemplateServicePropertyTest extends TestCase
                 if ($variableCount > 0) {
                     $examples = [];
                     for ($i = 1; $i <= $variableCount; $i++) {
-                        $examples[] = 'Example ' . $i;
+                        $examples[] = 'Example '.$i;
                     }
                     $bodyComponent['example'] = [
-                        'body_text' => [$examples]
+                        'body_text' => [$examples],
                     ];
                 }
                 $components[] = $bodyComponent;
-                
+
                 // Add FOOTER component
                 $components[] = [
                     'type' => 'FOOTER',
                     'text' => 'Footer text',
                 ];
-                
+
                 // Add BUTTONS component with quick reply buttons
                 $components[] = [
                     'type' => 'BUTTONS',
@@ -1033,20 +1031,20 @@ class TemplateServicePropertyTest extends TestCase
                         ['type' => 'QUICK_REPLY', 'text' => 'No'],
                     ],
                 ];
-                
+
                 $templateData = [
                     'name' => 'complex_template',
                     'category' => $category,
                     'language' => 'en',
                     'components' => $components,
                 ];
-                
+
                 // Serialize the template data
                 $serialized = $this->service->serializeTemplate($templateData);
-                
+
                 // Deserialize back
                 $deserialized = $this->service->deserializeTemplate($serialized);
-                
+
                 // Verify round-trip preserves all complex component data
                 $this->assertEquals(
                     $templateData,
@@ -1063,8 +1061,8 @@ class TemplateServicePropertyTest extends TestCase
     /**
      * Feature: template-management, Property 7: Preview Variable Rendering
      * Validates: Requirements 4.3
-     * 
-     * For any template body containing N variable placeholders ({{1}} through {{N}}), 
+     *
+     * For any template body containing N variable placeholders ({{1}} through {{N}}),
      * the preview function SHALL render exactly N placeholder indicators in the output string.
      */
     #[Test]
@@ -1080,16 +1078,16 @@ class TemplateServicePropertyTest extends TestCase
                 // Generate body text with sequential variables
                 $bodyText = 'Hello';
                 for ($i = 1; $i <= $variableCount; $i++) {
-                    $bodyText .= " {{" . $i . "}} world";
+                    $bodyText .= ' {{'.$i.'}} world';
                 }
-                
+
                 // Render the preview
                 $preview = $this->service->renderPreviewBody($bodyText);
-                
+
                 // Count placeholder indicators in the output
                 preg_match_all('/\[Variable \d+\]/', $preview, $matches);
                 $placeholderCount = count($matches[0]);
-                
+
                 $this->assertEquals(
                     $variableCount,
                     $placeholderCount,
@@ -1102,20 +1100,20 @@ class TemplateServicePropertyTest extends TestCase
                         $preview
                     )
                 );
-                
+
                 // Verify each variable is replaced correctly
                 for ($i = 1; $i <= $variableCount; $i++) {
                     $this->assertStringContainsString(
                         "[Variable $i]",
                         $preview,
-                        sprintf("Preview should contain [Variable %d]", $i)
+                        sprintf('Preview should contain [Variable %d]', $i)
                     );
-                    
+
                     // Original placeholder should not be present
                     $this->assertStringNotContainsString(
-                        "{{" . $i . "}}",
+                        '{{'.$i.'}}',
                         $preview,
-                        sprintf("Original placeholder {{%d}} should be replaced", $i)
+                        sprintf('Original placeholder {{%d}} should be replaced', $i)
                     );
                 }
             });
@@ -1124,7 +1122,7 @@ class TemplateServicePropertyTest extends TestCase
     /**
      * Feature: template-management, Property 7: Preview Variable Rendering (Non-Sequential)
      * Validates: Requirements 4.3
-     * 
+     *
      * For any template body containing non-sequential variable placeholders,
      * the preview function SHALL still render the correct number of placeholder indicators.
      */
@@ -1146,33 +1144,33 @@ class TemplateServicePropertyTest extends TestCase
                 for ($i = 0; $i < $variableCount; $i++) {
                     $varNum = $startNum + ($i * 2); // Skip numbers to make non-sequential
                     $variableNumbers[] = $varNum;
-                    $bodyText .= " {{" . $varNum . "}}";
+                    $bodyText .= ' {{'.$varNum.'}}';
                 }
-                
+
                 // Render the preview
                 $preview = $this->service->renderPreviewBody($bodyText);
-                
+
                 // Count placeholder indicators in the output
                 preg_match_all('/\[Variable \d+\]/', $preview, $matches);
                 $placeholderCount = count($matches[0]);
-                
+
                 $this->assertEquals(
                     $variableCount,
                     $placeholderCount,
                     sprintf(
-                        "Body with %d non-sequential variables should produce %d placeholder indicators. Got %d.",
+                        'Body with %d non-sequential variables should produce %d placeholder indicators. Got %d.',
                         $variableCount,
                         $variableCount,
                         $placeholderCount
                     )
                 );
-                
+
                 // Verify each variable is replaced correctly
                 foreach ($variableNumbers as $varNum) {
                     $this->assertStringContainsString(
                         "[Variable $varNum]",
                         $preview,
-                        sprintf("Preview should contain [Variable %d]", $varNum)
+                        sprintf('Preview should contain [Variable %d]', $varNum)
                     );
                 }
             });
@@ -1181,7 +1179,7 @@ class TemplateServicePropertyTest extends TestCase
     /**
      * Feature: template-management, Property 7: Preview Variable Rendering (Duplicate Variables)
      * Validates: Requirements 4.3
-     * 
+     *
      * For any template body containing duplicate variable placeholders,
      * the preview function SHALL render each occurrence as a placeholder indicator.
      */
@@ -1200,27 +1198,27 @@ class TemplateServicePropertyTest extends TestCase
                 // Generate body text with duplicate variables
                 $bodyText = 'Hello';
                 $totalOccurrences = 0;
-                
+
                 for ($i = 1; $i <= $uniqueVarCount; $i++) {
                     for ($j = 0; $j < $duplicatesPerVar; $j++) {
-                        $bodyText .= " {{" . $i . "}}";
+                        $bodyText .= ' {{'.$i.'}}';
                         $totalOccurrences++;
                     }
                 }
-                
+
                 // Render the preview
                 $preview = $this->service->renderPreviewBody($bodyText);
-                
+
                 // Count placeholder indicators in the output
                 preg_match_all('/\[Variable \d+\]/', $preview, $matches);
                 $placeholderCount = count($matches[0]);
-                
+
                 // Each occurrence should be replaced
                 $this->assertEquals(
                     $totalOccurrences,
                     $placeholderCount,
                     sprintf(
-                        "Body with %d total variable occurrences should produce %d placeholder indicators. Got %d.",
+                        'Body with %d total variable occurrences should produce %d placeholder indicators. Got %d.',
                         $totalOccurrences,
                         $totalOccurrences,
                         $placeholderCount
@@ -1232,32 +1230,32 @@ class TemplateServicePropertyTest extends TestCase
     /**
      * Feature: template-management, Property 7: Preview Variable Rendering (Empty Body)
      * Validates: Requirements 4.3
-     * 
+     *
      * Empty body text should produce empty preview with zero placeholders.
      */
     #[Test]
     public function preview_variable_rendering_handles_empty_body(): void
     {
         $preview = $this->service->renderPreviewBody('');
-        
+
         $this->assertEquals(
             '',
             $preview,
-            "Empty body should produce empty preview"
+            'Empty body should produce empty preview'
         );
-        
+
         preg_match_all('/\[Variable \d+\]/', $preview, $matches);
         $this->assertCount(
             0,
             $matches[0],
-            "Empty body should produce zero placeholder indicators"
+            'Empty body should produce zero placeholder indicators'
         );
     }
 
     /**
      * Feature: template-management, Property 7: Preview Variable Rendering (No Variables)
      * Validates: Requirements 4.3
-     * 
+     *
      * Body text without variables should be returned unchanged with zero placeholders.
      */
     #[Test]
@@ -1273,28 +1271,28 @@ class TemplateServicePropertyTest extends TestCase
                 if (preg_match('/\{\{\d+\}\}/', $bodyText)) {
                     return;
                 }
-                
+
                 // Skip empty strings (tested separately)
                 if (empty($bodyText)) {
                     return;
                 }
-                
+
                 // Render the preview
                 $preview = $this->service->renderPreviewBody($bodyText);
-                
+
                 // Body without variables should be unchanged
                 $this->assertEquals(
                     $bodyText,
                     $preview,
-                    "Body without variables should be unchanged in preview"
+                    'Body without variables should be unchanged in preview'
                 );
-                
+
                 // Should have zero placeholder indicators
                 preg_match_all('/\[Variable \d+\]/', $preview, $matches);
                 $this->assertCount(
                     0,
                     $matches[0],
-                    "Body without variables should produce zero placeholder indicators"
+                    'Body without variables should produce zero placeholder indicators'
                 );
             });
     }
@@ -1302,7 +1300,7 @@ class TemplateServicePropertyTest extends TestCase
     /**
      * Generate random template data for property testing
      *
-     * @param int $componentMask Bitmask for optional components (1=header, 2=footer, 4=buttons, 8=examples)
+     * @param  int  $componentMask  Bitmask for optional components (1=header, 2=footer, 4=buttons, 8=examples)
      * @return array Random template data
      */
     private function generateRandomTemplateData(int $componentMask): array
@@ -1310,23 +1308,23 @@ class TemplateServicePropertyTest extends TestCase
         $validChars = 'abcdefghijklmnopqrstuvwxyz0123456789_';
         $categories = ['MARKETING', 'UTILITY', 'AUTHENTICATION'];
         $languages = ['en', 'id', 'en_US', 'id_ID'];
-        
+
         // Generate valid template name
         $nameLength = random_int(3, 20);
         $name = '';
         for ($i = 0; $i < $nameLength; $i++) {
             $name .= $validChars[random_int(0, strlen($validChars) - 1)];
         }
-        
+
         $templateData = [
             'name' => $name,
             'category' => $categories[array_rand($categories)],
             'language' => $languages[array_rand($languages)],
         ];
-        
+
         // Build components array
         $components = [];
-        
+
         // Add HEADER if bit 0 is set
         if ($componentMask & 1) {
             $headerTypes = ['TEXT', 'IMAGE', 'VIDEO', 'DOCUMENT'];
@@ -1336,26 +1334,26 @@ class TemplateServicePropertyTest extends TestCase
                 'format' => $headerType,
             ];
             if ($headerType === 'TEXT') {
-                $header['text'] = 'Header text ' . random_int(1, 100);
+                $header['text'] = 'Header text '.random_int(1, 100);
             }
             $components[] = $header;
         }
-        
+
         // Always add BODY (required)
-        $bodyText = 'Body text ' . random_int(1, 1000);
+        $bodyText = 'Body text '.random_int(1, 1000);
         $components[] = [
             'type' => 'BODY',
             'text' => $bodyText,
         ];
-        
+
         // Add FOOTER if bit 1 is set
         if ($componentMask & 2) {
             $components[] = [
                 'type' => 'FOOTER',
-                'text' => 'Footer ' . random_int(1, 100),
+                'text' => 'Footer '.random_int(1, 100),
             ];
         }
-        
+
         // Add BUTTONS if bit 2 is set
         if ($componentMask & 4) {
             $buttonCount = random_int(1, 3);
@@ -1363,20 +1361,20 @@ class TemplateServicePropertyTest extends TestCase
             for ($i = 0; $i < $buttonCount; $i++) {
                 $buttons[] = [
                     'type' => 'QUICK_REPLY',
-                    'text' => 'Button ' . ($i + 1),
+                    'text' => 'Button '.($i + 1),
                 ];
             }
             $components[] = [
                 'type' => 'BUTTONS',
                 'buttons' => $buttons,
             ];
-            
+
             // Also store buttons at top level for separate serialization
             $templateData['buttons'] = $buttons;
         }
-        
+
         $templateData['components'] = $components;
-        
+
         return $templateData;
     }
 }

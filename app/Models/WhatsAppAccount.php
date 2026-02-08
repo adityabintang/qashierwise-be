@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -10,6 +11,22 @@ class WhatsAppAccount extends Model
     use HasFactory;
 
     protected $table = 'whatsapp_accounts';
+
+    /**
+     * The "booted" method of the model.
+     * Apply Row Level Security - only show accounts for authenticated user
+     */
+    protected static function booted(): void
+    {
+        static::addGlobalScope('userAccounts', function (Builder $builder) {
+            if (auth()->check()) {
+                $builder->where('user_id', auth()->id());
+            } else {
+                // If not authenticated, return no results (security default)
+                $builder->whereRaw('1 = 0');
+            }
+        });
+    }
 
     protected $fillable = [
         'user_id',

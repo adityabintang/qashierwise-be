@@ -19,20 +19,24 @@ class ProductController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $user = $request->user();
 
-        if (!$userId) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
                 'message' => 'Authentication required',
             ], 401);
         }
 
+        // Use effective user ID (master admin ID for sub-accounts)
+        $effectiveUserId = $user->getEffectiveUserId();
+
         $perPage = $request->input('per_page', 20);
+        $activeOnly = $request->has('active_only') ? $request->boolean('active_only') : true;
         $products = Product::with('category')
-            ->where('user_id', $userId)
-            ->when($request->input('category_id'), fn($q, $categoryId) => $q->where('category_id', $categoryId))
-            ->when($request->boolean('active_only', true), fn($q) => $q->where('is_active', true))
+            ->where('user_id', $effectiveUserId)
+            ->when($request->input('category_id'), fn ($q, $categoryId) => $q->where('category_id', $categoryId))
+            ->when($activeOnly, fn ($q) => $q->where('is_active', true))
             ->orderBy('name')
             ->paginate($perPage);
 
@@ -47,9 +51,9 @@ class ProductController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->getEffectiveUserId();
 
-        if (!$userId) {
+        if (! $userId) {
             return response()->json([
                 'success' => false,
                 'message' => 'Authentication required',
@@ -79,8 +83,17 @@ class ProductController extends Controller
     /**
      * Display the specified product.
      */
-    public function show(Product $product): JsonResponse
+    public function show(Product $product, Request $request): JsonResponse
     {
+        $effectiveUserId = $request->user()->getEffectiveUserId();
+
+        if ($product->user_id !== $effectiveUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this resource.',
+            ], 403);
+        }
+
         return response()->json([
             'success' => true,
             'data' => $product->load('category'),
@@ -92,6 +105,15 @@ class ProductController extends Controller
      */
     public function update(Request $request, Product $product): JsonResponse
     {
+        $effectiveUserId = auth()->user()->getEffectiveUserId();
+
+        if ($product->user_id !== $effectiveUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this resource.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'category_id' => 'sometimes|exists:categories,id',
@@ -113,8 +135,17 @@ class ProductController extends Controller
     /**
      * Remove the specified product (soft delete).
      */
-    public function destroy(Product $product): JsonResponse
+    public function destroy(Product $product, Request $request): JsonResponse
     {
+        $effectiveUserId = $request->user()->getEffectiveUserId();
+
+        if ($product->user_id !== $effectiveUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this resource.',
+            ], 403);
+        }
+
         $this->productService->delete($product);
 
         return response()->json([
@@ -132,7 +163,11 @@ class ProductController extends Controller
             'query' => 'required|string|min:1',
         ]);
 
-        $products = $this->productService->search($request->input('query'));
+        $user = $request->user();
+        $effectiveUserId = $user->getEffectiveUserId();
+        $activeOnly = $request->has('active_only') ? $request->boolean('active_only') : true;
+
+        $products = $this->productService->search($request->input('query'), $effectiveUserId, $activeOnly);
 
         return response()->json([
             'success' => true,

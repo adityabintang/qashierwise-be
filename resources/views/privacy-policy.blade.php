@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Kebijakan Privasi - QashierWise</title>
+    <title>{{ __('legal.privacy_policy.meta_title') }}</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -27,39 +27,89 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
     <style>
         body { font-family: 'Inter', sans-serif; }
+        [x-cloak] { display: none !important; }
     </style>
 </head>
 <body class="bg-white">
     <!-- Navigation -->
-    <nav class="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
+    <nav x-data="{ menuOpen: false }" class="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <!-- Logo -->
                 <div class="flex items-center space-x-2 mb-4">
                         <img src="{{ asset('images/logo-48.png') }}" class="h-7 rounded-xl" alt="Logo" width="28" height="28" loading="eager">
-                        <span class="text-xl font-bold text-primary">QashierWise</span>
+                        <span class="text-xl font-bold text-primary">{{ __('legal.company_name') }}</span>
                 </div>
 
                 <!-- Desktop Menu -->
                 <div class="hidden md:flex items-center space-x-8">
-                    <a href="/#features" class="text-gray-600 hover:text-primary transition">Cara Kerja</a>
-                    <a href="/#fitur" class="text-gray-600 hover:text-primary transition">Fitur</a>
-                    <a href="/#pricing" class="text-gray-600 hover:text-primary transition">Harga</a>
-                    <a href="/#about" class="text-gray-600 hover:text-primary transition">Tentang Kami</a>
-                    <a href="/#faq" class="text-gray-600 hover:text-primary transition">FAQ</a>
+                    <a href="/#features" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.how_it_works') }}</a>
+                    <a href="/#fitur" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.features') }}</a>
+                    <a href="/#pricing" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.pricing') }}</a>
+                    <a href="/#about" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.about') }}</a>
+                    <a href="/#faq" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.faq') }}</a>
                 </div>
 
                 <!-- CTA Buttons -->
-                <div class="flex items-center space-x-4">
+                <div class="hidden md:flex items-center space-x-4">
+                    <!-- Language Switcher -->
+                    <x-language-switcher />
+                    
                     @if (Route::has('login'))
                         @auth
-                            <a href="{{ url('/dashboard') }}" class="text-gray-600 hover:text-primary font-medium transition">Dashboard</a>
+                            <a href="{{ url('/dashboard') }}" class="text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.dashboard') }}</a>
                         @else
-                            <a href="/login" class="text-gray-600 hover:text-primary font-medium transition">Lihat Demo</a>
+                            <a href="https://youtu.be/knoL8c0CJs8?si=N8RBGATUSK940ZF4" target="_blank" rel="noopener noreferrer" class="text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.view_demo') }}</a>
                             <a href="/register" class="bg-primary text-white px-5 py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-all">
-                                Coba Gratis 14 Hari
+                                {{ __('landing.nav.try_free') }}
+                            </a>
+                        @endauth
+                    @endif
+                </div>
+
+                <!-- Mobile Hamburger Button -->
+                <button
+                    @click="menuOpen = !menuOpen"
+                    class="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    aria-label="Toggle menu"
+                >
+                    <i x-show="!menuOpen" class="fas fa-bars text-xl"></i>
+                    <i x-show="menuOpen" x-cloak class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile Menu -->
+        <div
+            x-show="menuOpen"
+            x-cloak
+            @click.away="menuOpen = false"
+            class="md:hidden bg-white border-t border-gray-100 shadow-lg"
+        >
+            <div class="px-4 py-4 space-y-3">
+                <a href="/#features" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.how_it_works') }}</a>
+                <a href="/#fitur" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.features') }}</a>
+                <a href="/#pricing" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.pricing') }}</a>
+                <a href="/#about" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.about') }}</a>
+                <a href="/#faq" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.faq') }}</a>
+
+                <div class="pt-4 border-t border-gray-100 space-y-3">
+                    <div class="flex justify-center">
+                        <x-language-switcher />
+                    </div>
+                    
+                    @if (Route::has('login'))
+                        @auth
+                            <a href="{{ url('/dashboard') }}" class="block py-3 px-4 text-center text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.dashboard') }}</a>
+                        @else
+                            <a href="https://youtu.be/knoL8c0CJs8?si=N8RBGATUSK940ZF4" target="_blank" rel="noopener noreferrer" class="block py-3 px-4 text-center text-gray-600 hover:text-primary font-medium transition">{{ __('landing.nav.view_demo') }}</a>
+                            <a href="/register" class="block py-3 px-4 text-center bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-all">
+                                {{ __('landing.nav.try_free') }}
                             </a>
                         @endauth
                     @endif
@@ -74,102 +124,93 @@
             <!-- Back Link -->
             <a href="/" class="inline-flex items-center text-gray-600 hover:text-primary mb-8 transition">
                 <i class="fas fa-arrow-left mr-2"></i>
-                Kembali ke Beranda
+                {{ __('legal.back_to_home') }}
             </a>
 
             <!-- Title -->
-            <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-4">Kebijakan Privasi</h1>
-            <p class="text-gray-500 mb-12">Terakhir diperbarui: 27 November 2025</p>
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-4">{{ __('legal.privacy_policy.title') }}</h1>
+            <p class="text-gray-500 mb-12">{{ __('legal.last_updated') }}: {{ __('legal.privacy_policy.last_updated_date') }}</p>
 
             <!-- Content -->
             <div class="prose prose-lg max-w-none">
                 <!-- Section 1 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">1. Informasi yang Kami Kumpulkan</h2>
-                <p class="text-gray-600 mb-4">QashierWise mengumpulkan informasi yang Anda berikan kepada kami ketika menggunakan layanan kami, termasuk:</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">1. {{ __('legal.privacy_policy.section_1.title') }}</h2>
+                <p class="text-gray-600 mb-4">{{ __('legal.privacy_policy.section_1.intro') }}</p>
                 <ul class="list-disc pl-6 text-gray-600 space-y-2 mb-6">
-                    <li>Informasi bisnis restoran (nama, alamat, kontak)</li>
-                    <li>Data reservasi dan pesanan pelanggan</li>
-                    <li>Informasi komunikasi melalui WhatsApp Business API</li>
-                    <li>Data transaksi dan pembayaran</li>
-                    <li>Informasi penggunaan layanan dan statistik</li>
+                    @foreach(__('legal.privacy_policy.section_1.items') as $item)
+                        <li>{{ $item }}</li>
+                    @endforeach
                 </ul>
 
                 <!-- Section 2 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">2. Penggunaan WhatsApp Business API</h2>
-                <p class="text-gray-600 mb-4">QashierWise menggunakan WhatsApp Business API untuk memfasilitasi komunikasi antara restoran dan pelanggan. Kami:</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">2. {{ __('legal.privacy_policy.section_2.title') }}</h2>
+                <p class="text-gray-600 mb-4">{{ __('legal.privacy_policy.section_2.intro') }}</p>
                 <ul class="list-disc pl-6 text-gray-600 space-y-2 mb-6">
-                    <li>Memproses pesan reservasi dan pesanan melalui WhatsApp</li>
-                    <li>Menyimpan riwayat percakapan untuk keperluan operasional</li>
-                    <li>Menggunakan data untuk meningkatkan layanan chatbot AI</li>
-                    <li>Tidak membagikan data WhatsApp Anda kepada pihak ketiga tanpa izin</li>
-                    <li>Mematuhi kebijakan privasi WhatsApp dan Meta</li>
+                    @foreach(__('legal.privacy_policy.section_2.items') as $item)
+                        <li>{{ $item }}</li>
+                    @endforeach
                 </ul>
 
                 <!-- Section 3 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">3. Bagaimana Kami Menggunakan Informasi</h2>
-                <p class="text-gray-600 mb-4">Informasi yang dikumpulkan digunakan untuk:</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">3. {{ __('legal.privacy_policy.section_3.title') }}</h2>
+                <p class="text-gray-600 mb-4">{{ __('legal.privacy_policy.section_3.intro') }}</p>
                 <ul class="list-disc pl-6 text-gray-600 space-y-2 mb-6">
-                    <li>Menyediakan dan meningkatkan layanan QashierWise</li>
-                    <li>Memproses reservasi dan pesanan pelanggan</li>
-                    <li>Mengirim notifikasi dan konfirmasi melalui WhatsApp</li>
-                    <li>Menganalisis dan meningkatkan performa sistem</li>
-                    <li>Mematuhi kewajiban hukum dan peraturan yang berlaku</li>
+                    @foreach(__('legal.privacy_policy.section_3.items') as $item)
+                        <li>{{ $item }}</li>
+                    @endforeach
                 </ul>
 
                 <!-- Section 4 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">4. Keamanan Data</h2>
-                <p class="text-gray-600 mb-6">Kami menerapkan langkah-langkah keamanan yang sesuai untuk melindungi informasi Anda dari akses, pengungkapan, perubahan, atau penghancuran yang tidak sah. Data disimpan dengan enkripsi dan hanya dapat diakses oleh personel yang berwenang.</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">4. {{ __('legal.privacy_policy.section_4.title') }}</h2>
+                <p class="text-gray-600 mb-6">{{ __('legal.privacy_policy.section_4.content') }}</p>
 
                 <!-- Section 5 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">5. Pembagian Informasi</h2>
-                <p class="text-gray-600 mb-4">Kami tidak menjual, menyewakan, atau membagikan informasi pribadi Anda kepada pihak ketiga, kecuali:</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">5. {{ __('legal.privacy_policy.section_5.title') }}</h2>
+                <p class="text-gray-600 mb-4">{{ __('legal.privacy_policy.section_5.intro') }}</p>
                 <ul class="list-disc pl-6 text-gray-600 space-y-2 mb-6">
-                    <li>Dengan persetujuan Anda</li>
-                    <li>Untuk mematuhi kewajiban hukum</li>
-                    <li>Dengan penyedia layanan pihak ketiga yang membantu operasional kami (seperti WhatsApp Business API, payment gateway)</li>
-                    <li>Untuk melindungi hak, properti, atau keamanan QashierWise dan pengguna kami</li>
+                    @foreach(__('legal.privacy_policy.section_5.items') as $item)
+                        <li>{{ $item }}</li>
+                    @endforeach
                 </ul>
 
                 <!-- Section 6 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">6. Retensi Data</h2>
-                <p class="text-gray-600 mb-6">Kami menyimpan informasi Anda selama akun Anda aktif atau sepanjang diperlukan untuk menyediakan layanan. Anda dapat meminta penghapusan data dengan menghubungi kami.</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">6. {{ __('legal.privacy_policy.section_6.title') }}</h2>
+                <p class="text-gray-600 mb-6">{{ __('legal.privacy_policy.section_6.content') }}</p>
 
                 <!-- Section 7 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">7. Hak Anda</h2>
-                <p class="text-gray-600 mb-4">Anda memiliki hak untuk:</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">7. {{ __('legal.privacy_policy.section_7.title') }}</h2>
+                <p class="text-gray-600 mb-4">{{ __('legal.privacy_policy.section_7.intro') }}</p>
                 <ul class="list-disc pl-6 text-gray-600 space-y-2 mb-6">
-                    <li>Mengakses dan mendapatkan salinan data pribadi Anda</li>
-                    <li>Memperbaiki data yang tidak akurat</li>
-                    <li>Meminta penghapusan data Anda</li>
-                    <li>Membatasi atau menolak pemrosesan data tertentu</li>
-                    <li>Menarik persetujuan yang telah diberikan</li>
+                    @foreach(__('legal.privacy_policy.section_7.items') as $item)
+                        <li>{{ $item }}</li>
+                    @endforeach
                 </ul>
 
                 <!-- Section 8 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">8. Cookies dan Teknologi Pelacakan</h2>
-                <p class="text-gray-600 mb-6">Website kami menggunakan cookies dan teknologi serupa untuk meningkatkan pengalaman pengguna, menganalisis traffic, dan personalisasi konten. Anda dapat mengatur preferensi cookies melalui browser Anda.</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">8. {{ __('legal.privacy_policy.section_8.title') }}</h2>
+                <p class="text-gray-600 mb-6">{{ __('legal.privacy_policy.section_8.content') }}</p>
 
                 <!-- Section 9 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">9. Perubahan Kebijakan Privasi</h2>
-                <p class="text-gray-600 mb-6">Kami dapat memperbarui kebijakan privasi ini dari waktu ke waktu. Perubahan akan diposting di halaman ini dengan tanggal "terakhir diperbarui" yang baru. Kami mendorong Anda untuk meninjau kebijakan ini secara berkala.</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">9. {{ __('legal.privacy_policy.section_9.title') }}</h2>
+                <p class="text-gray-600 mb-6">{{ __('legal.privacy_policy.section_9.content') }}</p>
 
                 <!-- Section 10 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">10. Hubungi Kami</h2>
-                <p class="text-gray-600 mb-6">Jika Anda memiliki pertanyaan tentang kebijakan privasi ini atau ingin menggunakan hak privasi Anda, silakan hubungi kami:</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">10. {{ __('legal.privacy_policy.section_10.title') }}</h2>
+                <p class="text-gray-600 mb-6">{{ __('legal.privacy_policy.section_10.intro') }}</p>
 
                 <!-- Contact Box -->
                 <div class="bg-gray-50 rounded-xl p-6 mb-8">
-                    <h3 class="font-bold text-gray-900 mb-3">QashierWise</h3>
+                    <h3 class="font-bold text-gray-900 mb-3">{{ __('legal.company_name') }}</h3>
                     <div class="text-gray-600 space-y-1">
-                        <p><span class="font-medium">Email:</span> support@qashierwise.com</p>
-                        <p><span class="font-medium">WhatsApp:</span> +62 882-1545-7494</p>
-                        <p><span class="font-medium">Alamat:</span> Jl. Widosari No. 55, Tegalrejo Raya, Salatiga, Jawa Tengah, Indonesia 50733</p>
+                        <p><span class="font-medium">{{ __('legal.email') }}:</span> support@qashierwise.com</p>
+                        <p><span class="font-medium">{{ __('legal.whatsapp') }}:</span> +62882003235019</p>
+                        <p><span class="font-medium">{{ __('legal.address') }}:</span> Jl. Widosari No. 55, Tegalrejo Raya, Salatiga, Jawa Tengah, Indonesia 50733</p>
                     </div>
                 </div>
 
                 <!-- Section 11 -->
-                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">11. Kepatuhan terhadap Regulasi</h2>
-                <p class="text-gray-600 mb-6">QashierWise berkomitmen untuk mematuhi peraturan perlindungan data yang berlaku di Indonesia, termasuk Undang-Undang Perlindungan Data Pribadi (UU PDP), serta kebijakan WhatsApp Business API dan Meta Platform.</p>
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">11. {{ __('legal.privacy_policy.section_11.title') }}</h2>
+                <p class="text-gray-600 mb-6">{{ __('legal.privacy_policy.section_11.content') }}</p>
             </div>
         </div>
     </main>
@@ -182,49 +223,50 @@
                 <div>
                     <div class="flex items-center space-x-2 mb-4">
                         <img src="{{ asset('images/logo-48.png') }}" class="h-7 rounded-xl" alt="Logo" width="28" height="28" loading="lazy">
-                        <span class="text-xl font-bold text-primary">QashierWise</span>
+                        <span class="text-xl font-bold text-primary">{{ __('legal.company_name') }}</span>
                     </div>
                     <p class="text-sm text-gray-600 mb-4">
-                        Coba gratis 14 hari, QashierWise membantu restoran menerima reservasi & order via WhatsApp dengan cepat.
+                        {!! __('landing.footer.company_description') !!}
                     </p>
                     <div class="text-sm text-gray-600">
-                        <p class="font-semibold text-gray-900 mb-1">Alamat</p>
-                        <p>Jl. Widosari No. 55, Tegalrejo Raya<br>Salatiga, Jawa Tengah, Indonesia<br>50733</p>
+                        <p class="font-semibold text-gray-900 mb-1">{{ __('legal.address') }}</p>
+                        <p>{!! __('landing.footer.address') !!}</p>
                     </div>
                 </div>
 
                 <!-- Navigation -->
                 <div>
-                    <h3 class="text-gray-900 font-semibold mb-4">Navigasi</h4>
+                    <h3 class="text-gray-900 font-semibold mb-4">{{ __('landing.footer.navigation_title') }}</h3>
                     <ul class="space-y-2 text-sm">
-                        <li><a href="/#fitur" class="text-gray-600 hover:text-primary transition">Fitur</a></li>
-                        <li><a href="/#pricing" class="text-gray-600 hover:text-primary transition">Harga</a></li>
-                        <li><a href="/#about" class="text-gray-600 hover:text-primary transition">Tentang Kami</a></li>
-                        <li><a href="/#faq" class="text-gray-600 hover:text-primary transition">FAQ</a></li>
+                        <li><a href="/#fitur" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.features') }}</a></li>
+                        <li><a href="/#pricing" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.pricing') }}</a></li>
+                        <li><a href="/#about" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.about') }}</a></li>
+                        <li><a href="/#faq" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.faq') }}</a></li>
                     </ul>
                 </div>
 
                 <!-- Legal -->
                 <div>
-                    <h3 class="text-gray-900 font-semibold mb-4">Legal</h4>
+                    <h3 class="text-gray-900 font-semibold mb-4">{{ __('landing.footer.legal_title') }}</h3>
                     <ul class="space-y-2 text-sm">
-                        <li><a href="/privacy-policy" class="text-gray-600 hover:text-primary transition">Kebijakan Privasi</a></li>
-                        <li><a href="/terms-of-service" class="text-gray-600 hover:text-primary transition">Ketentuan Layanan</a></li>
+                        <li><a href="/privacy-policy" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.privacy_policy') }}</a></li>
+                        <li><a href="/terms-of-service" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.terms_of_service') }}</a></li>
+                        <li><a href="/refund-policy" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.refund_policy') }}</a></li>
                     </ul>
                 </div>
 
                 <!-- Product -->
                 <div>
-                    <h3 class="text-gray-900 font-semibold mb-4">Produk</h4>
+                    <h3 class="text-gray-900 font-semibold mb-4">{{ __('landing.footer.product_title') }}</h3>
                     <ul class="space-y-2 text-sm">
-                        <li><a href="#" class="text-gray-600 hover:text-primary transition">QashierWise Console</a></li>
-                        <li><a href="#" class="text-gray-600 hover:text-primary transition">Chatbot WhatsApp</a></li>
+                        <li><a href="#" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.console') }}</a></li>
+                        <li><a href="#" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.chatbot') }}</a></li>
                     </ul>
                 </div>
             </div>
 
             <div class="border-t border-gray-200 pt-8 text-center text-sm text-gray-600">
-                <p>&copy; 2025 QashierWise by AdityaBintang. All Rights Reserved.</p>
+                <p>{!! __('landing.footer.copyright') !!}</p>
             </div>
         </div>
     </footer>

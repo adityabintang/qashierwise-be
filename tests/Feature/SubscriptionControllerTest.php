@@ -4,11 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Subscription;
 use App\Models\User;
-use App\Services\PolarService;
-use App\DTOs\CheckoutSession;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Mockery;
 use Tests\TestCase;
 
 class SubscriptionControllerTest extends TestCase
@@ -18,7 +15,7 @@ class SubscriptionControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Set up Polar config for tests
         config([
             'polar.api_token' => 'test_token',
@@ -61,7 +58,7 @@ class SubscriptionControllerTest extends TestCase
     public function test_status_returns_active_subscription(): void
     {
         $user = User::factory()->create();
-        
+
         Subscription::create([
             'user_id' => $user->id,
             'polar_subscription_id' => 'sub_123',

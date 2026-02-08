@@ -11,7 +11,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Property-based tests for SubscriptionStatus DTO
- * 
+ *
  * Feature: polar-subscription
  */
 class SubscriptionStatusPropertyTest extends TestCase
@@ -21,7 +21,7 @@ class SubscriptionStatusPropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 14: Subscription Serialization Round-Trip
      * Validates: Requirements 7.4
-     * 
+     *
      * For any valid SubscriptionStatus object, serializing to array and deserializing back
      * SHALL produce an equivalent SubscriptionStatus object.
      */
@@ -67,7 +67,7 @@ class SubscriptionStatusPropertyTest extends TestCase
                 $this->assertEquals($subscriptionStatus->status, $restoredStatus->status, 'status should be preserved');
                 $this->assertEquals($subscriptionStatus->planName, $restoredStatus->planName, 'planName should be preserved');
                 $this->assertEquals($subscriptionStatus->trialDaysRemaining, $restoredStatus->trialDaysRemaining, 'trialDaysRemaining should be preserved');
-                
+
                 // For Carbon dates, compare timestamps to handle timezone differences
                 if ($subscriptionStatus->periodEnd !== null) {
                     $this->assertNotNull($restoredStatus->periodEnd, 'periodEnd should not be null when original is not null');
@@ -96,7 +96,7 @@ class SubscriptionStatusPropertyTest extends TestCase
     /**
      * Feature: polar-subscription, Property 14: Subscription Serialization Round-Trip (JSON variant)
      * Validates: Requirements 7.4
-     * 
+     *
      * For any valid SubscriptionStatus object, serializing to JSON and deserializing back
      * SHALL produce an equivalent SubscriptionStatus object.
      */

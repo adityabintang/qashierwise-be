@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Controller for handling Polar.sh webhook events.
- * 
+ *
  * Receives and processes subscription lifecycle events from Polar.sh
  * including subscription creation, updates, and cancellations.
  */
@@ -24,11 +24,8 @@ class PolarWebhookController extends Controller
 
     /**
      * Handle incoming Polar.sh webhook events.
-     * 
+     *
      * Validates the webhook signature and routes events to appropriate handlers.
-     * 
-     * @param Request $request
-     * @return Response
      */
     public function handle(Request $request): Response
     {
@@ -46,7 +43,7 @@ class PolarWebhookController extends Controller
         ]);
 
         // Validate webhook signature
-        if (!$this->polarService->validateWebhookSignature($payload, $signature, $webhookId, $webhookTimestamp)) {
+        if (! $this->polarService->validateWebhookSignature($payload, $signature, $webhookId, $webhookTimestamp)) {
             Log::warning('Invalid Polar webhook signature', [
                 'signature' => $signature,
                 'webhookId' => $webhookId,
@@ -61,6 +58,7 @@ class PolarWebhookController extends Controller
 
         if ($event === null) {
             Log::warning('Invalid Polar webhook payload: not valid JSON');
+
             return response('Invalid payload', 400);
         }
 
@@ -68,6 +66,7 @@ class PolarWebhookController extends Controller
 
         if ($eventType === null) {
             Log::warning('Polar webhook missing event type');
+
             return response('Missing event type', 400);
         }
 

@@ -29,23 +29,25 @@ class BalanceService
     public function setAuditService(FinancialAuditService $auditService): self
     {
         $this->auditService = $auditService;
+
         return $this;
     }
 
     /**
      * Update a sub-merchant's balance.
      *
-     * @param SubMerchant $merchant The sub-merchant
-     * @param float $amount Amount to add (positive) or deduct (negative)
-     * @param string $type Type of update ('payment', 'withdrawal', 'adjustment', 'refund')
-     * @param string|null $reference Optional reference (e.g., order_id, withdrawal_id)
+     * @param  SubMerchant  $merchant  The sub-merchant
+     * @param  float  $amount  Amount to add (positive) or deduct (negative)
+     * @param  string  $type  Type of update ('payment', 'withdrawal', 'adjustment', 'refund')
+     * @param  string|null  $reference  Optional reference (e.g., order_id, withdrawal_id)
      * @return MerchantBalance Updated balance
+     *
      * @throws InvalidArgumentException If operation would result in negative balance
      */
     public function updateBalance(SubMerchant $merchant, float $amount, string $type, ?string $reference = null): MerchantBalance
     {
         $balance = $merchant->balance;
-        
+
         if ($balance === null) {
             throw new InvalidArgumentException('Sub-merchant has no balance record');
         }
@@ -53,7 +55,7 @@ class BalanceService
         return DB::transaction(function () use ($balance, $amount, $type, $reference, $merchant) {
             // Lock the balance record for update
             $balance = MerchantBalance::lockForUpdate()->find($balance->id);
-            
+
             // Capture balance before update for audit
             $balanceBefore = (float) $balance->available_balance;
 
@@ -71,7 +73,7 @@ class BalanceService
                     if ($amount < 0) {
                         throw new InvalidArgumentException('Withdrawal amount must be positive');
                     }
-                    if (!$balance->hasSufficientBalance($amount)) {
+                    if (! $balance->hasSufficientBalance($amount)) {
                         throw new InvalidArgumentException('Insufficient balance for withdrawal');
                     }
                     $balance->deductForWithdrawal($amount);
@@ -104,7 +106,7 @@ class BalanceService
             }
 
             $balance->save();
-            
+
             // Capture balance after update for audit
             $balanceAfter = (float) $balance->available_balance;
 
@@ -136,7 +138,7 @@ class BalanceService
     /**
      * Calculate platform fee for a given amount.
      *
-     * @param float $amount Transaction amount
+     * @param  float  $amount  Transaction amount
      * @return float Platform fee amount
      */
     public function calculatePlatformFee(float $amount): float
@@ -151,7 +153,7 @@ class BalanceService
     /**
      * Calculate net amount after platform fee deduction.
      *
-     * @param float $amount Gross transaction amount
+     * @param  float  $amount  Gross transaction amount
      * @return float Net amount (gross - platform fee)
      */
     public function calculateNetAmount(float $amount): float
@@ -162,13 +164,14 @@ class BalanceService
     /**
      * Process a successful payment and update merchant balance.
      *
-     * @param QrisTransaction $transaction The settled transaction
+     * @param  QrisTransaction  $transaction  The settled transaction
      * @return MerchantBalance Updated balance
+     *
      * @throws InvalidArgumentException If transaction is not settled
      */
     public function processPaymentSuccess(QrisTransaction $transaction): MerchantBalance
     {
-        if (!$transaction->isSettled()) {
+        if (! $transaction->isSettled()) {
             throw new InvalidArgumentException('Transaction must be settled to process payment');
         }
 
@@ -180,7 +183,7 @@ class BalanceService
         return DB::transaction(function () use ($transaction, $merchant) {
             // Get the net amount (already calculated when transaction was created)
             $netAmount = (float) $transaction->net_amount;
-            
+
             // Capture balance before for audit
             $balanceBefore = (float) ($merchant->balance?->available_balance ?? 0);
 
@@ -206,13 +209,13 @@ class BalanceService
                     (float) $transaction->platform_fee,
                     self::PLATFORM_FEE_PERCENTAGE
                 );
-                
+
                 $this->auditService->logFeeCollection(
                     $merchant,
                     $transaction,
                     $platformFee
                 );
-                
+
                 $this->auditService->logQrisSettlement(
                     $merchant,
                     $transaction,
@@ -228,13 +231,13 @@ class BalanceService
     /**
      * Get balance history/breakdown for a sub-merchant.
      *
-     * @param SubMerchant $merchant The sub-merchant
+     * @param  SubMerchant  $merchant  The sub-merchant
      * @return array Balance breakdown
      */
     public function getBalanceHistory(SubMerchant $merchant): array
     {
         $balance = $merchant->balance;
-        
+
         if ($balance === null) {
             return [
                 'available_balance' => 0,
@@ -258,8 +261,8 @@ class BalanceService
     /**
      * Get transaction history with fee breakdown for a sub-merchant.
      *
-     * @param SubMerchant $merchant The sub-merchant
-     * @param int $limit Number of transactions to return
+     * @param  SubMerchant  $merchant  The sub-merchant
+     * @param  int  $limit  Number of transactions to return
      * @return Collection Transaction history with fee details
      */
     public function getTransactionHistoryWithFees(SubMerchant $merchant, int $limit = 50): Collection
@@ -285,9 +288,9 @@ class BalanceService
     /**
      * Get total earnings for a sub-merchant within a date range.
      *
-     * @param SubMerchant $merchant The sub-merchant
-     * @param \DateTimeInterface|null $startDate Start date (optional)
-     * @param \DateTimeInterface|null $endDate End date (optional)
+     * @param  SubMerchant  $merchant  The sub-merchant
+     * @param  \DateTimeInterface|null  $startDate  Start date (optional)
+     * @param  \DateTimeInterface|null  $endDate  End date (optional)
      * @return array Earnings summary
      */
     public function getEarningsSummary(SubMerchant $merchant, ?\DateTimeInterface $startDate = null, ?\DateTimeInterface $endDate = null): array
@@ -316,8 +319,8 @@ class BalanceService
     /**
      * Validate that a balance operation won't result in negative balance.
      *
-     * @param MerchantBalance $balance The balance to check
-     * @param float $amount Amount to deduct
+     * @param  MerchantBalance  $balance  The balance to check
+     * @param  float  $amount  Amount to deduct
      * @return bool True if operation is valid
      */
     public function validateBalanceOperation(MerchantBalance $balance, float $amount): bool
@@ -332,7 +335,7 @@ class BalanceService
     /**
      * Get the current available balance for a sub-merchant.
      *
-     * @param SubMerchant $merchant The sub-merchant
+     * @param  SubMerchant  $merchant  The sub-merchant
      * @return float Available balance
      */
     public function getAvailableBalance(SubMerchant $merchant): float
@@ -343,14 +346,14 @@ class BalanceService
     /**
      * Check if a sub-merchant can withdraw a specific amount.
      *
-     * @param SubMerchant $merchant The sub-merchant
-     * @param float $amount Amount to withdraw
+     * @param  SubMerchant  $merchant  The sub-merchant
+     * @param  float  $amount  Amount to withdraw
      * @return bool True if withdrawal is possible
      */
     public function canWithdraw(SubMerchant $merchant, float $amount): bool
     {
         $balance = $merchant->balance;
-        
+
         if ($balance === null) {
             return false;
         }
@@ -361,8 +364,8 @@ class BalanceService
     /**
      * Get withdrawal validation errors.
      *
-     * @param SubMerchant $merchant The sub-merchant
-     * @param float $amount Amount to withdraw
+     * @param  SubMerchant  $merchant  The sub-merchant
+     * @param  float  $amount  Amount to withdraw
      * @return array<string, string> Validation errors (empty if valid)
      */
     public function getWithdrawalValidationErrors(SubMerchant $merchant, float $amount): array
@@ -372,14 +375,15 @@ class BalanceService
 
         if ($balance === null) {
             $errors['balance'] = 'No balance record found';
+
             return $errors;
         }
 
-        if (!$balance->meetsMinimumWithdrawal($amount)) {
-            $errors['amount'] = 'Minimum withdrawal amount is Rp ' . number_format(MerchantBalance::MINIMUM_WITHDRAWAL, 0, ',', '.');
+        if (! $balance->meetsMinimumWithdrawal($amount)) {
+            $errors['amount'] = 'Minimum withdrawal amount is Rp '.number_format(MerchantBalance::MINIMUM_WITHDRAWAL, 0, ',', '.');
         }
 
-        if (!$balance->hasSufficientBalance($amount)) {
+        if (! $balance->hasSufficientBalance($amount)) {
             $errors['balance'] = 'Insufficient available balance';
         }
 

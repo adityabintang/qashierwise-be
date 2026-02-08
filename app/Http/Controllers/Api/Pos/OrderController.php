@@ -21,20 +21,32 @@ class OrderController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $user = $request->user();
 
-        if (!$userId) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
                 'message' => 'Authentication required',
             ], 401);
         }
 
+        // Use effective user ID (master admin ID for sub-accounts)
+        $effectiveUserId = $user->getEffectiveUserId();
+
         $perPage = $request->input('per_page', 20);
+
+        // Clean search input - remove # if present
+        $search = $request->input('search');
+        if ($search) {
+            $search = str_replace('#', '', $search);
+        }
+
         $orders = Order::with(['store', 'table', 'posUser.user', 'items.product'])
-            ->whereHas('store', fn($q) => $q->where('user_id', $userId))
-            ->when($request->input('store_id'), fn($q, $storeId) => $q->where('store_id', $storeId))
-            ->when($request->input('status'), fn($q, $status) => $q->where('status', $status))
+            ->whereHas('store', fn ($q) => $q->where('user_id', $effectiveUserId))
+            ->when($request->input('store_id'), fn ($q, $storeId) => $q->where('store_id', $storeId))
+            ->when($request->input('status'), fn ($q, $status) => $q->where('status', $status))
+            ->when($search, fn ($q) => $q->where('order_number', 'like', '%'.$search.'%')
+            )
             ->orderBy('created_at', 'desc')
             ->paginate($perPage);
 
@@ -66,12 +78,18 @@ class OrderController extends Controller
                     ->where('is_active', true)
                     ->first();
 
-                // If no PosUser exists, create one with default role
-                if (!$posUser) {
-                    $defaultRole = \App\Models\Role::firstOrCreate(
-                        ['name' => 'Cashier'],
-                        ['permissions' => ['orders.create', 'orders.view', 'payments.create']]
-                    );
+                // If no PosUser exists, create one with default Spatie role
+                if (! $posUser) {
+                    $defaultRole = \Spatie\Permission\Models\Role::where('name', 'Cashier')
+                        ->where('guard_name', 'sanctum')
+                        ->first();
+
+                    if (! $defaultRole) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Default Cashier role not found. Please contact administrator.',
+                        ], 500);
+                    }
 
                     $posUser = \App\Models\PosUser::create([
                         'user_id' => $user->id,
@@ -79,6 +97,9 @@ class OrderController extends Controller
                         'role_id' => $defaultRole->id,
                         'is_active' => true,
                     ]);
+
+                    // Assign role to user via Spatie
+                    $user->syncRoles([$defaultRole->name]);
                 }
 
                 $validated['pos_user_id'] = $posUser->id;
@@ -96,7 +117,7 @@ class OrderController extends Controller
             $order = $this->orderService->create($validated);
 
             // Add items if provided
-            if (!empty($validated['items'])) {
+            if (! empty($validated['items'])) {
                 foreach ($validated['items'] as $itemData) {
                     $product = \App\Models\Product::find($itemData['product_id']);
                     if ($product) {
@@ -122,8 +143,17 @@ class OrderController extends Controller
     /**
      * Display the specified order.
      */
-    public function show(Order $order): JsonResponse
+    public function show(Order $order, Request $request): JsonResponse
     {
+        $effectiveUserId = $request->user()->getEffectiveUserId();
+
+        if ($order->store->user_id !== $effectiveUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this resource.',
+            ], 403);
+        }
+
         return response()->json([
             'success' => true,
             'data' => $order->load(['store', 'table', 'posUser.user', 'items.product', 'payments']),
@@ -135,6 +165,15 @@ class OrderController extends Controller
      */
     public function addItem(Request $request, Order $order): JsonResponse
     {
+        $effectiveUserId = auth()->user()->getEffectiveUserId();
+
+        if ($order->store->user_id !== $effectiveUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this resource.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'product_id' => 'required|exists:products,id',
             'quantity' => 'required|integer|min:1',
@@ -163,8 +202,17 @@ class OrderController extends Controller
     /**
      * Remove an item from the order.
      */
-    public function removeItem(Order $order, OrderItem $item): JsonResponse
+    public function removeItem(Order $order, OrderItem $item, Request $request): JsonResponse
     {
+        $effectiveUserId = $request->user()->getEffectiveUserId();
+
+        if ($order->store->user_id !== $effectiveUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this resource.',
+            ], 403);
+        }
+
         try {
             $this->orderService->removeItem($order, $item);
 
@@ -186,6 +234,15 @@ class OrderController extends Controller
      */
     public function applyDiscount(Request $request, Order $order): JsonResponse
     {
+        $effectiveUserId = auth()->user()->getEffectiveUserId();
+
+        if ($order->store->user_id !== $effectiveUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this resource.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'discount' => 'required|numeric|min:0',
         ]);
@@ -207,31 +264,19 @@ class OrderController extends Controller
     }
 
     /**
-     * Complete the order.
-     */
-    public function complete(Order $order): JsonResponse
-    {
-        try {
-            $order = $this->orderService->complete($order);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Order completed successfully',
-                'data' => $order->load(['items.product', 'payments']),
-            ]);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 400);
-        }
-    }
-
-    /**
      * Cancel the order.
      */
-    public function cancel(Order $order): JsonResponse
+    public function cancel(Order $order, Request $request): JsonResponse
     {
+        $effectiveUserId = $request->user()->getEffectiveUserId();
+
+        if ($order->store->user_id !== $effectiveUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this resource.',
+            ], 403);
+        }
+
         try {
             $order = $this->orderService->cancel($order);
 
