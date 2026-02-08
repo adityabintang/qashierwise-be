@@ -3,12 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\MerchantBalance;
-use App\Models\PaymentProviderCredential;
 use App\Models\QrisTransaction;
 use App\Models\SubMerchant;
 use App\Models\User;
-use App\Models\UserEncryptionKey;
-use App\Services\EncryptionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -22,29 +19,23 @@ class XenditWebhookControllerTest extends TestCase
 
     private QrisTransaction $transaction;
 
-    private PaymentProviderCredential $credential;
-
-    private EncryptionService $encryptionService;
+    private string $webhookToken = 'test_webhook_token_456';
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->encryptionService = app(EncryptionService::class);
+        // Set webhook token in config
+        config(['xendit.webhook_token' => $this->webhookToken]);
 
         // Create user and sub-merchant
         $this->user = User::factory()->create();
 
-        // Create encryption key for user
-        UserEncryptionKey::create([
-            'user_id' => $this->user->id,
-            'encryption_key_encrypted' => encrypt('test-encryption-key-'.$this->user->id),
-            'key_version' => 1,
-        ]);
-
         $this->subMerchant = SubMerchant::create([
             'user_id' => $this->user->id,
             'business_name' => 'Test Business',
+            'xendit_account_id' => 'xen_acc_test_123',
+            'xendit_account_status' => 'active',
             'is_active' => true,
         ]);
 
@@ -54,25 +45,6 @@ class XenditWebhookControllerTest extends TestCase
             'pending_balance' => 0,
             'total_earned' => 0,
             'total_withdrawn' => 0,
-        ]);
-
-        // Create Xendit provider credential
-        $credentials = [
-            'api_key' => 'xnd_test_api_key_123',
-            'webhook_token' => 'test_webhook_token_456',
-        ];
-
-        $encryptedCredentials = $this->encryptionService->encryptCredentials(
-            $this->user,
-            $credentials
-        );
-
-        $this->credential = PaymentProviderCredential::create([
-            'user_id' => $this->user->id,
-            'provider' => 'xendit',
-            'credentials_encrypted' => $encryptedCredentials,
-            'is_active' => true,
-            'connection_status' => 'valid',
         ]);
 
         // Create a pending transaction
@@ -89,17 +61,17 @@ class XenditWebhookControllerTest extends TestCase
     }
 
     /** @test */
-    public function webhook_rejects_missing_external_id(): void
+    public function webhook_rejects_missing_reference_id(): void
     {
         $response = $this->postJson('/api/webhooks/xendit', [
             'status' => 'COMPLETED',
         ], [
-            'x-callback-token' => 'test_webhook_token_456',
+            'x-callback-token' => $this->webhookToken,
         ]);
 
         $response->assertStatus(422)
             ->assertJson([
-                'error' => 'Missing required field: external_id',
+                'error' => 'Missing required field: reference_id or external_id',
                 'code' => 'VALIDATION_ERROR',
             ]);
     }
@@ -126,7 +98,7 @@ class XenditWebhookControllerTest extends TestCase
         $payload = $this->buildWebhookPayload($this->transaction->order_id, 'COMPLETED');
 
         $response = $this->postJson('/api/webhooks/xendit', $payload, [
-            'x-callback-token' => 'test_webhook_token_456',
+            'x-callback-token' => $this->webhookToken,
         ]);
 
         $response->assertStatus(200)
@@ -145,7 +117,7 @@ class XenditWebhookControllerTest extends TestCase
         $payload = $this->buildWebhookPayload($this->transaction->order_id, 'INACTIVE');
 
         $response = $this->postJson('/api/webhooks/xendit', $payload, [
-            'x-callback-token' => 'test_webhook_token_456',
+            'x-callback-token' => $this->webhookToken,
         ]);
 
         $response->assertStatus(200)
@@ -162,7 +134,7 @@ class XenditWebhookControllerTest extends TestCase
         $payload = $this->buildWebhookPayload('UNKNOWN-ORDER-ID', 'COMPLETED');
 
         $response = $this->postJson('/api/webhooks/xendit', $payload, [
-            'x-callback-token' => 'test_webhook_token_456',
+            'x-callback-token' => $this->webhookToken,
         ]);
 
         // Should return 200 to prevent retries
@@ -183,7 +155,7 @@ class XenditWebhookControllerTest extends TestCase
         $payload = $this->buildWebhookPayload($this->transaction->order_id, 'COMPLETED');
 
         $response = $this->postJson('/api/webhooks/xendit', $payload, [
-            'x-callback-token' => 'test_webhook_token_456',
+            'x-callback-token' => $this->webhookToken,
         ]);
 
         $response->assertStatus(200);
@@ -200,7 +172,7 @@ class XenditWebhookControllerTest extends TestCase
         $payload = $this->buildWebhookPayload($this->transaction->order_id, 'ACTIVE');
 
         $response = $this->postJson('/api/webhooks/xendit', $payload, [
-            'x-callback-token' => 'test_webhook_token_456',
+            'x-callback-token' => $this->webhookToken,
         ]);
 
         $response->assertStatus(200)
@@ -218,7 +190,7 @@ class XenditWebhookControllerTest extends TestCase
     {
         $payload = [
             'id' => 'qr_'.uniqid(),
-            'external_id' => $orderId,
+            'reference_id' => $orderId,
             'amount' => 100000,
             'status' => $status,
             'type' => 'DYNAMIC',
@@ -226,11 +198,6 @@ class XenditWebhookControllerTest extends TestCase
             'created' => now()->toIso8601String(),
             'updated' => now()->toIso8601String(),
         ];
-
-        // Add updated timestamp for completed payments
-        if ($status === 'COMPLETED') {
-            $payload['updated'] = now()->toIso8601String();
-        }
 
         return $payload;
     }

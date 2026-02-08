@@ -670,25 +670,25 @@
                         decoding="async"
                         loading="eager">
                     <!-- Floating Elements - Hidden on small mobile, visible on larger screens -->
-                    <div class="hidden sm:block absolute -bottom-4 md:-bottom-6 -left-2 md:-left-6 bg-white rounded-xl p-3 md:p-4 shadow-xl floating-card" style="contain: layout style; will-change: transform; width: 180px; height: 60px;">
-                        <div class="flex items-center space-x-2 md:space-x-3">
+                    <div class="hidden sm:block absolute -bottom-4 md:-bottom-6 -left-2 md:-left-6 bg-white rounded-xl p-3 md:p-4 shadow-xl floating-card" style="contain: layout style; will-change: transform;">
+                        <div class="flex items-center gap-2 md:gap-3">
                             <div class="w-8 h-8 md:w-10 md:h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
                                 <i class="fab fa-whatsapp text-green-600 text-lg md:text-xl"></i>
                             </div>
-                            <div style="min-width: 100px;">
-                                <p class="text-xs md:text-sm font-semibold text-gray-900 whitespace-nowrap">{{ __('landing.hero.floating_messages') }}</p>
-                                <p class="text-xs text-gray-500 whitespace-nowrap">{{ __('landing.hero.floating_messages_count') }}</p>
+                            <div class="flex flex-col justify-center">
+                                <p class="text-xs md:text-sm font-semibold text-gray-900 leading-tight">{{ __('landing.hero.floating_messages') }}</p>
+                                <p class="text-xs text-gray-500 leading-tight">{{ __('landing.hero.floating_messages_count') }}</p>
                             </div>
                         </div>
                     </div>
-                    <div class="hidden sm:block absolute -top-2 md:-top-4 -right-2 md:-right-4 bg-white rounded-xl p-3 md:p-4 shadow-xl floating-card" style="contain: layout style; will-change: transform; width: 180px; height: 60px;">
-                        <div class="flex items-center space-x-2 md:space-x-3">
+                    <div class="hidden sm:block absolute -top-2 md:-top-4 -right-2 md:-right-4 bg-white rounded-xl p-3 md:p-4 shadow-xl floating-card" style="contain: layout style; will-change: transform;">
+                        <div class="flex items-center gap-2 md:gap-3">
                             <div class="w-8 h-8 md:w-10 md:h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
                                 <i class="fas fa-chart-line text-primary text-lg md:text-xl"></i>
                             </div>
-                            <div style="min-width: 100px;">
-                                <p class="text-xs md:text-sm font-semibold text-gray-900 whitespace-nowrap">{{ __('landing.hero.floating_sales') }}</p>
-                                <p class="text-xs text-green-600 whitespace-nowrap">{{ __('landing.hero.floating_sales_trend') }}</p>
+                            <div class="flex flex-col justify-center">
+                                <p class="text-xs md:text-sm font-semibold text-gray-900 leading-tight">{{ __('landing.hero.floating_sales') }}</p>
+                                <p class="text-xs text-green-600 leading-tight">{{ __('landing.hero.floating_sales_trend') }}</p>
                             </div>
                         </div>
                     </div>

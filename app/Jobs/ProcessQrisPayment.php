@@ -45,7 +45,7 @@ class ProcessQrisPayment implements ShouldQueue
     protected QrisTransaction $transaction;
 
     /**
-     * The webhook payload from Midtrans.
+     * The webhook payload from the payment provider.
      */
     protected array $payload;
 
@@ -53,7 +53,7 @@ class ProcessQrisPayment implements ShouldQueue
      * Create a new job instance.
      *
      * @param  QrisTransaction  $transaction  The settled transaction
-     * @param  array  $payload  The webhook payload from Midtrans
+     * @param  array  $payload  The webhook payload
      */
     public function __construct(QrisTransaction $transaction, array $payload = [])
     {
@@ -171,7 +171,7 @@ class ProcessQrisPayment implements ShouldQueue
         Log::info('QRIS Payment Audit Trail', [
             'event' => 'payment_processed',
             'order_id' => $this->transaction->order_id,
-            'midtrans_transaction_id' => $this->transaction->midtrans_transaction_id,
+            'provider_transaction_id' => $this->transaction->provider_transaction_id,
             'sub_merchant_id' => $merchant->id,
             'user_id' => $merchant->user_id,
             'gross_amount' => $grossAmount,
@@ -181,10 +181,9 @@ class ProcessQrisPayment implements ShouldQueue
             'settled_at' => $this->transaction->settled_at?->toIso8601String(),
             'new_available_balance' => $merchant->balance->fresh()->available_balance,
             'webhook_payload' => [
-                'transaction_id' => $this->payload['transaction_id'] ?? null,
-                'transaction_status' => $this->payload['transaction_status'] ?? null,
-                'payment_type' => $this->payload['payment_type'] ?? null,
-                'transaction_time' => $this->payload['transaction_time'] ?? null,
+                'reference_id' => $this->payload['reference_id'] ?? $this->payload['id'] ?? null,
+                'status' => $this->payload['status'] ?? null,
+                'type' => $this->payload['type'] ?? null,
             ],
         ]);
     }

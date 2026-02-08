@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\DTOs\ErrorResponse;
 use App\Exceptions\InvalidWebhookException;
-use App\Exceptions\NoActiveProviderException;
 use App\Http\Controllers\Controller;
 use App\Services\QrisService;
+use App\Services\WithdrawalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -14,42 +14,22 @@ use Illuminate\Support\Facades\Log;
 /**
  * Controller for handling Xendit webhook notifications.
  *
- * Receives and processes QR code payment status updates from Xendit
- * including successful payments, expirations, and failures.
- *
- * Webhook verification is handled by QrisService using the provider's
- * verifyWebhook implementation.
+ * Receives and processes QR code payment and payout status updates from Xendit.
+ * Uses platform-level webhook token verification (XenPlatform).
  */
 class XenditWebhookController extends Controller
 {
-    /**
-     * Create a new controller instance.
-     */
     public function __construct(
-        private QrisService $qrisService
+        private QrisService $qrisService,
+        private WithdrawalService $withdrawalService,
     ) {}
 
     /**
-     * Handle incoming Xendit webhook notification.
-     *
-     * Xendit sends webhook notifications for QR code payment events:
-     * - QR code payment completed
-     * - QR code expired
-     * - QR code status changes
-     *
-     * The webhook signature is verified using the x-callback-token header.
-     *
-     * Note: API version 2022-07-31 uses 'reference_id' instead of 'external_id'.
-     * We support both for backward compatibility.
-     *
-     * @param  Request  $request  The webhook request
-     * @return JsonResponse Response to Xendit
+     * Handle incoming Xendit QRIS webhook notification.
      */
     public function handleNotification(Request $request): JsonResponse
     {
         $payload = $request->all();
-
-        // Get webhook signature from header
         $signature = $request->header('x-callback-token', '');
 
         // API version 2022-07-31 uses 'reference_id' instead of 'external_id'
@@ -61,7 +41,6 @@ class XenditWebhookController extends Controller
             'has_signature' => ! empty($signature),
         ]);
 
-        // Validate required fields - support both reference_id and external_id
         if (! $referenceId) {
             Log::warning('Xendit webhook missing reference_id/external_id', [
                 'payload_keys' => array_keys($payload),
@@ -76,12 +55,7 @@ class XenditWebhookController extends Controller
         }
 
         try {
-            // Process webhook through QrisService
-            // This will:
-            // 1. Verify webhook signature
-            // 2. Parse webhook payload
-            // 3. Update transaction status
-            $this->qrisService->handleWebhook('xendit', $payload, $signature);
+            $this->qrisService->handleWebhook($payload, $signature);
 
             Log::info('Xendit webhook processed successfully', [
                 'reference_id' => $referenceId,
@@ -99,33 +73,58 @@ class XenditWebhookController extends Controller
 
             return response()->json($errorResponse->toArray(), $errorResponse->statusCode);
 
-        } catch (NoActiveProviderException $e) {
-            Log::error('Xendit webhook provider not configured', [
-                'reference_id' => $referenceId,
-                'error' => $e->getMessage(),
-            ]);
-
-            // Return 200 to prevent Xendit from retrying
-            // This is a configuration issue, not a webhook issue
-            return response()->json(['status' => 'ok'], 200);
-
-        } catch (\RuntimeException $e) {
+        } catch (\Exception $e) {
             Log::error('Xendit webhook processing error', [
                 'reference_id' => $referenceId,
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
             ]);
 
             // Return 200 to prevent Xendit from retrying
-            // We've logged the error for investigation
+            return response()->json(['status' => 'ok'], 200);
+        }
+    }
+
+    /**
+     * Handle incoming Xendit payout webhook notification.
+     */
+    public function handlePayoutNotification(Request $request): JsonResponse
+    {
+        $payload = $request->all();
+        $signature = $request->header('x-callback-token', '');
+
+        // Payouts API v2 wraps in { event, data: {...} }
+        $payoutData = $payload['data'] ?? $payload;
+
+        Log::info('Xendit payout webhook received', [
+            'event' => $payload['event'] ?? null,
+            'payout_id' => $payoutData['id'] ?? null,
+            'reference_id' => $payoutData['reference_id'] ?? null,
+            'status' => $payoutData['status'] ?? null,
+        ]);
+
+        // Verify webhook signature
+        $xenPlatformService = app(\App\Services\XenPlatformService::class);
+        if (! $xenPlatformService->verifyWebhookSignature($signature)) {
+            Log::warning('Xendit payout webhook signature verification failed');
+
+            $errorResponse = ErrorResponse::unauthorized('Invalid webhook signature');
+
+            return response()->json($errorResponse->toArray(), $errorResponse->statusCode);
+        }
+
+        try {
+            $this->withdrawalService->handlePayoutWebhook($payload);
+
+            Log::info('Xendit payout webhook processed successfully', [
+                'payout_id' => $payload['id'] ?? null,
+            ]);
+
             return response()->json(['status' => 'ok'], 200);
 
         } catch (\Exception $e) {
-            Log::error('Xendit webhook unexpected error', [
-                'reference_id' => $referenceId,
+            Log::error('Xendit payout webhook processing error', [
+                'payout_id' => $payload['id'] ?? null,
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
-                'trace' => $e->getTraceAsString(),
             ]);
 
             // Return 200 to prevent Xendit from retrying

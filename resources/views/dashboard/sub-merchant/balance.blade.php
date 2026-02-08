@@ -31,52 +31,56 @@
                     <div class="space-y-6">
                         <!-- Balance Cards -->
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div class="card p-5 hover:shadow-md transition-shadow">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('submerchant.available_balance') }}</p>
-                                        <p class="text-2xl font-bold mt-1 text-emerald-600" x-text="formatCurrency(balance.available)">Rp 0</p>
+                            <div class="card p-6 hover:shadow-lg transition-all duration-200 border-l-4 border-emerald-500">
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="flex-1">
+                                        <p class="text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-2">{{ __('submerchant.available_balance') }}</p>
+                                        <p class="text-3xl font-bold text-emerald-600" x-text="formatCurrency(balance.available)">Rp 0</p>
                                     </div>
-                                    <div class="h-12 w-12 rounded-xl bg-emerald-50 flex items-center justify-center">
-                                        <i class="fas fa-wallet text-xl text-emerald-500"></i>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="card p-5 hover:shadow-md transition-shadow">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('submerchant.pending_balance') }}</p>
-                                        <p class="text-2xl font-bold mt-1 text-amber-600" x-text="formatCurrency(balance.pending)">Rp 0</p>
-                                    </div>
-                                    <div class="h-12 w-12 rounded-xl bg-amber-50 flex items-center justify-center">
-                                        <i class="fas fa-clock text-xl text-amber-500"></i>
+                                    <div class="h-14 w-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg">
+                                        <i class="fas fa-wallet text-2xl text-white"></i>
                                     </div>
                                 </div>
-                                <p class="text-xs text-[hsl(var(--muted-foreground))] mt-3">{{ __('submerchant.being_processed') }}</p>
+                                <a href="/dashboard/sub-merchant/withdrawals" class="flex items-center justify-center gap-2 w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-md hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200">
+                                    <i class="fas fa-money-bill-wave text-lg"></i>
+                                    <span>Tarik Saldo</span>
+                                </a>
                             </div>
 
-                            <div class="card p-5 hover:shadow-md transition-shadow">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('submerchant.total_earned') }}</p>
-                                        <p class="text-2xl font-bold mt-1" x-text="formatCurrency(balance.total_earned)">Rp 0</p>
+                            <div class="card p-6 hover:shadow-lg transition-all duration-200 border-l-4 border-amber-500">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="flex-1">
+                                        <p class="text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-2">{{ __('submerchant.pending_balance') }}</p>
+                                        <p class="text-3xl font-bold text-amber-600" x-text="formatCurrency(balance.pending)">Rp 0</p>
                                     </div>
-                                    <div class="h-12 w-12 rounded-xl bg-blue-50 flex items-center justify-center">
-                                        <i class="fas fa-chart-line text-xl text-blue-500"></i>
+                                    <div class="h-14 w-14 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg">
+                                        <i class="fas fa-clock text-2xl text-white"></i>
                                     </div>
                                 </div>
-                                <p class="text-xs text-[hsl(var(--muted-foreground))] mt-3">{{ __('submerchant.all_time_earnings') }}</p>
+                                <p class="text-xs text-amber-600 font-medium mt-3 px-3 py-2 bg-amber-50 rounded-lg">{{ __('submerchant.being_processed') }}</p>
                             </div>
 
-                            <div class="card p-5 hover:shadow-md transition-shadow">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('submerchant.total_transactions') }}</p>
-                                        <p class="text-2xl font-bold mt-1" x-text="balance.total_transactions || 0">0</p>
+                            <div class="card p-6 hover:shadow-lg transition-all duration-200 border-l-4 border-blue-500">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="flex-1">
+                                        <p class="text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-2">{{ __('submerchant.total_earned') }}</p>
+                                        <p class="text-3xl font-bold text-blue-600" x-text="formatCurrency(balance.total_earned)">Rp 0</p>
                                     </div>
-                                    <div class="h-12 w-12 rounded-xl bg-purple-50 flex items-center justify-center">
-                                        <i class="fas fa-receipt text-xl text-purple-500"></i>
+                                    <div class="h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shadow-lg">
+                                        <i class="fas fa-chart-line text-2xl text-white"></i>
+                                    </div>
+                                </div>
+                                <p class="text-xs text-blue-600 font-medium mt-3 px-3 py-2 bg-blue-50 rounded-lg">{{ __('submerchant.all_time_earnings') }}</p>
+                            </div>
+
+                            <div class="card p-6 hover:shadow-lg transition-all duration-200 border-l-4 border-purple-500">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex-1">
+                                        <p class="text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-2">{{ __('submerchant.total_transactions') }}</p>
+                                        <p class="text-3xl font-bold text-purple-600" x-text="balance.total_transactions || 0">0</p>
+                                    </div>
+                                    <div class="h-14 w-14 rounded-2xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center shadow-lg">
+                                        <i class="fas fa-receipt text-2xl text-white"></i>
                                     </div>
                                 </div>
                             </div>

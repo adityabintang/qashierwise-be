@@ -11,8 +11,13 @@ use InvalidArgumentException;
 
 class SubMerchantService
 {
+    public function __construct(
+        private XenPlatformService $xenPlatformService,
+    ) {}
+
     /**
      * Register a user as a sub-merchant.
+     * Creates the sub-merchant record, initializes balance, and creates a XenPlatform sub-account.
      *
      * @param  User  $user  The user to register as sub-merchant
      * @param  array  $details  Optional details (business_name)
@@ -34,6 +39,7 @@ class SubMerchantService
                 'business_name' => $details['business_name'] ?? $user->name,
                 'is_active' => true,
                 'verified_at' => null,
+                'xendit_account_status' => 'pending',
             ]);
 
             // Initialize balance to zero
@@ -51,20 +57,76 @@ class SubMerchantService
                 'sub_merchant_id' => $subMerchant->id,
             ]);
 
+            // Create XenPlatform sub-account (OWNED)
+            try {
+                $xenditAccount = $this->xenPlatformService->createSubAccount($subMerchant);
+
+                $subMerchant->update([
+                    'xendit_account_id' => $xenditAccount['id'],
+                    'xendit_account_status' => 'active',
+                ]);
+
+                Log::info('XenPlatform sub-account created', [
+                    'sub_merchant_id' => $subMerchant->id,
+                    'xendit_account_id' => $xenditAccount['id'],
+                ]);
+            } catch (\Exception $e) {
+                // Don't fail registration if XenPlatform API fails
+                // The account can be created later via retry
+                Log::error('Failed to create XenPlatform sub-account, will retry later', [
+                    'sub_merchant_id' => $subMerchant->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                $subMerchant->update([
+                    'xendit_account_status' => 'failed',
+                ]);
+            }
+
             return $subMerchant->fresh(['balance']);
         });
     }
 
     /**
+     * Retry creating a XenPlatform sub-account for a merchant that failed initially.
+     */
+    public function retryXenPlatformAccount(SubMerchant $merchant): bool
+    {
+        if ($merchant->hasXenditAccount()) {
+            return true; // Already has an active account
+        }
+
+        try {
+            $xenditAccount = $this->xenPlatformService->createSubAccount($merchant);
+
+            $merchant->update([
+                'xendit_account_id' => $xenditAccount['id'],
+                'xendit_account_status' => 'active',
+            ]);
+
+            Log::info('XenPlatform sub-account created on retry', [
+                'sub_merchant_id' => $merchant->id,
+                'xendit_account_id' => $xenditAccount['id'],
+            ]);
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Retry failed: XenPlatform sub-account creation', [
+                'sub_merchant_id' => $merchant->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
      * Activate a sub-merchant.
-     *
-     * @param  SubMerchant  $merchant  The sub-merchant to activate
-     * @return bool True if activation was successful
      */
     public function activateSubMerchant(SubMerchant $merchant): bool
     {
         if ($merchant->is_active) {
-            return true; // Already active
+            return true;
         }
 
         $merchant->is_active = true;
@@ -81,14 +143,11 @@ class SubMerchantService
 
     /**
      * Deactivate a sub-merchant.
-     *
-     * @param  SubMerchant  $merchant  The sub-merchant to deactivate
-     * @return bool True if deactivation was successful
      */
     public function deactivateSubMerchant(SubMerchant $merchant): bool
     {
         if (! $merchant->is_active) {
-            return true; // Already inactive
+            return true;
         }
 
         $merchant->is_active = false;
@@ -105,14 +164,11 @@ class SubMerchantService
 
     /**
      * Verify a sub-merchant (admin action).
-     *
-     * @param  SubMerchant  $merchant  The sub-merchant to verify
-     * @return bool True if verification was successful
      */
     public function verifySubMerchant(SubMerchant $merchant): bool
     {
         if ($merchant->isVerified()) {
-            return true; // Already verified
+            return true;
         }
 
         $merchant->verified_at = now();
@@ -129,8 +185,6 @@ class SubMerchantService
 
     /**
      * Find a sub-merchant by ID.
-     *
-     * @param  int  $id  Sub-merchant ID
      */
     public function find(int $id): ?SubMerchant
     {
@@ -139,8 +193,6 @@ class SubMerchantService
 
     /**
      * Find a sub-merchant by user ID.
-     *
-     * @param  int  $userId  User ID
      */
     public function findByUserId(int $userId): ?SubMerchant
     {
@@ -149,9 +201,6 @@ class SubMerchantService
 
     /**
      * Get sub-merchant with balance information.
-     *
-     * @param  SubMerchant  $merchant  The sub-merchant
-     * @return array Sub-merchant data with balance
      */
     public function getWithBalance(SubMerchant $merchant): array
     {
@@ -166,9 +215,6 @@ class SubMerchantService
 
     /**
      * Check if a user can become a sub-merchant.
-     *
-     * @param  User  $user  The user to check
-     * @return bool True if user can become a sub-merchant
      */
     public function canBecomeSubMerchant(User $user): bool
     {

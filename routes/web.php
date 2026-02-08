@@ -192,14 +192,6 @@ Route::middleware(['web', 'check.web.auth'])->group(function () {
             return view('dashboard.sub-merchant.settings');
         })->name('settings');
 
-        Route::get('/provider-settings', function () {
-            return view('dashboard.sub-merchant.provider-settings');
-        })->name('provider-settings');
-
-        Route::get('/migrate', function () {
-            return view('dashboard.sub-merchant.migrate');
-        })->name('migrate');
-
         Route::get('/qris', function () {
             return view('dashboard.sub-merchant.qris');
         })->name('qris');
@@ -207,5 +199,13 @@ Route::middleware(['web', 'check.web.auth'])->group(function () {
         Route::get('/balance', function () {
             return view('dashboard.sub-merchant.balance');
         })->name('balance');
+
+        Route::get('/withdrawals', function () {
+            return view('dashboard.sub-merchant.withdrawals');
+        })->name('withdrawals');
+
+        Route::get('/bank-account', function () {
+            return view('dashboard.sub-merchant.bank-account');
+        })->name('bank-account');
     });
 });

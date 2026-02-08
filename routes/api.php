@@ -4,11 +4,9 @@ use App\Http\Controllers\AiAgentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BalanceController;
 use App\Http\Controllers\Api\BroadcastAuthController;
-use App\Http\Controllers\Api\DokuWebhookController;
-use App\Http\Controllers\Api\DuitkuWebhookController;
+use App\Http\Controllers\Api\BankAccountController;
 use App\Http\Controllers\Api\EmbeddedSignupController;
-use App\Http\Controllers\Api\MidtransWebhookController;
-use App\Http\Controllers\Api\MigrationController;
+use App\Http\Controllers\Api\WithdrawalController;
 use App\Http\Controllers\Api\Pos\CategoryController;
 use App\Http\Controllers\Api\Pos\OrderController;
 use App\Http\Controllers\Api\Pos\PaymentController;
@@ -19,8 +17,6 @@ use App\Http\Controllers\Api\Pos\RoleController;
 use App\Http\Controllers\Api\Pos\StoreController;
 use App\Http\Controllers\Api\Pos\TableController;
 use App\Http\Controllers\Api\Pos\TransactionController;
-use App\Http\Controllers\Api\ProviderCredentialController;
-use App\Http\Controllers\Api\ProviderValidationController;
 use App\Http\Controllers\Api\QrisController;
 use App\Http\Controllers\Api\ResendWebhookController;
 use App\Http\Controllers\Api\ReservationController;
@@ -67,19 +63,16 @@ Route::post('/whatsapp/flow/endpoint', [WhatsAppFlowEndpointController::class, '
 // See: https://developers.facebook.com/docs/whatsapp/flows/guides/implementingyourflowendpoint#upload-public-key
 Route::get('/whatsapp/flow/public-key', [WhatsAppFlowEndpointController::class, 'getPublicKey']);
 
-// Payment Provider Webhooks (must be public for providers to access)
-Route::post('/webhooks/midtrans', [MidtransWebhookController::class, 'handleNotification'])
-    ->middleware('throttle:60,1'); // Rate limit: 60 requests per minute
-Route::post('/webhooks/doku', [DokuWebhookController::class, 'handleNotification']);
+// Xendit Webhooks (must be public for Xendit to access)
 Route::post('/webhooks/xendit', [XenditWebhookController::class, 'handleNotification']);
-Route::post('/webhooks/duitku', [DuitkuWebhookController::class, 'handleNotification']);
+Route::post('/webhooks/xendit/payout', [XenditWebhookController::class, 'handlePayoutNotification']);
 
 // Resend Email Webhook (must be public for Resend to access)
 Route::post('/webhooks/resend', [ResendWebhookController::class, 'handleNotification'])
     ->middleware('throttle:60,1'); // Rate limit: 60 requests per minute
 
 // Subscription Webhook (must be public for Midtrans to access)
-Route::post('/webhooks/midtrans/subscription', [MidtransWebhookController::class, 'handleSubscriptionWebhook'])
+Route::post('/webhooks/midtrans/subscription', [\App\Http\Controllers\Api\MidtransWebhookController::class, 'handleSubscriptionWebhook'])
     ->middleware('throttle:60,1'); // Rate limit: 60 requests per minute
 
 // Health Check Endpoint (public for monitoring services)
@@ -339,30 +332,22 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::post('/deactivate', [SubMerchantController::class, 'deactivate']);
         Route::post('/activate', [SubMerchantController::class, 'activate']);
 
-        // Migration to BYOK
-        Route::prefix('migration')->group(function () {
-            Route::get('/status', [MigrationController::class, 'checkMigrationStatus']);
-            Route::post('/migrate', [MigrationController::class, 'migrate']);
-            Route::post('/skip', [MigrationController::class, 'skipMigration']);
+        // Bank Account management
+        Route::prefix('bank-account')->group(function () {
+            Route::get('/', [BankAccountController::class, 'show']);
+            Route::post('/', [BankAccountController::class, 'store']);
+            Route::get('/banks', [BankAccountController::class, 'supportedBanks']);
         });
 
-        // Payment Provider Credential Management
-        Route::prefix('providers')->middleware('sanitize.provider.errors')->group(function () {
-            Route::get('/', [ProviderCredentialController::class, 'index']);
-            Route::post('/', [ProviderCredentialController::class, 'store']);
-            Route::put('/{id}', [ProviderCredentialController::class, 'update']);
-            Route::delete('/{id}', [ProviderCredentialController::class, 'destroy']);
-            Route::post('/set-active', [ProviderCredentialController::class, 'setActive']);
-
-            // Provider Validation
-            Route::post('/{id}/validate', [ProviderValidationController::class, 'validate']);
-            Route::post('/{id}/revalidate', [ProviderValidationController::class, 'revalidate']);
-            Route::get('/{id}/status', [ProviderValidationController::class, 'status']);
-            Route::get('/status-all', [ProviderValidationController::class, 'statusAll']);
+        // Withdrawal management
+        Route::prefix('withdrawals')->group(function () {
+            Route::post('/', [WithdrawalController::class, 'store']);
+            Route::get('/', [WithdrawalController::class, 'index']);
+            Route::get('/{id}', [WithdrawalController::class, 'show']);
         });
 
         // QRIS generation and management
-        Route::prefix('qris')->middleware('sanitize.provider.errors')->group(function () {
+        Route::prefix('qris')->group(function () {
             Route::post('/generate', [QrisController::class, 'generate'])->middleware('qris.rate_limit');
             Route::get('/history', [QrisController::class, 'history']);
             Route::get('/pending', [QrisController::class, 'pending']);

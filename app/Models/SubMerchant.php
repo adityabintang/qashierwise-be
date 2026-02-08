@@ -20,6 +20,11 @@ class SubMerchant extends Model
     protected $fillable = [
         'user_id',
         'business_name',
+        'xendit_account_id',
+        'xendit_account_status',
+        'bank_code',
+        'bank_account_number',
+        'bank_account_name',
         'is_active',
         'verified_at',
     ];
@@ -62,6 +67,14 @@ class SubMerchant extends Model
     }
 
     /**
+     * Get the withdrawal requests for this sub-merchant.
+     */
+    public function withdrawalRequests(): HasMany
+    {
+        return $this->hasMany(WithdrawalRequest::class);
+    }
+
+    /**
      * Check if the sub-merchant is verified.
      */
     public function isVerified(): bool
@@ -71,10 +84,29 @@ class SubMerchant extends Model
 
     /**
      * Check if the sub-merchant can accept payments.
-     * Now only requires active status (no bank account needed).
+     * Requires active status and a linked XenPlatform account.
      */
     public function canAcceptPayments(): bool
     {
-        return $this->is_active;
+        return $this->is_active && $this->hasXenditAccount();
+    }
+
+    /**
+     * Check if the sub-merchant has a linked XenPlatform account.
+     */
+    public function hasXenditAccount(): bool
+    {
+        return $this->xendit_account_id !== null
+            && $this->xendit_account_status === 'active';
+    }
+
+    /**
+     * Check if the sub-merchant has bank account details for withdrawal.
+     */
+    public function hasBankAccount(): bool
+    {
+        return $this->bank_code !== null
+            && $this->bank_account_number !== null
+            && $this->bank_account_name !== null;
     }
 }
