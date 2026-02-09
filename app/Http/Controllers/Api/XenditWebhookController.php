@@ -14,12 +14,13 @@ use Illuminate\Support\Facades\Log;
 /**
  * Controller for handling Xendit webhook notifications.
  *
- * Receives and processes QR code payment, Payment Requests V2, and payout status updates.
+ * Receives and processes QR code payment, Payment Requests V2, Disbursement, and Payout status updates.
  * Uses platform-level webhook token verification (XenPlatform).
  *
  * Xendit webhook formats:
  * - QR Codes: { event: "qr.payment", data: { reference_id, status, type, currency, ... } }
  * - Payment Requests V2: { event: "payment.succeeded", data: { reference_id, status, payment_method, ... } }
+ * - Disbursement (legacy): { id, external_id, amount, bank_code, status, ... }
  * - Payouts v2/v3: { event: "payout.succeeded"|"v3_payout.succeeded"|"payout-link.succeeded", data: { id, reference_id, status, ... } }
  * - Account events: { event: "account.created"|"account.updated", data: { id, type, status, ... } }
  */
@@ -56,7 +57,13 @@ class XenditWebhookController extends Controller
         $hasType = isset($payload['type']) && $payload['type'] === 'DYNAMIC';
         $hasCurrency = isset($payload['currency']);
 
-        if ($hasPaymentMethod && !$hasType) {
+        // Disbursement API (legacy) - has external_id, bank_code, disbursement_description
+        $isDisbursement = isset($payload['external_id']) && isset($payload['bank_code']) && isset($payload['disbursement_description']);
+
+        if ($isDisbursement) {
+            // Disbursement webhook (legacy API)
+            return $this->handleDisbursementWebhook($payload, $signature);
+        } elseif ($hasPaymentMethod && !$hasType) {
             // Payment Requests V2 webhook (unwrapped)
             return $this->handlePaymentRequestWebhook($payload, $signature);
         } elseif ($hasCurrency && $hasType) {
@@ -173,6 +180,66 @@ class XenditWebhookController extends Controller
         // For now, just acknowledge to prevent retries
 
         return response()->json(['status' => 'ok'], 200);
+    }
+
+    /**
+     * Handle Disbursement webhook notification (legacy Disbursement API).
+     * This is for the older Xendit Disbursement API (not Payouts v2/v3).
+     */
+    protected function handleDisbursementWebhook(array $payload, string $signature): JsonResponse
+    {
+        $externalId = $payload['external_id'] ?? null;
+        $status = $payload['status'] ?? null;
+
+        Log::info('Xendit Disbursement webhook received', [
+            'external_id' => $externalId,
+            'disbursement_id' => $payload['id'] ?? null,
+            'status' => $status,
+            'amount' => $payload['amount'] ?? null,
+            'bank_code' => $payload['bank_code'] ?? null,
+        ]);
+
+        // Verify webhook signature
+        $xenPlatformService = app(\App\Services\XenPlatformService::class);
+        if (! $xenPlatformService->verifyWebhookSignature($signature)) {
+            Log::warning('Xendit Disbursement webhook signature verification failed', [
+                'external_id' => $externalId,
+            ]);
+
+            $errorResponse = ErrorResponse::unauthorized('Invalid webhook signature');
+
+            return response()->json($errorResponse->toArray(), $errorResponse->statusCode);
+        }
+
+        try {
+            // Convert disbursement payload to payout format for processing
+            $payoutPayload = [
+                'event' => 'disbursement.'.$status,
+                'data' => [
+                    'id' => $payload['id'] ?? null,
+                    'reference_id' => $externalId,
+                    'status' => $status,
+                    'amount' => $payload['amount'] ?? null,
+                    'bank_code' => $payload['bank_code'] ?? null,
+                ],
+            ];
+
+            $this->withdrawalService->handlePayoutWebhook($payoutPayload);
+
+            Log::info('Xendit Disbursement webhook processed successfully', [
+                'external_id' => $externalId,
+            ]);
+
+            return response()->json(['status' => 'ok'], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Xendit Disbursement webhook processing error', [
+                'external_id' => $externalId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json(['status' => 'ok'], 200);
+        }
     }
 
     /**
