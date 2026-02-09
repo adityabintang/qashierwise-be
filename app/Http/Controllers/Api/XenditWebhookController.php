@@ -39,19 +39,21 @@ class XenditWebhookController extends Controller
             'reference_id' => $referenceId,
             'status' => $payload['status'] ?? null,
             'has_signature' => ! empty($signature),
+            'payload_keys' => array_keys($payload),
         ]);
 
         if (! $referenceId) {
             Log::warning('Xendit webhook missing reference_id/external_id', [
                 'payload_keys' => array_keys($payload),
+                'payload' => $payload,
             ]);
 
-            $errorResponse = ErrorResponse::validationError(
-                'Missing required field: reference_id or external_id',
-                ['required_fields' => ['reference_id']]
-            );
-
-            return response()->json($errorResponse->toArray(), $errorResponse->statusCode);
+            // Return 200 OK to prevent Xendit from retrying
+            // This webhook might be for a different event type (e.g., payment_requests)
+            return response()->json([
+                'status' => 'ignored',
+                'message' => 'Webhook ignored: missing reference_id or external_id',
+            ], 200);
         }
 
         try {
