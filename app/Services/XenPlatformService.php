@@ -384,23 +384,38 @@ class XenPlatformService
             return false;
         }
 
-        return hash_equals($this->webhookToken, $signature);
+        $result = hash_equals($this->webhookToken, $signature);
+
+        if (! $result) {
+            Log::warning('XenPlatform: Webhook signature verification failed', [
+                'expected_length' => strlen($this->webhookToken),
+                'received_length' => strlen($signature),
+                'received_prefix' => substr($signature, 0, 8) . '...',
+            ]);
+        }
+
+        return $result;
     }
 
     /**
      * Parse a QRIS webhook payload into a standard WebhookTransaction.
+     * Handles both wrapped { event, data } and direct formats.
      */
     public function parseQrisWebhookPayload(array $payload): WebhookTransaction
     {
         $status = $this->mapXenditStatus($payload['status'] ?? 'ACTIVE');
 
+        // Extract payment timestamp - different webhook formats use different field names
         $paidAt = null;
-        if ($status === 'settlement' && isset($payload['updated'])) {
-            $paidAt = $payload['updated'];
+        if ($status === 'settlement') {
+            $paidAt = $payload['updated'] ?? $payload['created'] ?? $payload['paid_at'] ?? now()->toIso8601String();
         }
 
         // API version 2022-07-31 uses 'reference_id' instead of 'external_id'
         $externalId = $payload['reference_id'] ?? $payload['external_id'] ?? $payload['id'] ?? '';
+
+        // Get QR ID for reference
+        $qrId = $payload['qr_id'] ?? $payload['id'] ?? null;
 
         return new WebhookTransaction(
             externalId: $externalId,
@@ -408,22 +423,25 @@ class XenPlatformService
             amount: isset($payload['amount']) ? (float) $payload['amount'] : 0.0,
             paidAt: $paidAt,
             provider: 'xendit',
-            referenceId: $payload['id'] ?? null,
+            referenceId: $qrId,
             metadata: [
                 'type' => $payload['type'] ?? null,
                 'currency' => $payload['currency'] ?? null,
                 'original_status' => $payload['status'] ?? null,
+                'qr_string' => $payload['qr_string'] ?? null,
+                'channel_code' => $payload['channel_code'] ?? null,
             ]
         );
     }
 
     /**
      * Map Xendit status to internal status.
+     * Handles statuses from both QR Codes API and Payment Requests API.
      */
     private function mapXenditStatus(string $xenditStatus): string
     {
         return match (strtoupper($xenditStatus)) {
-            'COMPLETED', 'PAID' => 'settlement',
+            'COMPLETED', 'PAID', 'SUCCEEDED' => 'settlement',
             'ACTIVE', 'PENDING' => 'pending',
             'INACTIVE', 'EXPIRED' => 'expire',
             'FAILED', 'CANCELLED', 'CANCELED' => 'failed',
