@@ -76,6 +76,16 @@ class SubMerchantQrisIntegrationTest extends TestCase
     }
 
     /**
+     * Get the webhook token for testing.
+     * Handles the case where config returns empty string vs null.
+     */
+    private function getWebhookToken(): string
+    {
+        $token = config('xendit.webhook_token');
+        return $token ?: 'test-webhook-token';
+    }
+
+    /**
      * Helper to build Xendit webhook payload.
      */
     private function buildWebhookPayload(string $referenceId, string $status, float $amount = 100000): array
@@ -146,7 +156,7 @@ class SubMerchantQrisIntegrationTest extends TestCase
 
         // Step 3: Simulate Xendit webhook for settlement
         $webhookPayload = $this->buildWebhookPayload($orderId, 'COMPLETED', 100000);
-        $webhookToken = config('xendit.webhook_token') ?? 'test-webhook-token';
+        $webhookToken = $this->getWebhookToken();
 
         $response = $this->withHeader('x-callback-token', $webhookToken)
             ->postJson('/api/webhooks/xendit', $webhookPayload);
@@ -263,7 +273,7 @@ class SubMerchantQrisIntegrationTest extends TestCase
 
         // Webhook should still process - using 'EXPIRED' status from Xendit
         $webhookPayload = $this->buildWebhookPayload($transaction->order_id, 'EXPIRED', 100000);
-        $webhookToken = config('xendit.webhook_token') ?? 'test-webhook-token';
+        $webhookToken = $this->getWebhookToken();
 
         $response = $this->withHeader('x-callback-token', $webhookToken)
             ->postJson('/api/webhooks/xendit', $webhookPayload);
@@ -312,7 +322,7 @@ class SubMerchantQrisIntegrationTest extends TestCase
 
         // 3. Simulate payment settlement
         $webhookPayload = $this->buildWebhookPayload($orderId, 'COMPLETED', 200000);
-        $webhookToken = config('xendit.webhook_token') ?? 'test-webhook-token';
+        $webhookToken = $this->getWebhookToken();
         $this->withHeader('x-callback-token', $webhookToken)
             ->postJson('/api/webhooks/xendit', $webhookPayload);
 
