@@ -251,10 +251,12 @@ class EmbeddedSignupService
         }
 
         // Use updateOrCreate to prevent duplicates (upsert)
-        $account = WhatsAppAccount::updateOrCreate(
-            ['user_id' => $userId],
-            $data
-        );
+        // Bypass RLS for the upsert operation
+        $account = WhatsAppAccount::withoutGlobalScope('userAccounts')
+            ->updateOrCreate(
+                ['user_id' => $userId],
+                $data
+            );
 
         Log::info('Stored WhatsApp credentials for user', [
             'user_id' => $userId,

@@ -423,10 +423,11 @@ class XenPlatformService
     private function mapXenditStatus(string $xenditStatus): string
     {
         return match (strtoupper($xenditStatus)) {
-            'COMPLETED' => 'settlement',
-            'ACTIVE' => 'pending',
-            'INACTIVE' => 'expire',
-            default => 'failed',
+            'COMPLETED', 'PAID' => 'settlement',
+            'ACTIVE', 'PENDING' => 'pending',
+            'INACTIVE', 'EXPIRED' => 'expire',
+            'FAILED', 'CANCELLED', 'CANCELED' => 'failed',
+            default => 'pending',
         };
     }
 

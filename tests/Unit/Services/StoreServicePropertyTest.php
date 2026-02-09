@@ -39,15 +39,17 @@ class StoreServicePropertyTest extends TestCase
     /**
      * Helper to create a PosUser for a store
      */
-    protected function createPosUser(Store $store): PosUser
+    protected function createPosUser(Store $store, ?User $user = null): PosUser
     {
-        $uniqueId = uniqid();
-
-        $user = User::create([
-            'name' => 'Test User',
-            'email' => "test-{$uniqueId}@example.com",
-            'password' => bcrypt('password'),
-        ]);
+        // Use existing user if provided, otherwise create a new one
+        if ($user === null) {
+            $uniqueId = uniqid();
+            $user = User::create([
+                'name' => 'Test User',
+                'email' => "test-{$uniqueId}@example.com",
+                'password' => bcrypt('password'),
+            ]);
+        }
 
         // Get or create Spatie role
         $role = \Spatie\Permission\Models\Role::firstOrCreate(
@@ -88,15 +90,23 @@ class StoreServicePropertyTest extends TestCase
                 Generators::string()
             )
             ->then(function (string $name, string $address) {
-                // Create an active store first
+                // Create a user first (stores require user_id)
+                $user = User::create([
+                    'name' => 'Test User',
+                    'email' => 'test-'.uniqid().'@example.com',
+                    'password' => bcrypt('password'),
+                ]);
+
+                // Create an active store first with user_id
                 $store = $this->storeService->create([
+                    'user_id' => $user->id,
                     'name' => $name,
                     'address' => $address,
                     'is_active' => true,
                 ]);
 
-                // Create a PosUser for the store
-                $posUser = $this->createPosUser($store);
+                // Create a PosUser for the store, reusing the user
+                $posUser = $this->createPosUser($store, $user);
 
                 // Deactivate the store
                 $this->storeService->deactivate($store);
@@ -170,15 +180,23 @@ class StoreServicePropertyTest extends TestCase
                 Generators::string()
             )
             ->then(function (string $name, string $address) {
-                // Create an active store
+                // Create a user first (stores require user_id)
+                $user = User::create([
+                    'name' => 'Test User',
+                    'email' => 'test-'.uniqid().'@example.com',
+                    'password' => bcrypt('password'),
+                ]);
+
+                // Create an active store with user_id
                 $store = $this->storeService->create([
+                    'user_id' => $user->id,
                     'name' => $name,
                     'address' => $address,
                     'is_active' => true,
                 ]);
 
-                // Create a PosUser for the store
-                $posUser = $this->createPosUser($store);
+                // Create a PosUser for the store, reusing the user
+                $posUser = $this->createPosUser($store, $user);
 
                 // Property: Store should be active
                 $this->assertTrue(

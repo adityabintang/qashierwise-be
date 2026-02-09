@@ -65,7 +65,8 @@ class WhatsAppAccountPropertyTest extends TestCase
                 );
 
                 // Property: When retrieved through the model, it should equal the original
-                $retrievedAccount = WhatsAppAccount::find($account->id);
+                $retrievedAccount = WhatsAppAccount::withoutGlobalScopes()->find($account->id);
+                $this->assertNotNull($retrievedAccount, 'Account should be retrievable without global scopes');
                 $this->assertEquals(
                     $accessToken,
                     $retrievedAccount->access_token,

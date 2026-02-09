@@ -152,7 +152,9 @@ class EmbeddedSignupServicePropertyTest extends TestCase
                 }
 
                 // Property: There should be exactly ONE account for this user
-                $accountCount = WhatsAppAccount::where('user_id', $user->id)->count();
+                $accountCount = WhatsAppAccount::withoutGlobalScope('userAccounts')
+                    ->where('user_id', $user->id)
+                    ->count();
 
                 $this->assertEquals(
                     1,
@@ -161,7 +163,9 @@ class EmbeddedSignupServicePropertyTest extends TestCase
                 );
 
                 // Clean up
-                WhatsAppAccount::where('user_id', $user->id)->delete();
+                WhatsAppAccount::withoutGlobalScope('userAccounts')
+                    ->where('user_id', $user->id)
+                    ->delete();
                 $user->delete();
             });
     }

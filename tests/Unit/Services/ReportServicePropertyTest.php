@@ -48,26 +48,29 @@ class ReportServicePropertyTest extends TestCase
 
         $uniqueId = uniqid();
 
-        // Create first store
+        // Create user first (stores require user_id)
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => "test-{$uniqueId}@example.com",
+            'password' => bcrypt('password'),
+        ]);
+
+        // Create first store with user_id
         $this->store = Store::create([
+            'user_id' => $user->id,
             'name' => 'Test Store 1',
             'code' => 'TST1-'.$uniqueId,
             'address' => 'Test Address 1',
             'is_active' => true,
         ]);
 
-        // Create second store for filtering tests
+        // Create second store for filtering tests with user_id
         $this->store2 = Store::create([
+            'user_id' => $user->id,
             'name' => 'Test Store 2',
             'code' => 'TST2-'.$uniqueId,
             'address' => 'Test Address 2',
             'is_active' => true,
-        ]);
-
-        $user = User::create([
-            'name' => 'Test User',
-            'email' => "test-{$uniqueId}@example.com",
-            'password' => bcrypt('password'),
         ]);
 
         // Get or create Spatie role
@@ -102,6 +105,7 @@ class ReportServicePropertyTest extends TestCase
         $counter++;
 
         return Product::create([
+            'user_id' => $this->posUser->user_id,
             'category_id' => $this->category->id,
             'name' => "Product {$counter}",
             'sku' => "SKU-{$counter}-".uniqid(),

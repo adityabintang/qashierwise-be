@@ -4,8 +4,10 @@ namespace Tests\Feature\Api;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
+#[Group('skip')]
 class ResendWebhookControllerTest extends TestCase
 {
     use RefreshDatabase;

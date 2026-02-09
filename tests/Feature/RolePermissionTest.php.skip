@@ -16,6 +16,9 @@ class RolePermissionTest extends TestCase
     {
         parent::setUp();
 
+        // Clear Spatie permission cache
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+
         // Run permission seeder to ensure all permissions exist
         $this->seed(\Database\Seeders\PermissionSeeder::class);
     }
@@ -30,7 +33,7 @@ class RolePermissionTest extends TestCase
             'guard_name' => 'sanctum',
         ]);
 
-        $permissions = Permission::whereIn('name', ['view_products', 'manage_products'])->get();
+        $permissions = Permission::whereIn('name', ['pos.view_products', 'pos.manage_products'])->get();
         $role->givePermissionTo($permissions);
 
         $this->assertDatabaseHas('roles', [
@@ -38,8 +41,8 @@ class RolePermissionTest extends TestCase
             'guard_name' => 'sanctum',
         ]);
 
-        $this->assertTrue($role->hasPermissionTo('view_products'));
-        $this->assertTrue($role->hasPermissionTo('manage_products'));
+        $this->assertTrue($role->hasPermissionTo('pos.view_products'));
+        $this->assertTrue($role->hasPermissionTo('pos.manage_products'));
     }
 
     /**
@@ -58,13 +61,13 @@ class RolePermissionTest extends TestCase
             'guard_name' => 'sanctum',
         ]);
 
-        $role->givePermissionTo(['view_products', 'view_orders']);
+        $role->givePermissionTo(['pos.view_products', 'pos.view_orders']);
 
         $user->assignRole($role);
 
         $this->assertTrue($user->hasRole('Cashier Test'));
-        $this->assertTrue($user->hasPermissionTo('view_products', 'sanctum'));
-        $this->assertTrue($user->hasPermissionTo('view_orders', 'sanctum'));
+        $this->assertTrue($user->hasPermissionTo('pos.view_products', 'sanctum'));
+        $this->assertTrue($user->hasPermissionTo('pos.view_orders', 'sanctum'));
     }
 
     /**
@@ -103,14 +106,14 @@ class RolePermissionTest extends TestCase
         ]);
 
         $role = Role::create(['name' => 'Manager Test', 'guard_name' => 'sanctum']);
-        $role->givePermissionTo(['manage_products', 'manage_orders']);
+        $role->givePermissionTo(['pos.manage_products', 'pos.manage_orders']);
 
         $user->assignRole($role);
 
         // Test with explicit guard
-        $this->assertTrue($user->hasPermissionTo('manage_products', 'sanctum'));
-        $this->assertTrue($user->hasPermissionTo('manage_orders', 'sanctum'));
-        $this->assertFalse($user->hasPermissionTo('manage_users', 'sanctum'));
+        $this->assertTrue($user->hasPermissionTo('pos.manage_products', 'sanctum'));
+        $this->assertTrue($user->hasPermissionTo('pos.manage_orders', 'sanctum'));
+        $this->assertFalse($user->hasPermissionTo('admin.manage_users', 'sanctum'));
     }
 
     /**
@@ -121,16 +124,16 @@ class RolePermissionTest extends TestCase
         $role = Role::create(['name' => 'Update Test', 'guard_name' => 'sanctum']);
 
         // Initial permissions
-        $role->givePermissionTo(['view_products', 'view_orders']);
-        $this->assertTrue($role->hasPermissionTo('view_products'));
-        $this->assertTrue($role->hasPermissionTo('view_orders'));
+        $role->givePermissionTo(['pos.view_products', 'pos.view_orders']);
+        $this->assertTrue($role->hasPermissionTo('pos.view_products'));
+        $this->assertTrue($role->hasPermissionTo('pos.view_orders'));
 
         // Update permissions using sync
-        $role->syncPermissions(['manage_products', 'manage_orders']);
-        $this->assertFalse($role->hasPermissionTo('view_products'));
-        $this->assertFalse($role->hasPermissionTo('view_orders'));
-        $this->assertTrue($role->hasPermissionTo('manage_products'));
-        $this->assertTrue($role->hasPermissionTo('manage_orders'));
+        $role->syncPermissions(['pos.manage_products', 'pos.manage_orders']);
+        $this->assertFalse($role->hasPermissionTo('pos.view_products'));
+        $this->assertFalse($role->hasPermissionTo('pos.view_orders'));
+        $this->assertTrue($role->hasPermissionTo('pos.manage_products'));
+        $this->assertTrue($role->hasPermissionTo('pos.manage_orders'));
     }
 
     /**
@@ -145,19 +148,19 @@ class RolePermissionTest extends TestCase
         ]);
 
         $role1 = Role::create(['name' => 'Role A', 'guard_name' => 'sanctum']);
-        $role1->givePermissionTo(['view_products', 'view_orders']);
+        $role1->givePermissionTo(['pos.view_products', 'pos.view_orders']);
 
         $role2 = Role::create(['name' => 'Role B', 'guard_name' => 'sanctum']);
-        $role2->givePermissionTo(['manage_categories', 'view_reports']);
+        $role2->givePermissionTo(['pos.manage_categories', 'pos.view_reports']);
 
         $user->assignRole([$role1, $role2]);
 
         $permissions = $user->getAllPermissions()->pluck('name')->toArray();
 
-        $this->assertContains('view_products', $permissions);
-        $this->assertContains('view_orders', $permissions);
-        $this->assertContains('manage_categories', $permissions);
-        $this->assertContains('view_reports', $permissions);
+        $this->assertContains('pos.view_products', $permissions);
+        $this->assertContains('pos.view_orders', $permissions);
+        $this->assertContains('pos.manage_categories', $permissions);
+        $this->assertContains('pos.view_reports', $permissions);
         $this->assertCount(4, $permissions);
     }
 
@@ -167,7 +170,6 @@ class RolePermissionTest extends TestCase
     public function test_can_delete_role(): void
     {
         $role = Role::create(['name' => 'Delete Test', 'guard_name' => 'sanctum']);
-        $role->givePermissionTo(['view_products']);
 
         $roleId = $role->id;
 
@@ -188,11 +190,11 @@ class RolePermissionTest extends TestCase
         ]);
 
         $role = Role::create(['name' => 'Any Test', 'guard_name' => 'sanctum']);
-        $role->givePermissionTo(['view_products']);
+        $role->givePermissionTo(['pos.view_products']);
         $user->assignRole($role);
 
-        $this->assertTrue($user->hasAnyPermission(['view_products', 'manage_products'], 'sanctum'));
-        $this->assertFalse($user->hasAnyPermission(['manage_products', 'manage_orders'], 'sanctum'));
+        $this->assertTrue($user->hasAnyPermission(['pos.view_products', 'pos.manage_products'], 'sanctum'));
+        $this->assertFalse($user->hasAnyPermission(['pos.manage_products', 'pos.manage_orders'], 'sanctum'));
     }
 
     /**
@@ -207,10 +209,21 @@ class RolePermissionTest extends TestCase
         ]);
 
         $role = Role::create(['name' => 'All Test', 'guard_name' => 'sanctum']);
-        $role->givePermissionTo(['view_products', 'manage_products']);
+        $role->givePermissionTo(['pos.view_products', 'pos.manage_products']);
         $user->assignRole($role);
 
-        $this->assertTrue($user->hasAllPermissions(['view_products', 'manage_products'], 'sanctum'));
-        $this->assertFalse($user->hasAllPermissions(['view_products', 'manage_orders'], 'sanctum'));
+        // Clear permission cache
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+
+        // Re-fetch user from database
+        $user = User::find($user->id);
+
+        // Check individual permissions
+        $this->assertTrue($user->hasPermissionTo('pos.view_products', 'sanctum'), 'User should have pos.view_products');
+        $this->assertTrue($user->hasPermissionTo('pos.manage_products', 'sanctum'), 'User should have pos.manage_products');
+        $this->assertFalse($user->hasPermissionTo('pos.manage_orders', 'sanctum'), 'User should not have pos.manage_orders');
+
+        $this->assertTrue($user->hasAllPermissions(['pos.view_products', 'pos.manage_products'], 'sanctum'));
+        $this->assertFalse($user->hasAllPermissions(['pos.view_products', 'pos.manage_orders'], 'sanctum'));
     }
 }

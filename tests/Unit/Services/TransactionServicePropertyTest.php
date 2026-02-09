@@ -41,18 +41,20 @@ class TransactionServicePropertyTest extends TestCase
 
         $uniqueId = uniqid();
 
-        // Create store
-        $this->store = Store::create([
-            'name' => 'Test Store',
-            'code' => 'TST-'.$uniqueId,
-            'address' => 'Test Address',
-            'is_active' => true,
-        ]);
-
+        // Create user first (stores require user_id)
         $user = User::create([
             'name' => 'Test User',
             'email' => "test-{$uniqueId}@example.com",
             'password' => bcrypt('password'),
+        ]);
+
+        // Create store with user_id
+        $this->store = Store::create([
+            'user_id' => $user->id,
+            'name' => 'Test Store',
+            'code' => 'TST-'.$uniqueId,
+            'address' => 'Test Address',
+            'is_active' => true,
         ]);
 
         // Get or create Spatie role

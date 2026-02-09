@@ -15,44 +15,53 @@ class PermissionSeeder extends Seeder
         // Reset cached roles and permissions
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
-        // Create all permissions for POS system
+        // Create all permissions for POS system with namespaced format
         $permissions = [
-            // Product Management
-            'view_products' => 'View Products',
-            'manage_products' => 'Manage Products (Create/Edit/Delete)',
+            // POS Product Management
+            'pos.view_products' => 'View Products',
+            'pos.manage_products' => 'Manage Products (Create/Edit/Delete)',
 
-            // Category Management
-            'view_categories' => 'View Categories',
-            'manage_categories' => 'Manage Categories (Create/Edit/Delete)',
+            // POS Category Management
+            'pos.view_categories' => 'View Categories',
+            'pos.manage_categories' => 'Manage Categories (Create/Edit/Delete)',
 
-            // Order Management
-            'view_orders' => 'View Orders',
-            'manage_orders' => 'Manage Orders (Create/Edit/Cancel)',
+            // POS Order Management
+            'pos.view_orders' => 'View Orders',
+            'pos.create_order' => 'Create Orders',
+            'pos.edit_order' => 'Edit Orders',
+            'pos.manage_orders' => 'Manage Orders (Create/Edit/Cancel)',
+            'pos.void_order' => 'Void Orders',
 
-            // Payment Processing
-            'process_payment' => 'Process Payments',
+            // POS Payment Processing
+            'pos.process_payment' => 'Process Payments',
 
-            // Store Management
-            'view_stores' => 'View Stores',
-            'manage_stores' => 'Manage Stores (Create/Edit/Activate/Deactivate)',
+            // POS Store Management
+            'pos.view_stores' => 'View Stores',
+            'pos.manage_stores' => 'Manage Stores (Create/Edit/Activate/Deactivate)',
 
-            // Table Management
-            'view_tables' => 'View Tables',
-            'manage_tables' => 'Manage Tables (Create/Edit/Delete)',
+            // POS Table Management
+            'pos.view_tables' => 'View Tables',
+            'pos.manage_tables' => 'Manage Tables (Create/Edit/Delete)',
 
-            // User Management
-            'view_users' => 'View POS Users',
-            'manage_users' => 'Manage POS Users (Create/Edit/Delete/Activate/Deactivate)',
+            // POS User Management
+            'pos.view_users' => 'View POS Users',
+            'pos.manage_users' => 'Manage POS Users (Create/Edit/Delete/Activate/Deactivate)',
 
             // Role Management
-            'view_roles' => 'View Roles',
-            'manage_roles' => 'Manage Roles (Create/Edit/Delete)',
+            'pos.view_roles' => 'View Roles',
+            'pos.manage_roles' => 'Manage Roles (Create/Edit/Delete)',
 
             // Reports & Analytics
-            'view_reports' => 'View Reports & Analytics',
+            'pos.view_reports' => 'View Reports & Analytics',
 
             // Transaction History
-            'view_transactions' => 'View Transaction History',
+            'pos.view_transactions' => 'View Transaction History',
+
+            // Admin: User Management
+            'admin.manage_users' => 'Manage All Users',
+
+            // Subscription: Manage Subscriptions
+            'subscription.manage' => 'Manage Subscriptions',
         ];
 
         foreach ($permissions as $permission => $description) {

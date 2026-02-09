@@ -9,7 +9,9 @@ use App\Models\QrisTransaction;
 use App\Models\SubMerchant;
 use App\Models\User;
 use App\Services\BalanceService;
+use App\Services\XenPlatformService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -60,6 +62,8 @@ class SubMerchantQrisIntegrationTest extends TestCase
             'user_id' => $this->user->id,
             'business_name' => 'Test Merchant',
             'is_active' => true,
+            'xendit_account_id' => 'test-xendit-id',
+            'xendit_account_status' => 'active',
         ]);
 
         $this->balance = MerchantBalance::create([
@@ -72,27 +76,19 @@ class SubMerchantQrisIntegrationTest extends TestCase
     }
 
     /**
-     * Helper to build Midtrans webhook payload.
+     * Helper to build Xendit webhook payload.
      */
-    private function buildWebhookPayload(string $orderId, string $status, float $amount = 100000): array
+    private function buildWebhookPayload(string $referenceId, string $status, float $amount = 100000): array
     {
-        $grossAmount = number_format($amount, 2, '.', '');
-        $statusCode = $status === 'settlement' ? '200' : ($status === 'pending' ? '201' : '202');
-
-        $serverKey = config('services.midtrans.server_key') ?? '';
-        $signatureString = $orderId.$statusCode.$grossAmount.$serverKey;
-        $signatureKey = hash('sha512', $signatureString);
-
         return [
-            'order_id' => $orderId,
-            'transaction_status' => $status,
-            'status_code' => $statusCode,
-            'gross_amount' => $grossAmount,
-            'signature_key' => $signatureKey,
-            'transaction_id' => 'midtrans-'.uniqid(),
-            'payment_type' => 'qris',
-            'fraud_status' => 'accept',
-            'transaction_time' => now()->toDateTimeString(),
+            'reference_id' => $referenceId,
+            'status' => $status,
+            'amount' => $amount,
+            'payment_id' => 'qris-'.uniqid(),
+            'payment_method' => 'QRIS',
+            'currency' => 'IDR',
+            'created' => now()->toIso8601String(),
+            'updated' => now()->toIso8601String(),
         ];
     }
 
@@ -104,6 +100,14 @@ class SubMerchantQrisIntegrationTest extends TestCase
     public function complete_qris_flow_from_registration_to_payment_settlement(): void
     {
         Queue::fake();
+
+        // Mock Xendit API calls
+        Http::fake([
+            'https://api.xendit.co/*' => Http::sequence()
+                ->push(['id' => 'test-xendit-id', 'type' => 'OWNED']) // createSubAccount
+                ->push(['id' => 'qris-'.uniqid(), 'qr_string' => 'test-qr-string']) // createQRIS
+                ->push(['status' => 'ACTIVE']), // getQRISStatus
+        ]);
 
         // Step 1: Register as sub-merchant via API
         $response = $this->actingAs($this->user)
@@ -140,10 +144,12 @@ class SubMerchantQrisIntegrationTest extends TestCase
         $this->assertEquals(97500, $transaction->net_amount);
         $this->assertEquals(QrisTransaction::STATUS_PENDING, $transaction->status);
 
-        // Step 3: Simulate Midtrans webhook for settlement
-        $webhookPayload = $this->buildWebhookPayload($orderId, 'settlement', 100000);
+        // Step 3: Simulate Xendit webhook for settlement
+        $webhookPayload = $this->buildWebhookPayload($orderId, 'COMPLETED', 100000);
+        $webhookToken = config('xendit.webhook_token') ?? 'test-webhook-token';
 
-        $response = $this->postJson('/api/webhooks/midtrans', $webhookPayload);
+        $response = $this->withHeader('x-callback-token', $webhookToken)
+            ->postJson('/api/webhooks/xendit', $webhookPayload);
         $response->assertStatus(200);
 
         // Verify transaction status updated
@@ -255,10 +261,12 @@ class SubMerchantQrisIntegrationTest extends TestCase
         $this->assertTrue($transaction->isExpired());
         $this->assertFalse($transaction->canBeUsed());
 
-        // Webhook should still process but balance shouldn't update for expired
-        $webhookPayload = $this->buildWebhookPayload($transaction->order_id, 'expire', 100000);
+        // Webhook should still process - using 'EXPIRED' status from Xendit
+        $webhookPayload = $this->buildWebhookPayload($transaction->order_id, 'EXPIRED', 100000);
+        $webhookToken = config('xendit.webhook_token') ?? 'test-webhook-token';
 
-        $response = $this->postJson('/api/webhooks/midtrans', $webhookPayload);
+        $response = $this->withHeader('x-callback-token', $webhookToken)
+            ->postJson('/api/webhooks/xendit', $webhookPayload);
         $response->assertStatus(200);
 
         // Verify transaction marked as expired
@@ -279,6 +287,14 @@ class SubMerchantQrisIntegrationTest extends TestCase
     {
         Queue::fake();
 
+        // Mock Xendit API calls
+        Http::fake([
+            'https://api.xendit.co/*' => Http::sequence()
+                ->push(['id' => 'test-xendit-id', 'type' => 'OWNED']) // createSubAccount
+                ->push(['id' => 'qris-'.uniqid(), 'qr_string' => 'test-qr-string']) // createQRIS
+                ->push(['status' => 'ACTIVE']), // getQRISStatus
+        ]);
+
         // 1. User registers as sub-merchant
         $response = $this->actingAs($this->user)
             ->postJson('/api/sub-merchant/register', [
@@ -295,8 +311,10 @@ class SubMerchantQrisIntegrationTest extends TestCase
         $orderId = $response->json('data.transaction.order_id');
 
         // 3. Simulate payment settlement
-        $webhookPayload = $this->buildWebhookPayload($orderId, 'settlement', 200000);
-        $this->postJson('/api/webhooks/midtrans', $webhookPayload);
+        $webhookPayload = $this->buildWebhookPayload($orderId, 'COMPLETED', 200000);
+        $webhookToken = config('xendit.webhook_token') ?? 'test-webhook-token';
+        $this->withHeader('x-callback-token', $webhookToken)
+            ->postJson('/api/webhooks/xendit', $webhookPayload);
 
         // 4. Process the payment job manually
         $transaction = QrisTransaction::where('order_id', $orderId)->first();
