@@ -302,9 +302,9 @@ class QrisService
             Log::warning('Transaction not found for webhook', [
                 'external_id' => $webhookTransaction->externalId,
             ]);
-            throw new RuntimeException(
-                "Transaction not found: {$webhookTransaction->externalId}"
-            );
+            // Don't throw exception - just log and return
+            // This allows webhook to return 200 OK and prevent retries
+            return;
         }
 
         // Don't update if transaction is already in a final state
@@ -359,7 +359,7 @@ class QrisService
                 'order_id' => $transaction->order_id,
                 'error' => $e->getMessage(),
             ]);
-            throw new RuntimeException("Failed to update transaction: {$e->getMessage()}");
+            // Don't throw - just log error
         }
     }
 

@@ -19,8 +19,9 @@ use Illuminate\Support\Facades\Log;
  *
  * Xendit webhook formats:
  * - QR Codes: { event: "qr.payment", data: { reference_id, status, type, currency, ... } }
- * - Payment Requests V2: { reference_id, status, payment_method, ... }
- * - Payouts v2/v3: { event: "payout.queued"|"payout.completed", data: { id, reference_id, status, ... } }
+ * - Payment Requests V2: { event: "payment.succeeded", data: { reference_id, status, payment_method, ... } }
+ * - Payouts v2/v3: { event: "payout.succeeded"|"v3_payout.succeeded"|"payout-link.succeeded", data: { id, reference_id, status, ... } }
+ * - Account events: { event: "account.created"|"account.updated", data: { id, type, status, ... } }
  */
 class XenditWebhookController extends Controller
 {
@@ -31,7 +32,7 @@ class XenditWebhookController extends Controller
 
     /**
      * Handle incoming Xendit webhook notification.
-     * Routes QR codes and Payment Requests V2 webhooks to appropriate handlers.
+     * Routes different event types to appropriate handlers.
      */
     public function handleNotification(Request $request): JsonResponse
     {
@@ -47,27 +48,16 @@ class XenditWebhookController extends Controller
             $innerData = $payload['data'];
 
             // Route based on event type
-            if (str_starts_with($eventType, 'qr.') || $eventType === 'qr.payment') {
-                return $this->handleQrisWebhook($innerData, $signature);
-            }
-
-            // Unknown wrapped event type
-            Log::warning('Xendit webhook: Unknown wrapped event type', [
-                'event' => $eventType,
-                'data_keys' => array_keys($innerData),
-            ]);
-            return response()->json(['status' => 'ok'], 200);
+            return $this->handleWrappedWebhook($eventType, $innerData, $signature);
         }
 
         // Detect webhook type by payload structure (unwrapped/direct format)
-        // Payment Requests V2 has: { reference_id, status, payment_method, ... }
-        // QR Codes direct has: { reference_id, status, type: 'DYNAMIC', currency, ... }
         $hasPaymentMethod = isset($payload['payment_method']);
         $hasType = isset($payload['type']) && $payload['type'] === 'DYNAMIC';
         $hasCurrency = isset($payload['currency']);
 
         if ($hasPaymentMethod && !$hasType) {
-            // Payment Requests V2 webhook
+            // Payment Requests V2 webhook (unwrapped)
             return $this->handlePaymentRequestWebhook($payload, $signature);
         } elseif ($hasCurrency && $hasType) {
             // QR Codes webhook (direct/unwrapped format)
@@ -77,12 +67,42 @@ class XenditWebhookController extends Controller
         // Unknown webhook type - log and return 200 to prevent retries
         Log::warning('Xendit webhook: Unknown webhook type', [
             'payload_keys' => array_keys($payload),
-            'payload' => $payload,
             'has_event' => $hasEvent,
             'has_data' => $hasData,
-            'has_payment_method' => $hasPaymentMethod,
-            'has_type' => $hasType,
-            'has_currency' => $hasCurrency,
+        ]);
+
+        return response()->json(['status' => 'ok'], 200);
+    }
+
+    /**
+     * Handle wrapped webhook payloads with { event, data } structure.
+     */
+    protected function handleWrappedWebhook(string $eventType, array $data, string $signature): JsonResponse
+    {
+        Log::info('Xendit wrapped webhook received', [
+            'event' => $eventType,
+            'reference_id' => $data['reference_id'] ?? null,
+        ]);
+
+        // QR payment events
+        if (str_starts_with($eventType, 'qr.') || $eventType === 'qr.payment') {
+            return $this->handleQrisWebhook($data, $signature);
+        }
+
+        // Payment request events
+        if (str_starts_with($eventType, 'payment.') || $eventType === 'payment.succeeded') {
+            return $this->handlePaymentRequestWebhook($data, $signature);
+        }
+
+        // Account events - just log and acknowledge
+        if (str_starts_with($eventType, 'account.')) {
+            return $this->handleAccountWebhook($eventType, $data);
+        }
+
+        // Unknown wrapped event type
+        Log::info('Xendit webhook: Unhandled event type (acknowledged)', [
+            'event' => $eventType,
+            'data_keys' => array_keys($data),
         ]);
 
         return response()->json(['status' => 'ok'], 200);
@@ -96,18 +116,13 @@ class XenditWebhookController extends Controller
     {
         $referenceId = $payload['reference_id'] ?? $payload['external_id'] ?? null;
 
-        Log::info('Xendit QRIS webhook received', [
+        Log::info('Xendit QRIS webhook processing', [
             'reference_id' => $referenceId,
             'status' => $payload['status'] ?? null,
-            'type' => $payload['type'] ?? null,
-            'currency' => $payload['currency'] ?? null,
-            'has_signature' => ! empty($signature),
         ]);
 
         if (! $referenceId) {
-            Log::warning('Xendit QRIS webhook missing reference_id', [
-                'payload' => $payload,
-            ]);
+            Log::warning('Xendit QRIS webhook missing reference_id');
             return response()->json(['status' => 'ok'], 200);
         }
 
@@ -123,7 +138,6 @@ class XenditWebhookController extends Controller
         } catch (InvalidWebhookException $e) {
             Log::warning('Xendit QRIS webhook signature verification failed', [
                 'reference_id' => $referenceId,
-                'error' => $e->getMessage(),
             ]);
 
             $errorResponse = ErrorResponse::unauthorized('Invalid webhook signature');
@@ -134,7 +148,6 @@ class XenditWebhookController extends Controller
             Log::error('Xendit QRIS webhook processing error', [
                 'reference_id' => $referenceId,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json(['status' => 'ok'], 200);
@@ -147,12 +160,12 @@ class XenditWebhookController extends Controller
      */
     protected function handlePaymentRequestWebhook(array $payload, string $signature): JsonResponse
     {
-        $referenceId = $payload['reference_id'] ?? $payload['id'] ?? null;
+        $referenceId = $payload['reference_id'] ?? $payload['payment_request_id'] ?? $payload['id'] ?? null;
 
-        Log::info('Xendit Payment Request V2 webhook received', [
+        Log::info('Xendit Payment Request webhook received', [
             'reference_id' => $referenceId,
             'status' => $payload['status'] ?? null,
-            'payment_method' => $payload['payment_method'] ?? null,
+            'payment_method' => $payload['payment_method']['type'] ?? $payload['payment_method'] ?? null,
             'amount' => $payload['amount'] ?? null,
         ]);
 
@@ -163,8 +176,25 @@ class XenditWebhookController extends Controller
     }
 
     /**
+     * Handle Account webhook notification (account.created, account.updated, etc).
+     * Just logs and acknowledges - for monitoring purposes.
+     */
+    protected function handleAccountWebhook(string $eventType, array $data): JsonResponse
+    {
+        Log::info('Xendit Account webhook received', [
+            'event' => $eventType,
+            'account_id' => $data['id'] ?? null,
+            'type' => $data['type'] ?? null,
+            'status' => $data['status'] ?? null,
+            'email' => $data['email'] ?? null,
+        ]);
+
+        return response()->json(['status' => 'ok'], 200);
+    }
+
+    /**
      * Handle incoming Xendit payout webhook notification.
-     * Payouts API v2/v3 sends: { event: "payout.queued"|"payout.completed", data: { id, reference_id, status, ... } }
+     * Payouts API v2/v3 sends: { event: "payout.succeeded"|"v3_payout.succeeded"|"payout-link.succeeded", data: { id, reference_id, status, ... } }
      */
     public function handlePayoutNotification(Request $request): JsonResponse
     {
@@ -180,15 +210,12 @@ class XenditWebhookController extends Controller
             'payout_id' => $payoutData['id'] ?? null,
             'reference_id' => $payoutData['reference_id'] ?? null,
             'status' => $payoutData['status'] ?? null,
-            'has_signature' => ! empty($signature),
         ]);
 
         // Verify webhook signature
         $xenPlatformService = app(\App\Services\XenPlatformService::class);
         if (! $xenPlatformService->verifyWebhookSignature($signature)) {
             Log::warning('Xendit payout webhook signature verification failed', [
-                'signature_provided' => ! empty($signature),
-                'signature_length' => strlen($signature),
                 'event' => $eventType,
             ]);
 
@@ -210,7 +237,6 @@ class XenditWebhookController extends Controller
             Log::error('Xendit payout webhook processing error', [
                 'payout_id' => $payoutData['id'] ?? null,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
             ]);
 
             // Return 200 to prevent Xendit from retrying
