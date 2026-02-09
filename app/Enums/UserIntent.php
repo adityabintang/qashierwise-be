@@ -28,19 +28,19 @@ enum UserIntent: string
             return self::VIEW_MENU;
         }
 
-        // Order
-        if (preg_match('/(pesan|beli|order|mau|ambil)/i', $message)) {
-            return self::ORDER;
-        }
-
-        // View Cart
+        // View Cart (check before Order - more specific)
         if (preg_match('/(keranjang|cart|pesanan saya|lihat pesanan)/i', $message)) {
             return self::VIEW_CART;
         }
 
-        // Checkout
+        // Checkout (check before Order - more specific)
         if (preg_match('/(checkout|bayar|konfirmasi|lanjut|proses)/i', $message)) {
             return self::CHECKOUT;
+        }
+
+        // Order (check after more specific patterns)
+        if (preg_match('/(pesan|beli|order|mau|ambil)/i', $message)) {
+            return self::ORDER;
         }
 
         // Business Info

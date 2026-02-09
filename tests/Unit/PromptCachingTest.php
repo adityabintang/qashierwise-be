@@ -52,14 +52,14 @@ class PromptCachingTest extends TestCase
         $builder = new AiAgentPromptBuilder($this->agent, $this->user->id);
 
         // First call - should cache
-        $prompt1 = $builder->build();
+        $prompt1 = $builder->buildWithCaching();
 
         // Check cache exists
         $cacheKey = "ai_prompt_static_{$this->agent->id}";
         $this->assertTrue(Cache::has($cacheKey));
 
         // Second call - should use cache
-        $prompt2 = $builder->build();
+        $prompt2 = $builder->buildWithCaching();
 
         // Should be identical
         $this->assertEquals($prompt1, $prompt2);
@@ -90,12 +90,12 @@ class PromptCachingTest extends TestCase
 
         // First call (cache miss)
         $start1 = microtime(true);
-        $prompt1 = $builder->build();
+        $prompt1 = $builder->buildWithCaching();
         $time1 = (microtime(true) - $start1) * 1000;
 
         // Second call (cache hit)
         $start2 = microtime(true);
-        $prompt2 = $builder->build();
+        $prompt2 = $builder->buildWithCaching();
         $time2 = (microtime(true) - $start2) * 1000;
 
         // Cache hit should be faster (or at least not slower)
@@ -128,7 +128,7 @@ class PromptCachingTest extends TestCase
         $builder = new AiAgentPromptBuilder($this->agent, $this->user->id);
 
         // Build prompt (creates cache)
-        $prompt1 = $builder->build();
+        $prompt1 = $builder->buildWithCaching();
 
         $cacheKey = "ai_prompt_static_{$this->agent->id}";
         $this->assertTrue(Cache::has($cacheKey));
@@ -140,7 +140,7 @@ class PromptCachingTest extends TestCase
         $this->assertFalse(Cache::has($cacheKey));
 
         // Build again (recreates cache)
-        $prompt2 = $builder->build();
+        $prompt2 = $builder->buildWithCaching();
 
         // Cache should exist again
         $this->assertTrue(Cache::has($cacheKey));
@@ -150,9 +150,14 @@ class PromptCachingTest extends TestCase
     {
         Cache::flush();
 
+        // Create second WhatsApp account for the second agent
+        $whatsappAccount2 = WhatsAppAccount::factory()->create([
+            'user_id' => $this->user->id,
+        ]);
+
         // Create second agent
         $agent2 = AiAgent::factory()->create([
-            'whatsapp_account_id' => $this->whatsappAccount->id,
+            'whatsapp_account_id' => $whatsappAccount2->id,
             'bot_name' => 'Test Bot 2',
             'system_prompt' => 'Different prompt.',
             'enable_prompt_caching' => true,
@@ -160,10 +165,10 @@ class PromptCachingTest extends TestCase
 
         // Build prompts for both agents
         $builder1 = new AiAgentPromptBuilder($this->agent, $this->user->id);
-        $prompt1 = $builder1->build();
+        $prompt1 = $builder1->buildWithCaching();
 
         $builder2 = new AiAgentPromptBuilder($agent2, $this->user->id);
-        $prompt2 = $builder2->build();
+        $prompt2 = $builder2->buildWithCaching();
 
         // Both should have separate cache keys
         $cacheKey1 = "ai_prompt_static_{$this->agent->id}";
@@ -182,10 +187,10 @@ class PromptCachingTest extends TestCase
 
         // Build with different intents
         $builder1 = new AiAgentPromptBuilder($this->agent, $this->user->id, UserIntent::GREETING);
-        $prompt1 = $builder1->build();
+        $prompt1 = $builder1->buildWithCaching();
 
         $builder2 = new AiAgentPromptBuilder($this->agent, $this->user->id, UserIntent::ORDER);
-        $prompt2 = $builder2->build();
+        $prompt2 = $builder2->buildWithCaching();
 
         // Static part should be cached (same for both)
         $cacheKey = "ai_prompt_static_{$this->agent->id}";

@@ -58,8 +58,8 @@ class AiAgentPromptBuilderTest extends TestCase
         $builder = new AiAgentPromptBuilder($this->agent, $this->user->id);
         $prompt = $builder->build();
 
-        // Check for new optimized prompt format
-        $this->assertStringContainsString('ATURAN', $prompt);
+        // Check for new optimized prompt format (uses English "RULES" not Indonesian "ATURAN")
+        $this->assertStringContainsString('RULES', $prompt);
         $this->assertStringContainsString('Test Bot', $prompt);
     }
 
@@ -67,11 +67,13 @@ class AiAgentPromptBuilderTest extends TestCase
     {
         $this->agent->order_enabled = false;
         $this->agent->save();
+        $this->agent->refresh(); // Refresh to get updated values
 
         $builder = new AiAgentPromptBuilder($this->agent, $this->user->id);
         $prompt = $builder->build();
 
-        $this->assertStringNotContainsString('Alur Pesan', $prompt);
+        // When order disabled, workflow should not be included
+        $this->assertStringNotContainsString('FLOW:', $prompt);
         $this->assertStringNotContainsString('add_to_cart', $prompt);
     }
 
@@ -90,7 +92,7 @@ class AiAgentPromptBuilderTest extends TestCase
         // Order intent - should include workflow
         $builder = new AiAgentPromptBuilder($this->agent, $this->user->id, UserIntent::ORDER);
         $prompt = $builder->build();
-        $this->assertStringContainsString('Alur Pesan', $prompt);
+        $this->assertStringContainsString('FLOW:', $prompt);
     }
 
     public function test_prompt_token_reduction()

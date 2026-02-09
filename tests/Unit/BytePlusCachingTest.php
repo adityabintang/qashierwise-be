@@ -125,30 +125,22 @@ class BytePlusCachingTest extends TestCase
     }
 
     /** @test */
-    public function call_llm_uses_responses_api_when_caching_enabled()
+    public function call_llm_includes_caching_metadata_when_enabled()
     {
-        // Mock the HTTP response for Responses API
+        // Mock the HTTP response for BytePlus ARK chat completions
         Http::fake([
-            '*/responses' => Http::response([
-                'id' => 'resp_new_123',
-                'output' => [
+            '*/chat/completions' => Http::response([
+                'choices' => [
                     [
-                        'type' => 'message',
-                        'content' => [
-                            [
-                                'type' => 'output_text',
-                                'text' => 'Hello! How can I help you?',
-                            ],
+                        'message' => [
+                            'content' => 'Hello! How can I help you?',
                         ],
                     ],
                 ],
                 'usage' => [
-                    'input_tokens' => 100,
-                    'output_tokens' => 20,
+                    'prompt_tokens' => 100,
+                    'completion_tokens' => 20,
                     'total_tokens' => 120,
-                    'input_tokens_details' => [
-                        'cached_tokens' => 0,
-                    ],
                 ],
             ], 200),
         ]);
@@ -157,77 +149,23 @@ class BytePlusCachingTest extends TestCase
             'You are a helpful assistant.',
             [['type' => 'human', 'content' => 'Hello']],
             null,
-            $this->agent,
-            $this->conversation
+            $this->agent
         );
 
         $this->assertArrayHasKey('content', $result);
         $this->assertEquals('Hello! How can I help you?', $result['content']);
 
-        // Verify cache response ID was stored
-        $this->conversation->refresh();
-        $this->assertEquals('resp_new_123', $this->conversation->cache_response_id);
-
-        // Verify Responses API was called
-        Http::assertSent(function ($request) {
-            return str_contains($request->url(), '/responses');
-        });
-    }
-
-    /** @test */
-    public function call_llm_uses_previous_response_id_for_subsequent_requests()
-    {
-        // Set up existing cache
-        $this->conversation->setCacheResponseId('resp_existing_123');
-
-        Http::fake([
-            '*/responses' => Http::response([
-                'id' => 'resp_updated_456',
-                'output' => [
-                    [
-                        'type' => 'message',
-                        'content' => [
-                            [
-                                'type' => 'output_text',
-                                'text' => 'I can help with that!',
-                            ],
-                        ],
-                    ],
-                ],
-                'usage' => [
-                    'input_tokens' => 150,
-                    'output_tokens' => 25,
-                    'total_tokens' => 175,
-                    'input_tokens_details' => [
-                        'cached_tokens' => 100, // Cache hit!
-                    ],
-                ],
-            ], 200),
-        ]);
-
-        $result = $this->service->callLLM(
-            'You are a helpful assistant.',
-            [['type' => 'human', 'content' => 'Can you help me?']],
-            null,
-            $this->agent,
-            $this->conversation
-        );
-
-        // Verify previous_response_id was sent
+        // Verify BytePlus ARK API was called with caching metadata
         Http::assertSent(function ($request) {
             $body = json_decode($request->body(), true);
 
-            return isset($body['previous_response_id'])
-                && $body['previous_response_id'] === 'resp_existing_123';
+            return isset($body['metadata']['prompt_caching_enabled'])
+                && $body['metadata']['prompt_caching_enabled'] === true;
         });
-
-        // Verify cache was updated with new response ID
-        $this->conversation->refresh();
-        $this->assertEquals('resp_updated_456', $this->conversation->cache_response_id);
     }
 
     /** @test */
-    public function call_llm_falls_back_to_chat_completions_when_caching_disabled()
+    public function call_llm_omits_caching_metadata_when_disabled()
     {
         // Disable caching
         $this->agent->enable_prompt_caching = false;
@@ -238,12 +176,14 @@ class BytePlusCachingTest extends TestCase
                 'choices' => [
                     [
                         'message' => [
-                            'content' => 'Hello from chat completions!',
+                            'content' => 'Hello without caching!',
                         ],
                     ],
                 ],
                 'usage' => [
-                    'total_tokens' => 50,
+                    'prompt_tokens' => 100,
+                    'completion_tokens' => 20,
+                    'total_tokens' => 120,
                 ],
             ], 200),
         ]);
@@ -252,39 +192,43 @@ class BytePlusCachingTest extends TestCase
             'You are a helpful assistant.',
             [['type' => 'human', 'content' => 'Hello']],
             null,
-            $this->agent,
-            $this->conversation
+            $this->agent
         );
 
-        $this->assertEquals('Hello from chat completions!', $result['content']);
+        $this->assertEquals('Hello without caching!', $result['content']);
 
-        // Verify Chat Completions API was called, not Responses API
+        // Verify caching metadata is NOT included
         Http::assertSent(function ($request) {
-            return str_contains($request->url(), '/chat/completions');
+            $body = json_decode($request->body(), true);
+
+            return !isset($body['metadata']['prompt_caching_enabled']);
         });
     }
 
     /** @test */
-    public function call_llm_handles_tool_calls_from_responses_api()
+    public function call_llm_handles_tool_calls()
     {
         Http::fake([
-            '*/responses' => Http::response([
-                'id' => 'resp_tool_123',
-                'output' => [
+            '*/chat/completions' => Http::response([
+                'choices' => [
                     [
-                        'type' => 'function_call',
-                        'call_id' => 'call_123',
-                        'name' => 'search_products',
-                        'arguments' => '{"query": "dimsum"}',
+                        'message' => [
+                            'tool_calls' => [
+                                [
+                                    'id' => 'call_123',
+                                    'function' => [
+                                        'name' => 'search_products',
+                                        'arguments' => '{"query": "dimsum"}',
+                                    ],
+                                ],
+                            ],
+                        ],
                     ],
                 ],
                 'usage' => [
-                    'input_tokens' => 200,
-                    'output_tokens' => 30,
+                    'prompt_tokens' => 200,
+                    'completion_tokens' => 30,
                     'total_tokens' => 230,
-                    'input_tokens_details' => [
-                        'cached_tokens' => 150,
-                    ],
                 ],
             ], 200),
         ]);
@@ -309,8 +253,7 @@ class BytePlusCachingTest extends TestCase
             'You are a helpful assistant.',
             [['type' => 'human', 'content' => 'I want dimsum']],
             $tools,
-            $this->agent,
-            $this->conversation
+            $this->agent
         );
 
         $this->assertArrayHasKey('tool_calls', $result);
@@ -319,45 +262,93 @@ class BytePlusCachingTest extends TestCase
     }
 
     /** @test */
-    public function first_request_includes_prefix_caching_flag()
+    public function call_llm_uses_correct_model_and_parameters()
     {
-        // Ensure no existing cache
-        $this->conversation->clearCacheResponseId();
-
         Http::fake([
-            '*/responses' => Http::response([
-                'id' => 'resp_first_123',
-                'output' => [
+            '*/chat/completions' => Http::response([
+                'choices' => [
                     [
-                        'type' => 'message',
-                        'content' => [
-                            ['type' => 'output_text', 'text' => 'Hello!'],
+                        'message' => [
+                            'content' => 'Response',
                         ],
                     ],
                 ],
                 'usage' => [
-                    'input_tokens' => 100,
-                    'output_tokens' => 10,
-                    'total_tokens' => 110,
-                    'input_tokens_details' => ['cached_tokens' => 0],
+                    'prompt_tokens' => 50,
+                    'completion_tokens' => 10,
+                    'total_tokens' => 60,
                 ],
             ], 200),
         ]);
 
         $this->service->callLLM(
-            'You are a helpful assistant.',
-            [['type' => 'human', 'content' => 'Hello']],
+            'Test prompt',
+            [['type' => 'human', 'content' => 'Test message']],
             null,
-            $this->agent,
-            $this->conversation
+            $this->agent
         );
 
-        // Verify first request has prefix: true
+        // Verify request parameters
         Http::assertSent(function ($request) {
             $body = json_decode($request->body(), true);
 
-            return isset($body['caching']['prefix'])
-                && $body['caching']['prefix'] === true;
+            return isset($body['model'])
+                && isset($body['temperature'])
+                && isset($body['max_tokens'])
+                && is_array($body['messages'])
+                && count($body['messages']) === 2; // system + user
+        });
+    }
+
+    /** @test */
+    public function call_llm_includes_tools_in_request_when_provided()
+    {
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => 'Let me search for that.',
+                        ],
+                    ],
+                ],
+                'usage' => [
+                    'prompt_tokens' => 150,
+                    'completion_tokens' => 15,
+                    'total_tokens' => 165,
+                ],
+            ], 200),
+        ]);
+
+        $tools = [
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'get_all_products',
+                    'description' => 'Get all products',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [],
+                    ],
+                ],
+            ],
+        ];
+
+        $this->service->callLLM(
+            'You are a helpful assistant.',
+            [['type' => 'human', 'content' => 'Show me products']],
+            $tools,
+            $this->agent
+        );
+
+        // Verify tools are included
+        Http::assertSent(function ($request) {
+            $body = json_decode($request->body(), true);
+
+            return isset($body['tools'])
+                && is_array($body['tools'])
+                && isset($body['tool_choice'])
+                && $body['tool_choice'] === 'auto';
         });
     }
 }

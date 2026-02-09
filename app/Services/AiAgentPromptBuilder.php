@@ -95,8 +95,17 @@ class AiAgentPromptBuilder
 
         // Ultra-compact system context (~50 tokens)
         $prompt = "Asisten {$botName}. ";
-        $prompt .= config('ai_agent_prompts.core_rules');
-        $prompt .= "\n".config('ai_agent_prompts.ordering_workflow');
+
+        // Use appropriate core rules based on order_enabled
+        $configKey = $this->agent->isOrderEnabled()
+            ? 'ai_agent_prompts.core_rules'
+            : 'ai_agent_prompts.core_rules_without_ordering';
+        $prompt .= config($configKey) ?? config('ai_agent_prompts.core_rules');
+
+        // Only add ordering workflow if enabled
+        if ($this->agent->isOrderEnabled()) {
+            $prompt .= "\n".config('ai_agent_prompts.ordering_workflow');
+        }
 
         return str_replace(':business_name', $botName, $prompt);
     }
@@ -227,11 +236,17 @@ class AiAgentPromptBuilder
     private function getCoreRules(): string
     {
         // Use TOON-optimized rules if enabled
-        $configKey = ($this->agent->use_toon_format ?? false)
-            ? 'ai_agent_prompts.toon_core_rules'
-            : 'ai_agent_prompts.core_rules';
+        if ($this->agent->use_toon_format ?? false) {
+            $configKey = $this->agent->isOrderEnabled()
+                ? 'ai_agent_prompts.toon_core_rules'
+                : 'ai_agent_prompts.toon_core_rules_without_ordering';
+        } else {
+            $configKey = $this->agent->isOrderEnabled()
+                ? 'ai_agent_prompts.core_rules'
+                : 'ai_agent_prompts.core_rules_without_ordering';
+        }
 
-        $rules = config($configKey);
+        $rules = config($configKey) ?? config('ai_agent_prompts.core_rules');
 
         return str_replace(':business_name', $this->agent->bot_name, $rules);
     }

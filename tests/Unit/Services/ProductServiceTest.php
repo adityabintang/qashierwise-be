@@ -130,6 +130,7 @@ class ProductServiceTest extends TestCase
         ]);
 
         $this->service->create([
+            'user_id' => $this->user->id,
             'name' => 'Orange Juice',
             'category_id' => $category->id,
             'price' => 12000,
@@ -137,6 +138,7 @@ class ProductServiceTest extends TestCase
         ]);
 
         $this->service->create([
+            'user_id' => $this->user->id,
             'name' => 'Apple Juice',
             'category_id' => $category->id,
             'price' => 12000,
@@ -144,6 +146,7 @@ class ProductServiceTest extends TestCase
         ]);
 
         $this->service->create([
+            'user_id' => $this->user->id,
             'name' => 'Coffee',
             'category_id' => $category->id,
             'price' => 15000,

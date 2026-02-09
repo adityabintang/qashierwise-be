@@ -26,6 +26,14 @@ return [
 9. Cancel specific item: use remove_from_cart(product_name)
 10. Cancel all: use clear_cart()",
 
+    // Core rules without ordering (~40 tokens) - used when order_enabled = false
+    'core_rules_without_ordering' => "RULES:
+1. NEVER invent/hallucinate menu items or prices
+2. For MENU request: call get_all_products()
+3. Format: 'Nama - RpHarga'
+4. HIDE product IDs from user
+5. Off-topic: 'Maaf, saya :business_name untuk informasi menu.'",
+
     // Minimal workflow (~40 tokens)
     'ordering_workflow' => 'FLOW:menu→get_all_products|order→add_to_cart(items=[{product_name,quantity}]) DIRECTLY|cancel_item→remove_from_cart(name)|cancel_all→clear_cart',
 
@@ -42,6 +50,8 @@ return [
     */
 
     'toon_core_rules' => "R:fn_only|empty=skip|HIDE_ID|'Nama-RpHarga'|order→add_to_cart DIRECT",
+
+    'toon_core_rules_without_ordering' => "R:fn_only|empty=skip|HIDE_ID|'Nama-RpHarga'",
 
     'toon_ordering_workflow' => 'F:menu→get_all|order→add_to_cart(items) DIRECT|cancel→remove_from_cart(name)|clear→clear_cart',
 
