@@ -482,7 +482,7 @@ class SubscriptionController extends Controller
 
         try {
             // If subscription has Midtrans ID, cancel through Midtrans API
-            if ($subscription->provider === 'midtrans' && ! empty($subscription->midtrans_subscription_id)) {
+            if (! empty($subscription->midtrans_subscription_id)) {
                 Log::info('Cancelling Midtrans subscription via API', [
                     'event' => 'subscription.cancel_via_api',
                     'userId' => $user->id,
@@ -508,7 +508,6 @@ class SubscriptionController extends Controller
                     'event' => 'subscription.cancel_local_only',
                     'userId' => $user->id,
                     'subscriptionId' => $subscription->id,
-                    'provider' => $subscription->provider,
                     'hasMidtransId' => ! empty($subscription->midtrans_subscription_id),
                 ]);
             }

@@ -563,7 +563,6 @@ class MidtransWebhookController extends Controller
                     // Create or update subscription
                     $subscriptionData = [
                         'user_id' => $user->id,
-                        'provider' => 'midtrans',
                         'plan_name' => $planId,
                         'status' => 'active',
                         'current_period_start' => now(),

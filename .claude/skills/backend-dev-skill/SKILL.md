@@ -1,8 +1,7 @@
 ---
-name: backend-dev
+name: backend-dev-skill
 description: Comprehensive backend development workflow that orchestrates expert analysis, architecture design, implementation, and deployment using the integrated toolset. Handles everything from API design and database architecture to security implementation and DevOps automation.
 license: Apache 2.0
-tools: []
 ---
 
 # Backend Development Master - Complete Backend Engineering Workflow

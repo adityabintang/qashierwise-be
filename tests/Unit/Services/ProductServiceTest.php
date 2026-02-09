@@ -4,6 +4,7 @@ namespace Tests\Unit\Services;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\User;
 use App\Services\ProductService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -20,10 +21,13 @@ class ProductServiceTest extends TestCase
 
     private ProductService $service;
 
+    private User $user;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->service = new ProductService;
+        $this->user = User::factory()->create();
     }
 
     #[Test]
@@ -35,6 +39,7 @@ class ProductServiceTest extends TestCase
         ]);
 
         $product = $this->service->create([
+            'user_id' => $this->user->id,
             'name' => 'Coffee Latte',
             'category_id' => $category->id,
             'price' => 25000,
@@ -59,6 +64,7 @@ class ProductServiceTest extends TestCase
         ]);
 
         $product = $this->service->create([
+            'user_id' => $this->user->id,
             'name' => 'Burger',
             'category_id' => $category->id,
             'price' => 35000,
@@ -144,7 +150,7 @@ class ProductServiceTest extends TestCase
             'stock_quantity' => 50,
         ]);
 
-        $results = $this->service->search('Juice');
+        $results = $this->service->search('Juice', $this->user->id);
 
         $this->assertCount(2, $results);
     }
@@ -158,6 +164,7 @@ class ProductServiceTest extends TestCase
         ]);
 
         $this->service->create([
+            'user_id' => $this->user->id,
             'name' => 'Phone Charger',
             'category_id' => $category->id,
             'price' => 50000,
@@ -166,6 +173,7 @@ class ProductServiceTest extends TestCase
         ]);
 
         $this->service->create([
+            'user_id' => $this->user->id,
             'name' => 'USB Cable',
             'category_id' => $category->id,
             'price' => 25000,
@@ -173,7 +181,7 @@ class ProductServiceTest extends TestCase
             'sku' => 'ELEC-USB-002',
         ]);
 
-        $results = $this->service->search('ELEC-CHG');
+        $results = $this->service->search('ELEC-CHG', $this->user->id);
 
         $this->assertCount(1, $results);
         $this->assertEquals('Phone Charger', $results->first()->name);
@@ -191,6 +199,7 @@ class ProductServiceTest extends TestCase
 
         // Create a product with this SKU
         Product::create([
+            'user_id' => $this->user->id,
             'name' => 'Test Product',
             'category_id' => $category->id,
             'price' => 10000,
@@ -237,6 +246,7 @@ class ProductServiceTest extends TestCase
         ]);
 
         $this->service->create([
+            'user_id' => $this->user->id,
             'name' => 'Active Product',
             'category_id' => $category->id,
             'price' => 10000,
@@ -245,6 +255,7 @@ class ProductServiceTest extends TestCase
         ]);
 
         Product::create([
+            'user_id' => $this->user->id,
             'name' => 'Inactive Product',
             'category_id' => $category->id,
             'price' => 10000,
@@ -253,7 +264,7 @@ class ProductServiceTest extends TestCase
             'is_active' => false,
         ]);
 
-        $results = $this->service->search('Product');
+        $results = $this->service->search('Product', $this->user->id);
 
         $this->assertCount(1, $results);
         $this->assertEquals('Active Product', $results->first()->name);

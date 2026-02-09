@@ -29,20 +29,27 @@ class MidtransSubscriptionWebhookTest extends TestCase
         config(['services.midtrans.server_key' => 'test-server-key']);
         config(['midtrans.server_key' => 'test-server-key']);
         config(['subscription.plans' => [
-            'standard' => [
-                'name' => 'Standard',
-                'price' => 99000,
-                'currency' => 'IDR',
-            ],
             'pro' => [
+                'id' => 'pro',
                 'name' => 'Pro',
-                'price' => 199000,
-                'currency' => 'IDR',
+                'price_monthly' => 350000,
+                'tier' => 'pro',
+                'features' => ['All features'],
+                'durations' => [
+                    '1_month' => [
+                        'id' => 'pro_1_month',
+                        'name' => '1 Bulan',
+                        'months' => 1,
+                        'price' => 350000,
+                        'price_per_month' => 350000,
+                        'discount' => 0,
+                    ],
+                ],
             ],
         ]]);
 
         $this->serverKey = 'test-server-key';
-        $this->user = User::factory()->create();
+        $this->user = User::factory()->create(['is_master_admin' => true]);
     }
 
     /**
@@ -51,7 +58,7 @@ class MidtransSubscriptionWebhookTest extends TestCase
     public function test_successful_payment_creates_subscription(): void
     {
         $orderId = "SUB-{$this->user->id}-".time().'-test';
-        $grossAmount = '99000.00';
+        $grossAmount = '350000.00';
         $statusCode = '200';
 
         // Calculate signature
@@ -72,8 +79,8 @@ class MidtransSubscriptionWebhookTest extends TestCase
             'gross_amount' => $grossAmount,
             'fraud_status' => 'accept',
             'currency' => 'IDR',
-            'custom_field1' => 'standard',  // plan_id
-            'custom_field2' => 'subscription',  // payment_type
+            'custom_field1' => 'pro',  // plan_id
+            'custom_field2' => '1_month',  // duration
             'custom_field3' => (string) $this->user->id,  // user_id
         ];
 
@@ -92,22 +99,20 @@ class MidtransSubscriptionWebhookTest extends TestCase
         // Assert subscription was created
         $this->assertDatabaseHas('subscriptions', [
             'user_id' => $this->user->id,
-            'plan_name' => 'standard',
+            'plan_name' => 'pro',
             'status' => 'active',
-            'provider' => 'midtrans',
         ]);
 
         // Verify subscription details
         $subscription = $this->user->fresh()->subscription;
         $this->assertNotNull($subscription);
-        $this->assertEquals('standard', $subscription->plan_name);
+        $this->assertEquals('pro', $subscription->plan_name);
         $this->assertEquals('active', $subscription->status);
-        $this->assertEquals('midtrans', $subscription->provider);
 
         // Verify metadata
         $metadata = json_decode($subscription->metadata, true);
         $this->assertEquals($orderId, $metadata['order_id']);
-        $this->assertEquals('99000.00', $metadata['amount']);
+        $this->assertEquals('350000.00', $metadata['amount']);
     }
 
     /**
@@ -118,13 +123,12 @@ class MidtransSubscriptionWebhookTest extends TestCase
         // Create existing subscription
         $existingSubscription = Subscription::factory()->create([
             'user_id' => $this->user->id,
-            'plan_name' => 'standard',
+            'plan_name' => 'pro',
             'status' => 'expired',
-            'provider' => 'midtrans',
         ]);
 
         $orderId = "SUB-{$this->user->id}-".time().'-test';
-        $grossAmount = '199000.00';
+        $grossAmount = '350000.00';
         $statusCode = '200';
 
         // Calculate signature
@@ -146,7 +150,7 @@ class MidtransSubscriptionWebhookTest extends TestCase
             'fraud_status' => 'accept',
             'currency' => 'IDR',
             'custom_field1' => 'pro',  // plan_id
-            'custom_field2' => 'subscription',  // payment_type
+            'custom_field2' => '1_month',  // duration
             'custom_field3' => (string) $this->user->id,  // user_id
         ];
 
@@ -171,7 +175,7 @@ class MidtransSubscriptionWebhookTest extends TestCase
     public function test_webhook_with_invalid_signature_is_rejected(): void
     {
         $orderId = "SUB-{$this->user->id}-".time().'-test';
-        $grossAmount = '99000.00';
+        $grossAmount = '350000.00';
         $statusCode = '200';
 
         // Build webhook payload with invalid signature
@@ -188,8 +192,8 @@ class MidtransSubscriptionWebhookTest extends TestCase
             'gross_amount' => $grossAmount,
             'fraud_status' => 'accept',
             'currency' => 'IDR',
-            'custom_field1' => 'standard',
-            'custom_field2' => 'subscription',
+            'custom_field1' => 'pro',
+            'custom_field2' => '1_month',
             'custom_field3' => (string) $this->user->id,
         ];
 
@@ -212,7 +216,7 @@ class MidtransSubscriptionWebhookTest extends TestCase
     public function test_webhook_with_fraud_status_is_not_processed(): void
     {
         $orderId = "SUB-{$this->user->id}-".time().'-test';
-        $grossAmount = '99000.00';
+        $grossAmount = '350000.00';
         $statusCode = '200';
 
         // Calculate signature
@@ -233,8 +237,8 @@ class MidtransSubscriptionWebhookTest extends TestCase
             'gross_amount' => $grossAmount,
             'fraud_status' => 'deny',  // Fraud detected
             'currency' => 'IDR',
-            'custom_field1' => 'standard',
-            'custom_field2' => 'subscription',
+            'custom_field1' => 'pro',
+            'custom_field2' => '1_month',
             'custom_field3' => (string) $this->user->id,
         ];
 
@@ -256,7 +260,7 @@ class MidtransSubscriptionWebhookTest extends TestCase
     public function test_webhook_without_subscription_custom_field_is_ignored(): void
     {
         $orderId = "ORDER-{$this->user->id}-".time().'-test';
-        $grossAmount = '99000.00';
+        $grossAmount = '350000.00';
         $statusCode = '200';
 
         // Calculate signature
@@ -277,7 +281,7 @@ class MidtransSubscriptionWebhookTest extends TestCase
             'gross_amount' => $grossAmount,
             'fraud_status' => 'accept',
             'currency' => 'IDR',
-            'custom_field1' => 'standard',
+            'custom_field1' => 'pro',
             'custom_field2' => 'order',  // Not a subscription
             'custom_field3' => (string) $this->user->id,
         ];
@@ -300,7 +304,7 @@ class MidtransSubscriptionWebhookTest extends TestCase
     public function test_webhook_idempotency(): void
     {
         $orderId = "SUB-{$this->user->id}-".time().'-test';
-        $grossAmount = '99000.00';
+        $grossAmount = '350000.00';
         $statusCode = '200';
 
         // Calculate signature
@@ -321,8 +325,8 @@ class MidtransSubscriptionWebhookTest extends TestCase
             'gross_amount' => $grossAmount,
             'fraud_status' => 'accept',
             'currency' => 'IDR',
-            'custom_field1' => 'standard',
-            'custom_field2' => 'subscription',
+            'custom_field1' => 'pro',
+            'custom_field2' => '1_month',
             'custom_field3' => (string) $this->user->id,
         ];
 

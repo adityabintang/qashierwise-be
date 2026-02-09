@@ -36,24 +36,24 @@ return new class extends Migration
         // Update existing stores to set user_id based on PosUser relationship
         // This is a best-effort migration to set user_id for existing stores
         DB::statement("
-            UPDATE stores s
+            UPDATE stores
             SET user_id = (
                 SELECT pu.user_id
                 FROM pos_users pu
-                WHERE pu.store_id = s.id
+                WHERE pu.store_id = stores.id
                 LIMIT 1
             )
-            WHERE s.user_id IS NULL
+            WHERE user_id IS NULL
         ");
 
         // Set a default user (super admin) for any stores that still don't have user_id
         // This should not happen in a properly configured system
         DB::statement("
-            UPDATE stores s
+            UPDATE stores
             SET user_id = (
                 SELECT id FROM users WHERE email = 'admin@qashierwise.com' LIMIT 1
             )
-            WHERE s.user_id IS NULL
+            WHERE user_id IS NULL
         ");
     }
 

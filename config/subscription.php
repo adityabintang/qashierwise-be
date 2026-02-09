@@ -85,11 +85,25 @@ return [
     */
 
     'plans' => [
+        'free_trial' => [
+            'id' => 'free_trial',
+            'name' => 'Free Trial',
+            'price_monthly' => 0,
+            'currency' => 'IDR',
+            'tier' => 'basic',
+            'features' => [
+                'POS Kasir',
+                'Menu Management',
+                'Laporan Dasar',
+                'Hingga 1 outlet',
+            ],
+        ],
         'pro' => [
             'id' => 'pro',
             'name' => 'Pro',
             'price_monthly' => 350000,
             'currency' => 'IDR',
+            'tier' => 'pro',
             'features' => [
                 'Semua fitur Basic',
                 'Delivery + antrean & biaya',

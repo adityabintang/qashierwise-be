@@ -41,23 +41,31 @@ class PaymentServicePropertyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->paymentService = new PaymentService;
         $this->orderService = new OrderService;
+
+        // PaymentService requires OrderService, SubMerchantService, and BalanceService
+        $this->paymentService = new PaymentService(
+            $this->orderService,
+            app(\App\Services\SubMerchantService::class),
+            app(\App\Services\BalanceService::class)
+        );
 
         $uniqueId = uniqid();
 
-        // Create required entities for testing
-        $this->store = Store::create([
-            'name' => 'Test Store',
-            'code' => 'TST-'.$uniqueId,
-            'address' => 'Test Address',
-            'is_active' => true,
-        ]);
-
+        // Create user first, then store (since stores require user_id)
         $user = User::create([
             'name' => 'Test User',
             'email' => "test-{$uniqueId}@example.com",
             'password' => bcrypt('password'),
+        ]);
+
+        // Create required entities for testing
+        $this->store = Store::create([
+            'user_id' => $user->id,
+            'name' => 'Test Store',
+            'code' => 'TST-'.$uniqueId,
+            'address' => 'Test Address',
+            'is_active' => true,
         ]);
 
         // Get or create Spatie role

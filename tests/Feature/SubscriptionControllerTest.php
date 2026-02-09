@@ -16,15 +16,30 @@ class SubscriptionControllerTest extends TestCase
     {
         parent::setUp();
 
-        // Set up Polar config for tests
         config([
-            'polar.api_token' => 'test_token',
-            'polar.webhook_secret' => 'test_secret',
-            'polar.products.standard' => 'prod_standard',
-            'polar.products.pro' => 'prod_pro',
-            'polar.urls.success' => 'https://example.com/success',
-            'polar.urls.cancel' => 'https://example.com/cancel',
-            'polar.trial_days' => 14,
+            'midtrans.server_key' => 'test_server_key',
+            'midtrans.client_key' => 'test_client_key',
+            'midtrans.is_production' => false,
+            'subscription.trial_days' => 14,
+            'subscription.plans' => [
+                'pro' => [
+                    'id' => 'pro',
+                    'name' => 'Pro',
+                    'price_monthly' => 350000,
+                    'tier' => 'pro',
+                    'features' => ['All features'],
+                    'durations' => [
+                        '1_month' => [
+                            'id' => 'pro_1_month',
+                            'name' => '1 Bulan',
+                            'months' => 1,
+                            'price' => 350000,
+                            'price_per_month' => 350000,
+                            'discount' => 0,
+                        ],
+                    ],
+                ],
+            ],
         ]);
     }
 
@@ -57,13 +72,13 @@ class SubscriptionControllerTest extends TestCase
      */
     public function test_status_returns_active_subscription(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['is_master_admin' => true]);
 
         Subscription::create([
             'user_id' => $user->id,
-            'polar_subscription_id' => 'sub_123',
-            'polar_customer_id' => 'cus_123',
-            'plan_name' => 'standard',
+            'midtrans_subscription_id' => 'sub_123',
+            'midtrans_customer_id' => 'cust_123',
+            'plan_name' => 'pro',
             'status' => 'active',
             'current_period_start' => Carbon::now()->subDays(10),
             'current_period_end' => Carbon::now()->addDays(20),
@@ -78,7 +93,7 @@ class SubscriptionControllerTest extends TestCase
                 'data' => [
                     'subscription' => [
                         'status' => 'active',
-                        'plan_name' => 'standard',
+                        'plan_name' => 'pro',
                     ],
                 ],
             ]);
@@ -129,14 +144,14 @@ class SubscriptionControllerTest extends TestCase
     }
 
     /**
-     * Test portal endpoint returns 404 when no subscription exists.
+     * Test cancel endpoint returns 404 when no subscription exists.
      */
-    public function test_portal_returns_404_without_subscription(): void
+    public function test_cancel_returns_404_without_subscription(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['is_master_admin' => true]);
 
         $response = $this->actingAs($user, 'sanctum')
-            ->getJson('/api/subscription/portal');
+            ->postJson('/api/subscription/cancel');
 
         $response->assertStatus(404)
             ->assertJson([

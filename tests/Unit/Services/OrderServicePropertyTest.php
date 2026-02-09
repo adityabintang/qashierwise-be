@@ -42,18 +42,20 @@ class OrderServicePropertyTest extends TestCase
 
         $uniqueId = uniqid();
 
-        // Create required entities for testing
-        $this->store = Store::create([
-            'name' => 'Test Store',
-            'code' => 'TST-'.$uniqueId,
-            'address' => 'Test Address',
-            'is_active' => true,
-        ]);
-
+        // Create user first, then store (since stores require user_id)
         $user = User::create([
             'name' => 'Test User',
             'email' => "test-{$uniqueId}@example.com",
             'password' => bcrypt('password'),
+        ]);
+
+        // Create required entities for testing
+        $this->store = Store::create([
+            'user_id' => $user->id,
+            'name' => 'Test Store',
+            'code' => 'TST-'.$uniqueId,
+            'address' => 'Test Address',
+            'is_active' => true,
         ]);
 
         // Get or create Spatie role

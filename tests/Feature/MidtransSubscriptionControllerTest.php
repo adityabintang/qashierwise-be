@@ -23,21 +23,22 @@ class MidtransSubscriptionControllerTest extends TestCase
             'subscription.midtrans.client_key' => 'test_client_key',
             'subscription.midtrans.is_production' => false,
             'subscription.plans' => [
-                'standard' => [
-                    'id' => 'standard',
-                    'name' => 'Standard',
-                    'price' => 99000,
-                    'interval' => 'month',
-                    'interval_count' => 1,
-                    'currency' => 'IDR',
-                ],
                 'pro' => [
                     'id' => 'pro',
                     'name' => 'Pro',
-                    'price' => 199000,
-                    'interval' => 'month',
-                    'interval_count' => 1,
-                    'currency' => 'IDR',
+                    'price_monthly' => 350000,
+                    'tier' => 'pro',
+                    'features' => ['All features'],
+                    'durations' => [
+                        '1_month' => [
+                            'id' => 'pro_1_month',
+                            'name' => '1 Bulan',
+                            'months' => 1,
+                            'price' => 350000,
+                            'price_per_month' => 350000,
+                            'discount' => 0,
+                        ],
+                    ],
                 ],
             ],
         ]);
@@ -97,7 +98,7 @@ class MidtransSubscriptionControllerTest extends TestCase
 
         $response = $this->actingAs($user)
             ->post(route('subscription.checkout'), [
-                'plan_id' => 'standard',
+                'plan_id' => 'pro',
             ]);
 
         $response->assertRedirect()
@@ -109,14 +110,13 @@ class MidtransSubscriptionControllerTest extends TestCase
      */
     public function test_create_checkout_redirects_if_user_has_active_subscription(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['is_master_admin' => true]);
 
         Subscription::create([
             'user_id' => $user->id,
-            'provider' => 'midtrans',
             'midtrans_subscription_id' => 'sub_123',
             'midtrans_customer_id' => 'cus_123',
-            'plan_name' => 'standard',
+            'plan_name' => 'pro',
             'status' => 'active',
             'current_period_start' => now()->subDays(10),
             'current_period_end' => now()->addDays(20),
@@ -125,6 +125,7 @@ class MidtransSubscriptionControllerTest extends TestCase
         $response = $this->actingAs($user)
             ->post(route('subscription.checkout'), [
                 'plan_id' => 'pro',
+                'duration' => '1_month',
             ]);
 
         $response->assertRedirect(route('subscription.manage'))
@@ -205,17 +206,17 @@ class MidtransSubscriptionControllerTest extends TestCase
     /**
      * Test cancelSubscription returns error if subscription is not Midtrans.
      */
-    public function test_cancel_subscription_returns_error_if_not_midtrans(): void
+    public function test_cancel_subscription_returns_error_if_no_active_subscription(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['is_master_admin' => true]);
 
         Subscription::create([
             'user_id' => $user->id,
-            'provider' => 'polar',
-            'polar_subscription_id' => 'sub_123',
-            'polar_customer_id' => 'cus_123',
-            'plan_name' => 'standard',
-            'status' => 'active',
+            'midtrans_subscription_id' => 'sub_123',
+            'midtrans_customer_id' => 'cus_123',
+            'plan_name' => 'pro',
+            'status' => 'cancelled',
+            'cancelled_at' => now()->subDays(5),
             'current_period_start' => now()->subDays(10),
             'current_period_end' => now()->addDays(20),
         ]);
@@ -224,7 +225,7 @@ class MidtransSubscriptionControllerTest extends TestCase
             ->post(route('subscription.cancel.post'));
 
         $response->assertRedirect()
-            ->assertSessionHas('error');
+            ->assertSessionHas('error', 'No active subscription found.');
     }
 
     /**
@@ -232,14 +233,13 @@ class MidtransSubscriptionControllerTest extends TestCase
      */
     public function test_cancel_subscription_returns_info_if_already_cancelled(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['is_master_admin' => true]);
 
         Subscription::create([
             'user_id' => $user->id,
-            'provider' => 'midtrans',
             'midtrans_subscription_id' => 'sub_123',
             'midtrans_customer_id' => 'cus_123',
-            'plan_name' => 'standard',
+            'plan_name' => 'pro',
             'status' => 'cancelled',
             'cancelled_at' => now()->subDay(),
             'current_period_start' => now()->subDays(10),
@@ -258,14 +258,13 @@ class MidtransSubscriptionControllerTest extends TestCase
      */
     public function test_cancel_subscription_successfully_cancels_midtrans_subscription(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['is_master_admin' => true]);
 
         $subscription = Subscription::create([
             'user_id' => $user->id,
-            'provider' => 'midtrans',
             'midtrans_subscription_id' => 'sub_123',
             'midtrans_customer_id' => 'cus_123',
-            'plan_name' => 'standard',
+            'plan_name' => 'pro',
             'status' => 'active',
             'current_period_start' => now()->subDays(10),
             'current_period_end' => now()->addDays(20),
@@ -297,14 +296,13 @@ class MidtransSubscriptionControllerTest extends TestCase
      */
     public function test_cancel_subscription_handles_service_failure(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['is_master_admin' => true]);
 
         Subscription::create([
             'user_id' => $user->id,
-            'provider' => 'midtrans',
             'midtrans_subscription_id' => 'sub_123',
             'midtrans_customer_id' => 'cus_123',
-            'plan_name' => 'standard',
+            'plan_name' => 'pro',
             'status' => 'active',
             'current_period_start' => now()->subDays(10),
             'current_period_end' => now()->addDays(20),
