@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -17,7 +17,7 @@ return new class extends Migration
     public function up(): void
     {
         // Add user_id column to stores table if it doesn't exist
-        if (!Schema::hasColumn('stores', 'user_id')) {
+        if (! Schema::hasColumn('stores', 'user_id')) {
             Schema::table('stores', function (Blueprint $table) {
                 // Add user_id as foreign key with cascade delete
                 // This ensures that when a user is deleted, all their stores are deleted
@@ -35,7 +35,7 @@ return new class extends Migration
 
         // Update existing stores to set user_id based on PosUser relationship
         // This is a best-effort migration to set user_id for existing stores
-        DB::statement("
+        DB::statement('
             UPDATE stores
             SET user_id = (
                 SELECT pu.user_id
@@ -44,7 +44,7 @@ return new class extends Migration
                 LIMIT 1
             )
             WHERE user_id IS NULL
-        ");
+        ');
 
         // Set a default user (super admin) for any stores that still don't have user_id
         // This should not happen in a properly configured system

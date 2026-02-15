@@ -5,15 +5,15 @@ require __DIR__.'/vendor/autoload.php';
 $app = require_once __DIR__.'/bootstrap/app.php';
 $app->make('Illuminate\Contracts\Console\Kernel')->bootstrap();
 
-use App\Models\User;
-use App\Models\Product;
 use App\Models\Category;
+use App\Models\Product;
+use App\Models\User;
 
 echo "=== CHECKING KASIR USER DATA ACCESS ===\n\n";
 
 $kasir = User::where('email', 'kasir@gmail.com')->first();
 echo "Kasir User ID: {$kasir->id}\n";
-echo "Is Master Admin: " . ($kasir->is_master_admin ? 'YES' : 'NO') . "\n";
+echo 'Is Master Admin: '.($kasir->is_master_admin ? 'YES' : 'NO')."\n";
 
 $posUser = $kasir->posUsers()->with('store')->first();
 if ($posUser) {
@@ -30,7 +30,7 @@ if ($posUser) {
     echo "❌ NO POS USER RECORD!\n";
 }
 
-echo "\nEffective User ID: " . $kasir->getEffectiveUserId() . "\n";
+echo "\nEffective User ID: ".$kasir->getEffectiveUserId()."\n";
 
 $admin = User::where('email', 'admin@qashierwise.com')->first();
 echo "\nAdmin User ID: {$admin->id}\n";

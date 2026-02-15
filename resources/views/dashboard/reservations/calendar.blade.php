@@ -136,6 +136,7 @@
                                 <template x-for="ev in getEventsForDay(day.dateStr).slice(0, 3)" :key="ev.id">
                                     <div class="text-[10px] px-1.5 py-0.5 rounded truncate text-white font-medium"
                                          :style="'background-color:' + (ev.backgroundColor || '#6366f1')"
+                                         @click.stop="viewEventDetail(ev)"
                                          x-text="ev.title"></div>
                                 </template>
                                 <template x-if="getEventsForDay(day.dateStr).length > 3">
@@ -148,9 +149,8 @@
             </div>
         </template>
     </div>
-</div>
 
-<!-- Event Detail Modal -->
+    <!-- Event Detail Modal -->
 <div x-show="eventModal.show" x-cloak
      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
      x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
@@ -163,7 +163,11 @@
             <div class="flex items-start justify-between mb-4">
                 <div>
                     <h3 class="text-lg font-semibold text-[hsl(var(--foreground))]" x-text="eventModal.data?.title || 'Reservasi'"></h3>
-                    <p class="text-sm text-[hsl(var(--muted-foreground))] mt-0.5" x-text="eventModal.dateDisplay"></p>
+                    <p class="text-sm text-[hsl(var(--muted-foreground))] mt-0.5">
+                        <span x-text="eventModal.dateDisplay"></span>
+                        <span x-show="eventModal.data?.extendedProps?.time_display" class="mx-1">•</span>
+                        <span x-show="eventModal.data?.extendedProps?.time_display" x-text="eventModal.data?.extendedProps?.time_display"></span>
+                    </p>
                 </div>
                 <button @click="eventModal.show = false" class="p-1 rounded-md hover:bg-[hsl(var(--muted)/0.5)] transition-colors">
                     <svg class="w-5 h-5 text-[hsl(var(--muted-foreground))]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -172,9 +176,15 @@
             <template x-if="eventModal.data">
                 <div class="space-y-3">
                     <div class="flex items-center gap-2.5 text-sm">
-                        <span class="px-2.5 py-1 rounded-full text-xs font-medium text-white"
-                              :style="'background-color:' + (eventModal.data.backgroundColor || '#6366f1')"
-                              x-text="eventModal.data.extendedProps?.status === 'confirmed' ? 'Confirmed' : (eventModal.data.extendedProps?.status === 'completed' ? 'Completed' : eventModal.data.extendedProps?.status)"></span>
+                        <span class="px-2 py-1 text-xs font-medium rounded-full"
+                              :class="{
+                                  'bg-amber-100 text-amber-800': eventModal.data.extendedProps?.status === 'pending_payment',
+                                  'bg-cyan-100 text-cyan-700': eventModal.data.extendedProps?.status === 'confirmed' && eventModal.data.extendedProps?.payment_type === 'dp',
+                                  'bg-blue-100 text-blue-800': eventModal.data.extendedProps?.status === 'confirmed',
+                                  'bg-green-100 text-green-800': eventModal.data.extendedProps?.status === 'completed',
+                                  'bg-red-100 text-red-800': eventModal.data.extendedProps?.status === 'cancelled'
+                              }"
+                              x-text="eventModal.data.extendedProps?.status_label"></span>
                     </div>
                     <div class="grid gap-2 text-sm text-[hsl(var(--foreground)/0.8)]">
                         <div class="flex items-center gap-2" x-show="eventModal.data.extendedProps?.customer_name">
@@ -185,6 +195,10 @@
                             <i class="fas fa-phone w-4 text-center text-[hsl(var(--muted-foreground))]"></i>
                             <span x-text="eventModal.data.extendedProps?.customer_phone"></span>
                         </div>
+                        <div class="flex items-center gap-2" x-show="eventModal.data.extendedProps?.time_display">
+                            <i class="fas fa-clock w-4 text-center text-[hsl(var(--muted-foreground))]"></i>
+                            <span x-text="eventModal.data.extendedProps?.time_display"></span>
+                        </div>
                         <div class="flex items-center gap-2" x-show="eventModal.data.extendedProps?.guest_count">
                             <i class="fas fa-users w-4 text-center text-[hsl(var(--muted-foreground))]"></i>
                             <span x-text="(eventModal.data.extendedProps?.guest_count || 0) + ' tamu'"></span>
@@ -192,11 +206,18 @@
                         <div class="flex items-center gap-2" x-show="eventModal.data.extendedProps?.table_name">
                             <i class="fas fa-chair w-4 text-center text-[hsl(var(--muted-foreground))]"></i>
                             <span x-text="eventModal.data.extendedProps?.table_name"></span>
+                            <template x-if="eventModal.data.extendedProps?.table_capacity">
+                                <span class="text-xs text-[hsl(var(--muted-foreground))]" x-text="'(' + eventModal.data.extendedProps.table_capacity + ' orang)'"></span>
+                            </template>
                         </div>
                         <div class="flex items-center gap-2" x-show="eventModal.data.extendedProps?.order_id">
                             <i class="fas fa-receipt w-4 text-center text-[hsl(var(--muted-foreground))]"></i>
                             <span class="font-mono text-xs" x-text="eventModal.data.extendedProps?.order_id"></span>
                         </div>
+                    </div>
+                    <div x-show="eventModal.data.extendedProps?.notes" class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)] p-3">
+                        <div class="text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Catatan</div>
+                        <p class="mt-1 text-sm text-[hsl(var(--foreground))] whitespace-pre-wrap" x-text="eventModal.data.extendedProps?.notes"></p>
                     </div>
                 </div>
             </template>
@@ -239,14 +260,21 @@
                             <div class="font-medium text-sm text-[hsl(var(--foreground))] truncate" x-text="ev.title"></div>
                             <div class="text-xs text-[hsl(var(--muted-foreground))] mt-0.5" x-text="ev.extendedProps?.time_display || ''"></div>
                         </div>
-                        <span class="flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
-                              :style="'background-color:' + (ev.backgroundColor || '#6366f1')"
-                              x-text="ev.extendedProps?.status === 'confirmed' ? 'Confirmed' : 'Completed'"></span>
+                        <span class="flex-shrink-0 px-2 py-1 text-xs font-medium rounded-full"
+                              :class="{
+                                  'bg-amber-100 text-amber-800': ev.extendedProps?.status === 'pending_payment',
+                                  'bg-cyan-100 text-cyan-700': ev.extendedProps?.status === 'confirmed' && ev.extendedProps?.payment_type === 'dp',
+                                  'bg-blue-100 text-blue-800': ev.extendedProps?.status === 'confirmed',
+                                  'bg-green-100 text-green-800': ev.extendedProps?.status === 'completed',
+                                  'bg-red-100 text-red-800': ev.extendedProps?.status === 'cancelled'
+                              }"
+                              x-text="ev.extendedProps?.status_label"></span>
                     </div>
                 </template>
             </div>
         </div>
     </div>
+</div>
 </div>
 
 <script>
@@ -555,12 +583,21 @@ function calendarApp() {
         },
 
         viewEventDetail(ev) {
+            console.log('viewEventDetail called with:', ev);
+
+            if (!ev) {
+                console.error('No event data provided');
+                return;
+            }
+
             this.eventModal.data = ev;
             const dateStr = ev.start?.split('T')[0] || ev.start;
             this.eventModal.dateDisplay = dateStr
                 ? new Date(dateStr + 'T00:00:00').toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
                 : '';
             this.eventModal.show = true;
+
+            console.log('Modal state after:', this.eventModal);
         },
 
         toDateStr(d) {

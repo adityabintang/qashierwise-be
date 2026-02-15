@@ -63,7 +63,7 @@ class XenditWebhookController extends Controller
         if ($isDisbursement) {
             // Disbursement webhook (legacy API)
             return $this->handleDisbursementWebhook($payload, $signature);
-        } elseif ($hasPaymentMethod && !$hasType) {
+        } elseif ($hasPaymentMethod && ! $hasType) {
             // Payment Requests V2 webhook (unwrapped)
             return $this->handlePaymentRequestWebhook($payload, $signature);
         } elseif ($hasCurrency && $hasType) {
@@ -130,6 +130,7 @@ class XenditWebhookController extends Controller
 
         if (! $referenceId) {
             Log::warning('Xendit QRIS webhook missing reference_id');
+
             return response()->json(['status' => 'ok'], 200);
         }
 

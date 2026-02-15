@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\MerchantBalance;
 use App\Models\SubMerchant;
 use App\Models\WithdrawalRequest;
 use Illuminate\Support\Collection;

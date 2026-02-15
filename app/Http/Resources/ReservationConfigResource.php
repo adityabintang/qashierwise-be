@@ -21,6 +21,7 @@ class ReservationConfigResource extends JsonResource
             'is_active' => $this->is_active,
             'available_slots' => $this->available_slots,
             'available_dates_formatted' => $this->getAvailableDatesFormatted(),
+            'capacity_per_slot' => $this->capacity_per_slot,
             'guest_options' => $this->guest_options,
             'reservation_fee' => $this->reservation_fee,
             'dp_percentage' => $this->dp_percentage,

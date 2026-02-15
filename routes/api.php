@@ -202,6 +202,7 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
     // Reservation Configuration routes
     Route::prefix('reservation-config')->group(function () {
         Route::get('/', [\App\Http\Controllers\Api\ReservationConfigController::class, 'index']);
+        Route::post('/generate-slots', [\App\Http\Controllers\Api\ReservationConfigController::class, 'generateSlots']);
         Route::post('/', [\App\Http\Controllers\Api\ReservationConfigController::class, 'store']);
         Route::get('/{id}', [\App\Http\Controllers\Api\ReservationConfigController::class, 'show']);
         Route::put('/{id}', [\App\Http\Controllers\Api\ReservationConfigController::class, 'update']);

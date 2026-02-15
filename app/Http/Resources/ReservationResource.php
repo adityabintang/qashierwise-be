@@ -24,6 +24,7 @@ class ReservationResource extends JsonResource
             'reservation_date' => $this->reservation_date,
             'reservation_date_formatted' => $this->reservation_date?->format('d M Y'),
             'guest_count' => $this->guest_count,
+            'notes' => $this->notes,
             'table' => [
                 'id' => $this->table?->id,
                 'name' => $this->table?->number,

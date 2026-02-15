@@ -87,23 +87,10 @@
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Jumlah Tamu *</label>
-                                <select
-                                    x-model="formData.guest_count"
-                                    required
-                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                >
-                                    <option value="">Pilih Jumlah Tamu</option>
-                                    @foreach($guestOptions as $option)
-                                        <option value="{{ $option['id'] }}">{{ $option['title'] }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-
-                            <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Pilih Meja *</label>
                                 <select
                                     x-model="formData.table_id"
+                                    @change="updateGuestCountFromTable()"
                                     required
                                     :disabled="!formData.reservation_date || loadingTables"
                                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -113,7 +100,19 @@
                                         <option :value="table.id" x-text="table.label"></option>
                                     </template>
                                 </select>
+                                <p class="text-xs text-gray-500 mt-2">💡 Pilih meja sesuai dengan jumlah tamu Anda. Kapasitas meja akan otomatis terisi. Gunakan catatan di bawah jika perlu penyesuaian.</p>
                                 <p class="text-xs text-gray-500 mt-1" x-show="loadingTables">Memuat meja tersedia...</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Catatan untuk Restoran (Opsional)</label>
+                                <textarea
+                                    x-model="formData.notes"
+                                    rows="3"
+                                    placeholder="Contoh: Saya butuh untuk 3 orang tapi hanya tersedia meja untuk 4 orang. Atau permintaan khusus lainnya..."
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                ></textarea>
+                                <p class="text-xs text-gray-500 mt-1">Tuliskan permintaan khusus atau penyesuaian yang Anda butuhkan di sini.</p>
                             </div>
 
                             @if($config->enable_menu_selection)
@@ -124,21 +123,35 @@
                                     @click="loadProducts()"
                                     class="w-full px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-left"
                                 >
-                                    <span x-show="formData.selected_products.length === 0">Pilih makanan...</span>
-                                    <span x-show="formData.selected_products.length > 0" x-text="`${formData.selected_products.length} item dipilih`"></span>
+                                    <span x-show="getSelectedProductCount() === 0">Pilih makanan...</span>
+                                    <span x-show="getSelectedProductCount() > 0" x-text="`${getSelectedProductCount()} item dipilih`"></span>
                                 </button>
                                 <div x-show="showProductList" class="mt-2 border border-gray-300 rounded-lg max-h-60 overflow-y-auto">
                                     <template x-for="product in availableProducts" :key="product.id">
-                                        <label class="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                :value="product.id"
-                                                @change="toggleProduct(product.id)"
-                                                :checked="formData.selected_products.includes(product.id)"
-                                                class="rounded"
-                                            >
-                                            <span class="flex-1" x-text="product.label"></span>
-                                        </label>
+                                        <div class="flex items-center justify-between gap-3 p-3 hover:bg-gray-50">
+                                            <div class="flex-1">
+                                                <p class="text-sm font-medium text-gray-800" x-text="product.name"></p>
+                                                <p class="text-xs text-gray-500" x-text="formatCurrency(product.price)"></p>
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    @click="decreaseProduct(product.id)"
+                                                    class="h-8 w-8 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                                    :disabled="getProductQuantity(product.id) === 0"
+                                                >
+                                                    -
+                                                </button>
+                                                <span class="w-6 text-center text-sm font-medium" x-text="getProductQuantity(product.id)"></span>
+                                                <button
+                                                    type="button"
+                                                    @click="increaseProduct(product)"
+                                                    class="h-8 w-8 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-100"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
+                                        </div>
                                     </template>
                                     <div x-show="availableProducts.length === 0" class="p-3 text-sm text-gray-500">
                                         Tidak ada pilihan makanan tersedia.
@@ -339,8 +352,9 @@
                     phone: '',
                     email: '',
                     reservation_date: '',
-                    guest_count: '',
+                    guest_count: 1,
                     table_id: '',
+                    notes: '',
                     selected_products: [],
                     payment_type: @json($config->allow_full_payment ? 'full' : ($config->allow_dp_payment ? 'dp' : '')),
                     store_id: @json($defaultStoreId),
@@ -378,6 +392,13 @@
                     }
                 },
 
+                updateGuestCountFromTable() {
+                    const selectedTable = this.availableTables.find(t => t.id == this.formData.table_id);
+                    if (selectedTable && selectedTable.capacity) {
+                        this.formData.guest_count = selectedTable.capacity;
+                    }
+                },
+
                 async loadProducts() {
                     this.showProductList = !this.showProductList;
                     if (this.availableProducts.length > 0) return;
@@ -398,13 +419,44 @@
                     }
                 },
 
-                toggleProduct(productId) {
-                    const index = this.formData.selected_products.indexOf(productId);
-                    if (index > -1) {
-                        this.formData.selected_products.splice(index, 1);
-                    } else {
-                        this.formData.selected_products.push(productId);
+                getSelectedProductIndex(productId) {
+                    return this.formData.selected_products.findIndex(item => item.id === productId);
+                },
+
+                getProductQuantity(productId) {
+                    const selected = this.formData.selected_products.find(item => item.id === productId);
+                    return selected ? Number(selected.quantity || 0) : 0;
+                },
+
+                getSelectedProductCount() {
+                    return this.formData.selected_products
+                        .reduce((total, item) => total + Number(item.quantity || 0), 0);
+                },
+
+                increaseProduct(product) {
+                    const index = this.getSelectedProductIndex(product.id);
+                    if (index === -1) {
+                        this.formData.selected_products.push({
+                            id: product.id,
+                            quantity: 1,
+                        });
+                        return;
                     }
+
+                    this.formData.selected_products[index].quantity += 1;
+                },
+
+                decreaseProduct(productId) {
+                    const index = this.getSelectedProductIndex(productId);
+                    if (index === -1) return;
+
+                    const currentQty = Number(this.formData.selected_products[index].quantity || 0);
+                    if (currentQty <= 1) {
+                        this.formData.selected_products.splice(index, 1);
+                        return;
+                    }
+
+                    this.formData.selected_products[index].quantity = currentQty - 1;
                 },
 
                 async submitReservation() {
@@ -488,9 +540,12 @@
                 },
 
                 getSelectedProductTotal() {
-                    return this.availableProducts
-                        .filter((product) => this.formData.selected_products.includes(product.id))
-                        .reduce((total, product) => total + Number(product.price || 0), 0);
+                    return this.formData.selected_products.reduce((total, item) => {
+                        const product = this.availableProducts.find((entry) => entry.id === item.id);
+                        if (!product) return total;
+
+                        return total + (Number(product.price || 0) * Number(item.quantity || 0));
+                    }, 0);
                 },
 
                 getTotalAmount() {

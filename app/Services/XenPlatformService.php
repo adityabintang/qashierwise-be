@@ -390,7 +390,7 @@ class XenPlatformService
             Log::warning('XenPlatform: Webhook signature verification failed', [
                 'expected_length' => strlen($this->webhookToken),
                 'received_length' => strlen($signature),
-                'received_prefix' => substr($signature, 0, 8) . '...',
+                'received_prefix' => substr($signature, 0, 8).'...',
             ]);
         }
 

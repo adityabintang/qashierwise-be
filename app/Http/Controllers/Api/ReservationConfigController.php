@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\BulkTimeSlotGenerateRequest;
 use App\Http\Resources\ReservationConfigResource;
 use App\Models\ReservationConfig;
 use App\Models\Store;
+use App\Services\ReservationSlotGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -95,6 +97,7 @@ class ReservationConfigController extends Controller
             'is_active' => 'boolean',
             'available_slots' => 'nullable|array',
             'available_slots.*' => 'nullable|date_format:Y-m-d\TH:i',
+            'capacity_per_slot' => 'nullable|integer|min:1|max:100',
             'guest_options' => 'required|array|min:1',
             'guest_options.*' => 'required|integer|min:1|max:100',
             'reservation_fee' => 'required|numeric|min:0',
@@ -140,6 +143,7 @@ class ReservationConfigController extends Controller
                 'store_id' => $validated['store_id'],
                 'is_active' => $validated['is_active'] ?? true,
                 'available_slots' => $validated['available_slots'] ?? [],
+                'capacity_per_slot' => $validated['capacity_per_slot'] ?? 12,
                 'guest_options' => $validated['guest_options'],
                 'reservation_fee' => $validated['reservation_fee'] ?? 0,
                 'dp_percentage' => $validated['dp_percentage'],
@@ -192,6 +196,7 @@ class ReservationConfigController extends Controller
             'is_active' => 'boolean',
             'available_slots' => 'nullable|array',
             'available_slots.*' => 'nullable|date_format:Y-m-d\TH:i',
+            'capacity_per_slot' => 'nullable|integer|min:1|max:100',
             'guest_options' => 'nullable|array|min:1',
             'guest_options.*' => 'required_with:guest_options|integer|min:1|max:100',
             'reservation_fee' => 'required|numeric|min:0',
@@ -277,5 +282,22 @@ class ReservationConfigController extends Controller
                 'message' => __('dashboard.reservation.config_delete_failed'),
             ], 500);
         }
+    }
+
+    /**
+     * Generate bulk time slots for a store configuration.
+     */
+    public function generateSlots(BulkTimeSlotGenerateRequest $request, ReservationSlotGenerator $generator): JsonResponse
+    {
+        $validated = $request->validated();
+        $slots = $generator->generate($validated);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'slots' => $slots,
+                'count' => count($slots),
+            ],
+        ]);
     }
 }

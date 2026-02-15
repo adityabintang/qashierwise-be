@@ -38,6 +38,7 @@ class ReservationFactory extends Factory
             'phone' => '+62'.fake()->numerify('8##########'),
             'email' => fake()->safeEmail(),
             'reservation_date' => $reservationDate,
+            'reservation_time' => fake()->time('H:i'),
             'guest_count' => $guestCount,
             'table_id' => Table::factory(),
             'selected_products' => [

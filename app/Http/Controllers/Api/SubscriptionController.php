@@ -78,14 +78,14 @@ class SubscriptionController extends Controller
 
     /**
      * Get billing history for current user.
-     * 
+     *
      * POS users see their master admin's billing history since
      * all payments are made by the merchant owner.
      */
     public function billingHistory(Request $request): JsonResponse
     {
         $user = $request->user();
-        
+
         // CRITICAL: Use effective user ID to get master admin's billing history
         // POS users inherit billing history from their master admin
         $effectiveUserId = $user->getEffectiveUserId();
@@ -268,14 +268,14 @@ class SubscriptionController extends Controller
      *
      * Cancels the user's active subscription via Midtrans.
      * Access remains until the end of the current billing period.
-     * 
+     *
      * CRITICAL: Only master admins can cancel subscriptions.
      * POS users cannot cancel - they inherit from master admin.
      */
     public function cancelSubscription(Request $request): JsonResponse
     {
         $user = $request->user();
-        
+
         // CRITICAL: Only master admins can cancel subscriptions
         if (! $user->isMasterAdmin()) {
             return response()->json([
@@ -286,7 +286,7 @@ class SubscriptionController extends Controller
                 ],
             ], 403);
         }
-        
+
         // Get the master admin's subscription directly
         $subscription = $user->subscription;
 

@@ -2,6 +2,11 @@
 
 namespace App\Services;
 
+// Manually load Google API client aliases until composer autoloader is regenerated
+if (file_exists(__DIR__ . '/../../vendor/google/apiclient/src/aliases.php')) {
+    require_once __DIR__ . '/../../vendor/google/apiclient/src/aliases.php';
+}
+
 use App\Models\Reservation;
 use App\Models\User;
 use Exception;
@@ -16,16 +21,25 @@ class GoogleCalendarService
      */
     public function __construct()
     {
-        // Google API Client will be initialized when needed
-        // Commented out since package installation had issues
-        // You can enable this after successfully installing google/apiclient
-        /*
-        $this->client = new \Google_Client();
-        $this->client->setClientId(config('services.google.client_id'));
-        $this->client->setClientSecret(config('services.google.client_secret'));
-        $this->client->setRedirectUri(config('services.google.redirect_uri'));
-        $this->client->addScope(\Google_Service_Calendar::CALENDAR);
-        */
+        // Lazy initialization - client will be created when needed
+    }
+
+    /**
+     * Get or create Google Client instance.
+     */
+    protected function getClient(): \Google_Client
+    {
+        if (! $this->client) {
+            $this->client = new \Google_Client;
+            $this->client->setClientId(config('services.google.client_id'));
+            $this->client->setClientSecret(config('services.google.client_secret'));
+            $this->client->setRedirectUri(config('services.google.redirect_uri'));
+            $this->client->addScope(\Google_Service_Calendar::CALENDAR);
+            $this->client->setAccessType('offline');
+            $this->client->setPrompt('consent');
+        }
+
+        return $this->client;
     }
 
     /**
@@ -34,12 +48,17 @@ class GoogleCalendarService
     public function setAccessToken(string $token): void
     {
         try {
-            // $this->client->setAccessToken($token);
+            $client = $this->getClient();
+            $client->setAccessToken($token);
 
             // Refresh token if expired
-            // if ($this->client->isAccessTokenExpired()) {
-            //     $this->client->fetchAccessTokenWithRefreshToken($this->client->getRefreshToken());
-            // }
+            if ($client->isAccessTokenExpired()) {
+                $refreshToken = $client->getRefreshToken();
+                if ($refreshToken) {
+                    $newToken = $client->fetchAccessTokenWithRefreshToken($refreshToken);
+                    $client->setAccessToken($newToken);
+                }
+            }
         } catch (Exception $e) {
             Log::error('Failed to set Google Calendar access token', [
                 'error' => $e->getMessage(),
@@ -56,33 +75,38 @@ class GoogleCalendarService
     public function createEvent(Reservation $reservation): string
     {
         try {
-            // Get user's calendar email
-            $calendarEmail = $reservation->user->google_calendar_email ?? $reservation->user->email;
+            $client = $this->getClient();
 
-            // For now, return a mock event ID since package isn't fully installed
-            // Once google/apiclient is properly installed, uncomment below:
-
-            /*
-            if (!$this->client->getAccessToken()) {
+            if (! $client->getAccessToken()) {
                 throw new Exception('Google Calendar access token not set');
             }
 
-            $service = new \Google_Service_Calendar($this->client);
+            $service = new \Google_Service_Calendar($client);
 
-            // Set event time (assume 2 hours duration)
-            $startDateTime = $reservation->reservation_date->setTime(12, 0);
+            // Set event time with proper timezone handling
+            $timezone = $reservation->store->timezone ?? 'Asia/Jakarta';
+            $startDateTime = $reservation->reservation_date->copy();
+
+            // If reservation has specific time, use it; otherwise use 12:00
+            if ($reservation->reservation_time) {
+                $timeParts = explode(':', $reservation->reservation_time);
+                $startDateTime->setTime((int) $timeParts[0], (int) $timeParts[1]);
+            } else {
+                $startDateTime->setTime(12, 0);
+            }
+
             $endDateTime = $startDateTime->copy()->addHours(2);
 
             $event = new \Google_Service_Calendar_Event([
-                'summary' => 'Reservasi - ' . $reservation->customer_name,
+                'summary' => 'Reservasi - '.$reservation->customer_name,
                 'description' => $this->buildEventDescription($reservation),
                 'start' => [
                     'dateTime' => $startDateTime->toRfc3339String(),
-                    'timeZone' => 'Asia/Jakarta',
+                    'timeZone' => $timezone,
                 ],
                 'end' => [
                     'dateTime' => $endDateTime->toRfc3339String(),
-                    'timeZone' => 'Asia/Jakarta',
+                    'timeZone' => $timezone,
                 ],
                 'attendees' => [
                     ['email' => $reservation->email],
@@ -94,29 +118,26 @@ class GoogleCalendarService
                         ['method' => 'popup', 'minutes' => 60],
                     ],
                 ],
+                'location' => $reservation->store->address ?? '',
             ]);
 
             $createdEvent = $service->events->insert('primary', $event);
 
-            return $createdEvent->getId();
-            */
-
-            // Mock implementation for now
-            $eventId = 'evt_'.time().'_'.$reservation->id;
-
-            Log::info('Calendar event created (mock)', [
+            Log::info('Calendar event created successfully', [
                 'reservation_id' => $reservation->id,
-                'event_id' => $eventId,
+                'event_id' => $createdEvent->getId(),
                 'customer' => $reservation->customer_name,
                 'date' => $reservation->reservation_date->format('Y-m-d'),
+                'email' => $reservation->email,
             ]);
 
-            return $eventId;
+            return $createdEvent->getId();
 
         } catch (Exception $e) {
             Log::error('Failed to create calendar event', [
                 'reservation_id' => $reservation->id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             // Return a fallback ID so the reservation can still proceed
@@ -130,17 +151,45 @@ class GoogleCalendarService
     public function updateEvent(string $eventId, Reservation $reservation): void
     {
         try {
-            /*
-            $service = new \Google_Service_Calendar($this->client);
+            $client = $this->getClient();
+
+            if (! $client->getAccessToken()) {
+                throw new Exception('Google Calendar access token not set');
+            }
+
+            // Skip update for fallback event IDs
+            if (str_starts_with($eventId, 'fallback_')) {
+                Log::warning('Skipping calendar update for fallback event ID', [
+                    'event_id' => $eventId,
+                ]);
+
+                return;
+            }
+
+            $service = new \Google_Service_Calendar($client);
 
             $event = $service->events->get('primary', $eventId);
-            $event->setSummary('Reservasi - ' . $reservation->customer_name);
+            $event->setSummary('Reservasi - '.$reservation->customer_name);
             $event->setDescription($this->buildEventDescription($reservation));
 
-            $service->events->update('primary', $eventId, $event);
-            */
+            // Update time if changed
+            $timezone = $reservation->store->timezone ?? 'Asia/Jakarta';
+            $startDateTime = $reservation->reservation_date->copy();
 
-            Log::info('Calendar event updated (mock)', [
+            $endDateTime = $startDateTime->copy()->addHours(2);
+
+            $event->setStart(new \Google_Service_Calendar_EventDateTime([
+                'dateTime' => $startDateTime->toRfc3339String(),
+                'timeZone' => $timezone,
+            ]));
+            $event->setEnd(new \Google_Service_Calendar_EventDateTime([
+                'dateTime' => $endDateTime->toRfc3339String(),
+                'timeZone' => $timezone,
+            ]));
+
+            $service->events->update('primary', $eventId, $event);
+
+            Log::info('Calendar event updated successfully', [
                 'event_id' => $eventId,
                 'reservation_id' => $reservation->id,
             ]);
@@ -158,12 +207,25 @@ class GoogleCalendarService
     public function deleteEvent(string $eventId): void
     {
         try {
-            /*
-            $service = new \Google_Service_Calendar($this->client);
-            $service->events->delete('primary', $eventId);
-            */
+            $client = $this->getClient();
 
-            Log::info('Calendar event deleted (mock)', [
+            if (! $client->getAccessToken()) {
+                throw new Exception('Google Calendar access token not set');
+            }
+
+            // Skip deletion for fallback event IDs
+            if (str_starts_with($eventId, 'fallback_')) {
+                Log::warning('Skipping calendar deletion for fallback event ID', [
+                    'event_id' => $eventId,
+                ]);
+
+                return;
+            }
+
+            $service = new \Google_Service_Calendar($client);
+            $service->events->delete('primary', $eventId);
+
+            Log::info('Calendar event deleted successfully', [
                 'event_id' => $eventId,
             ]);
         } catch (Exception $e) {
@@ -171,6 +233,53 @@ class GoogleCalendarService
                 'event_id' => $eventId,
                 'error' => $e->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * Get OAuth authorization URL.
+     */
+    public function getAuthorizationUrl(): string
+    {
+        return $this->getClient()->createAuthUrl();
+    }
+
+    /**
+     * Exchange authorization code for access token.
+     */
+    public function authenticate(string $code): array
+    {
+        $token = $this->getClient()->fetchAccessTokenWithAuthCode($code);
+
+        if (isset($token['error'])) {
+            throw new Exception('Failed to authenticate: '.($token['error_description'] ?? $token['error']));
+        }
+
+        return $token;
+    }
+
+    /**
+     * Get user's calendar email.
+     */
+    public function getCalendarEmail(): ?string
+    {
+        try {
+            $client = $this->getClient();
+
+            if (! $client->getAccessToken()) {
+                return null;
+            }
+
+            $service = new \Google_Service_Calendar($client);
+            $calendarList = $service->calendarList->get('primary');
+
+            return $calendarList->getSummary();
+        } catch (Exception $e) {
+            Log::error('Failed to get calendar email', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
         }
     }
 
@@ -188,6 +297,10 @@ class GoogleCalendarService
 
         if ($reservation->table) {
             $description .= "Meja: {$reservation->table->number}\n";
+        }
+
+        if ($reservation->notes) {
+            $description .= "\nCatatan: {$reservation->notes}\n";
         }
 
         $description .= "\nPembayaran:\n";

@@ -14,7 +14,7 @@ $kasir = User::where('email', 'kasir@gmail.com')->first();
 
 // Get or create token
 $token = $kasir->tokens()->first();
-if (!$token) {
+if (! $token) {
     $token = $kasir->createToken('test-token');
     echo "Created new token\n";
 } else {
@@ -30,15 +30,15 @@ echo "Testing GET /api/pos/products\n";
 $response = Http::withToken($tokenString)
     ->get('http://127.0.0.1:8000/api/pos/products');
 
-echo "Status: " . $response->status() . "\n";
+echo 'Status: '.$response->status()."\n";
 $data = $response->json();
-echo "Response:\n" . json_encode($data, JSON_PRETTY_PRINT) . "\n\n";
+echo "Response:\n".json_encode($data, JSON_PRETTY_PRINT)."\n\n";
 
 // Test Categories API
 echo "Testing GET /api/pos/categories\n";
 $response = Http::withToken($tokenString)
     ->get('http://127.0.0.1:8000/api/pos/categories');
 
-echo "Status: " . $response->status() . "\n";
+echo 'Status: '.$response->status()."\n";
 $data = $response->json();
-echo "Response:\n" . json_encode($data, JSON_PRETTY_PRINT) . "\n";
+echo "Response:\n".json_encode($data, JSON_PRETTY_PRINT)."\n";

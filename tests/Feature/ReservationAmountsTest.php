@@ -36,12 +36,14 @@ class ReservationAmountsTest extends TestCase
 
         $service = app(ReservationService::class);
         $amounts = $service->calculateAmounts([
-            'selected_products' => [$product->id],
+            'selected_products' => [
+                ['id' => $product->id, 'quantity' => 3],
+            ],
         ], $config);
 
-        $this->assertEquals(412200, $amounts['total_amount']);
-        $this->assertEquals(206100, $amounts['dp_amount']);
-        $this->assertEquals(206100, $amounts['remaining_amount']);
+        $this->assertEquals(436600, $amounts['total_amount']);
+        $this->assertEquals(218300, $amounts['dp_amount']);
+        $this->assertEquals(218300, $amounts['remaining_amount']);
     }
 
     public function test_calculate_amounts_uses_reservation_fee_when_no_products(): void

@@ -29,6 +29,7 @@ class ReservationService
     public function createReservation(array $data, User $merchant): array
     {
         return DB::transaction(function () use ($data, $merchant) {
+            $selectedProducts = $this->normalizeSelectedProducts($data['selected_products'] ?? null);
             // Get configuration
             $config = ReservationConfig::where('user_id', $merchant->id)
                 ->where('store_id', $data['store_id'] ?? null)
@@ -40,6 +41,7 @@ class ReservationService
             }
 
             // Validate table availability
+            $table = null;
             if (! empty($data['table_id'])) {
                 $table = Table::findOrFail($data['table_id']);
                 if (! $this->checkTableQuota($table, Carbon::parse($data['reservation_date']))) {
@@ -58,6 +60,16 @@ class ReservationService
                 ? $amounts['dp_amount']
                 : $amounts['total_amount'];
 
+            // Parse reservation datetime
+            $reservationDateTime = Carbon::parse($data['reservation_date']);
+            $reservationDate = $reservationDateTime->toDateString();
+
+            // Extract time - if no time component, default to 12:00
+            $hasTimeComponent = str_contains($data['reservation_date'], 'T') || str_contains($data['reservation_date'], ':');
+            $reservationTime = $hasTimeComponent
+                ? $reservationDateTime->format('H:i')
+                : '12:00';
+
             // Create reservation record
             $reservation = Reservation::create([
                 'user_id' => $merchant->id,
@@ -65,10 +77,12 @@ class ReservationService
                 'customer_name' => $data['customer_name'],
                 'phone' => $data['phone'],
                 'email' => $data['email'],
-                'reservation_date' => $data['reservation_date'],
-                'guest_count' => $data['guest_count'],
+                'reservation_date' => $reservationDate,
+                'reservation_time' => $reservationTime,
+                'guest_count' => (int) ($data['guest_count'] ?? 1),
                 'table_id' => $data['table_id'] ?? null,
-                'selected_products' => $data['selected_products'] ?? [],
+                'notes' => $data['notes'] ?? null,
+                'selected_products' => $selectedProducts,
                 'payment_type' => $data['payment_type'],
                 'payment_method' => Reservation::PAYMENT_METHOD_QRIS,
                 'total_amount' => $amounts['total_amount'],
@@ -271,10 +285,21 @@ class ReservationService
     {
         $baseFee = (float) ($config->reservation_fee ?? 0);
         $productTotal = 0;
+        $selectedProducts = $this->normalizeSelectedProducts($data['selected_products'] ?? null);
 
-        if (! empty($data['selected_products'])) {
-            $products = Product::whereIn('id', $data['selected_products'])->get();
-            $productTotal = $products->sum('price');
+        if ($selectedProducts !== []) {
+            $productMap = Product::whereIn('id', collect($selectedProducts)->pluck('id'))
+                ->get()
+                ->keyBy('id');
+
+            $productTotal = collect($selectedProducts)->reduce(function (float $total, array $item) use ($productMap) {
+                $product = $productMap->get($item['id']);
+                if (! $product) {
+                    return $total;
+                }
+
+                return $total + ((float) $product->price * $item['quantity']);
+            }, 0.0);
         }
 
         $totalAmount = $baseFee + $productTotal;
@@ -286,6 +311,48 @@ class ReservationService
             'dp_amount' => $dpAmount,
             'remaining_amount' => $remainingAmount,
         ];
+    }
+
+    /**
+     * @param  array<int, int|array{id:int, quantity?:int}>|null  $selectedProducts
+     * @return array<int, array{id:int, quantity:int}>
+     */
+    private function normalizeSelectedProducts(?array $selectedProducts): array
+    {
+        return collect($selectedProducts ?? [])
+            ->map(function ($item) {
+                if (is_array($item)) {
+                    $id = isset($item['id']) ? (int) $item['id'] : 0;
+                    $quantity = isset($item['quantity']) ? (int) $item['quantity'] : 1;
+
+                    if ($id <= 0) {
+                        return null;
+                    }
+
+                    return [
+                        'id' => $id,
+                        'quantity' => max(1, $quantity),
+                    ];
+                }
+
+                if (is_numeric($item)) {
+                    $id = (int) $item;
+
+                    if ($id <= 0) {
+                        return null;
+                    }
+
+                    return [
+                        'id' => $id,
+                        'quantity' => 1,
+                    ];
+                }
+
+                return null;
+            })
+            ->filter()
+            ->values()
+            ->all();
     }
 
     /**

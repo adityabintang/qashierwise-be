@@ -12,7 +12,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (Schema::hasTable('roles')) { return; }
+        if (Schema::hasTable('roles')) {
+            return;
+        }
         // Drop foreign key constraint from pos_users table if it exists
         // Using raw SQL to avoid transaction issues in PostgreSQL
         if (Schema::hasTable('pos_users') && Schema::hasColumn('pos_users', 'role_id')) {

@@ -267,6 +267,13 @@
                                     </div>
                                 </div>
 
+                                <div x-show="detailModal.data.notes" class="border-l-4 border-blue-500">
+                                    <h4 class="font-semibold text-gray-700 mb-2 pl-3">Catatan Pelanggan</h4>
+                                    <div class="bg-blue-50 p-3 rounded space-y-1 text-sm">
+                                        <p class="text-gray-700 whitespace-pre-wrap" x-text="detailModal.data.notes"></p>
+                                    </div>
+                                </div>
+
                                 <div x-show="detailModal.data.selected_products && detailModal.data.selected_products.length > 0">
                                     <h4 class="font-semibold text-gray-700 mb-2">Makanan yang Dipilih</h4>
                                     <div class="bg-gray-50 p-3 rounded space-y-2">

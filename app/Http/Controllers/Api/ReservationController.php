@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\ReservationResource;
 use App\Models\Reservation;
 use App\Services\ReservationService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -216,27 +217,71 @@ class ReservationController extends Controller
 
         $reservations = Reservation::with(['table', 'store'])
             ->where('user_id', $effectiveUserId)
-            ->whereBetween('reservation_date', [$startDate, $endDate])
+            ->whereDate('reservation_date', '>=', $startDate)
+            ->whereDate('reservation_date', '<=', $endDate)
             ->whereIn('status', [Reservation::STATUS_CONFIRMED, Reservation::STATUS_COMPLETED])
             ->get();
 
         // Format for calendar (FullCalendar format)
         $events = $reservations->map(function ($reservation) {
+            $guestCount = $reservation->table?->capacity ?? $reservation->guest_count;
+            $reservationTime = $reservation->reservation_time ?? null;
+            $startDateTime = null;
+            $timeDisplay = 'Waktu belum ditentukan';
+
+            if ($reservationTime) {
+                // Parse time in Asia/Jakarta timezone (WIB)
+                if (is_string($reservationTime) && preg_match('/^\d{2}:\d{2}/', $reservationTime)) {
+                    // Ensure we have a date string (not a Carbon object)
+                    $dateString = $reservation->reservation_date instanceof \Carbon\Carbon
+                        ? $reservation->reservation_date->toDateString()
+                        : $reservation->reservation_date;
+                    $startDateTime = Carbon::parse($dateString.' '.$reservationTime, 'Asia/Jakarta');
+                } else {
+                    $startDateTime = Carbon::parse($reservationTime, 'Asia/Jakarta');
+                }
+
+                $timeDisplay = $startDateTime->format('H:i').' WIB';
+            }
+
+            $tableNumber = $reservation->table?->number;
+            $tableLabel = $tableNumber ? 'Meja '.$tableNumber : null;
+
+            // Determine status label and color based on payment type
+            $isDP = $reservation->status === Reservation::STATUS_CONFIRMED && $reservation->payment_type === Reservation::PAYMENT_TYPE_DP;
+            $statusLabel = match ($reservation->status) {
+                Reservation::STATUS_PENDING_PAYMENT => 'Menunggu Pembayaran',
+                Reservation::STATUS_CONFIRMED => $isDP ? 'DP Confirmed' : 'Confirmed',
+                Reservation::STATUS_COMPLETED => 'Selesai',
+                Reservation::STATUS_CANCELLED => 'Dibatalkan',
+                default => ucfirst($reservation->status),
+            };
+
             return [
                 'id' => $reservation->id,
-                'title' => $reservation->customer_name.' ('.$reservation->guest_count.' guests)',
-                'start' => $reservation->reservation_date,
-                'backgroundColor' => match ($reservation->status) {
-                    Reservation::STATUS_CONFIRMED => '#3b82f6',
-                    Reservation::STATUS_COMPLETED => '#10b981',
-                    default => '#6b7280',
+                'title' => $reservation->customer_name.' ('.$guestCount.' tamu)',
+                'start' => $startDateTime ? $startDateTime->toIso8601String() : $reservation->reservation_date,
+                'backgroundColor' => match (true) {
+                    $isDP => '#06b6d4',  // cyan for DP
+                    $reservation->status === Reservation::STATUS_CONFIRMED => '#3b82f6',  // blue for full payment
+                    $reservation->status === Reservation::STATUS_COMPLETED => '#10b981',  // green
+                    $reservation->status === Reservation::STATUS_CANCELLED => '#ef4444',  // red
+                    default => '#f59e0b',  // amber for pending
                 },
                 'extendedProps' => [
                     'order_id' => $reservation->order_id,
-                    'customer_phone' => $reservation->customer_phone,
-                    'table_name' => $reservation->table?->name,
+                    'customer_name' => $reservation->customer_name,
+                    'customer_phone' => $reservation->phone,
+                    'customer_email' => $reservation->email,
+                    'table_name' => $tableLabel,
+                    'table_capacity' => $reservation->table?->capacity,
                     'status' => $reservation->status,
-                    'guest_count' => $reservation->guest_count,
+                    'payment_type' => $reservation->payment_type,
+                    'status_label' => $statusLabel,
+                    'guest_count' => $guestCount,
+                    'reservation_time' => $startDateTime ? $startDateTime->format('H:i') : null,
+                    'time_display' => $timeDisplay,
+                    'notes' => $reservation->notes,
                 ],
             ];
         });
@@ -278,6 +323,14 @@ class ReservationController extends Controller
             'today' => (clone $query)->whereDate('reservation_date', today())->whereIn('status', [Reservation::STATUS_CONFIRMED, Reservation::STATUS_COMPLETED])->count(),
             'upcoming' => (clone $query)->where('reservation_date', '>', today())->where('status', Reservation::STATUS_CONFIRMED)->count(),
             'total_revenue' => (clone $query)->where('status', Reservation::STATUS_COMPLETED)->sum('paid_amount'),
+            'booked_capacity' => (clone $query)
+                ->whereDate('reservation_date', '>=', today())
+                ->whereIn('status', [
+                    Reservation::STATUS_PENDING_PAYMENT,
+                    Reservation::STATUS_CONFIRMED,
+                    Reservation::STATUS_COMPLETED,
+                ])
+                ->sum('guest_count'),
         ];
 
         return response()->json([

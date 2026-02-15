@@ -90,15 +90,20 @@
                                     </template>
                                 </select>
                             </div>
-                            <div class="mt-4 grid gap-3 sm:grid-cols-2" x-show="selectedStoreId" x-cloak>
+                            <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3" x-show="selectedStoreId" x-cloak>
                                 <div class="rounded-lg border border-border/70 bg-muted/30 p-4 transition-all duration-300 hover:-translate-y-0.5 hover:bg-background/80">
                                     <p class="text-sm text-muted-foreground mb-2">Slot terjadwal</p>
                                     <p class="text-2xl font-semibold" x-text="form.available_slots.length"></p>
                                 </div>
                                 <div class="rounded-lg border border-border/70 bg-muted/30 p-4 transition-all duration-300 hover:-translate-y-0.5 hover:bg-background/80">
-                                    <p class="text-sm text-muted-foreground mb-2">Pilihan tamu</p>
-                                    <p class="text-2xl font-semibold" x-text="form.guest_options.length"></p>
+                                    <p class="text-sm text-muted-foreground mb-2">Kapasitas terbooking</p>
+                                    <p class="text-2xl font-semibold" x-text="bookedCapacity"></p>
                                 </div>
+                                <div class="hidden xl:block rounded-lg border border-border/70 bg-muted/30 p-4 transition-all duration-300 hover:-translate-y-0.5 hover:bg-background/80" x-show="totalTableCapacity > 0" x-cloak>
+                                    <p class="text-sm text-muted-foreground mb-2">Total kapasitas meja</p>
+                                    <p class="text-2xl font-semibold" x-text="totalTableCapacity"></p>
+                                </div>
+
                             </div>
                         </div>
 
@@ -131,46 +136,46 @@
                                             <p class="card-description">Atur slot waktu yang bisa dipilih pelanggan.</p>
                                         </div>
                                         <div class="card-content space-y-3">
-                                            <template x-for="(slot, index) in form.available_slots" :key="index">
-                                                <div class="flex gap-2">
-                                                    <input type="datetime-local" x-model="form.available_slots[index]"
-                                                           :min="new Date().toISOString().slice(0, 16)"
-                                                           class="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-                                                    <button type="button" @click="removeSlot(index)" class="btn btn-outline btn-sm text-destructive transition-all duration-200 hover:-translate-y-0.5">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
-                                                </div>
+                                            <div class="space-y-2 max-h-96 overflow-y-auto">
+                                                <template x-for="(slot, index) in displayedSlots" :key="index">
+                                                    <div class="flex items-center gap-2">
+                                                        <!-- Input container with formatted display -->
+                                                        <div class="flex-1 relative">
+                                                            <!-- Formatted display (visible to user) -->
+                                                            <div class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm flex items-center justify-between cursor-pointer relative z-0">
+                                                                <span x-text="formatSlotDisplay(slot)" class="text-foreground font-medium"></span>
+                                                                <i class="fas fa-calendar-alt text-muted-foreground text-xs"></i>
+                                                            </div>
+                                                            <!-- Native input (invisible but functional) -->
+                                                            <input type="datetime-local"
+                                                                   x-model="form.available_slots[index]"
+                                                                   :min="new Date().toISOString().slice(0, 16)"
+                                                                   class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                                                        </div>
+                                                        <!-- Delete button -->
+                                                        <button type="button" @click="removeSlot(index)" class="btn btn-outline btn-sm text-destructive transition-all duration-200 hover:-translate-y-0.5">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                            <template x-if="hasMoreSlots">
+                                                <button type="button" @click="loadMoreSlots()" class="btn btn-outline btn-sm w-full transition-all duration-200 hover:-translate-y-0.5">
+                                                    <i class="fas fa-chevron-down"></i>
+                                                    Load More (<span x-text="remainingSlots"></span> slot)
+                                                </button>
                                             </template>
-                                            <button type="button" @click="addSlot()" class="btn btn-outline btn-sm w-full transition-all duration-200 hover:-translate-y-0.5">
-                                                <i class="fas fa-plus"></i>
-                                                Tambah Slot Waktu
+                                            <template x-if="form.available_slots.length > 0">
+                                                <p class="text-xs text-muted-foreground text-center">Menampilkan <span x-text="displayedSlots.length"></span> dari <span x-text="form.available_slots.length"></span> slot</p>
+                                            </template>
+                                            <button type="button" @click="openBulkSlotModal()" class="btn btn-sm w-full bg-purple-600 text-white shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:bg-purple-700 hover:shadow-lg">
+                                                <i class="fas fa-layer-group"></i>
+                                                Bulk Time Slot
                                             </button>
                                         </div>
                                     </div>
 
-                                    <div class="card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-                                        <div class="card-header">
-                                            <p class="text-xs uppercase tracking-[0.2em] text-muted-foreground">Tamu</p>
-                                            <div class="card-title">Opsi Jumlah Tamu</div>
-                                            <p class="card-description">Contoh: 2, 4, 6, 8 tamu per reservasi.</p>
-                                        </div>
-                                        <div class="card-content space-y-3">
-                                            <template x-for="(guest, index) in form.guest_options" :key="index">
-                                                <div class="flex gap-2">
-                                                    <input type="number" x-model.number="form.guest_options[index]"
-                                                           min="1" max="100"
-                                                           class="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-                                                    <button type="button" @click="removeGuest(index)" class="btn btn-outline btn-sm text-destructive transition-all duration-200 hover:-translate-y-0.5">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
-                                                </div>
-                                            </template>
-                                            <button type="button" @click="addGuest()" class="btn btn-outline btn-sm w-full transition-all duration-200 hover:-translate-y-0.5">
-                                                <i class="fas fa-plus"></i>
-                                                Tambah Opsi
-                                            </button>
-                                        </div>
-                                    </div>
+
 
                                     <div class="card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
                                         <div class="card-header">
@@ -191,6 +196,19 @@
                                                 >
                                                 <p class="mt-2 text-xs text-muted-foreground">Pelanggan wajib membayar sebelum reservasi aktif.</p>
                                                 <p class="mt-2 text-xs text-destructive" x-show="!isReservationFeeValid">Biaya reservasi wajib diisi.</p>
+                                            </div>
+
+                                            <div>
+                                                <label class="text-sm font-medium">Kapasitas Per Slot</label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="100"
+                                                    x-model.number="form.capacity_per_slot"
+                                                    placeholder="12"
+                                                    class="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                                                >
+                                                <p class="mt-2 text-xs text-muted-foreground">Maksimal reservasi per slot waktu.</p>
                                             </div>
                                             <div class="space-y-3">
                                                 <label class="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/30 p-3 transition-all duration-200 hover:bg-background/80">
@@ -348,6 +366,116 @@
                 </div>
             </div>
         </main>
+        <div x-show="bulkSlotModalOpen" x-cloak class="fixed inset-0 z-[90] flex items-center justify-center bg-white px-4 py-8">
+            <div class="absolute inset-0 bg-white" @click="closeBulkSlotModal()"></div>
+            <div x-show="bulkSlotModalOpen"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 translate-y-6 scale-95"
+                 x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                 x-transition:leave="transition ease-in duration-150"
+                 x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                 x-transition:leave-end="opacity-0 translate-y-6 scale-95"
+                 class="relative w-full max-w-3xl overflow-hidden rounded-2xl border border-border/70 bg-background shadow-2xl">
+                <div class="flex items-start justify-between gap-4 border-b border-border/70 px-6 py-5">
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.3em] text-purple-600">Bulk Time Slot</p>
+                        <h3 class="text-xl font-semibold">Bulk Time Slot Generator</h3>
+                        <p class="text-sm text-muted-foreground">Buat slot waktu untuk banyak tanggal sekaligus.</p>
+                    </div>
+                    <button type="button" @click="closeBulkSlotModal()" class="btn btn-ghost btn-sm">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form @submit.prevent="generateBulkSlots()" class="space-y-6 px-6 py-6">
+                    <div class="grid gap-6 lg:grid-cols-2">
+                        <div class="space-y-3">
+                            <p class="text-xs uppercase tracking-[0.25em] text-purple-600">Schedule Range</p>
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <div class="space-y-2">
+                                    <label class="text-sm font-medium">From Date</label>
+                                    <input type="date" x-model="bulkSlotForm.start_date" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="text-sm font-medium">To Date</label>
+                                    <input type="date" x-model="bulkSlotForm.end_date" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="space-y-3">
+                            <p class="text-xs uppercase tracking-[0.25em] text-purple-600">Operating Hours (WIB)</p>
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <div class="space-y-2">
+                                    <label class="text-sm font-medium">Start (GMT+7)</label>
+                                    <input type="text" inputmode="numeric" placeholder="17:00" x-model="bulkSlotForm.opening_time" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="text-sm font-medium">End (GMT+7)</label>
+                                    <input type="text" inputmode="numeric" placeholder="23:00" x-model="bulkSlotForm.closing_time" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+                                </div>
+                            </div>
+                            <p class="text-xs text-muted-foreground">Gunakan format 24 jam (WIB).</p>
+                        </div>
+                        <div class="space-y-3">
+                            <p class="text-xs uppercase tracking-[0.25em] text-purple-600">Capacity Per Slot</p>
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium">Capacity</label>
+                                <input type="number" min="1" max="100" x-model.number="bulkSlotForm.capacity_per_slot" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+                                <p class="text-xs text-muted-foreground">Jumlah maksimal reservasi per slot.</p>
+                            </div>
+                        </div>
+                        <div class="space-y-3">
+                            <p class="text-xs uppercase tracking-[0.25em] text-purple-600">Slot Duration</p>
+                            <div class="grid gap-3 sm:grid-cols-3">
+                                <button type="button" @click="bulkSlotForm.slot_duration = 30" class="rounded-xl border px-4 py-3 text-sm font-semibold transition"
+                                        :class="bulkSlotForm.slot_duration === 30 ? 'border-purple-600 bg-purple-50 text-purple-700' : 'border-border/70 bg-background hover:border-purple-300'">30 Min</button>
+                                <button type="button" @click="bulkSlotForm.slot_duration = 60" class="rounded-xl border px-4 py-3 text-sm font-semibold transition"
+                                        :class="bulkSlotForm.slot_duration === 60 ? 'border-purple-600 bg-purple-50 text-purple-700' : 'border-border/70 bg-background hover:border-purple-300'">1 Hr</button>
+                                <button type="button" @click="bulkSlotForm.slot_duration = 120" class="rounded-xl border px-4 py-3 text-sm font-semibold transition"
+                                        :class="bulkSlotForm.slot_duration === 120 ? 'border-purple-600 bg-purple-50 text-purple-700' : 'border-border/70 bg-background hover:border-purple-300'">2 Hr</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3 rounded-2xl border border-dashed border-purple-200 bg-purple-50/40 p-4">
+                        <div class="flex items-center justify-between">
+                            <p class="text-xs uppercase tracking-[0.25em] text-purple-600">Exclude Dates</p>
+                            <span class="text-xs text-muted-foreground">Optional</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <input type="date" x-model="bulkSlotExcludeInput" class="flex-1 min-w-[180px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+                            <button type="button" @click="addExcludedDate()" class="btn btn-outline btn-sm">
+                                <i class="fas fa-plus"></i>
+                                Tambah
+                            </button>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <template x-for="(date, index) in bulkSlotForm.exclude_dates" :key="date">
+                                <span class="inline-flex items-center gap-2 rounded-full border border-purple-200 bg-white px-3 py-1 text-xs font-medium text-purple-700">
+                                    <span x-text="date"></span>
+                                    <button type="button" @click="removeExcludedDate(index)" class="text-purple-400 hover:text-purple-700">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </span>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-4">
+                        <div class="text-sm text-muted-foreground">
+                            <span class="font-semibold text-foreground" x-text="bulkSlotPreviewCount"></span>
+                            <span>slot akan dibuat.</span>
+                        </div>
+                        <div class="flex gap-3">
+                            <button type="button" @click="closeBulkSlotModal()" class="btn btn-outline btn-sm">Batal</button>
+                            <button type="submit" :disabled="bulkSlotLoading" class="btn btn-sm bg-purple-600 text-white shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:bg-purple-700 hover:shadow-lg">
+                                <i class="fas fa-wand-magic-sparkles" :class="{ 'animate-spin': bulkSlotLoading }"></i>
+                                <span x-text="bulkSlotLoading ? 'Memproses...' : 'Generate All Slots'"></span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -391,10 +519,14 @@ function configApp() {
         products: [],
         loadingTables: false,
         loadingProducts: false,
+        loadingStats: false,
+        reservationStats: {
+            booked_capacity: 0,
+        },
         form: {
             is_active: true,
             available_slots: [],
-            guest_options: [2, 4, 6, 8],
+            capacity_per_slot: 12,
             reservation_fee: 0,
             dp_percentage: 50,
             allow_full_payment: true,
@@ -405,6 +537,19 @@ function configApp() {
             require_menu_selection: false
         },
         reservationFeeDisplay: '',
+        bulkSlotModalOpen: false,
+        bulkSlotLoading: false,
+        bulkSlotExcludeInput: '',
+        bulkSlotForm: {
+            start_date: '',
+            end_date: '',
+            opening_time: '17:00',
+            closing_time: '23:00',
+            slot_duration: 30,
+            capacity_per_slot: 12,
+            exclude_dates: []
+        },
+        slotPaginationOffset: 10,
 
         async init() {
             // Dashboard base init
@@ -464,6 +609,42 @@ function configApp() {
             return this.form.reservation_fee !== null
                 && this.form.reservation_fee !== ''
                 && !Number.isNaN(this.form.reservation_fee);
+        },
+
+        get bulkSlotPreviewCount() {
+            return this.calculateBulkSlotCount();
+        },
+
+        get displayedSlots() {
+            return this.form.available_slots.slice(0, this.slotPaginationOffset);
+        },
+
+        get hasMoreSlots() {
+            return this.form.available_slots.length > this.slotPaginationOffset;
+        },
+
+        get remainingSlots() {
+            return this.form.available_slots.length - this.slotPaginationOffset;
+        },
+
+        get bookedCapacity() {
+            return this.reservationStats?.booked_capacity ?? 0;
+        },
+
+        get totalTableCapacity() {
+            if (this.tables.length === 0 || this.form.available_tables.length === 0) {
+                return 0;
+            }
+
+            const selectedTableIds = new Set(this.form.available_tables.map(id => Number(id)));
+
+            return this.tables
+                .filter(table => selectedTableIds.has(Number(table.id)))
+                .reduce((total, table) => total + Number(table.capacity || 0), 0);
+        },
+
+        loadMoreSlots() {
+            this.slotPaginationOffset += 10;
         },
 
         get allTablesSelected() {
@@ -550,6 +731,32 @@ function configApp() {
             }
         },
 
+        async loadReservationStats() {
+            if (!this.selectedStoreId) return;
+
+            this.loadingStats = true;
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`/api/reservations/stats?store_id=${this.selectedStoreId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) throw new Error('Failed to load stats');
+
+                const data = await response.json();
+                if (data.success && data.data) {
+                    this.reservationStats = data.data;
+                }
+            } catch (error) {
+                console.error('Error loading reservation stats:', error);
+            } finally {
+                this.loadingStats = false;
+            }
+        },
+
         async loadStores() {
             try {
                 const token = localStorage.getItem('token');
@@ -620,7 +827,8 @@ function configApp() {
                     this.form = {
                         is_active: config.is_active,
                         available_slots: config.available_slots || [],
-                        guest_options: config.guest_options || [2, 4, 6, 8],
+                        capacity_per_slot: config.capacity_per_slot || 12,
+
                         reservation_fee: config.reservation_fee || 0,
                         dp_percentage: config.dp_percentage || 50,
                         allow_full_payment: config.allow_full_payment,
@@ -630,13 +838,15 @@ function configApp() {
                         enable_menu_selection: config.enable_menu_selection || false,
                         require_menu_selection: config.require_menu_selection || false
                     };
+                    this.bulkSlotForm.capacity_per_slot = config.capacity_per_slot || 12;
                 } else {
                     // Reset to defaults if no config exists
                     this.configId = null;
                     this.form = {
                         is_active: true,
                         available_slots: [],
-                        guest_options: [2, 4, 6, 8],
+                        capacity_per_slot: 12,
+
                         reservation_fee: 0,
                         dp_percentage: 50,
                         allow_full_payment: true,
@@ -651,6 +861,7 @@ function configApp() {
                 // Reload tables and products for the selected store
                 await this.loadTables();
                 await this.loadProducts();
+                await this.loadReservationStats();
             } catch (error) {
                 console.error('Error loading config:', error);
             } finally {
@@ -709,27 +920,164 @@ function configApp() {
             }
         },
 
-        addSlot() {
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            tomorrow.setHours(12, 0, 0, 0); // Default to noon
-            this.form.available_slots.push(tomorrow.toISOString().slice(0, 16));
-        },
-
         removeSlot(index) {
             this.form.available_slots.splice(index, 1);
         },
 
-        addGuest() {
-            const lastGuest = this.form.guest_options[this.form.guest_options.length - 1] || 0;
-            this.form.guest_options.push(lastGuest + 2);
+        openBulkSlotModal() {
+            const today = new Date();
+            const tomorrow = new Date();
+            tomorrow.setDate(today.getDate() + 1);
+            const defaultDate = this.formatDateKey(tomorrow);
+
+            if (!this.bulkSlotForm.start_date) {
+                this.bulkSlotForm.start_date = defaultDate;
+            }
+
+            if (!this.bulkSlotForm.end_date) {
+                this.bulkSlotForm.end_date = this.bulkSlotForm.start_date;
+            }
+
+            if (!this.bulkSlotForm.opening_time) {
+                this.bulkSlotForm.opening_time = '17:00';
+            }
+
+            if (!this.bulkSlotForm.closing_time) {
+                this.bulkSlotForm.closing_time = '23:00';
+            }
+
+            if (!this.bulkSlotForm.slot_duration) {
+                this.bulkSlotForm.slot_duration = 30;
+            }
+
+            if (!this.bulkSlotForm.capacity_per_slot) {
+                this.bulkSlotForm.capacity_per_slot = 12;
+            }
+
+            this.bulkSlotModalOpen = true;
         },
 
-        removeGuest(index) {
-            if (this.form.guest_options.length > 1) {
-                this.form.guest_options.splice(index, 1);
+        closeBulkSlotModal() {
+            this.bulkSlotModalOpen = false;
+        },
+
+        addExcludedDate() {
+            const date = this.bulkSlotExcludeInput;
+            if (!date) return;
+
+            if (!this.bulkSlotForm.exclude_dates.includes(date)) {
+                this.bulkSlotForm.exclude_dates.push(date);
+            }
+            this.bulkSlotExcludeInput = '';
+        },
+
+        removeExcludedDate(index) {
+            this.bulkSlotForm.exclude_dates.splice(index, 1);
+        },
+
+        calculateBulkSlotCount() {
+            if (!this.bulkSlotForm.start_date || !this.bulkSlotForm.end_date) return 0;
+            if (!this.bulkSlotForm.opening_time || !this.bulkSlotForm.closing_time) return 0;
+            if (!this.bulkSlotForm.slot_duration) return 0;
+
+            const startDate = new Date(`${this.bulkSlotForm.start_date}T00:00`);
+            const endDate = new Date(`${this.bulkSlotForm.end_date}T00:00`);
+            if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return 0;
+
+            const excludeSet = new Set(this.bulkSlotForm.exclude_dates || []);
+            let count = 0;
+            const cursor = new Date(startDate.getTime());
+
+            while (cursor.getTime() <= endDate.getTime()) {
+                const dateKey = this.formatDateKey(cursor);
+                if (!excludeSet.has(dateKey)) {
+                    const slotStart = new Date(`${dateKey}T${this.bulkSlotForm.opening_time}`);
+                    const slotEnd = new Date(`${dateKey}T${this.bulkSlotForm.closing_time}`);
+                    if (!Number.isNaN(slotStart.getTime()) && !Number.isNaN(slotEnd.getTime())) {
+                        let slotCursor = new Date(slotStart.getTime());
+                        while (slotCursor.getTime() < slotEnd.getTime()) {
+                            count += 1;
+                            slotCursor = new Date(slotCursor.getTime() + (this.bulkSlotForm.slot_duration * 60000));
+                        }
+                    }
+                }
+                cursor.setDate(cursor.getDate() + 1);
+            }
+
+            return count;
+        },
+
+        formatDateKey(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        },
+
+        async generateBulkSlots() {
+            if (!this.selectedStoreId) {
+                Alpine.store('toast').addToast('Pilih toko terlebih dahulu.', 'error');
+                return;
+            }
+
+            if (!this.bulkSlotForm.start_date || !this.bulkSlotForm.end_date) {
+                Alpine.store('toast').addToast('Tanggal mulai dan akhir wajib diisi.', 'error');
+                return;
+            }
+
+            if (!this.bulkSlotForm.opening_time || !this.bulkSlotForm.closing_time) {
+                Alpine.store('toast').addToast('Jam operasional wajib diisi.', 'error');
+                return;
+            }
+
+            this.bulkSlotLoading = true;
+            try {
+                const token = localStorage.getItem('token');
+                const payload = {
+                    store_id: this.selectedStoreId,
+                    start_date: this.bulkSlotForm.start_date,
+                    end_date: this.bulkSlotForm.end_date,
+                    opening_time: this.bulkSlotForm.opening_time,
+                    closing_time: this.bulkSlotForm.closing_time,
+                    slot_duration: this.bulkSlotForm.slot_duration,
+                    capacity_per_slot: this.bulkSlotForm.capacity_per_slot,
+                    exclude_dates: this.bulkSlotForm.exclude_dates
+                };
+
+                const response = await fetch('/api/reservation-config/generate-slots', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    const errorMessage = data?.message || 'Gagal membuat slot.';
+                    Alpine.store('toast').addToast(errorMessage, 'error');
+                    return;
+                }
+
+                if (data.success) {
+                    this.form.available_slots = data.data?.slots || [];
+                    this.slotPaginationOffset = 10;
+                    Alpine.store('toast').addToast(`Berhasil membuat ${data.data?.count || 0} slot.`, 'success');
+                    this.closeBulkSlotModal();
+                } else {
+                    Alpine.store('toast').addToast(data.message || 'Gagal membuat slot.', 'error');
+                }
+            } catch (error) {
+                console.error('Error generating slots:', error);
+                Alpine.store('toast').addToast('Terjadi kesalahan saat membuat slot.', 'error');
+            } finally {
+                this.bulkSlotLoading = false;
             }
         },
+
+
 
         copyLink() {
             navigator.clipboard.writeText(this.reservationLink);
@@ -792,6 +1140,25 @@ function configApp() {
         formatCurrency(amount) {
             const normalized = Number(amount || 0);
             return 'Rp ' + new Intl.NumberFormat('id-ID').format(normalized);
+        },
+
+        formatSlotDisplay(slot) {
+            if (!slot) return '';
+            try {
+                // Parse ISO datetime string and display in WIB 24-hour format
+                const date = new Date(slot);
+                if (isNaN(date.getTime())) return '';
+
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+
+                return `${day}/${month}/${year} ${hours}:${minutes} WIB`;
+            } catch (e) {
+                return '';
+            }
         },
 
         logout() {

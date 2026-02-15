@@ -25,6 +25,7 @@ class ReservationConfig extends Model
         'store_id',
         'is_active',
         'available_slots',
+        'capacity_per_slot',
         'guest_options',
         'dp_percentage',
         'allow_full_payment',
@@ -46,6 +47,7 @@ class ReservationConfig extends Model
         return [
             'is_active' => 'boolean',
             'available_slots' => 'array',
+            'capacity_per_slot' => 'integer',
             'guest_options' => 'array',
             'dp_percentage' => 'decimal:2',
             'allow_full_payment' => 'boolean',

@@ -52,19 +52,10 @@ class ReservationFormController extends Controller
         // Get available dates with availability status
         $availableDates = $this->getAvailableDatesWithStatus($config, $defaultStoreId);
 
-        // Get guest options
-        $guestOptions = collect($config->guest_options ?? [2, 4, 6, 8, 10])
-            ->map(fn ($count) => [
-                'id' => $count,
-                'title' => "{$count} orang",
-            ])
-            ->toArray();
-
         return view('reservation.form', [
             'merchant' => $merchant,
             'config' => $config,
             'availableDates' => $availableDates,
-            'guestOptions' => $guestOptions,
             'defaultStoreId' => $defaultStoreId,
         ]);
     }
