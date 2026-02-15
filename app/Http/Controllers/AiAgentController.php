@@ -70,6 +70,7 @@ class AiAgentController extends Controller
                     'default_store_id' => $aiAgent->default_store_id,
                     'order_enabled' => $aiAgent->order_enabled,
                     'qris_enabled' => $aiAgent->qris_enabled,
+                    'reservation_enabled' => $aiAgent->reservation_enabled,
                     'is_active' => $aiAgent->is_active,
                     'settings' => $aiAgent->settings,
                     'created_at' => $aiAgent->created_at,
@@ -126,6 +127,7 @@ class AiAgentController extends Controller
                     'default_store_id' => $request->default_store_id,
                     'order_enabled' => $request->boolean('order_enabled', false),
                     'qris_enabled' => $request->boolean('qris_enabled', false),
+                    'reservation_enabled' => $request->boolean('reservation_enabled', false),
                     'is_active' => $request->boolean('is_active', false),
                     'settings' => $request->settings,
                 ]
@@ -142,6 +144,7 @@ class AiAgentController extends Controller
                     'default_store_id' => $aiAgent->default_store_id,
                     'order_enabled' => $aiAgent->order_enabled,
                     'qris_enabled' => $aiAgent->qris_enabled,
+                    'reservation_enabled' => $aiAgent->reservation_enabled,
                     'is_active' => $aiAgent->is_active,
                     'settings' => $aiAgent->settings,
                 ],
@@ -367,6 +370,40 @@ class AiAgentController extends Controller
 
             // Add user message
             $conversation->addMessage('human', $request->message);
+
+            // Hard guard for test endpoint: block menu/order flow when ordering is disabled
+            if (! $aiAgent->isOrderEnabled() && $this->aiAgentService->isOrderMenuIntent($request->message)) {
+                Log::info('Test AI Agent blocked before LLM (order disabled)', [
+                    'agent_id' => $aiAgent->id,
+                    'user_id' => $userId,
+                    'message' => $request->message,
+                    'reservation_enabled' => $aiAgent->isReservationEnabled(),
+                ]);
+
+                $responseContent = $this->aiAgentService->getOrderDisabledMessage($aiAgent);
+                $conversation->addMessage('ai', $responseContent);
+
+                // Refresh to get latest messages from database
+                $conversation->refresh();
+
+                $conversationHistory = array_map(function ($msg) {
+                    return [
+                        'role' => $msg['type'] === 'human' ? 'user' : 'assistant',
+                        'content' => $msg['content'],
+                        'timestamp' => $msg['timestamp'] ?? null,
+                    ];
+                }, $conversation->messages ?? []);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Test message processed',
+                    'data' => [
+                        'user_message' => $request->message,
+                        'ai_response' => $responseContent,
+                        'conversation_history' => $conversationHistory,
+                    ],
+                ], 200);
+            }
 
             // Detect user intent for optimization
             $userIntent = \App\Enums\UserIntent::detect($request->message);

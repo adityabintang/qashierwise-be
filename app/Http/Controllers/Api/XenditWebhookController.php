@@ -176,6 +176,18 @@ class XenditWebhookController extends Controller
             'amount' => $payload['amount'] ?? null,
         ]);
 
+        // Verify webhook signature
+        $xenPlatformService = app(\App\Services\XenPlatformService::class);
+        if (! $xenPlatformService->verifyWebhookSignature($signature)) {
+            Log::warning('Xendit Payment Request webhook signature verification failed', [
+                'reference_id' => $referenceId,
+            ]);
+
+            $errorResponse = ErrorResponse::unauthorized('Invalid webhook signature');
+
+            return response()->json($errorResponse->toArray(), $errorResponse->statusCode);
+        }
+
         // TODO: Implement Payment Request V2 handling if needed
         // For now, just acknowledge to prevent retries
 

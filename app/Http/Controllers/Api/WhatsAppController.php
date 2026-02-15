@@ -1778,6 +1778,8 @@ class WhatsAppController extends Controller
                     'header' => $template->header,
                     'header_type' => $template->header_type,
                     'body' => $template->body,
+                    'body_examples' => $template->body_examples,
+                    'variable_type' => $template->variable_type ?? 'numeric',
                     'footer' => $template->footer,
                     'buttons' => $template->buttons ? json_decode($template->buttons, true) : [],
                     'quality_score' => $template->quality_score,
@@ -1964,6 +1966,15 @@ class WhatsAppController extends Controller
                 ], 422);
             }
 
+            $variableEdgeValidation = $this->templateService->validateLeadingTrailingVariables($bodyText);
+            if (! $variableEdgeValidation['valid']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => ['body' => $variableEdgeValidation['error']],
+                ], 422);
+            }
+
             // Validate footer if present
             if (! empty($data['footer'])) {
                 $footerText = is_array($data['footer']) ? ($data['footer']['text'] ?? '') : $data['footer'];
@@ -2030,6 +2041,16 @@ class WhatsAppController extends Controller
                 $buttons = json_encode($data['buttons']);
             }
 
+            // Prepare body examples if provided
+            $bodyExamples = null;
+            if (! empty($data['body_examples']) && is_array($data['body_examples'])) {
+                // Filter out empty examples
+                $filteredExamples = array_filter($data['body_examples'], fn ($ex) => is_string($ex) && trim($ex) !== '');
+                if (! empty($filteredExamples)) {
+                    $bodyExamples = array_values($filteredExamples);
+                }
+            }
+
             $template = WhatsAppTemplate::create([
                 'whatsapp_account_id' => $account->id,
                 'phone_number_id' => $account->phone_number_id,
@@ -2041,6 +2062,8 @@ class WhatsAppController extends Controller
                 'header' => $header,
                 'header_type' => $headerType,
                 'body' => $bodyText,
+                'body_examples' => $bodyExamples,
+                'variable_type' => $data['variable_type'] ?? 'numeric',
                 'footer' => $footer,
                 'buttons' => $buttons,
                 'components' => $components,

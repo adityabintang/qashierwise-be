@@ -93,6 +93,9 @@ return [
     'confirm_new_password' => 'Confirm New Password',
     'reset_password_button' => 'Reset Password',
     'password_reset_success' => 'Password has been reset successfully',
+    'reset_link_expired' => 'This password reset link has expired.',
+    'reset_link_expired_description' => 'For security reasons, password reset links are only valid for 60 minutes. Please request a new link to reset your password.',
+    'request_new_link' => 'Request New Link',
 
     // Email Verification
     'verify_email' => 'Verify Email',

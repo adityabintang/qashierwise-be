@@ -3,10 +3,9 @@
 use App\Http\Controllers\AiAgentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BalanceController;
-use App\Http\Controllers\Api\BroadcastAuthController;
 use App\Http\Controllers\Api\BankAccountController;
+use App\Http\Controllers\Api\BroadcastAuthController;
 use App\Http\Controllers\Api\EmbeddedSignupController;
-use App\Http\Controllers\Api\WithdrawalController;
 use App\Http\Controllers\Api\Pos\CategoryController;
 use App\Http\Controllers\Api\Pos\OrderController;
 use App\Http\Controllers\Api\Pos\PaymentController;
@@ -19,12 +18,11 @@ use App\Http\Controllers\Api\Pos\TableController;
 use App\Http\Controllers\Api\Pos\TransactionController;
 use App\Http\Controllers\Api\QrisController;
 use App\Http\Controllers\Api\ResendWebhookController;
-use App\Http\Controllers\Api\ReservationController;
 use App\Http\Controllers\Api\SubMerchantController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\WhatsAppController;
-use App\Http\Controllers\Api\WhatsAppFlowEndpointController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
+use App\Http\Controllers\Api\WithdrawalController;
 use App\Http\Controllers\Api\XenditWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -49,19 +47,11 @@ Route::post('/resend-otp', [AuthController::class, 'resendOtp'])
     ->middleware('throttle:3,1');
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+Route::post('/verify-reset-token', [AuthController::class, 'verifyResetToken']);
 
 // WhatsApp Webhook (must be public for WhatsApp to access)
 Route::get('/whatsapp/webhook', [WhatsAppWebhookController::class, 'verify']);
 Route::post('/whatsapp/webhook', [WhatsAppWebhookController::class, 'handle']);
-
-// WhatsApp Flow Data Endpoint (must be public for WhatsApp to access)
-// This endpoint receives encrypted requests from WhatsApp Flow and returns encrypted responses
-Route::post('/whatsapp/flow/endpoint', [WhatsAppFlowEndpointController::class, 'handleRequest']);
-
-// WhatsApp Flow Public Key Endpoint
-// Meta will fetch this endpoint to get the public key for signing
-// See: https://developers.facebook.com/docs/whatsapp/flows/guides/implementingyourflowendpoint#upload-public-key
-Route::get('/whatsapp/flow/public-key', [WhatsAppFlowEndpointController::class, 'getPublicKey']);
 
 // Xendit Webhooks (must be public for Xendit to access)
 Route::post('/webhooks/xendit', [XenditWebhookController::class, 'handleNotification']);
@@ -92,7 +82,7 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
     Route::post('/user/check-permission', [AuthController::class, 'checkPermission']);
 
     // DEBUG: Direct permission test
-    Route::get('/user/permissions/debug', function(\Illuminate\Http\Request $request) {
+    Route::get('/user/permissions/debug', function (\Illuminate\Http\Request $request) {
         $user = $request->user();
         $user->load('roles.permissions');
 
@@ -199,42 +189,23 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::delete('/conversations/{contactId}', [AiAgentController::class, 'clearConversation']);
     });
 
-    // Reservation routes
+    // Reservation Management routes
     Route::prefix('reservations')->group(function () {
-        // CRUD operations (non-parameterized first)
-        Route::get('/', [ReservationController::class, 'index']);
-        Route::post('/', [ReservationController::class, 'store']);
-        Route::get('/statistics', [ReservationController::class, 'statistics']);
+        Route::get('/', [\App\Http\Controllers\Api\ReservationController::class, 'index']);
+        Route::get('/calendar', [\App\Http\Controllers\Api\ReservationController::class, 'calendar']);
+        Route::get('/stats', [\App\Http\Controllers\Api\ReservationController::class, 'stats']);
+        Route::get('/{id}', [\App\Http\Controllers\Api\ReservationController::class, 'show']);
+        Route::post('/{id}/complete', [\App\Http\Controllers\Api\ReservationController::class, 'complete']);
+        Route::post('/{id}/cancel', [\App\Http\Controllers\Api\ReservationController::class, 'cancel']);
+    });
 
-        // WhatsApp Flow management (legacy)
-        Route::get('/flows/list', [ReservationController::class, 'listFlows']);
-        Route::post('/flows/create', [ReservationController::class, 'createFlow']);
-        Route::post('/flows/send', [ReservationController::class, 'sendFlow']);
-        Route::post('/flows/publish', [ReservationController::class, 'publishFlow']);
-        Route::delete('/flows/delete', [ReservationController::class, 'deleteFlow']);
-
-        // Flow Configuration (new dashboard feature) - MUST be before {reservation} wildcard
-        Route::prefix('flow-config')->group(function () {
-            Route::get('/', [\App\Http\Controllers\Api\ReservationFlowConfigController::class, 'show']);
-            Route::post('/', [\App\Http\Controllers\Api\ReservationFlowConfigController::class, 'update']);
-            Route::get('/preview', [\App\Http\Controllers\Api\ReservationFlowConfigController::class, 'preview']);
-            Route::post('/publish', [\App\Http\Controllers\Api\ReservationFlowConfigController::class, 'publish']);
-            Route::post('/sync', [\App\Http\Controllers\Api\ReservationFlowConfigController::class, 'sync']);
-            Route::post('/send', [\App\Http\Controllers\Api\ReservationFlowConfigController::class, 'send']);
-            Route::post('/regenerate', [\App\Http\Controllers\Api\ReservationFlowConfigController::class, 'regenerateFlow']);
-            Route::delete('/', [\App\Http\Controllers\Api\ReservationFlowConfigController::class, 'destroy']);
-        });
-
-        // Parameterized routes MUST come last
-        Route::get('/{reservation}', [ReservationController::class, 'show']);
-        Route::put('/{reservation}', [ReservationController::class, 'update']);
-        Route::delete('/{reservation}', [ReservationController::class, 'destroy']);
-
-        // Status actions
-        Route::post('/{reservation}/confirm', [ReservationController::class, 'confirm']);
-        Route::post('/{reservation}/cancel', [ReservationController::class, 'cancel']);
-        Route::post('/{reservation}/complete', [ReservationController::class, 'complete']);
-        Route::post('/{reservation}/no-show', [ReservationController::class, 'noShow']);
+    // Reservation Configuration routes
+    Route::prefix('reservation-config')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\ReservationConfigController::class, 'index']);
+        Route::post('/', [\App\Http\Controllers\Api\ReservationConfigController::class, 'store']);
+        Route::get('/{id}', [\App\Http\Controllers\Api\ReservationConfigController::class, 'show']);
+        Route::put('/{id}', [\App\Http\Controllers\Api\ReservationConfigController::class, 'update']);
+        Route::delete('/{id}', [\App\Http\Controllers\Api\ReservationConfigController::class, 'destroy']);
     });
 
     // POS (Point of Sale) API routes
@@ -341,7 +312,7 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
 
         // Withdrawal management
         Route::prefix('withdrawals')->group(function () {
-            Route::post('/', [WithdrawalController::class, 'store']);
+            Route::post('/', [WithdrawalController::class, 'store'])->middleware('throttle:5,1');
             Route::get('/', [WithdrawalController::class, 'index']);
             Route::get('/{id}', [WithdrawalController::class, 'show']);
         });

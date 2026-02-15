@@ -309,8 +309,11 @@ class WhatsAppWebhookController extends Controller
                         $content = 'Flow response received';
                         $metadata = $flowResponse;
 
-                        // Process the flow response for reservations
-                        $this->handleFlowResponse($flowResponse, $userId, $contact);
+                        Log::info('Flow response received but reservation processing is disabled', [
+                            'user_id' => $userId,
+                            'contact_id' => $contact->id,
+                            'flow_id' => $flowResponse['flow_id'] ?? null,
+                        ]);
                     }
                 }
                 break;
@@ -481,6 +484,7 @@ class WhatsAppWebhookController extends Controller
         $templateName = $value['message_template_name'] ?? null;
         $templateLanguage = $value['message_template_language'] ?? null;
         $reason = $value['reason'] ?? null;
+        $rejectionInfo = $value['rejection_info'] ?? null;
 
         Log::info('Template status update received', [
             'event' => $event,
@@ -488,6 +492,7 @@ class WhatsAppWebhookController extends Controller
             'template_name' => $templateName,
             'language' => $templateLanguage,
             'reason' => $reason,
+            'rejection_info' => $rejectionInfo,
             'waba_id' => $wabaId,
         ]);
 
@@ -573,6 +578,14 @@ class WhatsAppWebhookController extends Controller
         $oldStatus = $template->status;
         $template->status = $newStatus;
 
+        // Store rejection info if template was rejected
+        if ($newStatus === 'REJECTED' && ! empty($rejectionInfo)) {
+            $template->rejection_info = $rejectionInfo;
+        } elseif ($newStatus !== 'REJECTED') {
+            // Clear rejection info if template was no longer rejected
+            $template->rejection_info = null;
+        }
+
         // Update template_id if we received it from Meta and don't have it yet
         if ($templateId && ! $template->template_id) {
             $template->template_id = $templateId;
@@ -586,6 +599,7 @@ class WhatsAppWebhookController extends Controller
             'old_status' => $oldStatus,
             'new_status' => $newStatus,
             'reason' => $reason,
+            'rejection_info' => $rejectionInfo,
         ]);
 
         // If template was deleted, optionally remove from database
@@ -948,7 +962,7 @@ class WhatsAppWebhookController extends Controller
                 'Kami akan menghubungi Anda untuk konfirmasi. Terima kasih! 🙏',
                 $reservation->id,
                 $reservation->customer_name,
-                $reservation->reservation_date->format('d M Y'),
+                $reservation->reservation_time->format('d M Y'),
                 $reservation->reservation_time->format('H:i'),
                 $reservation->guest_count
             );

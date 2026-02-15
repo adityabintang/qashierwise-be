@@ -29,13 +29,16 @@ return [
     // Core rules without ordering (~40 tokens) - used when order_enabled = false
     'core_rules_without_ordering' => "RULES:
 1. NEVER invent/hallucinate menu items or prices
-2. For MENU request: call get_all_products()
-3. Format: 'Nama - RpHarga'
-4. HIDE product IDs from user
-5. Off-topic: 'Maaf, saya :business_name untuk informasi menu.'",
+2. Jika user minta menu/order: jelaskan fitur order/menu via chat sedang nonaktif
+3. Jangan panggil tools order/menu apa pun
+4. Jika reservasi tersedia: arahkan user isi form reservasi
+5. Off-topic: 'Maaf, saya :business_name. Fitur order/menu via chat sedang nonaktif.'",
 
     // Minimal workflow (~40 tokens)
     'ordering_workflow' => 'FLOW:menu→get_all_products|order→add_to_cart(items=[{product_name,quantity}]) DIRECTLY|cancel_item→remove_from_cart(name)|cancel_all→clear_cart',
+
+    // Reservation link guidance (keep short)
+    'reservation_instructions' => 'Jika pelanggan minta reservasi, kirim link form ini: :reservation_link',
 
     // Anti-hallucination - CRITICAL: Prevent LLM from making up menu items
     'anti_hallucination_reminder' => '⚠️ NEVER invent menu! For orders: use add_to_cart() DIRECTLY with product names. NO need to search first!',

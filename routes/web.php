@@ -60,6 +60,20 @@ Route::get('/refund-policy', function () {
 Route::get('/pay/qris/{orderId}', [App\Http\Controllers\QrisPaymentPageController::class, 'show'])
     ->name('qris.payment.page');
 
+// Public Reservation Form Routes
+Route::prefix('reservations')->name('reservation.')->group(function () {
+    Route::get('/form', [App\Http\Controllers\ReservationFormController::class, 'show'])
+        ->name('form');
+    Route::post('/form/submit', [App\Http\Controllers\ReservationFormController::class, 'submit'])
+        ->name('submit');
+    Route::get('/form/status/{orderId}', [App\Http\Controllers\ReservationFormController::class, 'status'])
+        ->name('status');
+    Route::get('/tables', [App\Http\Controllers\ReservationFormController::class, 'getAvailableTables'])
+        ->name('tables');
+    Route::get('/products', [App\Http\Controllers\ReservationFormController::class, 'getAvailableProducts'])
+        ->name('products');
+});
+
 // Dashboard routes (protected by authentication middleware)
 Route::middleware(['web', 'check.web.auth'])->group(function () {
     Route::get('/dashboard', function () {
@@ -78,10 +92,6 @@ Route::middleware(['web', 'check.web.auth'])->group(function () {
         return view('dashboard.templates');
     })->name('dashboard.templates');
 
-    Route::get('/dashboard/reservations', function () {
-        return view('dashboard.reservations');
-    })->name('dashboard.reservations');
-
     Route::get('/dashboard/profile', function () {
         return view('dashboard.profile');
     })->name('dashboard.profile');
@@ -93,6 +103,19 @@ Route::middleware(['web', 'check.web.auth'])->group(function () {
     Route::get('/dashboard/ai-agent', function () {
         return view('dashboard.ai-agent');
     })->name('dashboard.ai-agent');
+
+    // Reservation routes
+    Route::get('/dashboard/reservations', function () {
+        return view('dashboard.reservations.index');
+    })->name('dashboard.reservations');
+
+    Route::get('/dashboard/reservations/calendar', function () {
+        return view('dashboard.reservations.calendar');
+    })->name('dashboard.reservations.calendar');
+
+    Route::get('/dashboard/reservations/config', function () {
+        return view('dashboard.reservations.config');
+    })->name('dashboard.reservations.config');
 
     // Subscription routes
     Route::prefix('subscription')->name('subscription.')->group(function () {

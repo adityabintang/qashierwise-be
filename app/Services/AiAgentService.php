@@ -88,6 +88,22 @@ class AiAgentService
             // Add user message to conversation
             $conversation->addMessage('human', $messageText);
 
+            // Hard guard: when ordering is disabled, block any menu/order flow immediately
+            if (! $aiAgent->isOrderEnabled() && $this->isOrderMenuIntent($messageText)) {
+                Log::info('AI Agent request blocked before LLM (order disabled)', [
+                    'agent_id' => $aiAgent->id,
+                    'contact_id' => $contact->id,
+                    'message' => $messageText,
+                    'reservation_enabled' => $aiAgent->isReservationEnabled(),
+                ]);
+
+                $assistantMessage = $this->getOrderDisabledMessage($aiAgent);
+                $conversation->addMessage('ai', $assistantMessage);
+                $this->sendReply($account, $contact->wa_id, $assistantMessage);
+
+                return;
+            }
+
             // Check if summarization is needed
             $shouldSummarize = $this->conversationSummarizer->shouldSummarize($conversation);
 
@@ -583,6 +599,54 @@ class AiAgentService
         }
 
         return $tools;
+    }
+
+    /**
+     * Check if user message is asking about menu/order/cart flow.
+     */
+    public function isOrderMenuIntent(string $messageText): bool
+    {
+        $text = strtolower(trim($messageText));
+
+        $keywords = [
+            'menu',
+            'produk',
+            'daftar',
+            'pesan',
+            'beli',
+            'order',
+            'keranjang',
+            'cart',
+            'checkout',
+            'konfirmasi pesanan',
+            'jual apa',
+            'ada apa aja',
+        ];
+
+        foreach ($keywords as $keyword) {
+            if (str_contains($text, $keyword)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Standard response when ordering feature is disabled.
+     */
+    public function getOrderDisabledMessage(AiAgent $aiAgent): string
+    {
+        if ($aiAgent->isReservationEnabled()) {
+            $reservationUrl = $aiAgent->getReservationFormUrl();
+            if ($reservationUrl) {
+                return "Maaf, fitur order/menu via chat sedang nonaktif. Untuk reservasi, silakan isi form: {$reservationUrl}";
+            }
+
+            return 'Maaf, fitur order/menu via chat sedang nonaktif. Namun reservasi masih tersedia.';
+        }
+
+        return 'Maaf, fitur order/menu via chat sedang nonaktif saat ini.';
     }
 
     /**

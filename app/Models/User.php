@@ -49,6 +49,7 @@ class User extends Authenticatable
         'password',
         'language_preference',
         'is_master_admin',
+        'slug',
     ];
 
     /**
@@ -193,7 +194,7 @@ class User extends Authenticatable
      */
     public function isMerchantAdmin(): bool
     {
-        return $this->isMasterAdmin() && !$this->isSuperAdmin();
+        return $this->isMasterAdmin() && ! $this->isSuperAdmin();
     }
 
     /**

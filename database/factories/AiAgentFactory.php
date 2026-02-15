@@ -32,6 +32,7 @@ class AiAgentFactory extends Factory
             ],
             'order_enabled' => true,
             'qris_enabled' => false,
+            'reservation_enabled' => false,
             'is_active' => true,
             'settings' => [],
             'use_optimized_prompt' => true,
@@ -67,6 +68,16 @@ class AiAgentFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'qris_enabled' => true,
+        ]);
+    }
+
+    /**
+     * Indicate that reservation is enabled.
+     */
+    public function withReservation(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'reservation_enabled' => true,
         ]);
     }
 }

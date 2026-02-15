@@ -63,7 +63,7 @@
                 // Dashboard permissions that are always allowed for main users
                 dashboardPermissions: [
                     'dashboard', 'contacts', 'messages', 'templates',
-                    'reservations', 'whatsapp-account', 'ai-agent', 'profile',
+                    'whatsapp-account', 'ai-agent', 'profile',
                     'pos.orders', 'pos.payment', 'pos.products', 'pos.categories',
                     'pos.stores', 'pos.tables', 'pos.users', 'pos.roles',
                     'pos.reports', 'pos.transactions'

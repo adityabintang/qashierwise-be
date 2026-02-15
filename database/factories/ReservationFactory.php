@@ -3,8 +3,9 @@
 namespace Database\Factories;
 
 use App\Models\Reservation;
+use App\Models\Store;
+use App\Models\Table;
 use App\Models\User;
-use App\Models\WhatsAppContact;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -22,25 +23,42 @@ class ReservationFactory extends Factory
     public function definition(): array
     {
         $reservationDate = fake()->dateTimeBetween('now', '+30 days');
+        $guestCount = fake()->numberBetween(2, 8);
+        $totalAmount = fake()->numberBetween(200000, 1000000);
+        $paymentType = fake()->randomElement(['dp', 'full']);
+        $dpPercentage = 50;
+
+        $paidAmount = $paymentType === 'full' ? $totalAmount : ($totalAmount * $dpPercentage / 100);
+        $remainingAmount = $totalAmount - $paidAmount;
 
         return [
             'user_id' => User::factory(),
-            'whatsapp_contact_id' => null,
+            'store_id' => Store::factory(),
             'customer_name' => fake()->name(),
             'phone' => '+62'.fake()->numerify('8##########'),
+            'email' => fake()->safeEmail(),
             'reservation_date' => $reservationDate,
-            'reservation_time' => fake()->randomElement(['11:00', '12:00', '13:00', '18:00', '19:00', '20:00']),
-            'guest_count' => fake()->numberBetween(1, 10),
-            'email' => fake()->optional(0.5)->safeEmail(),
-            'event_type' => fake()->optional(0.3)->randomElement(['regular', 'birthday', 'meeting', 'anniversary', 'other']),
-            'special_notes' => fake()->optional(0.3)->sentence(),
-            'preferences' => fake()->optional(0.3)->randomElements(['window', 'quiet', 'smoking', 'baby_chair'], fake()->numberBetween(1, 2)),
-            'deposit' => fake()->randomElement([0, 0, 0, 50000, 100000, 200000]),
-            'deposit_paid' => false,
-            'pre_order_items' => null,
-            'flow_token' => null,
-            'flow_id' => null,
-            'status' => 'pending',
+            'guest_count' => $guestCount,
+            'table_id' => Table::factory(),
+            'selected_products' => [
+                [
+                    'id' => fake()->numberBetween(1, 10),
+                    'name' => fake()->randomElement(['Nasi Goreng', 'Mie Goreng', 'Ayam Bakar', 'Ikan Bakar', 'Sate Ayam']),
+                    'quantity' => fake()->numberBetween(1, 3),
+                    'price' => fake()->numberBetween(25000, 100000),
+                ],
+            ],
+            'payment_type' => $paymentType,
+            'payment_method' => 'qris',
+            'qris_transaction_id' => null,
+            'total_amount' => $totalAmount,
+            'paid_amount' => 0,
+            'remaining_amount' => $totalAmount,
+            'status' => Reservation::STATUS_PENDING_PAYMENT,
+            'order_id' => 'RSV-'.now()->timestamp.'-'.fake()->numberBetween(1000, 9999),
+            'calendar_event_id' => null,
+            'notified_at' => null,
+            'cancelled_reason' => null,
         ];
     }
 
@@ -49,9 +67,19 @@ class ReservationFactory extends Factory
      */
     public function confirmed(): static
     {
+        $totalAmount = fake()->numberBetween(200000, 1000000);
+        $paymentType = fake()->randomElement(['dp', 'full']);
+        $dpPercentage = 50;
+
+        $paidAmount = $paymentType === 'full' ? $totalAmount : ($totalAmount * $dpPercentage / 100);
+        $remainingAmount = $totalAmount - $paidAmount;
+
         return $this->state(fn (array $attributes) => [
-            'status' => 'confirmed',
-            'confirmed_at' => now(),
+            'status' => Reservation::STATUS_CONFIRMED,
+            'paid_amount' => $paidAmount,
+            'remaining_amount' => $remainingAmount,
+            'calendar_event_id' => 'mock_event_'.fake()->uuid(),
+            'notified_at' => now(),
         ]);
     }
 
@@ -61,9 +89,8 @@ class ReservationFactory extends Factory
     public function cancelled(): static
     {
         return $this->state(fn (array $attributes) => [
-            'status' => 'cancelled',
-            'cancelled_at' => now(),
-            'cancellation_reason' => fake()->sentence(),
+            'status' => Reservation::STATUS_CANCELLED,
+            'cancelled_reason' => fake()->sentence(),
         ]);
     }
 
@@ -73,8 +100,9 @@ class ReservationFactory extends Factory
     public function completed(): static
     {
         return $this->state(fn (array $attributes) => [
-            'status' => 'completed',
-            'completed_at' => now(),
+            'status' => Reservation::STATUS_COMPLETED,
+            'paid_amount' => $attributes['total_amount'],
+            'remaining_amount' => 0,
             'reservation_date' => fake()->dateTimeBetween('-7 days', 'yesterday'),
         ]);
     }
@@ -90,56 +118,36 @@ class ReservationFactory extends Factory
     }
 
     /**
-     * Indicate that the reservation has a WhatsApp contact.
+     * Indicate that the reservation has paid DP only.
      */
-    public function withContact(): static
+    public function withDp(): static
     {
+        $totalAmount = fake()->numberBetween(200000, 1000000);
+        $dpPercentage = 50;
+        $paidAmount = $totalAmount * $dpPercentage / 100;
+
         return $this->state(fn (array $attributes) => [
-            'whatsapp_contact_id' => WhatsAppContact::factory(),
+            'payment_type' => 'dp',
+            'total_amount' => $totalAmount,
+            'paid_amount' => $paidAmount,
+            'remaining_amount' => $totalAmount - $paidAmount,
+            'status' => Reservation::STATUS_CONFIRMED,
         ]);
     }
 
     /**
-     * Indicate that the reservation is for a birthday.
+     * Indicate that the reservation is fully paid.
      */
-    public function birthday(): static
+    public function fullyPaid(): static
     {
-        return $this->state(fn (array $attributes) => [
-            'event_type' => 'birthday',
-            'special_notes' => 'Birthday celebration - please prepare cake candles',
-        ]);
-    }
+        $totalAmount = fake()->numberBetween(200000, 1000000);
 
-    /**
-     * Indicate that the reservation requires deposit.
-     */
-    public function withDeposit(float $amount = 100000): static
-    {
         return $this->state(fn (array $attributes) => [
-            'deposit' => $amount,
-            'deposit_paid' => false,
-        ]);
-    }
-
-    /**
-     * Indicate that the reservation has paid deposit.
-     */
-    public function depositPaid(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'deposit' => $attributes['deposit'] ?? 100000,
-            'deposit_paid' => true,
-        ]);
-    }
-
-    /**
-     * Indicate that the reservation came from WhatsApp Flow.
-     */
-    public function fromFlow(string $flowId = 'FLOW_123'): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'flow_token' => fake()->uuid(),
-            'flow_id' => $flowId,
+            'payment_type' => 'full',
+            'total_amount' => $totalAmount,
+            'paid_amount' => $totalAmount,
+            'remaining_amount' => 0,
+            'status' => Reservation::STATUS_CONFIRMED,
         ]);
     }
 }

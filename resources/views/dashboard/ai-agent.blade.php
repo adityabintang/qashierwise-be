@@ -251,10 +251,10 @@
                                 </div>
 
                                 <!-- Order Toggle - AFTER store selection -->
-                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl" :class="form.default_store_id ? 'bg-emerald-50 border border-emerald-200' : 'bg-gray-50 border border-gray-200'">
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl" :class="config.order_enabled && form.default_store_id ? 'bg-emerald-100 border border-emerald-400 shadow-sm shadow-emerald-100' : (form.default_store_id ? 'bg-emerald-50 border border-emerald-200' : 'bg-gray-50 border border-gray-200')">
                                     <div class="flex-1">
-                                        <p class="font-medium" :class="form.default_store_id ? 'text-emerald-900' : 'text-gray-600'">Enable Order via Chat</p>
-                                        <p class="text-sm" :class="form.default_store_id ? 'text-emerald-700' : 'text-gray-500'">
+                                        <p class="font-medium" :class="config.order_enabled && form.default_store_id ? 'text-emerald-950' : (form.default_store_id ? 'text-emerald-900' : 'text-gray-600')">Enable Order via Chat</p>
+                                        <p class="text-sm" :class="config.order_enabled && form.default_store_id ? 'text-emerald-800' : (form.default_store_id ? 'text-emerald-700' : 'text-gray-500')">
                                             <span x-show="form.default_store_id">Pelanggan bisa melihat produk, menambah ke keranjang, dan order langsung via chat</span>
                                             <span x-show="!form.default_store_id"><i class="fas fa-info-circle mr-1"></i>Pilih store terlebih dahulu untuk mengaktifkan fitur ini</span>
                                         </p>
@@ -264,13 +264,35 @@
                                         @click="if(form.default_store_id) config.order_enabled = !config.order_enabled"
                                         :disabled="!form.default_store_id"
                                         :class="[
-                                            config.order_enabled && form.default_store_id ? 'bg-emerald-500' : 'bg-gray-300',
+                                            config.order_enabled && form.default_store_id ? 'bg-emerald-600 ring-2 ring-emerald-200' : 'bg-gray-300',
                                             !form.default_store_id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
                                         ]"
                                         class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 flex-shrink-0"
                                     >
                                         <span
                                             :class="config.order_enabled && form.default_store_id ? 'translate-x-6' : 'translate-x-1'"
+                                            class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md"
+                                        ></span>
+                                    </button>
+                                </div>
+
+                                <!-- Reservation Toggle -->
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl" :class="config.reservation_enabled ? 'bg-purple-100 border border-purple-400 shadow-sm shadow-purple-100' : 'bg-gray-50 border border-gray-200'">
+                                    <div class="flex-1">
+                                        <p class="font-medium" :class="config.reservation_enabled ? 'text-purple-950' : 'text-gray-600'">Enable Reservation via Chat</p>
+                                        <p class="text-sm" :class="config.reservation_enabled ? 'text-purple-800' : 'text-gray-500'">
+                                            <span x-show="config.reservation_enabled">AI Agent akan mengirim form reservasi agar pelanggan bisa booking meja via chat</span>
+                                            <span x-show="!config.reservation_enabled">Reservasi via chat nonaktif</span>
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        @click="config.reservation_enabled = !config.reservation_enabled"
+                                        :class="config.reservation_enabled ? 'bg-purple-600 ring-2 ring-purple-200' : 'bg-gray-300'"
+                                        class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 flex-shrink-0 cursor-pointer"
+                                    >
+                                        <span
+                                            :class="config.reservation_enabled ? 'translate-x-6' : 'translate-x-1'"
                                             class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md"
                                         ></span>
                                     </button>
@@ -305,10 +327,10 @@
                             </div>
                             <div class="p-4 sm:p-6 space-y-5">
                                 <!-- QRIS Toggle -->
-                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl" :class="config.qris_enabled ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50 border border-gray-200'">
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl" :class="config.qris_enabled ? 'bg-blue-100 border border-blue-400 shadow-sm shadow-blue-100' : 'bg-gray-50 border border-gray-200'">
                                     <div class="flex-1">
-                                        <p class="font-medium" :class="config.qris_enabled ? 'text-blue-900' : 'text-gray-600'">Enable QRIS Payment</p>
-                                        <p class="text-sm" :class="config.qris_enabled ? 'text-blue-700' : 'text-gray-500'">
+                                        <p class="font-medium" :class="config.qris_enabled ? 'text-blue-950' : 'text-gray-600'">Enable QRIS Payment</p>
+                                        <p class="text-sm" :class="config.qris_enabled ? 'text-blue-800' : 'text-gray-500'">
                                             <span x-show="config.qris_enabled">QRIS akan otomatis di-generate saat pelanggan konfirmasi pembelian</span>
                                             <span x-show="!config.qris_enabled">Pembayaran manual - pelanggan akan diarahkan ke kasir</span>
                                         </p>
@@ -316,7 +338,7 @@
                                     <button
                                         type="button"
                                         @click="config.qris_enabled = !config.qris_enabled"
-                                        :class="config.qris_enabled ? 'bg-blue-500' : 'bg-gray-300'"
+                                        :class="config.qris_enabled ? 'bg-blue-600 ring-2 ring-blue-200' : 'bg-gray-300'"
                                         class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex-shrink-0 cursor-pointer"
                                     >
                                         <span
@@ -524,6 +546,7 @@ function aiAgentApp() {
             is_active: false,
             order_enabled: false,
             qris_enabled: false,
+            reservation_enabled: false,
         },
         form: {
             bot_name: '',
@@ -570,7 +593,8 @@ function aiAgentApp() {
                 });
                 const data = await response.json();
                 if (data.success && data.data) {
-                    this.stores = data.data.filter(s => s.is_active);
+                    const stores = Array.isArray(data.data) ? data.data : (data.data.data || []);
+                    this.stores = stores.filter(s => s.is_active);
                 }
             } catch (error) {
                 console.error('Failed to load stores:', error);
@@ -603,6 +627,7 @@ function aiAgentApp() {
                         is_active: data.data.is_active,
                         order_enabled: data.data.order_enabled,
                         qris_enabled: data.data.qris_enabled || false,
+                        reservation_enabled: data.data.reservation_enabled || false,
                     };
                     this.form = {
                         bot_name: data.data.bot_name || '',
@@ -649,6 +674,7 @@ function aiAgentApp() {
                         is_active: this.config.is_active,
                         order_enabled: this.config.order_enabled,
                         qris_enabled: this.config.qris_enabled,
+                        reservation_enabled: this.config.reservation_enabled,
                     }),
                 });
 

@@ -302,6 +302,7 @@ class QrisService
             Log::warning('Transaction not found for webhook', [
                 'external_id' => $webhookTransaction->externalId,
             ]);
+
             // Don't throw exception - just log and return
             // This allows webhook to return 200 OK and prevent retries
             return;
@@ -345,13 +346,42 @@ class QrisService
                 ]);
 
                 if ($newStatus === QrisTransaction::STATUS_SETTLEMENT) {
-                    // Dispatch job to process payment and update balance
-                    \App\Jobs\ProcessQrisPayment::dispatch($transaction);
+                    // Check if this is a reservation payment
+                    $reservation = \App\Models\Reservation::where('qris_transaction_id', $transaction->id)->first();
 
-                    Log::info('Transaction settled, ProcessQrisPayment job dispatched', [
-                        'order_id' => $transaction->order_id,
-                        'transaction_id' => $transaction->id,
-                    ]);
+                    if ($reservation) {
+                        // Dispatch reservation payment processing job
+                        \App\Jobs\ProcessReservationPayment::dispatch($reservation, 'success', $transaction);
+
+                        Log::info('Reservation payment detected, ProcessReservationPayment job dispatched', [
+                            'order_id' => $transaction->order_id,
+                            'reservation_id' => $reservation->id,
+                            'transaction_id' => $transaction->id,
+                        ]);
+                    } else {
+                        // Regular order payment - dispatch normal job
+                        \App\Jobs\ProcessQrisPayment::dispatch($transaction);
+
+                        Log::info('Transaction settled, ProcessQrisPayment job dispatched', [
+                            'order_id' => $transaction->order_id,
+                            'transaction_id' => $transaction->id,
+                        ]);
+                    }
+                } elseif (in_array($newStatus, [QrisTransaction::STATUS_CANCEL, QrisTransaction::STATUS_EXPIRE])) {
+                    // Check if this is a failed/expired reservation payment
+                    $reservation = \App\Models\Reservation::where('qris_transaction_id', $transaction->id)->first();
+
+                    if ($reservation) {
+                        // Dispatch reservation payment failure job
+                        \App\Jobs\ProcessReservationPayment::dispatch($reservation, 'failed', $transaction);
+
+                        Log::info('Reservation payment failed/expired', [
+                            'order_id' => $transaction->order_id,
+                            'reservation_id' => $reservation->id,
+                            'transaction_id' => $transaction->id,
+                            'status' => $newStatus,
+                        ]);
+                    }
                 }
             });
         } catch (\Exception $e) {

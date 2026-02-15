@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\Payment;
 use App\Models\PlatformFee;
 use App\Models\QrisTransaction;
+use App\Models\Reservation;
 use App\Services\AiAgentService;
 use App\Services\BalanceService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -83,6 +84,19 @@ class ProcessQrisPayment implements ShouldQueue
                 ]);
 
                 return;
+            }
+
+            $reservation = Reservation::where('qris_transaction_id', $this->transaction->id)
+                ->where('status', Reservation::STATUS_PENDING_PAYMENT)
+                ->first();
+
+            if ($reservation) {
+                ProcessReservationPayment::dispatch($reservation, 'success', $this->transaction);
+
+                Log::info('Reservation payment queued from QRIS processing', [
+                    'reservation_id' => $reservation->id,
+                    'order_id' => $this->transaction->order_id,
+                ]);
             }
 
             // Check if platform fee already exists (prevent duplicate processing)

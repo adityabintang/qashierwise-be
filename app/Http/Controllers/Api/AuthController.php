@@ -46,7 +46,7 @@ class AuthController extends Controller
             return ApiResponse::validationError($validator->errors());
         }
 
-        $hasStore = !empty($request->store_name);
+        $hasStore = ! empty($request->store_name);
 
         // Create user - mark as master admin if creating a store
         $user = User::create([
@@ -130,7 +130,7 @@ class AuthController extends Controller
         $counter = 1;
 
         while (Store::where('code', $code)->exists()) {
-            $code = $baseCode . $counter;
+            $code = $baseCode.$counter;
             $counter++;
         }
 
@@ -236,6 +236,7 @@ class AuthController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'slug' => $user->slug,
                 'email_verified_at' => $user->email_verified_at,
                 'is_email_verified' => ! is_null($user->email_verified_at),
                 'is_super_admin' => $user->isSuperAdmin(),
@@ -259,10 +260,10 @@ class AuthController extends Controller
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
         \Log::info('=== getUserPermissions DEBUG ===');
-        \Log::info('User ID: ' . $user->id);
-        \Log::info('User Email: ' . $user->email);
-        \Log::info('Is Super Admin: ' . ($user->isSuperAdmin() ? 'true' : 'false'));
-        \Log::info('Is Master Admin: ' . ($user->isMasterAdmin() ? 'true' : 'false'));
+        \Log::info('User ID: '.$user->id);
+        \Log::info('User Email: '.$user->email);
+        \Log::info('Is Super Admin: '.($user->isSuperAdmin() ? 'true' : 'false'));
+        \Log::info('Is Master Admin: '.($user->isMasterAdmin() ? 'true' : 'false'));
 
         // Get all available permissions from database
         $allPermissions = \Spatie\Permission\Models\Permission::where('guard_name', 'sanctum')
@@ -313,7 +314,7 @@ class AuthController extends Controller
         $posUser = $user->posUsers()->first();
 
         // If no POS user and not master admin, return minimal permissions
-        if (!$posUser) {
+        if (! $posUser) {
             \Log::info('No POS user found - returning empty permissions');
             $response = ApiResponse::success([
                 'is_super_admin' => false,
@@ -334,12 +335,12 @@ class AuthController extends Controller
         // Get user roles and permissions using User model methods
         // These methods bypass JSON column conflict in roles table
         $roles = $user->getRoleNamesViaDirectQuery();
-        \Log::info('User roles: ' . json_encode($roles));
+        \Log::info('User roles: '.json_encode($roles));
 
         $permissions = $user->getPermissionsViaDirectQuery();
 
-        \Log::info('Final permissions array: ' . json_encode($permissions));
-        \Log::info('Final roles: ' . json_encode($roles));
+        \Log::info('Final permissions array: '.json_encode($permissions));
+        \Log::info('Final roles: '.json_encode($roles));
 
         $response = ApiResponse::success([
             'is_super_admin' => false,
@@ -571,6 +572,28 @@ class AuthController extends Controller
         $notifiable->notify(new SendPasswordResetLinkNotification($token));
 
         return ApiResponse::success(null, 'Password reset link sent to your email');
+    }
+
+    /**
+     * Verify if a password reset token is still valid
+     */
+    public function verifyResetToken(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'token' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return ApiResponse::validationError($validator->errors());
+        }
+
+        $email = $this->passwordResetService->verifyToken($request->token);
+
+        if (! $email) {
+            return ApiResponse::error('Invalid or expired reset token.', 400);
+        }
+
+        return ApiResponse::success(null, 'Token is valid.');
     }
 
     /**

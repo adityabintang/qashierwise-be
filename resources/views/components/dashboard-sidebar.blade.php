@@ -55,10 +55,6 @@
             <i class="fas fa-file-alt w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_templates') }}</span>
         </a>
-        <a href="/dashboard/reservations" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'reservations' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('reservations')">
-            <i class="fas fa-calendar-check w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Reservations</span>
-        </a>
         <a href="/dashboard/profile" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'profile' ? 'active' : '' }}">
             <i class="fas fa-building w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_business_profile') }}</span>
@@ -70,6 +66,25 @@
         <a href="/dashboard/ai-agent" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'ai-agent' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('ai-agent')">
             <i class="fas fa-robot w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_ai_agent') }}</span>
+        </a>
+
+        <!-- Reservation Section -->
+        <div x-show="sidebarOpen || isMobile" x-transition class="pt-4">
+            <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
+                Reservasi
+            </div>
+        </div>
+        <a href="/dashboard/reservations" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'reservations' ? 'active' : '' }}">
+            <i class="fas fa-calendar-check w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Daftar Reservasi</span>
+        </a>
+        <a href="/dashboard/reservations/calendar" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'reservations-calendar' ? 'active' : '' }}">
+            <i class="fas fa-calendar-alt w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Kalender</span>
+        </a>
+        <a href="/dashboard/reservations/config" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'reservations-config' ? 'active' : '' }}">
+            <i class="fas fa-cog w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Konfigurasi</span>
         </a>
 
         <!-- POS Section - Orders & Payment -->

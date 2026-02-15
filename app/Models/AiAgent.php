@@ -24,6 +24,7 @@ class AiAgent extends Model
         'business_info',
         'order_enabled',
         'qris_enabled',
+        'reservation_enabled',
         'is_active',
         'settings',
         'use_optimized_prompt',
@@ -43,6 +44,7 @@ class AiAgent extends Model
             'business_info' => 'array',
             'order_enabled' => 'boolean',
             'qris_enabled' => 'boolean',
+            'reservation_enabled' => 'boolean',
             'is_active' => 'boolean',
             'settings' => 'array',
             'use_optimized_prompt' => 'boolean',
@@ -93,6 +95,29 @@ class AiAgent extends Model
         return $this->qris_enabled
             && $this->hasActiveSubMerchant()
             && $this->hasActivePaymentProvider();
+    }
+
+    /**
+     * Check if reservation feature is enabled.
+     */
+    public function isReservationEnabled(): bool
+    {
+        return $this->reservation_enabled;
+    }
+
+    /**
+     * Get reservation form URL for this AI Agent.
+     */
+    public function getReservationFormUrl(): ?string
+    {
+        $user = $this->getUser();
+        if (! $user) {
+            return null;
+        }
+
+        $merchantIdentifier = $user->slug ?? (string) $user->id;
+
+        return route('reservation.form', ['merchantName' => $merchantIdentifier]);
     }
 
     /**

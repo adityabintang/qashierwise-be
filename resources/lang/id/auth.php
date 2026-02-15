@@ -94,6 +94,9 @@ return [
     'confirm_new_password' => 'Konfirmasi Password Baru',
     'reset_password_button' => 'Reset Password',
     'password_reset_success' => 'Password berhasil direset',
+    'reset_link_expired' => 'Link reset password ini sudah kedaluwarsa.',
+    'reset_link_expired_description' => 'Demi keamanan, link reset password hanya berlaku selama 60 menit. Silakan minta link baru untuk mereset password Anda.',
+    'request_new_link' => 'Minta Link Baru',
 
     // Email Verification
     'verify_email' => 'Verifikasi Email',

@@ -3,411 +3,286 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ReservationResource;
 use App\Models\Reservation;
-use App\Services\WhatsAppFlowService;
+use App\Services\ReservationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ReservationController extends Controller
 {
     public function __construct(
-        private WhatsAppFlowService $flowService
+        protected ReservationService $reservationService
     ) {}
 
     /**
-     * Display a listing of the resource.
+     * Display a listing of reservations.
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Reservation::where('user_id', auth()->user()->getEffectiveUserId())
-            ->with('whatsappContact')
-            ->orderBy('reservation_date', 'desc')
-            ->orderBy('reservation_time', 'desc');
+        $user = $request->user();
 
-        // Filter by status
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
-        }
-
-        // Filter by date range
-        if ($request->has('from_date')) {
-            $query->whereDate('reservation_date', '>=', $request->from_date);
-        }
-        if ($request->has('to_date')) {
-            $query->whereDate('reservation_date', '<=', $request->to_date);
-        }
-
-        // Filter upcoming only
-        if ($request->boolean('upcoming')) {
-            $query->upcoming();
-        }
-
-        // Filter today only
-        if ($request->boolean('today')) {
-            $query->today();
-        }
-
-        // Search by name or phone
-        if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('customer_name', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%");
-            });
-        }
-
-        $reservations = $query->paginate($request->get('per_page', 15));
-
-        return response()->json([
-            'success' => true,
-            'data' => $reservations,
-        ]);
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'customer_name' => 'required|string|max:255',
-            'phone' => 'required|string|max:20',
-            'reservation_date' => 'required|date|after_or_equal:today',
-            'reservation_time' => 'required|date_format:H:i',
-            'guest_count' => 'required|integer|min:1|max:100',
-            'email' => 'nullable|email|max:255',
-            'event_type' => 'nullable|string|in:regular,birthday,meeting,anniversary,family,other',
-            'special_notes' => 'nullable|string|max:1000',
-            'preferences' => 'nullable|array',
-            'preferences.*' => 'string|in:window,quiet,outdoor,smoking,baby_chair,wheelchair',
-            'deposit' => 'nullable|numeric|min:0',
-            'pre_order_items' => 'nullable|array',
-        ]);
-
-        $validated['user_id'] = auth()->user()->getEffectiveUserId();
-        $validated['status'] = 'pending';
-
-        $reservation = Reservation::create($validated);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Reservasi berhasil dibuat',
-            'data' => $reservation->load('whatsappContact'),
-        ], 201);
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(Reservation $reservation): JsonResponse
-    {
-        $this->authorizeReservation($reservation);
-
-        return response()->json([
-            'success' => true,
-            'data' => $reservation->load('whatsappContact'),
-        ]);
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, Reservation $reservation): JsonResponse
-    {
-        $this->authorizeReservation($reservation);
-
-        $validated = $request->validate([
-            'customer_name' => 'sometimes|string|max:255',
-            'phone' => 'sometimes|string|max:20',
-            'reservation_date' => 'sometimes|date',
-            'reservation_time' => 'sometimes|date_format:H:i',
-            'guest_count' => 'sometimes|integer|min:1|max:100',
-            'email' => 'nullable|email|max:255',
-            'event_type' => 'nullable|string|in:regular,birthday,meeting,anniversary,family,other',
-            'special_notes' => 'nullable|string|max:1000',
-            'preferences' => 'nullable|array',
-            'deposit' => 'nullable|numeric|min:0',
-            'deposit_paid' => 'sometimes|boolean',
-            'pre_order_items' => 'nullable|array',
-        ]);
-
-        $reservation->update($validated);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Reservasi berhasil diperbarui',
-            'data' => $reservation->fresh()->load('whatsappContact'),
-        ]);
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Reservation $reservation): JsonResponse
-    {
-        $this->authorizeReservation($reservation);
-
-        $reservation->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Reservasi berhasil dihapus',
-        ]);
-    }
-
-    /**
-     * Confirm a reservation
-     */
-    public function confirm(Reservation $reservation): JsonResponse
-    {
-        $this->authorizeReservation($reservation);
-
-        if (! $reservation->isPending()) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Hanya reservasi dengan status pending yang bisa dikonfirmasi',
-            ], 422);
+                'message' => 'Authentication required',
+            ], 401);
         }
 
-        $reservation->confirm();
+        // Use effective user ID (master admin ID for sub-accounts)
+        $effectiveUserId = $user->getEffectiveUserId();
+
+        $perPage = $request->input('per_page', 20);
+        $statusFilter = $request->input('status');
+
+        // Build query
+        $reservations = Reservation::with(['table', 'store', 'qrisTransaction'])
+            ->where('user_id', $effectiveUserId)
+            ->when($request->input('store_id'), fn ($q, $storeId) => $q->where('store_id', $storeId))
+            ->when($statusFilter, function ($query) use ($statusFilter) {
+                if ($statusFilter === 'dp_confirmed') {
+                    return $query
+                        ->where('status', Reservation::STATUS_CONFIRMED)
+                        ->where('payment_type', Reservation::PAYMENT_TYPE_DP);
+                }
+
+                return $query->where('status', $statusFilter);
+            })
+            ->when($request->input('date'), fn ($q, $date) => $q->whereDate('reservation_date', $date))
+            ->when($request->input('search'), fn ($q, $search) => $q->where(function ($query) use ($search) {
+                $query->where('order_id', 'like', '%'.$search.'%')
+                    ->orWhere('customer_name', 'like', '%'.$search.'%')
+                    ->orWhere('customer_phone', 'like', '%'.$search.'%')
+                    ->orWhere('customer_email', 'like', '%'.$search.'%');
+            })
+            )
+            ->orderBy($request->input('sort_by', 'reservation_date'), $request->input('sort_order', 'desc'))
+            ->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'message' => 'Reservasi berhasil dikonfirmasi',
-            'data' => $reservation->fresh(),
-        ]);
-    }
-
-    /**
-     * Cancel a reservation
-     */
-    public function cancel(Request $request, Reservation $reservation): JsonResponse
-    {
-        $this->authorizeReservation($reservation);
-
-        if ($reservation->isCancelled() || $reservation->isCompleted()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Reservasi tidak dapat dibatalkan',
-            ], 422);
-        }
-
-        $reason = $request->input('reason');
-        $reservation->cancel($reason);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Reservasi berhasil dibatalkan',
-            'data' => $reservation->fresh(),
-        ]);
-    }
-
-    /**
-     * Mark reservation as completed
-     */
-    public function complete(Reservation $reservation): JsonResponse
-    {
-        $this->authorizeReservation($reservation);
-
-        if (! $reservation->isConfirmed()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Hanya reservasi yang sudah dikonfirmasi yang bisa diselesaikan',
-            ], 422);
-        }
-
-        $reservation->complete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Reservasi berhasil diselesaikan',
-            'data' => $reservation->fresh(),
-        ]);
-    }
-
-    /**
-     * Mark reservation as no-show
-     */
-    public function noShow(Reservation $reservation): JsonResponse
-    {
-        $this->authorizeReservation($reservation);
-
-        if (! $reservation->isConfirmed()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Hanya reservasi yang sudah dikonfirmasi yang bisa ditandai no-show',
-            ], 422);
-        }
-
-        $reservation->markNoShow();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Reservasi ditandai sebagai no-show',
-            'data' => $reservation->fresh(),
-        ]);
-    }
-
-    /**
-     * Get reservation statistics
-     */
-    public function statistics(Request $request): JsonResponse
-    {
-        $userId = auth()->user()->getEffectiveUserId();
-
-        $stats = [
-            'today' => Reservation::where('user_id', $userId)->today()->count(),
-            'upcoming' => Reservation::where('user_id', $userId)->upcoming()->count(),
-            'pending' => Reservation::where('user_id', $userId)->pending()->count(),
-            'confirmed' => Reservation::where('user_id', $userId)->confirmed()->count(),
-            'total_this_month' => Reservation::where('user_id', $userId)
-                ->whereMonth('reservation_date', now()->month)
-                ->whereYear('reservation_date', now()->year)
-                ->count(),
-            'completed_this_month' => Reservation::where('user_id', $userId)
-                ->whereMonth('reservation_date', now()->month)
-                ->whereYear('reservation_date', now()->year)
-                ->where('status', 'completed')
-                ->count(),
-        ];
-
-        // Today's reservations by time
-        $todayByTime = Reservation::where('user_id', $userId)
-            ->today()
-            ->whereIn('status', ['pending', 'confirmed'])
-            ->orderBy('reservation_time')
-            ->get(['id', 'customer_name', 'reservation_time', 'guest_count', 'status']);
-
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'statistics' => $stats,
-                'today_reservations' => $todayByTime,
+            'data' => ReservationResource::collection($reservations),
+            'meta' => [
+                'current_page' => $reservations->currentPage(),
+                'last_page' => $reservations->lastPage(),
+                'per_page' => $reservations->perPage(),
+                'total' => $reservations->total(),
             ],
         ]);
     }
 
-    // ==================== WhatsApp Flow Methods ====================
-
     /**
-     * List all WhatsApp Flows
+     * Display the specified reservation.
      */
-    public function listFlows(): JsonResponse
+    public function show(Request $request, $id): JsonResponse
     {
-        $flows = $this->flowService->listFlows(auth()->user()->getEffectiveUserId());
+        $user = $request->user();
+
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
+        $effectiveUserId = $user->getEffectiveUserId();
+
+        $reservation = Reservation::with(['table', 'store', 'qrisTransaction'])
+            ->where('user_id', $effectiveUserId)
+            ->findOrFail($id);
 
         return response()->json([
             'success' => true,
-            'data' => $flows,
+            'data' => new ReservationResource($reservation),
         ]);
     }
 
     /**
-     * Create a new reservation flow
+     * Mark reservation as completed (for day-of completion).
      */
-    public function createFlow(): JsonResponse
+    public function complete(Request $request, $id): JsonResponse
     {
+        $user = $request->user();
+
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
+        $effectiveUserId = $user->getEffectiveUserId();
+
+        $reservation = Reservation::where('user_id', $effectiveUserId)->findOrFail($id);
+
+        if ($reservation->status !== Reservation::STATUS_CONFIRMED) {
+            return response()->json([
+                'success' => false,
+                'message' => __('dashboard.reservation.only_confirmed_can_be_completed'),
+            ], 422);
+        }
+
         try {
-            $result = $this->flowService->createReservationFlow(auth()->user()->getEffectiveUserId());
+            $this->reservationService->completeReservation($reservation);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Flow berhasil dibuat',
-                'data' => $result,
+                'message' => __('dashboard.reservation.completed_successfully'),
+                'data' => new ReservationResource($reservation->fresh()),
             ]);
         } catch (\Exception $e) {
+            Log::error('Failed to complete reservation', [
+                'reservation_id' => $reservation->id,
+                'error' => $e->getMessage(),
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => __('dashboard.reservation.complete_failed'),
             ], 500);
         }
     }
 
     /**
-     * Send reservation flow to a customer
+     * Cancel the specified reservation.
      */
-    public function sendFlow(Request $request): JsonResponse
+    public function cancel(Request $request, $id): JsonResponse
     {
+        $user = $request->user();
+
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
         $validated = $request->validate([
-            'phone' => 'required|string',
-            'flow_id' => 'required|string',
+            'reason' => 'nullable|string|max:500',
         ]);
 
+        $effectiveUserId = $user->getEffectiveUserId();
+
+        $reservation = Reservation::where('user_id', $effectiveUserId)->findOrFail($id);
+
+        if (! $reservation->canBeCancelled()) {
+            return response()->json([
+                'success' => false,
+                'message' => __('dashboard.reservation.cannot_be_cancelled'),
+            ], 422);
+        }
+
         try {
-            $result = $this->flowService->sendReservationFlow(
-                auth()->user()->getEffectiveUserId(),
-                $validated['phone'],
-                $validated['flow_id']
-            );
+            $this->reservationService->cancelReservation($reservation, $validated['reason'] ?? null);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Flow reservasi berhasil dikirim',
-                'data' => $result,
+                'message' => __('dashboard.reservation.cancelled_successfully'),
+                'data' => new ReservationResource($reservation->fresh()),
             ]);
         } catch (\Exception $e) {
+            Log::error('Failed to cancel reservation', [
+                'reservation_id' => $reservation->id,
+                'error' => $e->getMessage(),
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => __('dashboard.reservation.cancel_failed'),
             ], 500);
         }
     }
 
     /**
-     * Publish a flow
+     * Get reservations for calendar view.
      */
-    public function publishFlow(Request $request): JsonResponse
+    public function calendar(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'flow_id' => 'required|string',
-        ]);
+        $user = $request->user();
 
-        $success = $this->flowService->publishFlow(auth()->user()->getEffectiveUserId(), $validated['flow_id']);
-
-        if ($success) {
+        if (! $user) {
             return response()->json([
-                'success' => true,
-                'message' => 'Flow berhasil dipublish',
-            ]);
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
         }
 
+        $effectiveUserId = $user->getEffectiveUserId();
+
+        // Get date range from request (default to current month)
+        $startDate = $request->input('start', now()->startOfMonth()->toDateString());
+        $endDate = $request->input('end', now()->endOfMonth()->toDateString());
+
+        $reservations = Reservation::with(['table', 'store'])
+            ->where('user_id', $effectiveUserId)
+            ->whereBetween('reservation_date', [$startDate, $endDate])
+            ->whereIn('status', [Reservation::STATUS_CONFIRMED, Reservation::STATUS_COMPLETED])
+            ->get();
+
+        // Format for calendar (FullCalendar format)
+        $events = $reservations->map(function ($reservation) {
+            return [
+                'id' => $reservation->id,
+                'title' => $reservation->customer_name.' ('.$reservation->guest_count.' guests)',
+                'start' => $reservation->reservation_date,
+                'backgroundColor' => match ($reservation->status) {
+                    Reservation::STATUS_CONFIRMED => '#3b82f6',
+                    Reservation::STATUS_COMPLETED => '#10b981',
+                    default => '#6b7280',
+                },
+                'extendedProps' => [
+                    'order_id' => $reservation->order_id,
+                    'customer_phone' => $reservation->customer_phone,
+                    'table_name' => $reservation->table?->name,
+                    'status' => $reservation->status,
+                    'guest_count' => $reservation->guest_count,
+                ],
+            ];
+        });
+
         return response()->json([
-            'success' => false,
-            'message' => 'Gagal mempublish flow',
-        ], 500);
+            'success' => true,
+            'data' => $events,
+        ]);
     }
 
     /**
-     * Delete a flow
+     * Get reservation statistics.
      */
-    public function deleteFlow(Request $request): JsonResponse
+    public function stats(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'flow_id' => 'required|string',
-        ]);
+        $user = $request->user();
 
-        $success = $this->flowService->deleteFlow(auth()->user()->getEffectiveUserId(), $validated['flow_id']);
-
-        if ($success) {
+        if (! $user) {
             return response()->json([
-                'success' => true,
-                'message' => 'Flow berhasil dihapus',
-            ]);
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
         }
+
+        $effectiveUserId = $user->getEffectiveUserId();
+        $storeId = $request->input('store_id');
+
+        $query = Reservation::where('user_id', $effectiveUserId);
+
+        if ($storeId) {
+            $query->where('store_id', $storeId);
+        }
+
+        $stats = [
+            'pending_payment' => (clone $query)->where('status', Reservation::STATUS_PENDING_PAYMENT)->count(),
+            'confirmed' => (clone $query)->where('status', Reservation::STATUS_CONFIRMED)->count(),
+            'completed' => (clone $query)->where('status', Reservation::STATUS_COMPLETED)->count(),
+            'cancelled' => (clone $query)->where('status', Reservation::STATUS_CANCELLED)->count(),
+            'today' => (clone $query)->whereDate('reservation_date', today())->whereIn('status', [Reservation::STATUS_CONFIRMED, Reservation::STATUS_COMPLETED])->count(),
+            'upcoming' => (clone $query)->where('reservation_date', '>', today())->where('status', Reservation::STATUS_CONFIRMED)->count(),
+            'total_revenue' => (clone $query)->where('status', Reservation::STATUS_COMPLETED)->sum('paid_amount'),
+        ];
 
         return response()->json([
-            'success' => false,
-            'message' => 'Gagal menghapus flow',
-        ], 500);
-    }
-
-    /**
-     * Authorize that the user owns the reservation
-     */
-    private function authorizeReservation(Reservation $reservation): void
-    {
-        if ($reservation->user_id !== auth()->user()->getEffectiveUserId()) {
-            abort(403, 'Unauthorized access to reservation');
-        }
+            'success' => true,
+            'data' => $stats,
+        ]);
     }
 }

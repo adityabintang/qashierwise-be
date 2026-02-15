@@ -64,6 +64,10 @@ class AiAgentPromptBuilder
             $sections[] = $this->getAntiHallucinationReminder();
         }
 
+        if ($this->shouldIncludeReservationInstructions()) {
+            $sections[] = $this->getReservationInstructions();
+        }
+
         return implode("\n\n", array_filter($sections));
     }
 
@@ -105,6 +109,13 @@ class AiAgentPromptBuilder
         // Only add ordering workflow if enabled
         if ($this->agent->isOrderEnabled()) {
             $prompt .= "\n".config('ai_agent_prompts.ordering_workflow');
+        }
+
+        if ($this->shouldIncludeReservationInstructions()) {
+            $reservationInstructions = $this->getReservationInstructions();
+            if ($reservationInstructions !== '') {
+                $prompt .= "\n".$reservationInstructions;
+            }
         }
 
         return str_replace(':business_name', $botName, $prompt);
@@ -189,6 +200,10 @@ class AiAgentPromptBuilder
             $dynamicParts[] = $this->getAntiHallucinationReminder();
         }
 
+        if ($this->shouldIncludeReservationInstructions()) {
+            $dynamicParts[] = $this->getReservationInstructions();
+        }
+
         return $staticPart."\n\n".implode("\n\n", array_filter($dynamicParts));
     }
 
@@ -228,6 +243,10 @@ class AiAgentPromptBuilder
 
         if ($this->shouldIncludeOrderingWorkflow()) {
             $sections[] = $this->getOrderingWorkflow();
+        }
+
+        if ($this->shouldIncludeReservationInstructions()) {
+            $sections[] = $this->getReservationInstructions();
         }
 
         return implode("\n\n", array_filter($sections));
@@ -384,6 +403,21 @@ class AiAgentPromptBuilder
         return config('ai_agent_prompts.anti_hallucination_reminder');
     }
 
+    private function getReservationInstructions(): string
+    {
+        $reservationLink = $this->agent->getReservationFormUrl();
+        if (! $reservationLink) {
+            return '';
+        }
+
+        $template = config('ai_agent_prompts.reservation_instructions');
+        if (! $template) {
+            return '';
+        }
+
+        return str_replace(':reservation_link', $reservationLink, $template);
+    }
+
     private function shouldIncludeBusinessInfo(): bool
     {
         // Only include for greeting, business_info, or unknown intents
@@ -432,6 +466,11 @@ class AiAgentPromptBuilder
             UserIntent::CHECKOUT,
             UserIntent::UNKNOWN,
         ]);
+    }
+
+    private function shouldIncludeReservationInstructions(): bool
+    {
+        return $this->agent->isReservationEnabled();
     }
 
     /**
