@@ -1062,8 +1062,21 @@ function configApp() {
                 }
 
                 if (data.success) {
-                    this.form.available_slots = data.data?.slots || [];
+                    const slots = data.data?.slots || [];
+                    const normalizedSlots = slots
+                        .map(slot => (typeof slot === 'string' ? slot : slot?.datetime))
+                        .filter(Boolean);
+                    const capacityFromSlots = slots.find(slot => typeof slot === 'object' && slot?.capacity !== undefined)?.capacity;
+                    const normalizedCapacity = Number(capacityFromSlots);
+
+                    this.form.available_slots = normalizedSlots;
                     this.slotPaginationOffset = 10;
+
+                    if (Number.isFinite(normalizedCapacity) && normalizedCapacity > 0) {
+                        this.form.capacity_per_slot = normalizedCapacity;
+                        this.bulkSlotForm.capacity_per_slot = normalizedCapacity;
+                    }
+
                     Alpine.store('toast').addToast(`Berhasil membuat ${data.data?.count || 0} slot.`, 'success');
                     this.closeBulkSlotModal();
                 } else {

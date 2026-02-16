@@ -524,10 +524,36 @@ function calendarApp() {
             return this.events.filter(e => e.start === dateStr || (e.start && e.start.startsWith(dateStr)));
         },
 
+        getEventHourKey(ev) {
+            if (ev.extendedProps?.reservation_time) {
+                return ev.extendedProps.reservation_time.slice(0, 2);
+            }
+            if (ev.start && ev.start.includes('T')) {
+                const dt = new Date(ev.start);
+                return String(dt.getHours()).padStart(2, '0');
+            }
+
+            return '00';
+        },
+
+        getEventStackIndex(ev, dateStr) {
+            const hourKey = this.getEventHourKey(ev);
+            const sameSlotEvents = this.getEventsForDay(dateStr)
+                .filter(item => this.getEventHourKey(item) === hourKey)
+                .sort((a, b) => (a.start || '').localeCompare(b.start || ''));
+
+            return Math.max(0, sameSlotEvents.findIndex(item => item.id === ev.id));
+        },
+
         getEventGridStyle(ev, dayIndex) {
             const bgColor = ev.backgroundColor || '#6366f1';
             let startRow = 1;
             let spanRows = 1;
+            const eventHeight = 14;
+            const stackGap = 2;
+            const dateStr = ev.start?.split('T')[0] || ev.start;
+            const stackIndex = dateStr ? this.getEventStackIndex(ev, dateStr) : 0;
+            const stackOffset = (eventHeight + stackGap) * stackIndex;
 
             if (ev.extendedProps?.reservation_time) {
                 const parts = ev.extendedProps.reservation_time.split(':');
@@ -541,7 +567,7 @@ function calendarApp() {
             }
 
             const col = dayIndex + 2;
-            return `grid-column: ${col}; grid-row: ${startRow} / span ${spanRows}; background-color: ${bgColor}; border-left-color: ${bgColor};`;
+            return `grid-column: ${col}; grid-row: ${startRow} / span ${spanRows}; background-color: ${bgColor}; border-left-color: ${bgColor}; height: ${eventHeight}px; margin-top: ${stackOffset}px; line-height: 1;`;
         },
 
         getCurrentTimeGridStyle(dayIndex) {

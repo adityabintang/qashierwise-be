@@ -290,7 +290,13 @@ class ReservationConfigController extends Controller
     public function generateSlots(BulkTimeSlotGenerateRequest $request, ReservationSlotGenerator $generator): JsonResponse
     {
         $validated = $request->validated();
-        $slots = $generator->generate($validated);
+
+        // Pass store_id to generator for capacity calculation
+        $payload = array_merge($validated, [
+            'store_id' => $validated['store_id'],
+        ]);
+
+        $slots = $generator->generate($payload);
 
         return response()->json([
             'success' => true,

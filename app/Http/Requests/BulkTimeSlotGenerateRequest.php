@@ -34,7 +34,7 @@ class BulkTimeSlotGenerateRequest extends FormRequest
             'opening_time' => ['required', 'date_format:H:i'],
             'closing_time' => ['required', 'date_format:H:i', 'after:opening_time'],
             'slot_duration' => ['required', 'integer', 'in:30,60,120'],
-            'capacity_per_slot' => ['required', 'integer', 'min:1', 'max:100'],
+            'capacity_per_slot' => ['nullable', 'integer', 'min:1', 'max:100'],
             'exclude_dates' => ['nullable', 'array'],
             'exclude_dates.*' => ['date_format:Y-m-d'],
         ];

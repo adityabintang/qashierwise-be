@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Table;
 use Carbon\Carbon;
 
 class ReservationSlotGenerator
@@ -13,9 +14,11 @@ class ReservationSlotGenerator
      *   opening_time: string,
      *   closing_time: string,
      *   slot_duration: int,
+     *   store_id?: int,
+     *   capacity_per_slot?: int,
      *   exclude_dates?: array<int, string>
      * } $payload
-     * @return array<int, string>
+     * @return array<int, array{datetime: string, capacity: int}>
      */
     public function generate(array $payload): array
     {
@@ -27,10 +30,13 @@ class ReservationSlotGenerator
         $openingTime = $payload['opening_time'];
         $closingTime = $payload['closing_time'];
         $slotDuration = (int) $payload['slot_duration'];
+        $storeId = $payload['store_id'] ?? null;
         $excludeDates = collect($payload['exclude_dates'] ?? [])
             ->filter()
             ->map(fn (string $date) => Carbon::createFromFormat('Y-m-d', $date, $timezone)->toDateString())
             ->flip();
+
+        $capacityPerSlot = $this->resolveCapacityPerSlot($payload, $storeId);
 
         $slots = [];
         $currentDate = $startDate->copy();
@@ -47,8 +53,11 @@ class ReservationSlotGenerator
             $slotEnd = Carbon::createFromFormat('Y-m-d H:i', $dateKey.' '.$closingTime, $timezone);
 
             while ($slotStart->lt($slotEnd)) {
-                // Format as ISO 8601 datetime-local format (without timezone indicator for browser compatibility)
-                $slots[] = $slotStart->format('Y-m-d\TH:i');
+                // Store as array with datetime and capacity
+                $slots[] = [
+                    'datetime' => $slotStart->format('Y-m-d\TH:i'),
+                    'capacity' => $capacityPerSlot,
+                ];
                 $slotStart->addMinutes($slotDuration);
             }
 
@@ -56,5 +65,35 @@ class ReservationSlotGenerator
         }
 
         return $slots;
+    }
+
+    /**
+     * Calculate total capacity from available tables for a store.
+     */
+    private function calculateCapacityFromTables(?int $storeId): int
+    {
+        if (! $storeId) {
+            return 12; // Default capacity if no store specified
+        }
+
+        return Table::where('store_id', $storeId)
+            ->where('status', '!=', Table::STATUS_UNAVAILABLE)
+            ->sum('capacity');
+    }
+
+    /**
+     * Resolve capacity per slot from payload or table capacity.
+     *
+     * @param  array{capacity_per_slot?: int}  $payload
+     */
+    private function resolveCapacityPerSlot(array $payload, ?int $storeId): int
+    {
+        $payloadCapacity = $payload['capacity_per_slot'] ?? null;
+
+        if (is_numeric($payloadCapacity) && (int) $payloadCapacity > 0) {
+            return (int) $payloadCapacity;
+        }
+
+        return $this->calculateCapacityFromTables($storeId);
     }
 }

@@ -85,11 +85,63 @@ class ReservationConfig extends Model
             return [];
         }
 
-        return collect($this->available_slots)->map(function ($date) {
+        return collect($this->available_slots)->map(function ($slot) {
+            // Handle both old format (string) and new format (array with datetime and capacity)
+            $datetime = is_array($slot) ? ($slot['datetime'] ?? $slot[0] ?? '') : $slot;
+            $capacity = is_array($slot) ? ($slot['capacity'] ?? $slot[1] ?? null) : null;
+
             return [
-                'id' => $date,
-                'title' => \Carbon\Carbon::parse($date)->isoFormat('ddd, D MMM YYYY HH:mm'),
+                'id' => $datetime,
+                'title' => \Carbon\Carbon::parse($datetime)->isoFormat('ddd, D MMM YYYY HH:mm'),
+                'capacity' => $capacity,
             ];
         })->toArray();
+    }
+
+    /**
+     * Get unique dates from available slots (grouped by date, not datetime).
+     */
+    public function getUniqueDatesWithCapacity(): array
+    {
+        if (! $this->available_slots) {
+            return [];
+        }
+
+        $dateGroups = collect($this->available_slots)->groupBy(function ($slot) {
+            $datetime = is_array($slot) ? ($slot['datetime'] ?? $slot[0] ?? '') : $slot;
+
+            return \Carbon\Carbon::parse($datetime)->toDateString();
+        });
+
+        return $dateGroups->map(function ($slots, $date) {
+            // Get capacity from first slot (they should all have same capacity)
+            $firstSlot = $slots->first();
+            $capacity = is_array($firstSlot) ? ($firstSlot['capacity'] ?? $firstSlot[1] ?? null) : null;
+
+            return [
+                'date' => $date,
+                'title' => \Carbon\Carbon::parse($date)->isoFormat('ddd, D MMM YYYY'),
+                'slot_count' => $slots->count(),
+                'capacity' => $capacity,
+            ];
+        })->values()->toArray();
+    }
+
+    /**
+     * Get total capacity across all slots.
+     */
+    public function getTotalCapacity(): int
+    {
+        if (! $this->available_slots) {
+            return 0;
+        }
+
+        return collect($this->available_slots)->sum(function ($slot) {
+            if (is_array($slot)) {
+                return $slot['capacity'] ?? $slot[1] ?? 0;
+            }
+
+            return 0;
+        });
     }
 }
