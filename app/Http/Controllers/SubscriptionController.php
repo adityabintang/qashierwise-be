@@ -269,7 +269,6 @@ class SubscriptionController extends Controller
                 'status' => $subscriptionData['status'] === 'active' ? 'active' : 'pending',
                 'current_period_start' => now(),
                 'current_period_end' => now()->addMonthsNoOverflow($months),
-                'amount' => $durationDetails['price'] ?? $plan['price_monthly'],
                 'metadata' => json_encode([
                     'midtrans_name' => $subscriptionData['name'] ?? null,
                     'amount' => $subscriptionData['amount'] ?? null,
