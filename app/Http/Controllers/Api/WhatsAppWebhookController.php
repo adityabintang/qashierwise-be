@@ -125,6 +125,13 @@ class WhatsAppWebhookController extends Controller
                             }
                         }
 
+                        // Handle SMB message echoes (outgoing messages from the business)
+                        if (isset($change['value']['message_echoes'])) {
+                            foreach ($change['value']['message_echoes'] as $message) {
+                                $this->handleMessageEcho($message, $change['value'], $userId, $whatsappAccount);
+                            }
+                        }
+
                         // Handle status updates
                         if (isset($change['value']['statuses'])) {
                             foreach ($change['value']['statuses'] as $status) {
@@ -378,6 +385,161 @@ class WhatsAppWebhookController extends Controller
         }
 
         return $messageData;
+    }
+
+    /**
+     * Handle message echo (outgoing message confirmation from SMB API)
+     *
+     * @param  array  $message  Message echo data from webhook
+     * @param  array  $value  Value object containing metadata
+     * @param  int  $userId  User ID to associate the message with
+     * @param  WhatsAppAccount  $whatsappAccount  The WhatsApp account for user-specific credentials
+     */
+    protected function handleMessageEcho($message, $value, $userId, WhatsAppAccount $whatsappAccount)
+    {
+        $messageId = $message['id'] ?? null;
+
+        if (!$messageId) {
+            Log::warning('Message echo missing message_id, skipping', [
+                'user_id' => $userId,
+                'message' => $message,
+            ]);
+            return;
+        }
+
+        $to = $message['to'] ?? null;
+        $from = $message['from'] ?? null; // This is the business phone number
+        $timestamp = $message['timestamp'] ?? now()->timestamp;
+        $type = $message['type'] ?? 'text';
+
+        Log::info("Message echo for $type message to $to", [
+            'message_id' => $messageId,
+            'user_id' => $userId,
+            'phone_number_id' => $whatsappAccount->phone_number_id,
+        ]);
+
+        // For message echoes, the 'to' field contains the customer phone number
+        // The 'from' field contains the business phone number
+        $customerWaId = $to;
+
+        // Get or create contact (the recipient of the message)
+        $contact = WhatsAppContact::withoutGlobalScopes()->firstOrCreate(
+            [
+                'user_id' => $userId,
+                'phone_number_id' => $whatsappAccount->phone_number_id,
+                'wa_id' => $customerWaId,
+            ],
+            [
+                'name' => $customerWaId,
+            ]
+        );
+
+        // Extract message content based on type
+        $content = null;
+        $metadata = [];
+
+        switch ($type) {
+            case 'text':
+                $content = $message['text']['body'] ?? $message['text'] ?? null;
+                break;
+
+            case 'image':
+                $content = json_encode([
+                    'caption' => $message['image']['caption'] ?? '',
+                ]);
+                $metadata = [
+                    'media_id' => $message['image']['id'] ?? null,
+                    'mime_type' => $message['image']['mime_type'] ?? null,
+                ];
+                break;
+
+            case 'document':
+                $content = json_encode([
+                    'filename' => $message['document']['filename'] ?? 'document',
+                    'caption' => $message['document']['caption'] ?? '',
+                ]);
+                $metadata = [
+                    'media_id' => $message['document']['id'] ?? null,
+                    'mime_type' => $message['document']['mime_type'] ?? null,
+                    'filename' => $message['document']['filename'] ?? null,
+                ];
+                break;
+
+            case 'audio':
+                $content = json_encode(['audio' => true]);
+                $metadata = [
+                    'media_id' => $message['audio']['id'] ?? null,
+                    'mime_type' => $message['audio']['mime_type'] ?? null,
+                ];
+                break;
+
+            case 'video':
+                $content = json_encode([
+                    'caption' => $message['video']['caption'] ?? '',
+                ]);
+                $metadata = [
+                    'media_id' => $message['video']['id'] ?? null,
+                    'mime_type' => $message['video']['mime_type'] ?? null,
+                ];
+                break;
+
+            case 'location':
+                $location = $message['location'] ?? [];
+                $content = "Location: " . ($location['latitude'] ?? 0) . ", " . ($location['longitude'] ?? 0);
+                $metadata = $location;
+                break;
+
+            case 'contacts':
+                $content = 'Contact shared';
+                $metadata = $message['contacts'] ?? [];
+                break;
+
+            case 'interactive':
+                $interactiveType = $message['interactive']['type'] ?? null;
+                if ($interactiveType === 'button_reply') {
+                    $content = $message['interactive']['button_reply']['title'] ?? 'Button';
+                    $metadata = $message['interactive']['button_reply'] ?? [];
+                } elseif ($interactiveType === 'list_reply') {
+                    $content = $message['interactive']['list_reply']['title'] ?? 'List item';
+                    $metadata = $message['interactive']['list_reply'] ?? [];
+                }
+                break;
+
+            default:
+                $content = "Unsupported message type: $type";
+                $metadata = $message;
+                break;
+        }
+
+        // Save message echo to database as outgoing message
+        // Use updateOrCreate to prevent duplicate errors
+        $whatsappMessage = WhatsAppMessage::withoutGlobalScopes()->updateOrCreate(
+            ['message_id' => $messageId],
+            [
+                'user_id' => $userId,
+                'phone_number_id' => $whatsappAccount->phone_number_id,
+                'contact_id' => $contact->id,
+                'direction' => 'outgoing',
+                'type' => $type,
+                'content' => $content,
+                'metadata' => $metadata,
+                'status' => 'sent',
+                'is_read' => true,
+                'sent_at' => now()->timestamp($timestamp),
+            ]
+        );
+
+        // Update contact's last message info
+        $contact->update([
+            'last_message_at' => now(),
+            'last_message_text' => $content,
+        ]);
+
+        Log::info('Message echo saved to database', [
+            'message_id' => $messageId,
+            'contact_id' => $contact->id,
+            'direction' => 'outgoing',
+        ]);
     }
 
     /**
