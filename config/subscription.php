@@ -40,6 +40,7 @@ return [
     */
     'invoice' => [
         'enabled' => env('MIDTRANS_INVOICE_ENABLED', true),
+        'mode' => env('MIDTRANS_INVOICE_MODE', 'receipt'),
         'due_days' => env('MIDTRANS_INVOICE_DUE_DAYS', 7),
         'payment_methods' => [
             'bca_va',

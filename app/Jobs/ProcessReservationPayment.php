@@ -13,6 +13,7 @@ use App\Services\ReservationService;
 use Exception;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -337,17 +338,54 @@ class ProcessReservationPayment implements ShouldQueue
      * Generate a unique order number for the store.
      *
      * Uses format: STORE_DATE_SEQUENCE (e.g., STORE1_20250201_001)
+     *
+     * Uses database locking to prevent race conditions when multiple
+     * queue jobs run simultaneously.
      */
     protected function generateOrderNumber(int $storeId): string
     {
-        $today = now()->format('Ymd');
-        $prefix = "ORD{$storeId}_{$today}_";
+        Log::debug('Generating order number for store', [
+            'store_id' => $storeId,
+            'timestamp' => now()->toIso8601String(),
+        ]);
 
-        // Count orders created today for this store
-        $count = Order::where('store_id', $storeId)
-            ->where('order_number', 'like', $prefix.'%')
-            ->count();
+        return DB::transaction(function () use ($storeId) {
+            $today = now()->format('Ymd');
+            $prefix = "ORD{$storeId}_{$today}_";
 
-        return $prefix.str_pad($count + 1, 3, '0', STR_PAD_LEFT);
+            Log::debug('Starting order number transaction', [
+                'store_id' => $storeId,
+                'prefix' => $prefix,
+            ]);
+
+            // Lock existing orders for this store/date to prevent race conditions
+            // lockForUpdate() ensures exclusive access until transaction completes
+            $latestOrder = Order::where('store_id', $storeId)
+                ->where('order_number', 'like', $prefix.'%')
+                ->lockForUpdate()
+                ->orderBy('order_number', 'desc')
+                ->first();
+
+            // Extract sequence number from existing order or start at 0
+            $sequence = 0;
+            if ($latestOrder) {
+                $lastSequence = str_replace($prefix, '', $latestOrder->order_number);
+                $sequence = (int) $lastSequence;
+                Log::debug('Found existing order, extracting sequence', [
+                    'latest_order_number' => $latestOrder->order_number,
+                    'extracted_sequence' => $sequence,
+                ]);
+            }
+
+            $newOrderNumber = $prefix.str_pad($sequence + 1, 3, '0', STR_PAD_LEFT);
+
+            Log::debug('Generated order number', [
+                'store_id' => $storeId,
+                'order_number' => $newOrderNumber,
+                'new_sequence' => $sequence + 1,
+            ]);
+
+            return $newOrderNumber;
+        });
     }
 }

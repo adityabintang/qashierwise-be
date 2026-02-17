@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Jobs\ProcessQrisPayment;
 use App\Models\QrisTransaction;
 use App\Models\SubscriptionPayment;
+use App\Models\User;
+use App\Notifications\SubscriptionPaymentReceiptNotification;
 use App\Services\SubscriptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -537,6 +540,8 @@ class MidtransWebhookController extends Controller
     {
         $orderId = $payload['order_id'] ?? '';
         $transactionId = $payload['transaction_id'] ?? null;
+        $transactionStatus = $payload['transaction_status'] ?? SubscriptionPayment::STATUS_SETTLEMENT;
+        $transactionTime = $this->resolveTransactionTime($payload['transaction_time'] ?? null);
 
         Log::info('Processing subscription payment success', [
             'order_id' => $orderId,
@@ -605,8 +610,10 @@ class MidtransWebhookController extends Controller
                     }
 
                     // Record payment in subscription_payments table for billing history
+                    $subscriptionPayment = null;
+
                     try {
-                        SubscriptionPayment::updateOrCreate(
+                        $subscriptionPayment = SubscriptionPayment::updateOrCreate(
                             ['order_id' => $orderId],
                             [
                                 'subscription_id' => $subscription->id,
@@ -617,8 +624,8 @@ class MidtransWebhookController extends Controller
                                 'gross_amount' => $payload['gross_amount'] ?? $durationDetails['price'],
                                 'currency' => $plan['currency'] ?? 'IDR',
                                 'payment_type' => $payload['payment_type'] ?? 'snap',
-                                'status' => SubscriptionPayment::STATUS_SETTLEMENT,
-                                'transaction_time' => now(),
+                                'status' => $this->resolveSubscriptionPaymentStatus($transactionStatus),
+                                'transaction_time' => $transactionTime,
                                 'metadata' => [
                                     'months' => $months,
                                     'price_per_month' => $durationDetails['price_per_month'] ?? null,
@@ -737,63 +744,69 @@ class MidtransWebhookController extends Controller
                         // User will need to renew manually
                     }
 
-                    // Send invoice to user's email via Midtrans Invoice API
-                    try {
-                        $invoiceService = app(\App\Services\MidtransInvoiceService::class);
+                    $invoiceMode = config('subscription.invoice.mode', 'payment_link');
 
-                        Log::info('Attempting to create and send invoice', [
-                            'order_id' => $orderId,
-                            'user_id' => $user->id,
-                            'user_email' => $user->email,
-                            'plan_name' => $plan['name'],
-                            'duration_name' => $durationDetails['name'],
-                            'amount' => $payload['gross_amount'] ?? $durationDetails['price'],
-                        ]);
-
-                        $invoice = $invoiceService->createSubscriptionInvoice(
+                    if ($invoiceMode === 'receipt') {
+                        $this->sendSubscriptionReceipt(
+                            $subscriptionPayment,
                             $user,
-                            $orderId,
-                            $plan['name'],
-                            $durationDetails['name'],
-                            $payload['gross_amount'] ?? $durationDetails['price'],
-                            $plan['currency'] ?? 'IDR'
+                            $plan,
+                            $durationDetails
                         );
+                    } elseif (config('subscription.invoice.enabled', true)) {
+                        try {
+                            $invoiceService = app(\App\Services\MidtransInvoiceService::class);
 
-                        if ($invoice !== null && isset($invoice['id'])) {
-                            // Update subscription payment with invoice details
-                            $subscriptionPayment = SubscriptionPayment::where('order_id', $orderId)->first();
-                            if ($subscriptionPayment) {
-                                $metadata = $subscriptionPayment->metadata ?? [];
-                                $metadata['invoice_id'] = $invoice['id'];
-                                $metadata['invoice_number'] = $invoice['invoice_number'] ?? null;
-                                $metadata['pdf_url'] = $invoice['pdf_url'] ?? null;
-                                $subscriptionPayment->update(['metadata' => $metadata]);
-                            }
-
-                            Log::info('Invoice created and sent successfully', [
-                                'order_id' => $orderId,
-                                'invoice_id' => $invoice['id'],
-                                'invoice_number' => $invoice['invoice_number'] ?? null,
-                                'pdf_url' => $invoice['pdf_url'] ?? null,
-                                'user_email' => $user->email,
-                            ]);
-                        } else {
-                            Log::warning('Failed to create invoice, will continue without invoice', [
+                            Log::info('Attempting to create and send invoice', [
                                 'order_id' => $orderId,
                                 'user_id' => $user->id,
-                                'reason' => 'Invoice creation returned null or missing ID',
+                                'user_email' => $user->email,
+                                'plan_name' => $plan['name'],
+                                'duration_name' => $durationDetails['name'],
+                                'amount' => $payload['gross_amount'] ?? $durationDetails['price'],
+                            ]);
+
+                            $invoice = $invoiceService->createSubscriptionInvoice(
+                                $user,
+                                $orderId,
+                                $plan['name'],
+                                $durationDetails['name'],
+                                $payload['gross_amount'] ?? $durationDetails['price'],
+                                $plan['currency'] ?? 'IDR'
+                            );
+
+                            if ($invoice !== null && isset($invoice['id'])) {
+                                if ($subscriptionPayment) {
+                                    $metadata = $subscriptionPayment->metadata ?? [];
+                                    $metadata['invoice_id'] = $invoice['id'];
+                                    $metadata['invoice_number'] = $invoice['invoice_number'] ?? null;
+                                    $metadata['pdf_url'] = $invoice['pdf_url'] ?? null;
+                                    $subscriptionPayment->update(['metadata' => $metadata]);
+                                }
+
+                                Log::info('Invoice created and sent successfully', [
+                                    'order_id' => $orderId,
+                                    'invoice_id' => $invoice['id'],
+                                    'invoice_number' => $invoice['invoice_number'] ?? null,
+                                    'pdf_url' => $invoice['pdf_url'] ?? null,
+                                    'user_email' => $user->email,
+                                ]);
+                            } else {
+                                Log::warning('Failed to create invoice, will continue without invoice', [
+                                    'order_id' => $orderId,
+                                    'user_id' => $user->id,
+                                    'reason' => 'Invoice creation returned null or missing ID',
+                                ]);
+                            }
+                        } catch (\Exception $e) {
+                            Log::error('Exception while creating invoice', [
+                                'order_id' => $orderId,
+                                'user_id' => $user->id,
+                                'user_email' => $user->email,
+                                'error' => $e->getMessage(),
+                                'trace' => $e->getTraceAsString(),
                             ]);
                         }
-                    } catch (\Exception $e) {
-                        Log::error('Exception while creating invoice', [
-                            'order_id' => $orderId,
-                            'user_id' => $user->id,
-                            'user_email' => $user->email,
-                            'error' => $e->getMessage(),
-                            'trace' => $e->getTraceAsString(),
-                        ]);
-                        // Continue without invoice
-                        // Subscription is still active, invoice is non-critical
                     }
                 } else {
                     Log::warning('Plan or duration not found for subscription payment', [
@@ -815,6 +828,64 @@ class MidtransWebhookController extends Controller
 
         Log::info('Subscription payment success processed', [
             'order_id' => $orderId,
+        ]);
+    }
+
+    private function resolveSubscriptionPaymentStatus(string $transactionStatus): string
+    {
+        $status = strtolower($transactionStatus);
+
+        if (in_array($status, [SubscriptionPayment::STATUS_CAPTURE, SubscriptionPayment::STATUS_SETTLEMENT], true)) {
+            return $status;
+        }
+
+        return SubscriptionPayment::STATUS_SETTLEMENT;
+    }
+
+    private function resolveTransactionTime(?string $transactionTime): Carbon
+    {
+        if ($transactionTime !== null) {
+            return Carbon::parse($transactionTime);
+        }
+
+        return now();
+    }
+
+    private function sendSubscriptionReceipt(
+        ?SubscriptionPayment $subscriptionPayment,
+        User $user,
+        array $plan,
+        array $durationDetails
+    ): void {
+        if (! $subscriptionPayment) {
+            Log::warning('Receipt skipped: subscription payment record missing', [
+                'user_id' => $user->id,
+                'order_id' => $subscriptionPayment?->order_id,
+            ]);
+
+            return;
+        }
+
+        $metadata = $subscriptionPayment->metadata ?? [];
+        $metadata['receipt_sent_at'] = now()->toIso8601String();
+        $metadata['receipt_mode'] = 'email';
+        $subscriptionPayment->update(['metadata' => $metadata]);
+
+        $user->notify(new SubscriptionPaymentReceiptNotification(
+            orderId: $subscriptionPayment->order_id,
+            planName: $plan['name'],
+            durationName: $durationDetails['name'] ?? $subscriptionPayment->duration,
+            amount: (float) $subscriptionPayment->gross_amount,
+            currency: $subscriptionPayment->currency,
+            transactionStatus: $subscriptionPayment->status,
+            transactionId: $subscriptionPayment->transaction_id,
+            transactionTime: $subscriptionPayment->transaction_time
+        ));
+
+        Log::info('Subscription payment receipt sent', [
+            'order_id' => $subscriptionPayment->order_id,
+            'user_id' => $user->id,
+            'user_email' => $user->email,
         ]);
     }
 
