@@ -52,7 +52,7 @@ class SendReservationReminder implements ShouldQueue
         WhatsAppAccountService $whatsappService,
         TemplateParameterService $parameterService
     ): void {
-        $reservation = Reservation::with(['store', 'table', 'config'])->find($this->reservationId);
+        $reservation = Reservation::with(['store', 'table'])->find($this->reservationId);
 
         if (! $reservation) {
             Log::warning('Reservation not found for reminder', [
