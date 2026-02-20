@@ -21,24 +21,34 @@ class ReservationConfigFactory extends Factory
      */
     public function definition(): array
     {
-        // Generate 5 available dates in the next 30 days
-        $availableDays = [];
-        for ($i = 1; $i <= 5; $i++) {
-            $date = now()->addDays(fake()->numberBetween($i * 5, ($i + 1) * 5));
-            $availableDays[] = $date->toDateString();
-        }
-
         return [
             'user_id' => User::factory(),
             'store_id' => Store::factory(),
             'is_active' => true,
-            'available_days' => $availableDays,
             'guest_options' => [2, 4, 6, 8, 10],
             'dp_percentage' => 50.00,
             'allow_full_payment' => true,
             'allow_dp_payment' => true,
-            'notification_phone' => '+62'.fake()->numerify('8##########'),
+            'reminder_enabled' => false,
+            'reminder_template' => null,
+            'reminder_template_language' => null,
+            'reminder_timing' => [],
+            'reminder_param_mapping' => [],
         ];
+    }
+
+    /**
+     * Indicate that reminders are enabled and configured.
+     */
+    public function withReminders(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'reminder_enabled' => true,
+            'reminder_template' => 'reservation_reminder',
+            'reminder_template_language' => 'id',
+            'reminder_timing' => [60, 1440],
+            'reminder_param_mapping' => ['1' => 'customer_name', '2' => 'reservation_date'],
+        ]);
     }
 
     /**

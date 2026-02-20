@@ -43,8 +43,22 @@ class ReservationReminderService
             return [];
         }
 
-        // Get the reservation datetime
-        $reservationDateTime = $reservation->date.' '.$reservation->time;
+        // Get the reservation datetime from actual reservation columns
+        // Use explicit formatting to avoid double datetime when reservation_date is already a Date object
+        $dateString = $reservation->reservation_date instanceof \Carbon\Carbon
+            ? $reservation->reservation_date->toDateString()
+            : (string) $reservation->reservation_date;
+
+        $timeString = (string) $reservation->reservation_time;
+        $reservationDateTime = trim($dateString.' '.$timeString);
+
+        if ($reservationDateTime === '') {
+            Log::warning('Reservation datetime missing, skipping reminder scheduling', [
+                'reservation_id' => $reservation->id,
+            ]);
+
+            return [];
+        }
 
         // Check if reservation is in the past
         if (\Carbon\Carbon::parse($reservationDateTime)->isPast()) {
