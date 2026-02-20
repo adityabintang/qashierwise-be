@@ -110,6 +110,13 @@ class ReservationConfigController extends Controller
             'available_products.*' => 'nullable|integer',
             'enable_menu_selection' => 'boolean',
             'require_menu_selection' => 'boolean',
+            // Reminder fields
+            'reminder_enabled' => 'boolean',
+            'reminder_template' => 'nullable|string|max:255',
+            'reminder_template_language' => 'nullable|string|max:10',
+            'reminder_param_mapping' => 'nullable|array',
+            'reminder_timing' => 'nullable|array',
+            'reminder_timing.*' => 'nullable|integer|min:1|max:10080',
         ]);
 
         // Check if config already exists for this store
@@ -153,6 +160,12 @@ class ReservationConfigController extends Controller
                 'available_products' => $validated['available_products'] ?? [],
                 'enable_menu_selection' => $validated['enable_menu_selection'] ?? false,
                 'require_menu_selection' => $validated['require_menu_selection'] ?? false,
+                // Reminder fields
+                'reminder_enabled' => $validated['reminder_enabled'] ?? false,
+                'reminder_template' => $validated['reminder_template'] ?? null,
+                'reminder_template_language' => $validated['reminder_template_language'] ?? null,
+                'reminder_param_mapping' => $validated['reminder_param_mapping'] ?? [],
+                'reminder_timing' => $validated['reminder_timing'] ?? [],
             ]);
 
             return response()->json([
@@ -209,6 +222,16 @@ class ReservationConfigController extends Controller
             'available_products.*' => 'nullable|integer',
             'enable_menu_selection' => 'boolean',
             'require_menu_selection' => 'boolean',
+            // Reminder fields
+            'reminder_enabled' => 'boolean',
+            'reminder_template' => 'nullable|string|max:255',
+            'reminder_template_language' => 'nullable|string|max:10',
+            'reminder_param_mapping' => 'nullable|array',
+            'reminder_timing' => 'nullable|array',
+            'reminder_timing.*' => 'nullable|integer|min:1|max:10080',
+            // Auto cleanup fields
+            'auto_cleanup_enabled' => 'boolean',
+            'auto_cleanup_reference_date' => 'nullable|date_format:Y-m-d',
         ]);
 
         $allowFullPayment = $validated['allow_full_payment'] ?? $config->allow_full_payment;
@@ -291,18 +314,25 @@ class ReservationConfigController extends Controller
     {
         $validated = $request->validated();
 
-        // Pass store_id to generator for capacity calculation
+        // Get the config to check auto_cleanup_enabled setting
+        $config = ReservationConfig::where('user_id', $request->user()->getEffectiveUserId())
+            ->where('store_id', $validated['store_id'])
+            ->first();
+
+        // Pass store_id and auto_cleanup_enabled to generator for capacity calculation
         $payload = array_merge($validated, [
             'store_id' => $validated['store_id'],
+            'auto_cleanup_enabled' => $config?->auto_cleanup_enabled ?? false,
         ]);
 
-        $slots = $generator->generate($payload);
+        $result = $generator->generate($payload);
 
         return response()->json([
             'success' => true,
             'data' => [
-                'slots' => $slots,
-                'count' => count($slots),
+                'slots' => $result['slots'],
+                'metadata' => $result['metadata'],
+                'count' => count($result['slots']),
             ],
         ]);
     }

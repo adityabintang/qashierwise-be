@@ -23,6 +23,7 @@ class ReservationResource extends JsonResource
             'customer_email' => $this->email,
             'reservation_date' => $this->reservation_date,
             'reservation_date_formatted' => $this->reservation_date?->format('d M Y'),
+            'reservation_time' => $this->reservation_time,
             'guest_count' => $this->guest_count,
             'notes' => $this->notes,
             'table' => [

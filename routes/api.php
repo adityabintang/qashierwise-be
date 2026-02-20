@@ -65,6 +65,9 @@ Route::post('/webhooks/resend', [ResendWebhookController::class, 'handleNotifica
 Route::post('/webhooks/midtrans/subscription', [\App\Http\Controllers\Api\MidtransWebhookController::class, 'handleSubscriptionWebhook'])
     ->middleware('throttle:60,1'); // Rate limit: 60 requests per minute
 
+// Reservation Reminder Webhook (called by Qstash)
+Route::post('/internal/reservation-reminder', \App\Http\Controllers\Api\Internal\ReservationReminderController::class.'@handle');
+
 // Health Check Endpoint (public for monitoring services)
 Route::get('/health/subscription', [\App\Http\Controllers\MonitoringDashboardController::class, 'status']);
 

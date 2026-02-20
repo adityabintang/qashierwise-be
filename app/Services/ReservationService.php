@@ -19,6 +19,7 @@ class ReservationService
     public function __construct(
         protected QrisService $qrisService,
         protected GoogleCalendarService $calendarService,
+        protected ReservationReminderService $reminderService,
     ) {}
 
     /**
@@ -143,6 +144,14 @@ class ReservationService
                 'notified_at' => now(),
             ]);
 
+            // Schedule reminders
+            $scheduledIds = $this->reminderService->scheduleReminders($reservation);
+            if (! empty($scheduledIds)) {
+                $reservation->update([
+                    'scheduled_reminder_jobs' => $scheduledIds,
+                ]);
+            }
+
             // Update table status to reserved
             if ($reservation->table_id) {
                 $reservation->table->update([
@@ -207,6 +216,9 @@ class ReservationService
                 'status' => Reservation::STATUS_CANCELLED,
                 'cancelled_reason' => $reason,
             ]);
+
+            // Cancel scheduled reminders
+            $this->reminderService->cancelReminders($reservation);
 
             // Free the table
             if ($reservation->table_id) {

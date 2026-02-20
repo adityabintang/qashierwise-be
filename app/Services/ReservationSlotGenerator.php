@@ -16,9 +16,13 @@ class ReservationSlotGenerator
      *   slot_duration: int,
      *   store_id?: int,
      *   capacity_per_slot?: int,
-     *   exclude_dates?: array<int, string>
+     *   exclude_dates?: array<int, string>,
+     *   auto_cleanup_enabled?: bool
      * } $payload
-     * @return array<int, array{datetime: string, capacity: int}>
+     * @return array{
+     *   slots: array<int, array{datetime: string, capacity: int}>,
+     *   metadata: array{start_date: string, end_date: string, generated_at: string, auto_cleanup_enabled: bool}
+     * }
      */
     public function generate(array $payload): array
     {
@@ -37,6 +41,7 @@ class ReservationSlotGenerator
             ->flip();
 
         $capacityPerSlot = $this->resolveCapacityPerSlot($payload, $storeId);
+        $autoCleanupEnabled = $payload['auto_cleanup_enabled'] ?? false;
 
         $slots = [];
         $currentDate = $startDate->copy();
@@ -64,7 +69,61 @@ class ReservationSlotGenerator
             $currentDate->addDay();
         }
 
-        return $slots;
+        return [
+            'slots' => $slots,
+            'metadata' => [
+                'start_date' => $startDate->toDateString(),
+                'end_date' => $endDate->toDateString(),
+                'generated_at' => now()->toIso8601String(),
+                'auto_cleanup_enabled' => $autoCleanupEnabled,
+            ],
+        ];
+    }
+
+    /**
+     * Clean up expired slots from available_slots.
+     *
+     * This removes slots that are before the current date when auto_cleanup is enabled.
+     *
+     * @param array<int, array{datetime: string, capacity: int}> $slots
+     * @param array{start_date?: string, end_date?: string, generated_at?: string, auto_cleanup_enabled?: bool}|null $metadata
+     * @return array{slots: array<int, array{datetime: string, capacity: int}>, metadata: array{start_date: string, end_date: string, generated_at: string, auto_cleanup_enabled: bool}|null}
+     */
+    public function cleanupExpiredSlots(array $slots, ?array $metadata = null): array
+    {
+        // If no metadata or auto_cleanup is not enabled, return as-is
+        if (! $metadata || ! ($metadata['auto_cleanup_enabled'] ?? false)) {
+            return [
+                'slots' => $slots,
+                'metadata' => $metadata,
+            ];
+        }
+
+        // Get today's date in the configured timezone
+        $timezone = 'Asia/Jakarta';
+        $today = Carbon::now($timezone)->startOfDay();
+
+        // Filter out slots that are before today
+        $filteredSlots = collect($slots)->filter(function ($slot) use ($today, $timezone) {
+            $slotDate = Carbon::parse($slot['datetime'], $timezone)->startOfDay();
+
+            return $slotDate->gte($today);
+        })->values()->all();
+
+        // Update metadata end_date if all slots for the reference date are removed
+        if (! empty($filteredSlots)) {
+            // Find the minimum date in remaining slots
+            $minDate = collect($filteredSlots)->map(function ($slot) use ($timezone) {
+                return Carbon::parse($slot['datetime'], $timezone)->toDateString();
+            })->min();
+
+            $metadata['start_date'] = $minDate;
+        }
+
+        return [
+            'slots' => $filteredSlots,
+            'metadata' => $metadata,
+        ];
     }
 
     /**

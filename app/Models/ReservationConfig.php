@@ -25,6 +25,7 @@ class ReservationConfig extends Model
         'store_id',
         'is_active',
         'available_slots',
+        'available_slots_metadata',
         'capacity_per_slot',
         'guest_options',
         'dp_percentage',
@@ -35,6 +36,16 @@ class ReservationConfig extends Model
         'available_products',
         'enable_menu_selection',
         'require_menu_selection',
+        // Reminder settings
+        'reminder_enabled',
+        'reminder_template',
+        'reminder_template_language',
+        'reminder_param_mapping',
+        'reminder_timing',
+        'scheduled_reminder_jobs',
+        // Auto cleanup settings
+        'auto_cleanup_enabled',
+        'auto_cleanup_reference_date',
     ];
 
     /**
@@ -47,6 +58,7 @@ class ReservationConfig extends Model
         return [
             'is_active' => 'boolean',
             'available_slots' => 'array',
+            'available_slots_metadata' => 'array',
             'capacity_per_slot' => 'integer',
             'guest_options' => 'array',
             'dp_percentage' => 'decimal:2',
@@ -57,6 +69,14 @@ class ReservationConfig extends Model
             'available_products' => 'array',
             'enable_menu_selection' => 'boolean',
             'require_menu_selection' => 'boolean',
+            // Reminder casts
+            'reminder_enabled' => 'boolean',
+            'reminder_param_mapping' => 'array',
+            'reminder_timing' => 'array',
+            'scheduled_reminder_jobs' => 'array',
+            // Auto cleanup casts
+            'auto_cleanup_enabled' => 'boolean',
+            'auto_cleanup_reference_date' => 'date',
         ];
     }
 
@@ -96,6 +116,35 @@ class ReservationConfig extends Model
                 'capacity' => $capacity,
             ];
         })->toArray();
+    }
+
+    /**
+     * Get available fields for reminder parameter mapping.
+     * These are the reservation fields that can be used as template parameters.
+     */
+    public static function getAvailableMappingFields(): array
+    {
+        return [
+            ['key' => 'customer_name', 'label' => 'Nama Pelanggan', 'type' => 'string'],
+            ['key' => 'customer_phone', 'label' => 'Nomor Telepon', 'type' => 'string'],
+            ['key' => 'reservation_date', 'label' => 'Tanggal Reservasi', 'type' => 'date'],
+            ['key' => 'reservation_time', 'label' => 'Waktu Reservasi', 'type' => 'time'],
+            ['key' => 'guest_count', 'label' => 'Jumlah Tamu', 'type' => 'number'],
+            ['key' => 'store_name', 'label' => 'Nama Toko', 'type' => 'string'],
+            ['key' => 'store_address', 'label' => 'Alamat Toko', 'type' => 'string'],
+            ['key' => 'reservation_notes', 'label' => 'Catatan Reservasi', 'type' => 'string'],
+        ];
+    }
+
+    /**
+     * Check if reminder is enabled and configured properly.
+     */
+    public function isReminderConfigured(): bool
+    {
+        return $this->reminder_enabled
+            && ! empty($this->reminder_template)
+            && ! empty($this->reminder_param_mapping)
+            && ! empty($this->reminder_timing);
     }
 
     /**

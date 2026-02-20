@@ -174,7 +174,10 @@
                                             <div class="text-sm font-medium text-gray-900" x-text="reservation.customer_name"></div>
                                             <div class="text-xs text-gray-500" x-text="reservation.customer_phone"></div>
                                         </td>
-                                        <td class="px-4 py-3 text-sm" x-text="reservation.reservation_date_formatted"></td>
+                                        <td class="px-4 py-3 text-sm">
+                                            <div x-text="reservation.reservation_date_formatted"></div>
+                                            <div class="text-xs text-gray-500" x-text="reservation.reservation_time || ''"></div>
+                                        </td>
                                         <td class="px-4 py-3 text-sm" x-text="reservation.guest_count + ' orang'"></td>
                                         <td class="px-4 py-3 text-sm" x-text="reservation.table?.name || '-'"></td>
                                         <td class="px-4 py-3">
@@ -261,6 +264,7 @@
                                     <div class="bg-gray-50 p-3 rounded space-y-1 text-sm">
                                         <div><span class="font-medium">Order ID:</span> <span class="font-mono" x-text="detailModal.data.order_id"></span></div>
                                         <div><span class="font-medium">Tanggal:</span> <span x-text="detailModal.data.reservation_date_formatted"></span></div>
+                                        <div><span class="font-medium">Waktu:</span> <span x-text="detailModal.data.reservation_time || '-'"></span></div>
                                         <div><span class="font-medium">Jumlah Tamu:</span> <span x-text="detailModal.data.guest_count + ' orang'"></span></div>
                                         <div><span class="font-medium">Meja:</span> <span x-text="detailModal.data.table?.name || '-'"></span></div>
                                         <div><span class="font-medium">Status:</span> <span x-text="detailModal.data.status_label"></span></div>

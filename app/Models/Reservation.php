@@ -64,6 +64,7 @@ class Reservation extends Model
         'calendar_event_id',
         'notified_at',
         'cancelled_reason',
+        'scheduled_reminder_jobs',
     ];
 
     /**
@@ -81,6 +82,7 @@ class Reservation extends Model
             'paid_amount' => 'decimal:2',
             'remaining_amount' => 'decimal:2',
             'notified_at' => 'datetime',
+            'scheduled_reminder_jobs' => 'array',
         ];
     }
 

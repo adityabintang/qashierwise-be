@@ -31,6 +31,14 @@ class ReservationConfigResource extends JsonResource
             'available_products' => $this->available_products,
             'enable_menu_selection' => $this->enable_menu_selection,
             'require_menu_selection' => $this->require_menu_selection,
+            // Reminder fields
+            'reminder_enabled' => $this->reminder_enabled,
+            'reminder_template' => $this->reminder_template,
+            'reminder_template_language' => $this->reminder_template_language,
+            'reminder_param_mapping' => $this->reminder_param_mapping,
+            'reminder_timing' => $this->reminder_timing,
+            'available_mapping_fields' => \App\Models\ReservationConfig::getAvailableMappingFields(),
+            'is_reminder_configured' => $this->isReminderConfigured(),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             'store' => $this->whenLoaded('store', function () {

@@ -9,9 +9,9 @@
         <!-- Header -->
         @include('components.dashboard-header', ['title' => __('whatsapp.messages_title'), 'description' => __('whatsapp.messages_subtitle')])
         <!-- Page Content -->
-        <main class="flex-1 p-4 md:p-6">
-            <div class="max-w-7xl mx-auto h-[calc(100vh-10rem)]" x-data="messagesManager()">
-                <div class="card flex h-full overflow-hidden">
+        <main class="flex-1 overflow-hidden flex flex-col">
+            <div class="flex-1 overflow-hidden" x-data="messagesManager()">
+                <div class="card flex overflow-hidden" style="height: calc(100vh - 8rem);">
                     <!-- Contacts Sidebar -->
                     <div
                         class="border-r border-[hsl(var(--border))] flex flex-col transition-all duration-300"
@@ -159,20 +159,41 @@
                                             <div class="max-w-[85%] md:max-w-[70%]">
                                                 <!-- Message Bubble - Adjusted padding for mobile (Requirements 4.5) -->
                                                 <div
-                                                    class="rounded-2xl px-3 py-1.5 md:px-4 md:py-2 shadow-sm"
+                                                    class="rounded-2xl px-3 py-1.5 md:px-4 md:py-2 shadow-sm overflow-hidden"
+                                                    style="overflow-wrap:anywhere;word-break:break-word;"
                                                     :class="message?.direction === 'outgoing' ? 'bg-[hsl(var(--primary))] text-white rounded-br-md' : 'bg-white border border-[hsl(var(--border))] rounded-bl-md'"
                                                 >
                                                     <!-- Text -->
-                                                    <div x-show="message?.type === 'text'">
-                                                        <p class="text-sm whitespace-pre-wrap" x-html="formatWhatsAppText(message?.content || message?.body)"></p>
+                                                    <div x-show="message?.type === 'text'" x-data="{ expanded: false }">
+                                                        <p
+                                                            class="text-sm break-words whitespace-pre-wrap overflow-hidden"
+                                                            :class="!expanded && (message?.content || message?.body || '').length > 300 ? 'line-clamp-4' : ''"
+                                                            x-html="formatWhatsAppText(message?.content || message?.body)"
+                                                        ></p>
+                                                        <button
+                                                            x-show="(message?.content || message?.body || '').length > 300"
+                                                            @click.stop="expanded = !expanded"
+                                                            class="text-xs mt-1 underline opacity-70 hover:opacity-100"
+                                                            x-text="expanded ? 'Show less' : 'Show more'"
+                                                        ></button>
                                                     </div>
                                                     <!-- Template -->
-                                                    <div x-show="message?.type === 'template'" class="text-sm">
+                                                    <div x-show="message?.type === 'template'" class="text-sm" x-data="{ expanded: false }">
                                                         <div class="flex items-center gap-2 mb-1 opacity-80">
                                                             <i class="fas fa-file-alt text-xs"></i>
                                                             <span class="text-xs font-medium">Template</span>
                                                         </div>
-                                                        <p class="whitespace-pre-wrap" x-html="formatWhatsAppText(message?.body || 'Template message')"></p>
+                                                        <p
+                                                            class="break-words whitespace-pre-wrap overflow-hidden"
+                                                            :class="!expanded && (message?.body || '').length > 300 ? 'line-clamp-4' : ''"
+                                                            x-html="formatWhatsAppText(message?.body || 'Template message')"
+                                                        ></p>
+                                                        <button
+                                                            x-show="(message?.body || '').length > 300"
+                                                            @click.stop="expanded = !expanded"
+                                                            class="text-xs mt-1 underline opacity-70 hover:opacity-100"
+                                                            x-text="expanded ? 'Show less' : 'Show more'"
+                                                        ></button>
                                                     </div>
                                                     <!-- Image -->
                                                     <div x-show="message?.type === 'image'">
@@ -1114,6 +1135,12 @@ function messagesManager() {
 
             // Quote: > text (at start of line)
             formatted = formatted.replace(/^&gt; (.+)$/gm, '<div class="border-l-2 border-current pl-2 opacity-80">$1</div>');
+
+            // Auto-link URLs: make them clickable and force word-break
+            formatted = formatted.replace(
+                /(https?:\/\/[^\s<>"']+)/g,
+                '<a href="$1" target="_blank" rel="noopener noreferrer" class="underline break-all" style="word-break:break-all;overflow-wrap:anywhere;">$1</a>'
+            );
 
             return formatted;
         },

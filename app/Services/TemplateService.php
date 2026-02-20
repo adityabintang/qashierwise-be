@@ -743,7 +743,17 @@ class TemplateService
         // Build components from form data
         $components = $this->buildComponents($data);
 
+        // Meta's update endpoint does NOT accept 'example' fields in components —
+        // those are for creation only. Stripping them avoids "Invalid parameter" errors.
+        $components = array_map(function (array $component): array {
+            unset($component['example']);
+
+            return $component;
+        }, $components);
+
         // Build API request payload for update
+        // WhatsApp API only accepts 'components' when updating via /{template-id}
+        // 'name' and 'language' are NOT accepted and cause "Invalid parameter" errors
         $payload = [
             'components' => $components,
         ];

@@ -111,6 +111,8 @@ class SecurityHeaders
                 'https://api.xendit.co',
             ]),
 
+            "media-src 'self' https:",
+
             "frame-src 'self' ".implode(' ', [
                 'https://www.google.com',
                 'https://maps.google.com',
