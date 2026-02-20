@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\Models\Reservation;
+use App\Models\WhatsAppContact;
+use App\Models\WhatsAppMessage;
 use App\Services\WhatsAppAccountService;
 use Exception;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -114,12 +116,33 @@ class SendReservationNotification implements ShouldQueue
                 false // Don't preview URLs
             );
 
+            $responseBody = $this->extractResponseBody($response);
+            $messageId = $this->extractMessageId($responseBody);
+
+            if ($messageId) {
+                $this->persistOutgoingMessage(
+                    userId: $this->reservation->user_id,
+                    phoneNumberId: (string) $whatsappAccount->phone_number_id,
+                    customerPhone: $customerPhone,
+                    messageId: $messageId,
+                    message: $message,
+                    status: 'sent'
+                );
+            } else {
+                Log::warning('Reservation notification sent but missing message_id in response', [
+                    'reservation_id' => $this->reservation->id,
+                    'order_id' => $this->reservation->order_id,
+                    'type' => $this->type,
+                    'customer_phone' => $customerPhone,
+                ]);
+            }
+
             Log::info('Reservation notification sent', [
                 'reservation_id' => $this->reservation->id,
                 'order_id' => $this->reservation->order_id,
                 'type' => $this->type,
                 'customer_phone' => $customerPhone,
-                'response' => $response,
+                'message_id' => $messageId,
             ]);
         } catch (Exception $e) {
             Log::error('Failed to send reservation notification', [
@@ -200,5 +223,77 @@ class SendReservationNotification implements ShouldQueue
         }
 
         return $phone;
+    }
+
+    protected function extractResponseBody(mixed $response): array
+    {
+        if (is_object($response)) {
+            if (method_exists($response, 'decodedBody')) {
+                $decoded = $response->decodedBody();
+
+                return is_array($decoded) ? $decoded : [];
+            }
+
+            if (method_exists($response, 'json')) {
+                $decoded = $response->json();
+
+                return is_array($decoded) ? $decoded : [];
+            }
+        }
+
+        return is_array($response) ? $response : [];
+    }
+
+    protected function extractMessageId(array $responseBody): ?string
+    {
+        $messageId = $responseBody['messages'][0]['id'] ?? null;
+
+        return is_string($messageId) && $messageId !== '' ? $messageId : null;
+    }
+
+    protected function persistOutgoingMessage(
+        int $userId,
+        string $phoneNumberId,
+        string $customerPhone,
+        string $messageId,
+        string $message,
+        string $status
+    ): void {
+        $contact = WhatsAppContact::withoutGlobalScopes()->firstOrCreate(
+            [
+                'user_id' => $userId,
+                'phone_number_id' => $phoneNumberId,
+                'wa_id' => $customerPhone,
+            ],
+            [
+                'name' => $this->reservation->customer_name ?: $customerPhone,
+            ]
+        );
+
+        WhatsAppMessage::withoutGlobalScopes()->updateOrCreate(
+            ['message_id' => $messageId],
+            [
+                'user_id' => $userId,
+                'phone_number_id' => $phoneNumberId,
+                'contact_id' => $contact->id,
+                'direction' => 'outgoing',
+                'type' => 'text',
+                'content' => $message,
+                'metadata' => [
+                    'source' => 'reservation_notification',
+                    'reservation_id' => $this->reservation->id,
+                    'order_id' => $this->reservation->order_id,
+                    'notification_type' => $this->type,
+                ],
+                'status' => $status,
+                'is_read' => true,
+                'sent_at' => now(),
+            ]
+        );
+
+        $contact->update([
+            'last_message_at' => now(),
+            'last_message_text' => $message,
+        ]);
     }
 }

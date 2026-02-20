@@ -1,5 +1,11 @@
 <?php
 
+$qstashBaseUrl = env('QSTASH_API_URL');
+
+if (empty($qstashBaseUrl) && ! empty(env('QSTASH_URL'))) {
+    $qstashBaseUrl = rtrim((string) env('QSTASH_URL'), '/').'/v2';
+}
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -19,7 +25,7 @@ return [
     |--------------------------------------------------------------------------
     | Default: http://127.0.0.1:8080/v2 (local) or https://qstash.upstash.io/v2 (cloud)
     */
-    'api_url' => env('QSTASH_API_URL', 'http://127.0.0.1:8080/v2'),
+    'api_url' => $qstashBaseUrl ?: 'http://127.0.0.1:8080/v2',
 
     /*
     |--------------------------------------------------------------------------

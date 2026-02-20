@@ -21,9 +21,9 @@ class QstashSchedulerService
 
     public function __construct()
     {
-        $this->token = config('services.qstash.token', config('whatsapp.qstash_token', env('QSTASH_TOKEN', '')));
+        $this->token = config('qstash.token', env('QSTASH_TOKEN', ''));
         // Qstash server URL - can be local or cloud
-        $this->baseUrl = config('services.qstash.api_url', env('QSTASH_API_URL', 'http://127.0.0.1:8080/v2'));
+        $this->baseUrl = config('qstash.api_url', env('QSTASH_API_URL', 'http://127.0.0.1:8080/v2'));
         // The callback URL is the endpoint that will handle the job
         $this->callbackUrl = config('app.url').'/api/internal/reservation-reminder';
     }
