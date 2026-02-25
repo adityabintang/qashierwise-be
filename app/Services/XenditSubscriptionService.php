@@ -222,7 +222,6 @@ class XenditSubscriptionService
                     'interval_count' => $durationDetails['months'],
                     'total_recurrence' => $durationDetails['months'], // Limited number of cycles
                 ],
-                'callback_url' => config('app.url').'/api/webhooks/xendit',
                 'success_return_url' => $successUrl,
                 'failure_return_url' => $cancelUrl,
             ];
