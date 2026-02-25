@@ -53,16 +53,16 @@ class QstashSchedulerService
             // Convert to Unix timestamp if it's a date string
             $timestamp = is_string($sendAt) ? strtotime($sendAt) : $sendAt;
 
-            // Format: POST /v2/publish/{callback_url} with schedule_at header
-            // Or use /v2/schedule/{callback_url} for scheduled jobs
+            // Upstash QStash API:
+            // - POST /v2/publish/{destination_url}
+            // - The request BODY is forwarded verbatim to the destination
+            // - Scheduling is controlled via the Upstash-Not-Before header (unix timestamp)
             $response = Http::withToken($this->token)
                 ->withHeaders([
                     'Content-Type' => 'application/json',
+                    'Upstash-Not-Before' => (string) $timestamp,
                 ])
-                ->post("{$this->baseUrl}/publish/".$this->callbackUrl, [
-                    'body' => json_encode($payload),
-                    'schedule_at' => $timestamp,
-                ]);
+                ->post("{$this->baseUrl}/publish/".$this->callbackUrl, $payload);
 
             if ($response->successful()) {
                 $data = $response->json();
