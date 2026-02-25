@@ -21,6 +21,8 @@ class Subscription extends Model
         'user_id',
         'midtrans_subscription_id',
         'midtrans_customer_id',
+        'xendit_subscription_id',
+        'xendit_customer_id',
         'plan_name',
         'status',
         'current_period_start',
@@ -120,5 +122,30 @@ class Subscription extends Model
     public function isExpired(): bool
     {
         return $this->getPeriodEnd()->isPast();
+    }
+
+    /**
+     * Check if this is a Xendit subscription.
+     */
+    public function isXendit(): bool
+    {
+        return ! empty($this->xendit_subscription_id);
+    }
+
+    /**
+     * Get the provider-specific subscription ID.
+     * Returns Xendit or Midtrans subscription ID based on which is set.
+     */
+    public function getProviderSubscriptionId(): ?string
+    {
+        return $this->xendit_subscription_id ?? $this->midtrans_subscription_id;
+    }
+
+    /**
+     * Get the provider-specific customer ID.
+     */
+    public function getProviderCustomerId(): ?string
+    {
+        return $this->xendit_customer_id ?? $this->midtrans_customer_id;
     }
 }

@@ -6,6 +6,7 @@ use App\DTOs\ErrorResponse;
 use App\Exceptions\InvalidWebhookException;
 use App\Http\Controllers\Controller;
 use App\Services\QrisService;
+use App\Services\SubscriptionService;
 use App\Services\WithdrawalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,7 +15,8 @@ use Illuminate\Support\Facades\Log;
 /**
  * Controller for handling Xendit webhook notifications.
  *
- * Receives and processes QR code payment, Payment Requests V2, Disbursement, and Payout status updates.
+ * Receives and processes QR code payment, Payment Requests V2, Disbursement, Payout status updates.
+ * Also handles Recurring/Subscription webhooks for subscription management.
  * Uses platform-level webhook token verification (XenPlatform).
  *
  * Xendit webhook formats:
@@ -22,6 +24,7 @@ use Illuminate\Support\Facades\Log;
  * - Payment Requests V2: { event: "payment.succeeded", data: { reference_id, status, payment_method, ... } }
  * - Disbursement (legacy): { id, external_id, amount, bank_code, status, ... }
  * - Payouts v2/v3: { event: "payout.succeeded"|"v3_payout.succeeded"|"payout-link.succeeded", data: { id, reference_id, status, ... } }
+ * - Recurring: { event: "recurring.plan.activated"|"recurring.cycle.succeeded", data: { id, reference_id, ... } }
  * - Account events: { event: "account.created"|"account.updated", data: { id, type, status, ... } }
  */
 class XenditWebhookController extends Controller
@@ -29,6 +32,7 @@ class XenditWebhookController extends Controller
     public function __construct(
         private QrisService $qrisService,
         private WithdrawalService $withdrawalService,
+        private SubscriptionService $subscriptionService,
     ) {}
 
     /**
@@ -99,6 +103,11 @@ class XenditWebhookController extends Controller
         // Payment request events
         if (str_starts_with($eventType, 'payment.') || $eventType === 'payment.succeeded') {
             return $this->handlePaymentRequestWebhook($data, $signature);
+        }
+
+        // Recurring/Subscription events
+        if (str_starts_with($eventType, 'recurring.')) {
+            return $this->handleRecurringWebhook($eventType, $data);
         }
 
         // Account events - just log and acknowledge
@@ -270,6 +279,52 @@ class XenditWebhookController extends Controller
         ]);
 
         return response()->json(['status' => 'ok'], 200);
+    }
+
+    /**
+     * Handle Recurring/Subscription webhook notification.
+     *
+     * Events handled:
+     * - recurring.plan.activated: Subscription activated after payment method linking
+     * - recurring.plan.inactivated: Subscription cancelled/stopped
+     * - recurring.cycle.succeeded: Payment successful for a cycle
+     * - recurring.cycle.failed: Payment failed for a cycle
+     */
+    protected function handleRecurringWebhook(string $eventType, array $data): JsonResponse
+    {
+        $subscriptionId = $data['id'] ?? null;
+        $referenceId = $data['reference_id'] ?? null;
+
+        Log::info('Xendit Recurring webhook received', [
+            'event' => $eventType,
+            'subscription_id' => $subscriptionId,
+            'reference_id' => $referenceId,
+            'status' => $data['status'] ?? null,
+        ]);
+
+        try {
+            $this->subscriptionService->processXenditWebhook([
+                'event' => $eventType,
+                'data' => $data,
+            ]);
+
+            Log::info('Xendit Recurring webhook processed successfully', [
+                'event' => $eventType,
+                'subscription_id' => $subscriptionId,
+            ]);
+
+            return response()->json(['status' => 'ok'], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Xendit Recurring webhook processing error', [
+                'event' => $eventType,
+                'subscription_id' => $subscriptionId,
+                'error' => $e->getMessage(),
+            ]);
+
+            // Return 200 to prevent Xendit from retrying for non-critical errors
+            return response()->json(['status' => 'ok'], 200);
+        }
     }
 
     /**

@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Subscription;
 use App\Models\SubscriptionPayment;
-use App\Services\MidtransSnapService;
 use App\Services\PlanConfig;
 use App\Services\SubscriptionService;
+use App\Services\XenditSubscriptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -16,13 +17,13 @@ use Illuminate\Support\Facades\Validator;
  * Controller for subscription-related API endpoints.
  *
  * Handles subscription status retrieval, checkout session creation,
- * and subscription management.
+ * and subscription management using Xendit Recurring.
  */
 class SubscriptionController extends Controller
 {
     public function __construct(
         private SubscriptionService $subscriptionService,
-        private MidtransSnapService $midtransSnapService,
+        private XenditSubscriptionService $xenditSubscriptionService,
         private PlanConfig $planConfig,
     ) {}
 
@@ -120,7 +121,7 @@ class SubscriptionController extends Controller
     }
 
     /**
-     * Create a checkout session for a subscription plan.
+     * Create a checkout session for a subscription plan using Xendit.
      */
     public function createCheckout(Request $request): JsonResponse
     {
@@ -146,16 +147,16 @@ class SubscriptionController extends Controller
         $duration = $request->input('duration');
         $promoCode = $request->input('promo_code');
 
-        Log::info('Checkout attempt', [
+        Log::info('Xendit checkout attempt', [
             'userId' => $user->id,
             'planId' => $planId,
             'duration' => $duration,
             'hasPromoCode' => ! empty($promoCode),
         ]);
 
-        // Check if Midtrans Snap service is configured
-        if (! $this->midtransSnapService->isConfigured()) {
-            Log::error('Midtrans Snap not configured', [
+        // Check if Xendit service is configured
+        if (! $this->xenditSubscriptionService->isConfigured()) {
+            Log::error('Xendit not configured', [
                 'userId' => $user->id,
                 'planId' => $planId,
                 'duration' => $duration,
@@ -164,7 +165,7 @@ class SubscriptionController extends Controller
             return response()->json([
                 'success' => false,
                 'error' => [
-                    'code' => 'MIDTRANS_CONFIG_MISSING',
+                    'code' => 'XENDIT_CONFIG_MISSING',
                     'message' => 'Subscription service is not configured',
                 ],
             ], 503);
@@ -215,58 +216,103 @@ class SubscriptionController extends Controller
             ]);
         }
 
-        // Create Snap token with final amount
-        $result = $this->midtransSnapService->createSubscriptionSnapToken(
-            $user,
-            $planId,
-            $duration,
-            $finalAmount,
-            $promoCodeData ? $promoCodeData->code : null
-        );
+        try {
+            // Create Xendit recurring plan
+            $result = $this->xenditSubscriptionService->createRecurringPlan(
+                $user,
+                $planId,
+                $duration
+            );
 
-        if ($result === null) {
-            Log::error('Failed to create Snap token', [
+            Log::info('Xendit checkout session created successfully', [
                 'userId' => $user->id,
                 'planId' => $planId,
                 'duration' => $duration,
+                'subscription_id' => $result['subscription_id'] ?? null,
+                'status' => $result['status'] ?? null,
+            ]);
+
+            $durationDetails = $plan['durations'][$duration];
+            $months = (int) ($durationDetails['months'] ?? 1);
+            $masterAdmin = $user->isMasterAdmin() ? $user : $user->getMasterAdmin();
+
+            if ($masterAdmin === null) {
+                Log::warning('Master admin not found, using current user for subscription ownership', [
+                    'userId' => $user->id,
+                    'planId' => $planId,
+                    'duration' => $duration,
+                ]);
+
+                $masterAdmin = $user;
+            }
+
+            $subscriptionPayload = [
+                'user_id' => $masterAdmin->id,
+                'xendit_subscription_id' => $result['subscription_id'] ?? null,
+                'plan_name' => $planId,
+                'status' => 'pending',
+                'current_period_start' => now(),
+                'current_period_end' => now()->addMonthsNoOverflow($months),
+                'metadata' => json_encode([
+                    'reference_id' => $result['reference_id'] ?? null,
+                    'amount' => $finalAmount,
+                    'original_amount' => $originalAmount,
+                    'discount' => $discountAmount,
+                    'currency' => $plan['currency'] ?? 'IDR',
+                    'plan_id' => $planId,
+                    'duration' => $duration,
+                    'duration_name' => $durationDetails['name'] ?? null,
+                    'months' => $months,
+                    'price_per_month' => $durationDetails['price_per_month'] ?? null,
+                    'xendit_status' => $result['status'] ?? null,
+                    'initiated_by_user_id' => $user->id,
+                    'initiated_by_email' => $user->email,
+                ]),
+            ];
+
+            $existingSubscription = $masterAdmin->subscription;
+
+            if ($existingSubscription !== null) {
+                $existingSubscription->update($subscriptionPayload);
+            } else {
+                Subscription::create($subscriptionPayload);
+            }
+
+            // Return checkout URL for user to complete payment
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'checkout_url' => $result['action_url'],
+                    'redirect_url' => $result['action_url'],
+                    'subscription_id' => $result['subscription_id'],
+                    'status' => $result['status'],
+                    'original_amount' => $originalAmount,
+                    'final_amount' => $finalAmount,
+                    'discount' => $discountAmount,
+                ],
+            ]);
+        } catch (\RuntimeException $e) {
+            Log::error('Failed to create Xendit checkout', [
+                'userId' => $user->id,
+                'planId' => $planId,
+                'duration' => $duration,
+                'error' => $e->getMessage(),
             ]);
 
             return response()->json([
                 'success' => false,
                 'error' => [
                     'code' => 'CHECKOUT_FAILED',
-                    'message' => 'Failed to create checkout session',
+                    'message' => 'Failed to create checkout session: '.$e->getMessage(),
                 ],
             ], 500);
         }
-
-        Log::info('Checkout session created successfully', [
-            'userId' => $user->id,
-            'planId' => $planId,
-            'duration' => $duration,
-            'originalAmount' => $originalAmount,
-            'finalAmount' => $finalAmount,
-            'hasPromoCode' => ! empty($promoCode),
-            'hasSnapToken' => ! empty($result['snap_token']),
-            'hasRedirectUrl' => ! empty($result['redirect_url']),
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'redirect_url' => $result['redirect_url'],
-                'snap_token' => $result['snap_token'],
-                'original_amount' => $originalAmount,
-                'final_amount' => $finalAmount,
-                'discount' => $discountAmount,
-            ],
-        ]);
     }
 
     /**
      * Cancel current subscription.
      *
-     * Cancels the user's active subscription via Midtrans.
+     * Cancels the user's active subscription via Xendit.
      * Access remains until the end of the current billing period.
      *
      * CRITICAL: Only master admins can cancel subscriptions.
@@ -300,38 +346,60 @@ class SubscriptionController extends Controller
             ], 404);
         }
 
-        if ($subscription->midtrans_subscription_id === null) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'INVALID_SUBSCRIPTION',
-                    'message' => 'Subscription does not have a valid Midtrans subscription ID',
-                ],
-            ], 400);
-        }
+        // Check if Xendit subscription ID exists
+        if (empty($subscription->xendit_subscription_id)) {
+            // Try Midtrans if Xendit is not set
+            if (empty($subscription->midtrans_subscription_id)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'INVALID_SUBSCRIPTION',
+                        'message' => 'Subscription does not have a valid subscription ID',
+                    ],
+                ], 400);
+            }
 
-        $midtransSubscriptionService = app(\App\Services\MidtransSubscriptionService::class);
+            // Use Midtrans to cancel
+            $midtransService = app(\App\Services\MidtransSubscriptionService::class);
+            if (! $midtransService->isConfigured()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'CONFIG_MISSING',
+                        'message' => 'Subscription service is not configured',
+                    ],
+                ], 503);
+            }
 
-        if (! $midtransSubscriptionService->isConfigured()) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'MIDTRANS_CONFIG_MISSING',
-                    'message' => 'Subscription service is not configured',
-                ],
-            ], 503);
-        }
+            $midtransService->cancelSubscription($subscription->midtrans_subscription_id);
+        } else {
+            // Use Xendit to cancel
+            if (! $this->xenditSubscriptionService->isConfigured()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'XENDIT_CONFIG_MISSING',
+                        'message' => 'Subscription service is not configured',
+                    ],
+                ], 503);
+            }
 
-        $result = $midtransSubscriptionService->cancelSubscription($subscription->midtrans_subscription_id);
+            try {
+                $this->xenditSubscriptionService->stopRecurringPlan($subscription->xendit_subscription_id);
+            } catch (\RuntimeException $e) {
+                Log::error('Failed to cancel Xendit subscription', [
+                    'subscription_id' => $subscription->xendit_subscription_id,
+                    'error' => $e->getMessage(),
+                ]);
 
-        if (! $result) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'CANCELLATION_FAILED',
-                    'message' => 'Failed to cancel subscription with Midtrans',
-                ],
-            ], 500);
+                return response()->json([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'CANCELLATION_FAILED',
+                        'message' => 'Failed to cancel subscription: '.$e->getMessage(),
+                    ],
+                ], 500);
+            }
         }
 
         $this->subscriptionService->cancelSubscription($subscription, now());
