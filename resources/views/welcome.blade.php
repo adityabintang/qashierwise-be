@@ -1358,13 +1358,7 @@
                 appliedPromo: null,
 
                 // Pricing data from config
-                plans: {
-                    pro: {
-                        '1_month': { price: 350000, perMonth: 350000, discount: 0, label: '1 Bulan' },
-                        '3_months': { price: 1050000, perMonth: 350000, discount: 0, label: '3 Bulan' },
-                        '1_year': { price: 3780000, perMonth: 315000, discount: 10, label: '1 Tahun' }
-                    }
-                },
+                plans: @js(config('subscription.plans')),
 
                 init() {
                     // Get auth token from localStorage (stored as 'token' during login)
@@ -1384,7 +1378,8 @@
                 },
 
                 getPrice(plan) {
-                    const basePrice = this.plans[plan][this.selectedDuration].price;
+                    const planData = this.plans?.[plan]?.durations?.[this.selectedDuration];
+                    const basePrice = planData?.price ?? 0;
                     // If promo is applied and matches this plan, show discounted price
                     if (this.appliedPromo && this.appliedPromo.plan === plan) {
                         return this.appliedPromo.final_amount;
@@ -1400,7 +1395,7 @@
                 },
 
                 getDiscount(plan) {
-                    return this.plans[plan][this.selectedDuration].discount;
+                    return this.plans?.[plan]?.durations?.[this.selectedDuration]?.discount ?? 0;
                 },
 
                 formatPrice(amount) {
@@ -1540,9 +1535,10 @@
 
                         const data = await response.json();
 
-                        if (response.ok && data.data?.redirect_url) {
-                            // Redirect to Midtrans payment page
-                            window.location.href = data.data.redirect_url;
+                        const checkoutUrl = data.data?.checkout_url ?? data.data?.redirect_url;
+
+                        if (response.ok && checkoutUrl) {
+                            window.location.href = checkoutUrl;
                         } else {
                             this.error = data.error?.message || 'Gagal membuat sesi checkout. Silakan coba lagi.';
                         }

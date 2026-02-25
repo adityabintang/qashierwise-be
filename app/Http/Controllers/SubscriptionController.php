@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\MidtransSubscriptionService;
 use App\Services\SubscriptionService;
+use App\Services\XenditSubscriptionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -18,7 +19,8 @@ class SubscriptionController extends Controller
 {
     public function __construct(
         private MidtransSubscriptionService $midtransService,
-        private SubscriptionService $subscriptionService
+        private SubscriptionService $subscriptionService,
+        private XenditSubscriptionService $xenditSubscriptionService,
     ) {}
 
     /**
@@ -336,6 +338,33 @@ class SubscriptionController extends Controller
             'userId' => $user->id,
             'queryParams' => $request->query(),
         ]);
+
+        $subscription = $user->getEffectiveSubscription();
+
+        if ($subscription !== null && ! empty($subscription->xendit_subscription_id)) {
+            $xenditPlan = $this->xenditSubscriptionService->getRecurringPlan($subscription->xendit_subscription_id);
+            $xenditStatus = strtoupper((string) ($xenditPlan['status'] ?? ''));
+
+            Log::info('Xendit status sync from success callback', [
+                'event' => 'checkout.success_xendit_sync',
+                'userId' => $user->id,
+                'subscriptionId' => $subscription->id,
+                'xenditSubscriptionId' => $subscription->xendit_subscription_id,
+                'xenditStatus' => $xenditStatus,
+            ]);
+
+            if ($xenditStatus === 'ACTIVE') {
+                $subscription->update([
+                    'status' => 'active',
+                ]);
+
+                return redirect()->route('dashboard')->with('success', 'Payment successful! Your subscription is now active.');
+            }
+
+            if ($xenditStatus === 'REQUIRES_ACTION' || $subscription->status === 'pending') {
+                return redirect()->route('dashboard')->with('info', 'Pembayaran sedang diproses. Status subscription akan aktif otomatis setelah dikonfirmasi oleh Xendit.');
+            }
+        }
 
         // The actual subscription creation/update will be handled by webhook
         // Redirect to dashboard with refresh parameter to force subscription reload
