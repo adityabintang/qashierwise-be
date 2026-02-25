@@ -66,8 +66,8 @@ class QstashSchedulerService
 
             if ($response->successful()) {
                 $data = $response->json();
-                // Response format: { "taskId": "..." } or { "scheduleId": "..." }
-                $scheduleId = $data['taskId'] ?? $data['scheduleId'] ?? null;
+                // Upstash QStash /v2/publish response: { "messageId": "msg_xxx" }
+                $scheduleId = $data['messageId'] ?? $data['taskId'] ?? $data['scheduleId'] ?? null;
 
                 Log::info('Reminder scheduled via Qstash', [
                     'reservation_id' => $reservationId,
