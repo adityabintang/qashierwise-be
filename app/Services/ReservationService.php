@@ -159,20 +159,19 @@ class ReservationService
                 ]);
             }
 
-            // Create Google Calendar event
-            try {
-                if ($reservation->user->google_calendar_refresh_token) {
+            // Create Google Calendar event (only if user has connected Google Calendar)
+            if ($reservation->user->google_calendar_refresh_token) {
+                try {
                     $this->calendarService->setAccessToken($reservation->user->google_calendar_refresh_token);
+                    $eventId = $this->calendarService->createEvent($reservation);
+                    $reservation->update(['calendar_event_id' => $eventId]);
+                } catch (Exception $e) {
+                    Log::error('Failed to create calendar event for reservation', [
+                        'reservation_id' => $reservation->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                    // Don't fail the confirmation if calendar creation fails
                 }
-
-                $eventId = $this->calendarService->createEvent($reservation);
-                $reservation->update(['calendar_event_id' => $eventId]);
-            } catch (Exception $e) {
-                Log::error('Failed to create calendar event for reservation', [
-                    'reservation_id' => $reservation->id,
-                    'error' => $e->getMessage(),
-                ]);
-                // Don't fail the confirmation if calendar creation fails
             }
 
             Log::info('Reservation confirmed', [
