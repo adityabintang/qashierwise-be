@@ -85,8 +85,9 @@ class SendReservationReminder implements ShouldQueue
             return;
         }
 
-        // Get the template
-        $template = WhatsAppTemplate::where('name', $config->reminder_template)
+        // Get the template (bypass global auth scope — jobs run without an authenticated user)
+        $template = WhatsAppTemplate::withoutGlobalScope('userTemplates')
+            ->where('name', $config->reminder_template)
             ->where('whatsapp_account_id', function ($query) use ($reservation) {
                 $query->select('id')
                     ->from('whatsapp_accounts')
@@ -128,12 +129,12 @@ class SendReservationReminder implements ShouldQueue
             'store_address' => $reservation->store?->address ?? '',
             'reservation_notes' => $reservation->notes ?? '',
             'table_name' => $reservation->table?->number ?? '',
-            'reservation_code' => 'RSV-' . $reservation->id,
+            'reservation_code' => 'RSV-'.$reservation->id,
         ];
 
         // Convert mapping from array format ["field1","field2"] to indexed format {"1":"field1","2":"field2"}
         $paramMapping = $config->reminder_param_mapping;
-        if (is_array($paramMapping) && !empty($paramMapping) && is_numeric(array_keys($paramMapping)[0] ?? null)) {
+        if (is_array($paramMapping) && ! empty($paramMapping) && is_numeric(array_keys($paramMapping)[0] ?? null)) {
             // Array format - convert to indexed format
             $indexedMapping = [];
             foreach ($paramMapping as $index => $field) {
