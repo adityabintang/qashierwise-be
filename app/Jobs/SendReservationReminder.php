@@ -119,9 +119,20 @@ class SendReservationReminder implements ShouldQueue
         }
 
         // Prepare reservation data for parameter mapping
+        $statusLabels = [
+            'pending_payment' => 'Menunggu Pembayaran',
+            'confirmed' => 'Dikonfirmasi',
+            'completed' => 'Selesai',
+            'cancelled' => 'Dibatalkan',
+        ];
+        $paymentTypeLabels = [
+            'dp' => 'DP',
+            'full' => 'Lunas',
+        ];
         $reservationData = [
             'customer_name' => $reservation->customer_name,
             'customer_phone' => $reservation->phone,
+            'customer_email' => $reservation->email ?? '',
             'reservation_date' => \Carbon\Carbon::parse($reservation->reservation_date)->format('d/m/Y'),
             'reservation_time' => $reservation->reservation_time,
             'guest_count' => $reservation->guest_count,
@@ -129,7 +140,13 @@ class SendReservationReminder implements ShouldQueue
             'store_address' => $reservation->store?->address ?? '',
             'reservation_notes' => $reservation->notes ?? '',
             'table_name' => $reservation->table?->number ?? '',
-            'reservation_code' => 'RSV-'.$reservation->id,
+            'reservation_code' => $reservation->order_id ?? 'RSV-'.$reservation->id,
+            'reservation_datetime' => \Carbon\Carbon::parse($reservation->reservation_date)->locale('id')->isoFormat('D MMM YYYY').' '.$reservation->reservation_time.' WIB',
+            'status' => $statusLabels[$reservation->status] ?? $reservation->status,
+            'payment_type' => $paymentTypeLabels[$reservation->payment_type] ?? $reservation->payment_type ?? '',
+            'total_amount' => $reservation->total_amount ? number_format((float) $reservation->total_amount, 0, ',', '.') : '',
+            'paid_amount' => $reservation->paid_amount ? number_format((float) $reservation->paid_amount, 0, ',', '.') : '',
+            'remaining_amount' => $reservation->remaining_amount ? number_format((float) $reservation->remaining_amount, 0, ',', '.') : '',
         ];
 
         // Convert mapping from array format ["field1","field2"] to indexed format {"1":"field1","2":"field2"}

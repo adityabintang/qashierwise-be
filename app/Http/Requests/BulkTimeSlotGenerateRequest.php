@@ -47,26 +47,31 @@ class BulkTimeSlotGenerateRequest extends FormRequest
      */
     public function messages(): array
     {
+        $startDate = $this->input('start_date', 'tanggal mulai');
+        $endDate = $this->input('end_date', 'tanggal akhir');
+        $openingTime = $this->input('opening_time', 'jam mulai');
+        $closingTime = $this->input('closing_time', 'jam selesai');
+
         return [
             'store_id.required' => 'Toko wajib dipilih.',
             'store_id.exists' => 'Toko tidak valid.',
             'start_date.required' => 'Tanggal mulai wajib diisi.',
-            'start_date.date_format' => 'Format tanggal mulai tidak valid.',
+            'start_date.date_format' => 'Format tanggal mulai tidak valid. Gunakan format YYYY-MM-DD.',
             'end_date.required' => 'Tanggal akhir wajib diisi.',
-            'end_date.date_format' => 'Format tanggal akhir tidak valid.',
-            'end_date.after_or_equal' => 'Tanggal akhir harus sama atau setelah tanggal mulai.',
+            'end_date.date_format' => 'Format tanggal akhir tidak valid. Gunakan format YYYY-MM-DD.',
+            'end_date.after_or_equal' => "Tanggal akhir ({$endDate}) harus sama atau setelah tanggal mulai ({$startDate}).",
             'opening_time.required' => 'Jam mulai wajib diisi.',
-            'opening_time.date_format' => 'Format jam mulai tidak valid.',
+            'opening_time.date_format' => 'Format jam mulai tidak valid. Gunakan format HH:MM.',
             'closing_time.required' => 'Jam selesai wajib diisi.',
-            'closing_time.date_format' => 'Format jam selesai tidak valid.',
-            'closing_time.after' => 'Jam selesai harus setelah jam mulai.',
+            'closing_time.date_format' => 'Format jam selesai tidak valid. Gunakan format HH:MM.',
+            'closing_time.after' => "Jam selesai ({$closingTime}) harus setelah jam mulai ({$openingTime}).",
             'slot_duration.required' => 'Durasi slot wajib dipilih.',
             'slot_duration.in' => 'Durasi slot harus 30, 60, atau 120 menit.',
             'capacity_per_slot.required' => 'Kapasitas per slot wajib diisi.',
             'capacity_per_slot.integer' => 'Kapasitas per slot harus berupa angka.',
             'capacity_per_slot.min' => 'Kapasitas per slot minimal 1.',
             'capacity_per_slot.max' => 'Kapasitas per slot maksimal 100.',
-            'exclude_dates.*.date_format' => 'Format tanggal pengecualian tidak valid.',
+            'exclude_dates.*.date_format' => 'Format tanggal pengecualian tidak valid. Gunakan format YYYY-MM-DD.',
         ];
     }
 }

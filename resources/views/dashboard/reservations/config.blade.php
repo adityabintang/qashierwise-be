@@ -4,7 +4,7 @@
 
 @section('content')
 <!-- Toast Notification Container -->
-<div id="toast-container" class="fixed top-4 right-4 z-[100] flex flex-col gap-2" x-data="toastManager()">
+<div id="toast-container" class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2" x-data="toastManager()">
     <template x-for="toast in toasts" :key="toast.id">
         <div x-show="toast.visible"
              x-transition:enter="transition ease-out duration-300"
@@ -541,12 +541,21 @@
                                                             <option value="">Pilih field sumber...</option>
                                                             <option value="customer_name">Nama Pelanggan</option>
                                                             <option value="customer_phone">Nomor WhatsApp</option>
+                                                            <option value="customer_email">Email Pelanggan</option>
+                                                            <option value="reservation_datetime">Tanggal &amp; Jam Reservasi</option>
                                                             <option value="reservation_date">Tanggal Reservasi</option>
                                                             <option value="reservation_time">Jam Reservasi</option>
                                                             <option value="guest_count">Jumlah Tamu</option>
                                                             <option value="table_name">Nama Meja</option>
                                                             <option value="store_name">Nama Toko</option>
+                                                            <option value="store_address">Alamat Toko</option>
                                                             <option value="reservation_code">Kode Reservasi</option>
+                                                            <option value="status">Status Reservasi</option>
+                                                            <option value="payment_type">Jenis Pembayaran</option>
+                                                            <option value="total_amount">Total Tagihan</option>
+                                                            <option value="paid_amount">Jumlah Dibayar</option>
+                                                            <option value="remaining_amount">Sisa Tagihan</option>
+                                                            <option value="reservation_notes">Catatan Reservasi</option>
                                                         </select>
                                                     </div>
                                                 </template>
@@ -1203,12 +1212,21 @@ function configApp() {
             const fieldLabels = {
                 customer_name: 'Nama Pelanggan',
                 customer_phone: 'Nomor WhatsApp',
+                customer_email: 'Email Pelanggan',
+                reservation_datetime: 'Tanggal & Jam Reservasi',
                 reservation_date: 'Tanggal Reservasi',
                 reservation_time: 'Jam Reservasi',
                 guest_count: 'Jumlah Tamu',
                 table_name: 'Nama Meja',
                 store_name: 'Nama Toko',
+                store_address: 'Alamat Toko',
                 reservation_code: 'Kode Reservasi',
+                status: 'Status Reservasi',
+                payment_type: 'Jenis Pembayaran',
+                total_amount: 'Total Tagihan',
+                paid_amount: 'Jumlah Dibayar',
+                remaining_amount: 'Sisa Tagihan',
+                reservation_notes: 'Catatan Reservasi',
             };
 
             let body = template.body || '';
@@ -1542,8 +1560,23 @@ function configApp() {
 
                 const data = await response.json();
                 if (!response.ok) {
-                    const errorMessage = data?.message || 'Gagal membuat slot.';
-                    Alpine.store('toast').addToast(errorMessage, 'error');
+                    // Check for validation errors (422 response)
+                    if (data.errors && typeof data.errors === 'object') {
+                        // Build error message from validation errors
+                        const errorMessages = [];
+                        for (const [field, messages] of Object.entries(data.errors)) {
+                            if (Array.isArray(messages)) {
+                                errorMessages.push(...messages);
+                            } else {
+                                errorMessages.push(messages);
+                            }
+                        }
+                        const errorMessage = errorMessages.join(' ');
+                        Alpine.store('toast').addToast(errorMessage, 'error');
+                    } else {
+                        const errorMessage = data?.message || 'Gagal membuat slot.';
+                        Alpine.store('toast').addToast(errorMessage, 'error');
+                    }
                     return;
                 }
 
@@ -1615,12 +1648,21 @@ function configApp() {
                 const sampleValues = {
                     customer_name: 'Pelanggan Tes',
                     customer_phone: '08123456789',
+                    customer_email: 'pelanggan@email.com',
+                    reservation_datetime: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + ' 14:00 WIB',
                     reservation_date: new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
                     reservation_time: '14:00',
                     guest_count: '4',
                     table_name: 'Meja A1',
                     store_name: this.form.store_name || 'Toko Anda',
-                    reservation_code: 'RSV-001',
+                    store_address: 'Jl. Contoh No. 1',
+                    reservation_code: 'RSV-1234567890-AB12CD',
+                    status: 'Dikonfirmasi',
+                    payment_type: 'DP',
+                    total_amount: '500.000',
+                    paid_amount: '250.000',
+                    remaining_amount: '250.000',
+                    reservation_notes: 'Minta tempat dekat jendela',
                 };
 
                 const paramKeys = this.currentTemplateParams.length > 0
@@ -1793,8 +1835,8 @@ document.addEventListener('alpine:init', () => {
 
 document.addEventListener('show-toast', (e) => {
     const container = document.querySelector('[x-data="toastManager()"]');
-    if (container && container.__x) {
-        container.__x.$data.addToast(e.detail.message, e.detail.type);
+    if (container) {
+        Alpine.$data(container).addToast(e.detail.message, e.detail.type);
     }
 });
 </script>
