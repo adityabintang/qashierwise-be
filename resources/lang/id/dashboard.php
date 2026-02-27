@@ -244,4 +244,15 @@ return [
     'awaiting_confirmation' => 'Menunggu konfirmasi',
     'total_reservations' => 'Total reservasi',
 
+    // Reservation Config
+    'reservation' => [
+        'config_updated' => 'Reservation Configuration Successfully updated',
+        'config_created' => 'Reservation Configuration Successfully created',
+        'config_update_failed' => 'Failed to update Reservation Configuration',
+        'config_create_failed' => 'Failed to create Reservation Configuration',
+        'config_deleted' => 'Reservation Configuration Successfully deleted',
+        'config_delete_failed' => 'Failed to delete Reservation Configuration',
+        'config_already_exists' => 'Reservation Configuration already exists for this store',
+    ],
+
 ];

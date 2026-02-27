@@ -1194,14 +1194,16 @@ function configApp() {
                 // Generate param placeholders like {{1}}, {{2}}, etc.
                 this.currentTemplateParams = Array.from({length: paramCount}, (_, i) => String(i + 1));
 
-                // Initialize empty mappings for new params
+                // Rebuild mapping with only current template's params, preserving existing values
+                const prevMapping = this.form.reminder_param_mapping;
+                const freshMapping = {};
                 this.currentTemplateParams.forEach(param => {
-                    if (!this.form.reminder_param_mapping[param]) {
-                        this.form.reminder_param_mapping[param] = '';
-                    }
+                    freshMapping[param] = prevMapping[param] || '';
                 });
+                this.form.reminder_param_mapping = freshMapping;
             } else {
                 this.currentTemplateParams = [];
+                this.form.reminder_param_mapping = {};
             }
         },
 
@@ -1392,9 +1394,16 @@ function configApp() {
                     : '/api/reservation-config';
                 const method = this.configId ? 'PUT' : 'POST';
 
+                // Filter reminder_param_mapping to only include keys for the current template's params
+                const filteredMapping = {};
+                this.currentTemplateParams.forEach(param => {
+                    filteredMapping[param] = this.form.reminder_param_mapping[param] || '';
+                });
+
                 const payload = {
                     ...this.form,
-                    store_id: this.selectedStoreId
+                    store_id: this.selectedStoreId,
+                    reminder_param_mapping: filteredMapping
                 };
 
                 const response = await fetch(url, {
