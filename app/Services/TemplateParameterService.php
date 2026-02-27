@@ -72,24 +72,38 @@ class TemplateParameterService
 
     /**
      * Build body parameters from reservation data based on mapping.
+     * Params are returned ordered by their position in the template.
      *
-     * @param  array  $paramMapping  Mapping from template index to reservation field
+     * @param  array  $paramMapping  Mapping from param name/index to reservation field
      * @param  array  $reservationData  Reservation data array
-     * @return array Array of parameter values in correct order
+     * @param  WhatsAppTemplate|null  $template  Template to derive parameter order from
+     * @return array Array of parameter values in template order
      */
-    public function buildParameters(array $paramMapping, array $reservationData): array
+    public function buildParameters(array $paramMapping, array $reservationData, ?WhatsAppTemplate $template = null): array
     {
-        $params = [];
+        if ($template !== null) {
+            // Order parameters by their position in the template body
+            $structure = $this->getParameterStructure($template);
+            $bodyParams = array_filter($structure, fn ($p) => $p['type'] === 'body');
+            usort($bodyParams, fn ($a, $b) => $a['index'] - $b['index']);
 
-        // Sort by index to maintain order
-        ksort($paramMapping);
+            $params = [];
+            foreach ($bodyParams as $param) {
+                $key = $param['name'];
+                $field = $paramMapping[$key] ?? $paramMapping[(string) $param['index']] ?? '';
+                $params[] = $this->getFieldValue($field, $reservationData);
+            }
 
-        foreach ($paramMapping as $index => $field) {
-            $value = $this->getFieldValue($field, $reservationData);
-            $params[$index] = $value;
+            return $params;
         }
 
-        // Return values in order (1, 2, 3, ...)
+        // Legacy path: sort by key and return ordered values
+        ksort($paramMapping);
+        $params = [];
+        foreach ($paramMapping as $index => $field) {
+            $params[$index] = $this->getFieldValue($field, $reservationData);
+        }
+
         return array_values($params);
     }
 
@@ -124,8 +138,13 @@ class TemplateParameterService
      */
     public function validateMapping(WhatsAppTemplate $template, array $paramMapping): array
     {
-        $requiredCount = $this->getParameterCount($template);
+        $structure = $this->getParameterStructure($template);
+        $bodyParams = array_filter($structure, fn ($p) => $p['type'] === 'body');
+        $requiredParams = array_values(array_column($bodyParams, 'name')); // e.g. ['nama', 'order_id'] or ['1', '2']
+
+        $requiredCount = count($requiredParams);
         $providedCount = count($paramMapping);
+        $providedKeys = array_map('strval', array_keys($paramMapping));
 
         $errors = [];
 
@@ -133,11 +152,10 @@ class TemplateParameterService
             $errors[] = "Template membutuhkan {$requiredCount} parameter, tapi mapping menyediakan {$providedCount}";
         }
 
-        // Check that all indices are present
-        $indices = array_keys($paramMapping);
-        for ($i = 1; $i <= $requiredCount; $i++) {
-            if (! in_array((string) $i, $indices) && ! in_array($i, $indices)) {
-                $errors[] = "Parameter ke-{$i} tidak ada dalam mapping";
+        foreach ($requiredParams as $paramName) {
+            // Accept both the exact name and numeric fallback (e.g. '1', '2')
+            if (! in_array((string) $paramName, $providedKeys, true)) {
+                $errors[] = "Parameter '{$paramName}' tidak ada dalam mapping";
             }
         }
 

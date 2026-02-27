@@ -1190,9 +1190,21 @@ function configApp() {
         onTemplateChange() {
             const template = this.templates.find(t => t.name === this.form.reminder_template);
             if (template) {
-                const paramCount = template.body_examples?.length || 0;
-                // Generate param placeholders like {{1}}, {{2}}, etc.
-                this.currentTemplateParams = Array.from({length: paramCount}, (_, i) => String(i + 1));
+                // Extract actual param names/keys from template body
+                // Use RegExp constructor to avoid Blade parsing {{}} as PHP
+                const varRegex = new RegExp('{' + '{' + '([^}]+)' + '}' + '}', 'g');
+                const body = template.body || '';
+                const params = [];
+                let m;
+                while ((m = varRegex.exec(body)) !== null) {
+                    params.push(m[1]); // e.g. 'nama', 'order_id', or '1', '2'
+                }
+                // Fallback to counting body_examples if body is unavailable
+                if (params.length === 0) {
+                    const paramCount = template.body_examples?.length || 0;
+                    for (let i = 1; i <= paramCount; i++) { params.push(String(i)); }
+                }
+                this.currentTemplateParams = params;
 
                 // Rebuild mapping with only current template's params, preserving existing values
                 const prevMapping = this.form.reminder_param_mapping;
@@ -1241,7 +1253,8 @@ function configApp() {
                 const style = mappedField
                     ? 'background:#bbf7d0;color:#166534;font-weight:700;padding:1px 5px;border-radius:4px;font-size:0.8em;'
                     : 'background:#f3f4f6;color:#9ca3af;font-weight:600;padding:1px 5px;border-radius:4px;font-size:0.8em;border:1px dashed #d1d5db;';
-                const placeholder = '{' + '{' + (index + 1) + '}' + '}';
+                // Use the actual param name/key as the placeholder (works for both {{1}} and {{nama}})
+                const placeholder = '{' + '{' + param + '}' + '}';
                 body = body.split(placeholder).join('<span style="' + style + '">' + label + '</span>');
             });
 
