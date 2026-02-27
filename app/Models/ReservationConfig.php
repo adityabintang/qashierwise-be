@@ -133,6 +133,15 @@ class ReservationConfig extends Model
             ['key' => 'store_name', 'label' => 'Nama Toko', 'type' => 'string'],
             ['key' => 'store_address', 'label' => 'Alamat Toko', 'type' => 'string'],
             ['key' => 'reservation_notes', 'label' => 'Catatan Reservasi', 'type' => 'string'],
+            ['key' => 'table_name', 'label' => 'Nomor Meja', 'type' => 'string'],
+            ['key' => 'reservation_code', 'label' => 'Kode Reservasi', 'type' => 'string'],
+            ['key' => 'reservation_datetime', 'label' => 'Tanggal & Jam Reservasi', 'type' => 'string'],
+            ['key' => 'status', 'label' => 'Status Reservasi', 'type' => 'string'],
+            ['key' => 'customer_email', 'label' => 'Email Pelanggan', 'type' => 'string'],
+            ['key' => 'payment_type', 'label' => 'Jenis Pembayaran', 'type' => 'string'],
+            ['key' => 'total_amount', 'label' => 'Total Tagihan', 'type' => 'string'],
+            ['key' => 'paid_amount', 'label' => 'Jumlah Dibayar', 'type' => 'string'],
+            ['key' => 'remaining_amount', 'label' => 'Sisa Tagihan', 'type' => 'string'],
         ];
     }
 
