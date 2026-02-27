@@ -149,21 +149,13 @@ class SendReservationReminder implements ShouldQueue
             'remaining_amount' => $reservation->remaining_amount ? number_format((float) $reservation->remaining_amount, 0, ',', '.') : '',
         ];
 
-        // Convert mapping from array format ["field1","field2"] to indexed format {"1":"field1","2":"field2"}
-        $paramMapping = $config->reminder_param_mapping;
-        if (is_array($paramMapping) && ! empty($paramMapping) && is_numeric(array_keys($paramMapping)[0] ?? null)) {
-            // Array format - convert to indexed format
-            $indexedMapping = [];
-            foreach ($paramMapping as $index => $field) {
-                $indexedMapping[$index + 1] = $field;  // 0-based to 1-based
-            }
-            $paramMapping = $indexedMapping;
-        }
+        $paramMapping = $config->reminder_param_mapping ?? [];
 
-        // Build the parameters based on mapping
+        // Build the parameters based on mapping, ordered by template structure
         $bodyParams = $parameterService->buildParameters(
             $paramMapping,
-            $reservationData
+            $reservationData,
+            $template
         );
 
         // Validate parameters
