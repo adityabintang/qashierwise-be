@@ -534,7 +534,7 @@
                                                 <template x-for="(param, index) in currentTemplateParams" :key="index">
                                                     <div class="flex items-center gap-3">
                                                         <span class="inline-flex items-center rounded-md bg-purple-50 border border-purple-200 px-2.5 py-1.5 font-mono text-xs font-semibold text-purple-600 whitespace-nowrap flex-shrink-0"
-                                                              x-text="'{{ ' + param + ' }}'"></span>
+                                                              x-text="String.fromCharCode(123,123) + ' ' + param + ' ' + String.fromCharCode(125,125)"></span>
                                                         <i class="fas fa-arrow-right text-xs text-muted-foreground/50 flex-shrink-0"></i>
                                                         <select x-model="form.reminder_param_mapping[param]"
                                                                 class="flex-1 min-w-0 rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400 transition-colors">
@@ -838,6 +838,7 @@
 </div>
 
 <script>
+@verbatim
 function toastManager() {
     return {
         toasts: [],
@@ -1861,6 +1862,7 @@ document.addEventListener('show-toast', (e) => {
         Alpine.$data(container).addToast(e.detail.message, e.detail.type);
     }
 });
+@endverbatim
 </script>
 
 <style>

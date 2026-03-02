@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Models\Reservation;
 use App\Models\ReservationConfig;
+use App\Models\WhatsAppContact;
+use App\Models\WhatsAppMessage;
 use App\Models\WhatsAppTemplate;
 use App\Services\TemplateParameterService;
 use App\Services\WhatsAppAccountService;
@@ -217,6 +219,9 @@ class SendReservationReminder implements ShouldQueue
                 'customer_phone' => $reservation->phone,
                 'template' => $config->reminder_template,
             ]);
+
+            // Save message to database for dashboard display
+            $this->saveMessageToDatabase($reservation, $whatsappAccount, $config, $response);
         } catch (\Exception $e) {
             Log::error('Failed to send reservation reminder', [
                 'reservation_id' => $this->reservationId,
@@ -225,5 +230,76 @@ class SendReservationReminder implements ShouldQueue
 
             throw $e;
         }
+    }
+
+    /**
+     * Save the sent message to the database for dashboard display.
+     */
+    protected function saveMessageToDatabase(
+        $reservation,
+        $whatsappAccount,
+        $config,
+        $response
+    ): void {
+        // Normalize phone number (remove + prefix if present)
+        $normalizedPhone = $reservation->phone;
+        if (str_starts_with($normalizedPhone, '+')) {
+            $normalizedPhone = substr($normalizedPhone, 1);
+        }
+
+        // Find or create contact
+        $contact = WhatsAppContact::firstOrCreate(
+            [
+                'whatsapp_account_id' => $whatsappAccount->id,
+                'phone' => $normalizedPhone,
+            ],
+            [
+                'name' => $reservation->customer_name,
+                'wa_id' => $normalizedPhone,
+            ]
+        );
+
+        // Extract message ID from response
+        $messageId = null;
+        if (isset($response['messages']) && is_array($response['messages']) && !empty($response['messages'])) {
+            $messageId = $response['messages'][0]['id'] ?? null;
+        }
+
+        // Prepare content for template message
+        $contentData = [
+            'template_name' => $config->reminder_template,
+            'language' => $config->reminder_template_language,
+            'reservation_id' => $reservation->id,
+        ];
+
+        // Create the message record
+        WhatsAppMessage::create([
+            'user_id' => $reservation->user_id,
+            'phone_number_id' => $whatsappAccount->phone_number_id,
+            'contact_id' => $contact->id,
+            'message_id' => $messageId,
+            'direction' => 'outgoing',
+            'status' => 'sent',
+            'type' => 'template',
+            'content' => json_encode($contentData),
+            'metadata' => [
+                'template_name' => $config->reminder_template,
+                'template_language' => $config->reminder_template_language,
+                'reservation_id' => $reservation->id,
+            ],
+            'sent_at' => now(),
+        ]);
+
+        // Update contact's last message info
+        $contact->update([
+            'last_message_at' => now(),
+            'last_message_text' => '📋 Template: ' . ($config->reminder_template ?? 'Template'),
+        ]);
+
+        Log::info('Reservation reminder message saved to database', [
+            'reservation_id' => $this->reservationId,
+            'contact_id' => $contact->id,
+            'message_id' => $messageId,
+        ]);
     }
 }
