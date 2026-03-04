@@ -42,12 +42,8 @@
         </script>
         <link rel="stylesheet" href="{{ asset('css/app-fallback.css') }}">
     @else
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @vite(['resources/css/app.css', 'resources/css/fontawesome.css', 'resources/js/app.js'])
     @endif
-
-    <!-- Font Awesome - Non-blocking -->
-    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
 
     <!-- Alpine.js - Deferred -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
