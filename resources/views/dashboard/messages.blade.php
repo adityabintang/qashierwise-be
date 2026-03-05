@@ -1,4 +1,5 @@
 @extends('layouts.app')
+@include('components.dashboard-scripts')
 @section('title', __('dashboard.messages_title'))
 @section('content')
 <div x-data="messagesApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
