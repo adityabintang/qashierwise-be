@@ -175,7 +175,7 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<!-- ApexCharts is now loaded via Vite bundle (window.ApexCharts) -->
 <script>
 function reportsApp() {
     return {

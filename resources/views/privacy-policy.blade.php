@@ -5,33 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('legal.privacy_policy.meta_title') }}</title>
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#4910ce',
-                    }
-                }
-            }
-        }
-    </script>
-
-    <!-- Vite Assets (includes self-hosted Font Awesome) -->
+    <!-- Vite Assets (Tailwind CSS v4 + JS bundle with Alpine, Font Awesome, Inter font) -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
-    <!-- Alpine.js -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-
     <style>
-        body { font-family: 'Inter', sans-serif; }
         [x-cloak] { display: none !important; }
     </style>
 </head>
