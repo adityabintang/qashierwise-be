@@ -543,7 +543,7 @@
                             </div>
                             <div class="flex flex-col justify-center">
                                 <p class="text-xs md:text-sm font-semibold text-gray-900 leading-tight">{{ __('landing.hero.floating_sales') }}</p>
-                                <p class="text-xs text-green-600 leading-tight">{{ __('landing.hero.floating_sales_trend') }}</p>
+                                <p class="text-xs text-green-700 leading-tight">{{ __('landing.hero.floating_sales_trend') }}</p>
                             </div>
                         </div>
                     </div>
@@ -802,7 +802,7 @@
                         class="px-4 md:px-6 py-2 rounded-full font-semibold transition-all text-xs md:text-sm relative"
                     >
                         1 Tahun
-                        <span class="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">-10%</span>
+                        <span class="absolute -top-2 -right-2 bg-green-700 text-white text-xs px-2 py-0.5 rounded-full font-bold">-10%</span>
                     </button>
                 </div>
 
