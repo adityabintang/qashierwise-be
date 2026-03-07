@@ -86,6 +86,10 @@
             <i class="fas fa-cog w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>Konfigurasi</span>
         </a>
+        <a href="/dashboard/reservations/whatsapp-flows" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'reservations-whatsapp-flows' ? 'active' : '' }}">
+            <i class="fab fa-whatsapp w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>WA Flow</span>
+        </a>
 
         <!-- POS Section - Orders & Payment -->
         <template x-if="$store.permissions.hasPermission('pos.orders') || $store.permissions.hasPermission('pos.payment')">

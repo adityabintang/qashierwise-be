@@ -36,6 +36,8 @@ class Reservation extends Model
      */
     const PAYMENT_METHOD_QRIS = 'qris';
 
+    const PAYMENT_METHOD_CASH = 'cash';
+
     /**
      * The attributes that are mass assignable.
      *
@@ -55,6 +57,7 @@ class Reservation extends Model
         'selected_products',
         'payment_type',
         'payment_method',
+        'payment_label',
         'qris_transaction_id',
         'total_amount',
         'paid_amount',
@@ -65,6 +68,18 @@ class Reservation extends Model
         'notified_at',
         'cancelled_reason',
         'scheduled_reminder_jobs',
+        // WhatsApp Flow fields
+        'flow_token',
+        'flow_id',
+        'whatsapp_contact_id',
+        'event_type',
+        'special_notes',
+        'preferences',
+        'table_fee',
+        'menu_total',
+        'deposit',
+        'deposit_paid',
+        'confirmed_at',
     ];
 
     /**
@@ -83,6 +98,13 @@ class Reservation extends Model
             'remaining_amount' => 'decimal:2',
             'notified_at' => 'datetime',
             'scheduled_reminder_jobs' => 'array',
+            // WhatsApp Flow casts
+            'preferences' => 'array',
+            'table_fee' => 'decimal:2',
+            'menu_total' => 'decimal:2',
+            'deposit' => 'decimal:2',
+            'deposit_paid' => 'boolean',
+            'confirmed_at' => 'datetime',
         ];
     }
 
@@ -116,6 +138,14 @@ class Reservation extends Model
     public function qrisTransaction(): BelongsTo
     {
         return $this->belongsTo(QrisTransaction::class);
+    }
+
+    /**
+     * Get the WhatsApp contact who submitted this reservation via flow.
+     */
+    public function whatsappContact(): BelongsTo
+    {
+        return $this->belongsTo(WhatsAppContact::class);
     }
 
     /**

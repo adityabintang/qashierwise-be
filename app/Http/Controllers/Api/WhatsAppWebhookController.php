@@ -316,11 +316,7 @@ class WhatsAppWebhookController extends Controller
                         $content = 'Flow response received';
                         $metadata = $flowResponse;
 
-                        Log::info('Flow response received but reservation processing is disabled', [
-                            'user_id' => $userId,
-                            'contact_id' => $contact->id,
-                            'flow_id' => $flowResponse['flow_id'] ?? null,
-                        ]);
+                        $this->handleFlowResponse($flowResponse, $userId, $contact);
                     }
                 }
                 break;
@@ -399,11 +395,12 @@ class WhatsAppWebhookController extends Controller
     {
         $messageId = $message['id'] ?? null;
 
-        if (!$messageId) {
+        if (! $messageId) {
             Log::warning('Message echo missing message_id, skipping', [
                 'user_id' => $userId,
                 'message' => $message,
             ]);
+
             return;
         }
 
@@ -485,7 +482,7 @@ class WhatsAppWebhookController extends Controller
 
             case 'location':
                 $location = $message['location'] ?? [];
-                $content = "Location: " . ($location['latitude'] ?? 0) . ", " . ($location['longitude'] ?? 0);
+                $content = 'Location: '.($location['latitude'] ?? 0).', '.($location['longitude'] ?? 0);
                 $metadata = $location;
                 break;
 
