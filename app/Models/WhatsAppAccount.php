@@ -49,6 +49,10 @@ class WhatsAppAccount extends Model
         'vertical',
         'websites',
         'profile_picture_url',
+        'data_sync_settings',
+        'last_data_sync_at',
+        'data_sync_status',
+        'data_sync_error',
     ];
 
     protected $casts = [
@@ -56,7 +60,9 @@ class WhatsAppAccount extends Model
         'coexistence_enabled' => 'boolean',
         'webhook_config' => 'array',
         'websites' => 'array',
+        'data_sync_settings' => 'array',
         'token_expires_at' => 'datetime',
+        'last_data_sync_at' => 'datetime',
         'access_token' => 'encrypted',
     ];
 
@@ -83,5 +89,10 @@ class WhatsAppAccount extends Model
     public function media()
     {
         return $this->hasMany(WhatsAppMedia::class, 'whatsapp_account_id');
+    }
+
+    public function dataSharingConsent()
+    {
+        return $this->hasOne(WhatsAppDataSharingConsent::class, 'whatsapp_account_id');
     }
 }

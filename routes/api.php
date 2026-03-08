@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\ResendWebhookController;
 use App\Http\Controllers\Api\SubMerchantController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\WhatsAppController;
+use App\Http\Controllers\Api\WhatsAppDataSharingController;
 use App\Http\Controllers\Api\WhatsAppFlowController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
 use App\Http\Controllers\Api\WithdrawalController;
@@ -130,6 +131,16 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         // Account management routes
         Route::delete('/account', [EmbeddedSignupController::class, 'disconnect']);
         Route::get('/account', [EmbeddedSignupController::class, 'getAccountStatus']);
+
+        // Data Sharing
+        Route::get('/data-sharing/info', [WhatsAppDataSharingController::class, 'info']);
+        Route::get('/data-sharing/status', [WhatsAppDataSharingController::class, 'status']);
+        Route::post('/data-sharing/consent', [WhatsAppDataSharingController::class, 'store']);
+        Route::put('/data-sharing/consent', [WhatsAppDataSharingController::class, 'update']);
+        Route::delete('/data-sharing/consent', [WhatsAppDataSharingController::class, 'destroy']);
+        Route::get('/data-sharing/sync-status', [WhatsAppDataSharingController::class, 'status']);
+        Route::post('/data-sharing/sync', [WhatsAppDataSharingController::class, 'sync']);
+        Route::get('/contacts/preview', [WhatsAppDataSharingController::class, 'contactsPreview']);
 
         // Webhook subscription management
         Route::post('/subscribe-webhooks', [EmbeddedSignupController::class, 'subscribeToWebhooks']);

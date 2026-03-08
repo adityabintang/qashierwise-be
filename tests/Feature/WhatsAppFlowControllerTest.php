@@ -104,14 +104,18 @@ class WhatsAppFlowControllerTest extends TestCase
             ->assertJsonValidationErrors(['phone']);
     }
 
-    public function test_send_flow_requires_flow_id_or_flow_name(): void
+    public function test_send_flow_requires_flow_id_when_no_config(): void
     {
         $user = User::factory()->create();
+
+        $this->mock(WhatsAppFlowService::class, function ($mock) {
+            $mock->shouldReceive('getFlowConfig')->once()->andReturn(null);
+        });
 
         $this->actingAs($user, 'sanctum')
             ->postJson('/api/whatsapp/flows/send', ['phone' => '6281234567890'])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['flow_name']);
+            ->assertJsonFragment(['message' => 'flow_id wajib diisi']);
     }
 
     public function test_authenticated_user_can_send_flow(): void
@@ -119,6 +123,7 @@ class WhatsAppFlowControllerTest extends TestCase
         $user = User::factory()->create();
 
         $this->mock(WhatsAppFlowService::class, function ($mock) use ($user) {
+            $mock->shouldReceive('getFlowConfig')->once()->andReturn(null);
             $mock->shouldReceive('sendReservationFlow')
                 ->once()
                 ->andReturn([
@@ -158,7 +163,7 @@ class WhatsAppFlowControllerTest extends TestCase
             ->assertStatus(400);
     }
 
-    public function test_flow_endpoint_returns_welcome_screen_for_ping_action(): void
+    public function test_flow_endpoint_returns_health_check_payload_for_ping_action(): void
     {
         $user = User::factory()->create();
         $flowToken = $user->id.'_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx';
@@ -179,8 +184,8 @@ class WhatsAppFlowControllerTest extends TestCase
                 ]);
             $mock->shouldReceive('encryptResponse')
                 ->once()
-                ->with(Mockery::on(fn ($r) => $r['screen'] === 'WELCOME_SCREEN'), Mockery::any(), Mockery::any())
-                ->andReturn(base64_encode('{"screen":"WELCOME_SCREEN"}'));
+                ->with(Mockery::on(fn ($r) => ($r['data']['status'] ?? null) === 'active'), Mockery::any(), Mockery::any())
+                ->andReturn(base64_encode('{"data":{"status":"active"}}'));
         });
 
         $this->postJson('/api/whatsapp/flow/endpoint', [
@@ -317,5 +322,77 @@ class WhatsAppFlowControllerTest extends TestCase
         $this->assertSame(Reservation::STATUS_CONFIRMED, $reservation->status);
         $this->assertNotNull($reservation->confirmed_at);
         $this->assertNotNull($reservation->order_id);
+    }
+
+    public function test_flow_endpoint_creates_reservation_on_payment_confirmed_trigger(): void
+    {
+        $user = User::factory()->create();
+        $flowToken = $user->id.'_payment-confirm-test';
+
+        ReservationConfig::factory()->create([
+            'user_id' => $user->id,
+            'is_active' => true,
+            'reminder_template_language' => 'id',
+        ]);
+
+        // Pre-populate the cache the way the flow progression would
+        \Illuminate\Support\Facades\Cache::put('flow_data:'.$flowToken, [
+            'reservation_date' => now()->addDays(3)->format('Y-m-d'),
+            'reservation_time' => '19:00',
+            'customer_name' => 'Dedi Pratama',
+            'phone' => '6285678901234',
+            'guest_count' => '3',
+            'table_id' => null,
+            'selected_products' => [],
+            'menu_total' => 0.0,
+            'table_fee' => 0.0,
+            'grand_total' => 0.0,
+            'dp_amount' => 0,
+        ], now()->addHours(2));
+
+        $payload = [
+            'action' => 'data_exchange',
+            'flow_token' => $flowToken,
+            'data' => [
+                'trigger' => 'payment_confirmed',
+                'payment_type' => 'full',
+                'payment_method' => 'cash',
+            ],
+        ];
+
+        $createdReservation = Reservation::factory()->create([
+            'user_id' => $user->id,
+            'customer_name' => 'Dedi Pratama',
+            'status' => Reservation::STATUS_CONFIRMED,
+        ]);
+
+        $this->mock(WhatsAppFlowEncryptionService::class, function ($mock) use ($payload) {
+            $mock->shouldReceive('decryptRequest')
+                ->once()
+                ->andReturn([
+                    'data' => $payload,
+                    'aes_key' => 'mock_aes_key',
+                    'iv' => str_repeat("\x00", 16),
+                ]);
+            $mock->shouldReceive('encryptResponse')
+                ->once()
+                ->with(Mockery::on(fn ($r) => $r['screen'] === 'SUCCESS'), Mockery::any(), Mockery::any())
+                ->andReturn(base64_encode('{"screen":"SUCCESS"}'));
+        });
+
+        $this->mock(WhatsAppFlowService::class, function ($mock) use ($createdReservation) {
+            $mock->shouldReceive('processFlowResponse')
+                ->once()
+                ->andReturn($createdReservation);
+        });
+
+        $this->postJson('/api/whatsapp/flow/endpoint', [
+            'encrypted_aes_key' => base64_encode('test'),
+            'encrypted_flow_data' => base64_encode('test'),
+            'initial_vector' => base64_encode('test'),
+        ])->assertOk();
+
+        // Cache should be cleared after successful reservation creation
+        $this->assertNull(\Illuminate\Support\Facades\Cache::get('flow_data:'.$flowToken));
     }
 }

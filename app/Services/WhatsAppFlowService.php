@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class WhatsAppFlowService
@@ -28,6 +29,12 @@ class WhatsAppFlowService
      */
     public function createReservationFlow(int $userId): array
     {
+        $flowConfig = $this->getFlowConfig($userId);
+
+        if ($flowConfig) {
+            return $this->createReservationFlowWithConfig($userId, $flowConfig);
+        }
+
         $account = $this->accountService->getActiveAccount($userId);
 
         if (! $account) {
@@ -317,19 +324,22 @@ class WhatsAppFlowService
             'flow_token' => $flowToken,
             'flow_cta' => $flowCta,
             'flow_action' => $flowAction,
-            'flow_action_payload' => $flowActionPayload,
         ];
+
+        // Only include flow_action_payload if it has data (WhatsApp rejects empty arrays)
+        if (! empty($flowActionPayload)) {
+            $flowParameters['flow_action_payload'] = $flowActionPayload;
+        }
 
         if (! empty($flowId)) {
             $flowParameters['flow_id'] = $flowId;
         }
 
-        if (! empty($flowName)) {
-            $flowParameters['flow_name'] = $flowName;
-        }
+        // Note: Meta API does not support flow_name in message parameters;
+        // flow_id is the only accepted flow reference.
 
         if ($flowMode === 'draft') {
-            $flowParameters['flow_mode'] = 'draft';
+            $flowParameters['mode'] = 'draft';
         }
 
         $response = Http::withToken($account->access_token)
@@ -1113,6 +1123,11 @@ class WhatsAppFlowService
                 'flow_id' => $flowId,
                 'response' => $updateResponse->json(),
             ]);
+
+            $config->forceFill([
+                'flow_id' => $flowId,
+                'flow_status' => 'draft',
+            ])->save();
         }
 
         return $result;
@@ -1836,6 +1851,10 @@ class WhatsAppFlowService
      */
     public function getFlowConfig(int $userId): ?\App\Models\ReservationFlowConfig
     {
+        if (! Schema::hasTable('reservation_flow_configs')) {
+            return null;
+        }
+
         return \App\Models\ReservationFlowConfig::where('user_id', $userId)->first();
     }
 }

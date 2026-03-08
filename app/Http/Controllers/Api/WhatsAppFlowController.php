@@ -14,6 +14,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class WhatsAppFlowController extends Controller
@@ -115,22 +116,36 @@ class WhatsAppFlowController extends Controller
         $request->validate([
             'phone' => 'required|string',
             'flow_id' => 'nullable|string',
-            'flow_name' => 'nullable|string|required_without:flow_id',
             'flow_mode' => 'nullable|string|in:published,draft',
             'flow_cta' => 'nullable|string|max:20',
         ]);
 
         try {
-            $result = $this->flowService->sendReservationFlow(
-                userId: $request->user()->id,
-                phoneNumber: $request->input('phone'),
-                flowId: $request->input('flow_id'),
-                flowName: $request->input('flow_name'),
-                flowMode: $request->input('flow_mode', 'published'),
-                flowCta: $request->input('flow_cta', 'Buat Reservasi'),
-                flowAction: 'data_exchange',
-                flowActionPayload: ['trigger' => 'ping'],
-            );
+            $userId = $request->user()->id;
+            $config = $this->flowService->getFlowConfig($userId);
+
+            if ($config && $config->flow_id) {
+                $result = $this->flowService->sendReservationFlowWithConfig(
+                    userId: $userId,
+                    phoneNumber: $request->input('phone'),
+                    config: $config,
+                );
+            } else {
+                $flowId = $request->input('flow_id');
+
+                if (empty($flowId)) {
+                    return response()->json(['message' => 'flow_id wajib diisi'], 422);
+                }
+
+                $result = $this->flowService->sendReservationFlow(
+                    userId: $userId,
+                    phoneNumber: $request->input('phone'),
+                    flowId: $flowId,
+                    flowMode: $request->input('flow_mode', 'published'),
+                    flowCta: $request->input('flow_cta', 'Buat Reservasi'),
+                    flowAction: 'data_exchange',
+                );
+            }
 
             return response()->json($result);
         } catch (\Exception $e) {
@@ -224,7 +239,7 @@ class WhatsAppFlowController extends Controller
         $userId = $this->extractUserIdFromToken($flowToken);
 
         if ($action === 'ping') {
-            return $this->buildWelcomeScreenData($userId);
+            return $this->buildHealthCheckResponse();
         }
 
         if ($action === 'complete') {
@@ -236,10 +251,11 @@ class WhatsAppFlowController extends Controller
 
             return match ($trigger) {
                 'date_selected' => $this->handleDateSelected($userId, $data),
-                'welcome_submitted' => $this->buildDetailsScreenData($userId, $data),
-                'details_submitted' => $this->buildSummaryScreenData($userId, $data),
-                'summary_confirmed' => $this->buildPaymentScreenData($userId, $data),
-                'payment_type_selected' => $this->handlePaymentTypeSelected($userId, $data),
+                'welcome_submitted' => $this->buildDetailsScreenData($userId, $data, $flowToken),
+                'details_submitted' => $this->buildSummaryScreenData($userId, $data, $flowToken),
+                'summary_confirmed' => $this->buildPaymentScreenData($userId, $data, $flowToken),
+                'payment_type_selected' => $this->handlePaymentTypeSelected($userId, $data, $flowToken),
+                'payment_confirmed' => $this->handlePaymentConfirmed($userId, $data, $flowToken),
                 default => $this->buildWelcomeScreenData($userId),
             };
         }
@@ -258,6 +274,20 @@ class WhatsAppFlowController extends Controller
     }
 
     /**
+     * Build the Meta-compliant health check response for ping requests.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildHealthCheckResponse(): array
+    {
+        return [
+            'data' => [
+                'status' => 'active',
+            ],
+        ];
+    }
+
+    /**
      * Build WELCOME_SCREEN data: dates, times, guest_options.
      *
      * @return array<string, mixed>
@@ -270,7 +300,6 @@ class WhatsAppFlowController extends Controller
         $guestOptions = $this->buildGuestOptionsData($config);
 
         return [
-            'version' => '3.0',
             'screen' => 'WELCOME_SCREEN',
             'data' => [
                 'dates' => $dates,
@@ -294,7 +323,6 @@ class WhatsAppFlowController extends Controller
         $times = $this->buildTimeSlotsData($config, $selectedDate);
 
         return [
-            'version' => '3.0',
             'screen' => 'WELCOME_SCREEN',
             'data' => [
                 'times' => $times,
@@ -306,11 +334,27 @@ class WhatsAppFlowController extends Controller
     /**
      * Build DETAILS screen data: tables, products, event_types.
      *
+     * Caches the WELCOME form data (customer info, date, time, guest count) so it
+     * can be merged back at the summary and payment steps.
+     *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function buildDetailsScreenData(int $userId, array $data): array
+    private function buildDetailsScreenData(int $userId, array $data, string $flowToken = ''): array
     {
+        if (! empty($flowToken)) {
+            Cache::put(
+                'flow_data:'.$flowToken,
+                [
+                    'reservation_date' => $data['reservation_date'] ?? null,
+                    'reservation_time' => $data['reservation_time'] ?? null,
+                    'customer_name' => $data['customer_name'] ?? null,
+                    'phone' => $data['phone'] ?? null,
+                    'guest_count' => $data['guest_count'] ?? null,
+                ],
+                now()->addHours(2)
+            );
+        }
         $config = $this->getReservationConfig($userId);
 
         $tables = Table::where('user_id', $userId)
@@ -338,7 +382,6 @@ class WhatsAppFlowController extends Controller
         }
 
         return [
-            'version' => '3.0',
             'screen' => 'DETAILS',
             'data' => [
                 'tables' => $tables,
@@ -351,11 +394,20 @@ class WhatsAppFlowController extends Controller
     /**
      * Build SUMMARY screen data: appointment_summary, table_summary, menu_summary, price_breakdown.
      *
+     * Merges DETAILS form data with cached WELCOME data so all reservation fields are available.
+     *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function buildSummaryScreenData(int $userId, array $data): array
+    private function buildSummaryScreenData(int $userId, array $data, string $flowToken = ''): array
     {
+        if (! empty($flowToken)) {
+            $cacheKey = 'flow_data:'.$flowToken;
+            $cachedData = Cache::get($cacheKey, []);
+            $data = array_merge($cachedData, $data);
+            Cache::put($cacheKey, $data, now()->addHours(2));
+        }
+
         $config = $this->getReservationConfig($userId);
 
         $reservationDate = $data['reservation_date'] ?? null;
@@ -401,7 +453,6 @@ class WhatsAppFlowController extends Controller
         }
 
         return [
-            'version' => '3.0',
             'screen' => 'SUMMARY',
             'data' => [
                 'appointment_summary' => $appointmentSummary,
@@ -415,12 +466,20 @@ class WhatsAppFlowController extends Controller
     /**
      * Build PAYMENT screen: payment_types, payment_methods, instruction.
      *
+     * Retrieves cached flow data and stores computed pricing for use in payment_confirmed.
+     *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function buildPaymentScreenData(int $userId, array $data): array
+    private function buildPaymentScreenData(int $userId, array $data, string $flowToken = ''): array
     {
         $config = $this->getReservationConfig($userId);
+
+        if (! empty($flowToken)) {
+            $cacheKey = 'flow_data:'.$flowToken;
+            $cachedData = Cache::get($cacheKey, []);
+            $data = array_merge($cachedData, $data);
+        }
 
         $selectedProductIds = $data['selected_products'] ?? [];
         $menuTotal = empty($selectedProductIds)
@@ -431,6 +490,19 @@ class WhatsAppFlowController extends Controller
         $grandTotal = $menuTotal + $reservationFee;
         $dpPercentage = $config?->dp_percentage ?? 50;
         $dpAmount = (int) ceil($grandTotal * ((float) $dpPercentage / 100));
+
+        if (! empty($flowToken)) {
+            Cache::put(
+                'flow_data:'.$flowToken,
+                array_merge($data, [
+                    'menu_total' => $menuTotal,
+                    'table_fee' => $reservationFee,
+                    'grand_total' => $grandTotal,
+                    'dp_amount' => $dpAmount,
+                ]),
+                now()->addHours(2)
+            );
+        }
 
         $paymentTypes = [];
         if ($config?->allow_dp_payment ?? false) {
@@ -447,7 +519,6 @@ class WhatsAppFlowController extends Controller
         }
 
         return [
-            'version' => '3.0',
             'screen' => 'PAYMENT',
             'data' => [
                 'payment_types' => $paymentTypes,
@@ -467,9 +538,61 @@ class WhatsAppFlowController extends Controller
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function handlePaymentTypeSelected(int $userId, array $data): array
+    private function handlePaymentTypeSelected(int $userId, array $data, string $flowToken = ''): array
     {
-        return $this->buildPaymentScreenData($userId, $data);
+        return $this->buildPaymentScreenData($userId, $data, $flowToken);
+    }
+
+    /**
+     * Handle payment_confirmed trigger — create reservation and return SUCCESS screen.
+     *
+     * Merges cached flow data (accumulated from WELCOME → DETAILS → SUMMARY → PAYMENT)
+     * with the current payment fields then delegates to processFlowResponse.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function handlePaymentConfirmed(int $userId, array $data, string $flowToken): array
+    {
+        $cacheKey = 'flow_data:'.$flowToken;
+        $cachedData = Cache::get($cacheKey, []);
+        $allData = array_merge($cachedData, [
+            'payment_type' => $data['payment_type'] ?? 'full',
+            'payment_method' => $data['payment_method'] ?? 'cash',
+        ]);
+
+        $phone = $allData['phone'] ?? null;
+        $contact = null;
+        if ($phone) {
+            $normalizedPhone = $this->normalizePhone($phone);
+            $contact = WhatsAppContact::where('user_id', $userId)
+                ->where('wa_id', $normalizedPhone)
+                ->first();
+        }
+
+        $reservation = $this->flowService->processFlowResponse(
+            userId: $userId,
+            flowToken: $flowToken,
+            responseData: $allData,
+            contact: $contact,
+        );
+
+        Cache::forget($cacheKey);
+
+        $confirmationMessage = sprintf(
+            "Terima kasih %s!\n\nReservasi untuk %d tamu pada %s telah kami terima.\nStatus: Menunggu konfirmasi\n\nTim kami akan menghubungi Anda segera.",
+            $reservation->customer_name,
+            $reservation->guest_count,
+            Carbon::parse($reservation->reservation_date)->locale('id')->isoFormat('D MMM YYYY'),
+        );
+
+        return [
+            'screen' => 'SUCCESS',
+            'data' => [
+                'reservation_code' => 'RSV-'.str_pad((string) $reservation->id, 6, '0', STR_PAD_LEFT),
+                'confirmation_message' => $confirmationMessage,
+            ],
+        ];
     }
 
     /**
@@ -504,7 +627,6 @@ class WhatsAppFlowController extends Controller
         );
 
         return [
-            'version' => '3.0',
             'screen' => 'SUCCESS',
             'data' => [
                 'reservation_code' => 'RSV-'.str_pad((string) $reservation->id, 6, '0', STR_PAD_LEFT),
@@ -634,7 +756,6 @@ class WhatsAppFlowController extends Controller
     private function buildErrorScreen(string $message): array
     {
         return [
-            'version' => '3.0',
             'screen' => 'SUCCESS',
             'data' => [
                 'reservation_code' => '-',
