@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\ResendWebhookController;
 use App\Http\Controllers\Api\SubMerchantController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\WhatsAppController;
+use App\Http\Controllers\Api\WhatsAppFlowController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
 use App\Http\Controllers\Api\WithdrawalController;
 use App\Http\Controllers\Api\XenditWebhookController;
@@ -52,6 +53,10 @@ Route::post('/verify-reset-token', [AuthController::class, 'verifyResetToken']);
 // WhatsApp Webhook (must be public for WhatsApp to access)
 Route::get('/whatsapp/webhook', [WhatsAppWebhookController::class, 'verify']);
 Route::post('/whatsapp/webhook', [WhatsAppWebhookController::class, 'handle']);
+
+// WhatsApp Flow data exchange endpoint (public — called by WhatsApp servers during flow execution)
+Route::get('/whatsapp/flow/endpoint', [WhatsAppFlowController::class, 'endpoint']);
+Route::post('/whatsapp/flow/endpoint', [WhatsAppFlowController::class, 'endpoint']);
 
 // Xendit Webhooks (must be public for Xendit to access)
 Route::post('/webhooks/xendit', [XenditWebhookController::class, 'handleNotification']);
@@ -178,6 +183,14 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::get('/contacts', [WhatsAppController::class, 'getContacts']);
         Route::get('/contacts/{id}/messages', [WhatsAppController::class, 'getContactMessages']);
         Route::post('/contacts/{id}/mark-read', [WhatsAppController::class, 'markContactMessagesAsRead']);
+
+        // Flow Management
+        Route::get('/flows', [WhatsAppFlowController::class, 'index']);
+        Route::post('/flows', [WhatsAppFlowController::class, 'store']);
+        Route::post('/flows/send', [WhatsAppFlowController::class, 'send']);
+        Route::get('/flows/{flowId}', [WhatsAppFlowController::class, 'show']);
+        Route::post('/flows/{flowId}/publish', [WhatsAppFlowController::class, 'publish']);
+        Route::delete('/flows/{flowId}', [WhatsAppFlowController::class, 'destroy']);
     });
 
     // AI Agent routes

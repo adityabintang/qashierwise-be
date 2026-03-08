@@ -35,13 +35,13 @@ class WhatsAppFlowService
         }
 
         $wabaId = $account->waba_id ?? $account->business_account_id;
-        $flowJson = $this->getReservationFlowJson();
+        $flowJson = $this->getReservationFlowJsonString();
 
         $response = Http::withToken($account->access_token)
             ->post("https://graph.facebook.com/v21.0/{$wabaId}/flows", [
                 'name' => 'Reservasi_'.Str::random(6),
                 'categories' => ['APPOINTMENT_BOOKING'],
-                'flow_json' => json_encode($flowJson),
+                'flow_json' => $flowJson,
             ]);
 
         if ($response->failed()) {
@@ -396,16 +396,29 @@ class WhatsAppFlowService
 
         // Extract payment and pricing data
         $menuTotal = (float) ($responseData['menu_total'] ?? 0);
-        $tableFee = (float) ($responseData['table_fee'] ?? config('services.whatsapp.flow_table_fee', 100000));
+        $tableFee = (float) ($responseData['table_fee'] ?? 0);
         $grandTotal = (float) ($responseData['grand_total'] ?? ($menuTotal + $tableFee));
         $dpAmount = (float) ($responseData['dp_amount'] ?? ceil($grandTotal * 0.5));
-        $paymentType = $responseData['payment_type'] ?? 'dp';
-        $paymentMethod = $responseData['payment_method'] ?? 'cash';
-        $paymentAmount = (float) ($responseData['payment_amount'] ?? ($paymentType === 'lunas' ? $grandTotal : $dpAmount));
 
-        // Determine status and payment label based on payment type
-        $status = $paymentType === 'lunas' ? 'confirmed' : 'pending';
-        $paymentLabel = strtoupper($paymentType); // 'DP' or 'LUNAS'
+        // Map 'lunas' (legacy WA flow value) to 'full' (DB enum value)
+        $rawPaymentType = $responseData['payment_type'] ?? 'full';
+        $paymentType = $rawPaymentType === 'lunas' ? 'full' : $rawPaymentType;
+        if (! in_array($paymentType, ['dp', 'full'])) {
+            $paymentType = 'full';
+        }
+
+        $paymentMethod = $responseData['payment_method'] ?? 'cash';
+        if (! in_array($paymentMethod, ['qris', 'cash'])) {
+            $paymentMethod = 'cash';
+        }
+
+        $paymentAmount = (float) ($responseData['payment_amount'] ?? ($paymentType === 'full' ? $grandTotal : $dpAmount));
+
+        // Determine status: confirmed immediately for cash full payment, otherwise pending_payment
+        $status = ($paymentType === 'full' && $paymentMethod === 'cash')
+            ? Reservation::STATUS_CONFIRMED
+            : Reservation::STATUS_PENDING_PAYMENT;
+        $paymentLabel = strtoupper($paymentType); // 'DP' or 'FULL'
 
         // Create reservation in a transaction
         return DB::transaction(function () use (
@@ -426,12 +439,13 @@ class WhatsAppFlowService
                 'event_type' => $responseData['event_type'] ?? null,
                 'special_notes' => $responseData['special_notes'] ?? null,
                 'preferences' => $responseData['preferences'] ?? [],
-                'pre_order_items' => $responseData['selected_products'] ?? [],
+                'selected_products' => $responseData['selected_products'] ?? [],
                 'table_id' => ! empty($responseData['table_id']) ? (int) $responseData['table_id'] : null,
                 'table_fee' => $tableFee,
                 'menu_total' => $menuTotal,
                 'total_amount' => $grandTotal,
-                'paid_amount' => $paymentMethod === 'qris' ? $paymentAmount : 0, // QRIS is prepaid
+                'paid_amount' => $paymentMethod === 'qris' ? $paymentAmount : 0,
+                'remaining_amount' => $grandTotal - ($paymentMethod === 'qris' ? $paymentAmount : 0),
                 'deposit' => $paymentAmount,
                 'deposit_paid' => $paymentMethod === 'qris',
                 'payment_type' => $paymentType,
@@ -440,7 +454,8 @@ class WhatsAppFlowService
                 'flow_token' => $flowToken,
                 'flow_id' => $responseData['flow_id'] ?? null,
                 'status' => $status,
-                'confirmed_at' => $status === 'confirmed' ? now() : null,
+                'order_id' => 'RSV-'.time().'-'.strtoupper(substr(md5(uniqid('', true)), 0, 6)),
+                'confirmed_at' => $status === Reservation::STATUS_CONFIRMED ? now() : null,
             ]);
 
             // Update table status to reserved if table was selected
@@ -573,6 +588,31 @@ class WhatsAppFlowService
 
         // Return default flow structure
         return $this->getDefaultReservationFlowStructure();
+    }
+
+    /**
+     * Get the reservation flow JSON as a string.
+     *
+     * This preserves object semantics (e.g. empty object `{}`) from static JSON files.
+     */
+    public function getReservationFlowJsonString(): string
+    {
+        $flowPath = resource_path('whatsapp/flows/reservation-flow.json');
+
+        if (file_exists($flowPath)) {
+            $contents = file_get_contents($flowPath);
+
+            if ($contents === false) {
+                throw new \RuntimeException('Failed to read reservation flow JSON file');
+            }
+
+            return $contents;
+        }
+
+        return (string) json_encode(
+            $this->getDefaultReservationFlowStructure(),
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+        );
     }
 
     /**
@@ -730,7 +770,7 @@ class WhatsAppFlowService
                                 'label' => 'Selesai',
                                 'on-click-action' => [
                                     'name' => 'complete',
-                                    'payload' => [],
+                                    'payload' => (object) [],
                                 ],
                             ],
                         ],
@@ -1250,7 +1290,7 @@ class WhatsAppFlowService
                         'label' => 'Selesai',
                         'on-click-action' => [
                             'name' => 'complete',
-                            'payload' => [],
+                            'payload' => (object) [],
                         ],
                     ],
                 ],
@@ -1575,7 +1615,7 @@ class WhatsAppFlowService
         $formChildren[] = [
             'type' => 'TextArea',
             'name' => 'special_notes',
-            'label' => 'Catatan Khusus (Opsional)',
+            'label' => 'Catatan (Opsional)',
             'required' => false,
         ];
 

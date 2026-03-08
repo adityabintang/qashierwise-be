@@ -117,6 +117,10 @@ Route::middleware(['web', 'check.web.auth'])->group(function () {
         return view('dashboard.reservations.config');
     })->name('dashboard.reservations.config');
 
+    Route::get('/dashboard/reservations/whatsapp-flows', function () {
+        return view('dashboard.reservations.whatsapp-flows');
+    })->name('dashboard.reservations.whatsapp-flows');
+
     // Subscription routes
     Route::prefix('subscription')->name('subscription.')->group(function () {
         Route::get('/pricing', [App\Http\Controllers\SubscriptionController::class, 'index'])

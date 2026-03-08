@@ -224,7 +224,7 @@
                             {
                                 "type": "TextArea",
                                 "name": "special_notes",
-                                "label": "Catatan Khusus (Opsional)",
+                                "label": "Catatan (Opsional)",
                                 "required": false
                             },
                             {
@@ -392,8 +392,9 @@
                                 "type": "Footer",
                                 "label": "Konfirmasi Pembayaran",
                                 "on-click-action": {
-                                    "name": "complete",
+                                    "name": "data_exchange",
                                     "payload": {
+                                        "trigger": "payment_confirmed",
                                         "payment_type": "${form.payment_type}",
                                         "payment_method": "${form.payment_method}"
                                     }
@@ -441,6 +442,14 @@
                     {
                         "type": "TextCaption",
                         "text": "Kami akan menghubungi Anda untuk konfirmasi. Terima kasih!"
+                    },
+                    {
+                        "type": "Footer",
+                        "label": "Selesai",
+                        "on-click-action": {
+                            "name": "complete",
+                            "payload": {}
+                        }
                     }
                 ]
             }
