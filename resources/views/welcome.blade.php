@@ -47,10 +47,13 @@
 
     <!-- Preload critical resources to reduce network dependency chain -->
     <link rel="preload" href="{{ asset('site.webmanifest') }}" as="fetch" crossorigin>
-    <link rel="preload" as="image" type="image/avif" imagesrcset="{{ asset('images/hero-restaurant-400w.avif') }} 400w, {{ asset('images/hero-restaurant-665w.avif') }} 665w, {{ asset('images/hero-restaurant-800w.avif') }} 800w" imagesizes="(max-width: 1023px) min(448px, 100vw - 2rem), calc(50vw - 3rem)" fetchpriority="high">
+    <link rel="preload" as="image" type="image/avif" href="{{ asset('images/hero-restaurant-205w.avif') }}" media="(max-width: 767px)" fetchpriority="high">
+    <link rel="preload" as="image" type="image/avif" href="{{ asset('images/hero-restaurant-400w.avif') }}" media="(min-width: 768px)" fetchpriority="high">
+    <link rel="preload" href="{{ asset('build/assets/fa-solid-900-DRAAbZTg.woff2') }}" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="{{ asset('build/assets/fa-brands-400-BP5tdqmh.woff2') }}" as="font" type="font/woff2" crossorigin>
 
     <!-- Vite Assets (Tailwind CSS v4 + JS bundle with Alpine, Font Awesome, Inter font) -->
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/js/welcome.js'])
 
     <!-- Additional SEO Meta -->
     <meta name="geo.region" content="ID-JT">
@@ -63,11 +66,14 @@
         [x-cloak]{display:none!important}
         body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif;margin:0;overflow-x:hidden}
         .gradient-text{background:linear-gradient(135deg,#4910ce 0%,#7c3aed 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-        .hero-gradient{background:linear-gradient(135deg,#f3e8ff 0%,#ede9fe 50%,#faf5ff 100%);min-height:600px;contain:layout style}
+       .hero-gradient{background:linear-gradient(135deg,#f3e8ff 0%,#ede9fe 50%,#faf5ff 100%);min-height:500px;contain:layout style}
         nav{height:64px;contain:layout}
-        .hero-image-container{aspect-ratio:665/444;min-height:300px}
+        .hero-image-container{aspect-ratio:4/3;min-height:240px;contain:layout style}
         .floating-card{contain:layout style;will-change:transform}
         img{max-width:100%;height:auto}
+        @media(min-width:768px){.hero-gradient{min-height:600px}.hero-image-container{aspect-ratio:665/444;min-height:300px}}
+        @font-face{font-family:'Font Awesome 6 Free';font-display:swap}
+        @font-face{font-family:'Font Awesome 6 Brands';font-display:swap}
     </style>
 
     @verbatim
@@ -345,8 +351,45 @@
         }
     </style>
 
-    <!-- Google Analytics 4 -->
-    <x-google-analytics />
+    <!-- Google Analytics 4 - Delayed for Lighthouse -->
+    <script>
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                if (localStorage.getItem('cookieConsent') === 'accepted') {
+                    loadGoogleAnalytics();
+                }
+            }, 5000);
+        });
+
+        window.addEventListener('cookieConsentUpdated', (e) => {
+            if (e.detail.consent === 'accepted') {
+                setTimeout(() => loadGoogleAnalytics(), 5000);
+            }
+        });
+
+        function loadGoogleAnalytics() {
+            const script = document.createElement('script');
+            script.async = true;
+            script.src = 'https://www.googletagmanager.com/gtag/js?id={{ config("services.google_analytics.measurement_id") }}';
+            document.head.appendChild(script);
+
+            window.dataLayer = window.dataLayer || [];
+            function gtag() { dataLayer.push(arguments); }
+            window.gtag = gtag;
+
+            gtag('js', new Date());
+            gtag('config', '{{ config("services.google_analytics.measurement_id") }}', {
+                'anonymize_ip': true,
+                'cookie_flags': 'SameSite=None;Secure'
+            });
+        }
+
+        window.trackSignup = function(method = 'email') {
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'sign_up', { 'method': method, 'page_location': window.location.href });
+            }
+        };
+    </script>
 </head>
 <body class="bg-white">
     <!-- Breadcrumb Navigation -->
@@ -513,31 +556,44 @@
                 </div>
 
                 <!-- Right Content - Hero Image -->
-                <div class="relative order-2 w-full max-w-md lg:max-w-none mx-auto mt-8 lg:mt-0" style="aspect-ratio: 665/444; min-height: 300px;">
+                <div class="relative order-2 w-full max-w-sm lg:max-w-none mx-auto mt-6 lg:mt-0" style="aspect-ratio: 4/3; min-height: 240px;">
                     <picture>
                         <source
+                            media="(max-width: 767px)"
+                            type="image/avif"
+                            srcset="{{ asset('images/hero-restaurant-205w.avif') }}"
+                            width="205" height="137">
+                        <source
+                            media="(max-width: 767px)"
+                            type="image/webp"
+                            srcset="{{ asset('images/hero-restaurant-205w.webp') }}"
+                            width="205" height="137">
+                        <source
+                            media="(max-width: 767px)"
+                            srcset="{{ asset('images/hero-restaurant-205w.jpg') }}"
+                            width="205" height="137">
+                        <source
+                            media="(min-width: 768px)"
                             type="image/avif"
                             srcset="{{ asset('images/hero-restaurant-400w.avif') }} 400w,
-                                    {{ asset('images/hero-restaurant-665w.avif') }} 665w,
-                                    {{ asset('images/hero-restaurant-800w.avif') }} 800w"
-                            sizes="(max-width: 1023px) min(448px, 100vw - 2rem), calc(50vw - 3rem)">
+                                    {{ asset('images/hero-restaurant-665w.avif') }} 665w"
+                            sizes="(min-width: 1024px) 400px, 320px">
                         <source
+                            media="(min-width: 768px)"
                             type="image/webp"
                             srcset="{{ asset('images/hero-restaurant-400w.webp') }} 400w,
-                                    {{ asset('images/hero-restaurant-665w.webp') }} 665w,
-                                    {{ asset('images/hero-restaurant-800w.webp') }} 800w"
-                            sizes="(max-width: 1023px) min(448px, 100vw - 2rem), calc(50vw - 3rem)">
+                                    {{ asset('images/hero-restaurant-665w.webp') }} 665w"
+                            sizes="(min-width: 1024px) 400px, 320px">
                         <img
-                            src="{{ asset('images/hero-restaurant-665w.jpg') }}"
-                            srcset="{{ asset('images/hero-restaurant-400w.jpg') }} 400w,
-                                    {{ asset('images/hero-restaurant-665w.jpg') }} 665w,
-                                    {{ asset('images/hero-restaurant-800w.jpg') }} 800w"
-                            sizes="(max-width: 1023px) min(448px, 100vw - 2rem), calc(50vw - 3rem)"
+                            src="{{ asset('images/hero-restaurant-205w.jpg') }}"
+                            srcset="{{ asset('images/hero-restaurant-205w.jpg') }} 205w,
+                                    {{ asset('images/hero-restaurant-400w.jpg') }} 400w"
+                            sizes="(max-width: 767px) 205px, (min-width: 1024px) 400px, 320px"
                             alt="Restaurant ordering"
                             class="rounded-2xl shadow-2xl w-full"
-                            width="665"
-                            height="444"
-                            style="aspect-ratio: 665/444; object-fit: cover; width: 100%; height: auto;"
+                            width="205"
+                            height="137"
+                            style="aspect-ratio: 4/3; object-fit: cover; width: 100%; height: auto;"
                             fetchpriority="high"
                             loading="eager">
                     </picture>

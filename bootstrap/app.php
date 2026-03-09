@@ -32,12 +32,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Apply localization middleware to all routes
         $middleware->appendToGroup('web', [
+            \App\Http\Middleware\GzipMiddleware::class,
             \App\Http\Middleware\LocalizationMiddleware::class,
             \App\Http\Middleware\SetPostgresUserContext::class,
             \App\Http\Middleware\SecurityHeaders::class,
         ]);
 
         $middleware->appendToGroup('api', [
+            \App\Http\Middleware\GzipMiddleware::class,
             \App\Http\Middleware\LocalizationMiddleware::class,
             \App\Http\Middleware\SetPostgresUserContext::class,
         ]);
