@@ -45,6 +45,10 @@
     <meta name="twitter:image" content="https://qashierwise.com/images/og-image.png">
     <meta name="twitter:image:alt" content="QashierWise - AI Chatbot WhatsApp untuk Restoran">
 
+    <!-- Preload critical resources to reduce network dependency chain -->
+    <link rel="preload" href="{{ asset('site.webmanifest') }}" as="fetch" crossorigin>
+    <link rel="preload" as="image" type="image/avif" imagesrcset="{{ asset('images/hero-restaurant-400w.avif') }} 400w, {{ asset('images/hero-restaurant-665w.avif') }} 665w, {{ asset('images/hero-restaurant-800w.avif') }} 800w" imagesizes="(max-width: 1023px) min(448px, 100vw - 2rem), calc(50vw - 3rem)" fetchpriority="high">
+
     <!-- Vite Assets (Tailwind CSS v4 + JS bundle with Alpine, Font Awesome, Inter font) -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
@@ -510,20 +514,33 @@
 
                 <!-- Right Content - Hero Image -->
                 <div class="relative order-2 w-full max-w-md lg:max-w-none mx-auto mt-8 lg:mt-0" style="aspect-ratio: 665/444; min-height: 300px;">
-                    <img
-                        src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=665&q=75"
-                        srcset="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=75 400w,
-                                https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=665&q=75 665w,
-                                https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=75 800w"
-                        sizes="(max-width: 640px) 400px, (max-width: 1024px) 665px, 800px"
-                        alt="Restaurant ordering"
-                        class="rounded-2xl shadow-2xl w-full"
-                        width="665"
-                        height="444"
-                        style="aspect-ratio: 665/444; object-fit: cover; width: 100%; height: auto;"
-                        fetchpriority="high"
-                        decoding="async"
-                        loading="eager">
+                    <picture>
+                        <source
+                            type="image/avif"
+                            srcset="{{ asset('images/hero-restaurant-400w.avif') }} 400w,
+                                    {{ asset('images/hero-restaurant-665w.avif') }} 665w,
+                                    {{ asset('images/hero-restaurant-800w.avif') }} 800w"
+                            sizes="(max-width: 1023px) min(448px, 100vw - 2rem), calc(50vw - 3rem)">
+                        <source
+                            type="image/webp"
+                            srcset="{{ asset('images/hero-restaurant-400w.webp') }} 400w,
+                                    {{ asset('images/hero-restaurant-665w.webp') }} 665w,
+                                    {{ asset('images/hero-restaurant-800w.webp') }} 800w"
+                            sizes="(max-width: 1023px) min(448px, 100vw - 2rem), calc(50vw - 3rem)">
+                        <img
+                            src="{{ asset('images/hero-restaurant-665w.jpg') }}"
+                            srcset="{{ asset('images/hero-restaurant-400w.jpg') }} 400w,
+                                    {{ asset('images/hero-restaurant-665w.jpg') }} 665w,
+                                    {{ asset('images/hero-restaurant-800w.jpg') }} 800w"
+                            sizes="(max-width: 1023px) min(448px, 100vw - 2rem), calc(50vw - 3rem)"
+                            alt="Restaurant ordering"
+                            class="rounded-2xl shadow-2xl w-full"
+                            width="665"
+                            height="444"
+                            style="aspect-ratio: 665/444; object-fit: cover; width: 100%; height: auto;"
+                            fetchpriority="high"
+                            loading="eager">
+                    </picture>
                     <!-- Floating Elements - Hidden on small mobile, visible on larger screens -->
                     <div class="hidden sm:block absolute -bottom-4 md:-bottom-6 -left-2 md:-left-6 bg-white rounded-xl p-3 md:p-4 shadow-xl floating-card" style="contain: layout style; will-change: transform;">
                         <div class="flex items-center gap-2 md:gap-3">

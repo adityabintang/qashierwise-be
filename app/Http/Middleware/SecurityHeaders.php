@@ -73,7 +73,6 @@ class SecurityHeaders
             "img-src 'self' data: https: ".implode(' ', [
                 'https://www.google-analytics.com',
                 'https://api.dicebear.com',
-                'https://images.unsplash.com',
                 'https://api.qrserver.com',
             ]),
 
