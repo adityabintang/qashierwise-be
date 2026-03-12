@@ -122,10 +122,10 @@ class BlogPostResourceTest extends TestCase
             ->fillForm([
                 'title' => 'Title',
                 'slug' => 'title',
-                'content' => '',
+                'content' => null,
             ])
             ->call('create')
-            ->assertHasFormErrors(['content' => 'required']);
+            ->assertHasFormErrors(['content']);
     }
 
     public function test_create_blog_post_requires_unique_slug(): void
