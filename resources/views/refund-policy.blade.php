@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('legal.refund_policy.meta_title') }}</title>
 
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/logo-32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/logo-16.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/logo-180.png') }}">
+    <link rel="manifest" href="{{ asset('site.webmanifest') }}">
+    <meta name="theme-color" content="#4910ce">
+
     <!-- Vite Assets (Tailwind CSS v4 + JS bundle with Alpine only) -->
     @vite(['resources/css/app.css', 'resources/js/static.js'])
 
