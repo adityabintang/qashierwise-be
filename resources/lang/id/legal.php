@@ -114,6 +114,7 @@ return [
     'terms_of_service' => [
         'title' => 'Ketentuan Layanan',
         'meta_title' => 'Ketentuan Layanan - QashierWise',
+        'meta_description' => 'Baca Ketentuan Layanan QashierWise. Pelajari hak pengguna, tanggung jawab, keamanan data, dan kondisi layanan platform manajemen restoran kami.',
         'last_updated_date' => '10 Februari 2025',
 
         'intro' => [

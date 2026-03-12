@@ -114,6 +114,7 @@ return [
     'terms_of_service' => [
         'title' => 'Terms of Service',
         'meta_title' => 'Terms of Service - QashierWise',
+        'meta_description' => 'Read QashierWise Terms of Service. Learn about user rights, responsibilities, data security, and service conditions for our restaurant management platform.',
         'last_updated_date' => 'February 10, 2025',
 
         'intro' => [
