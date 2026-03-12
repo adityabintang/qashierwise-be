@@ -16,22 +16,23 @@ class BlogCategoriesTable
         return $table
             ->columns([
                 TextColumn::make('name')
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('slug')
                     ->searchable(),
                 IconColumn::make('is_active')
-                    ->boolean(),
-                TextColumn::make('seo_title')
-                    ->searchable(),
+                    ->boolean()
+                    ->sortable(),
+                TextColumn::make('posts_count')
+                    ->counts('posts')
+                    ->label('Posts')
+                    ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->defaultSort('name')
             ->filters([
                 //
             ])

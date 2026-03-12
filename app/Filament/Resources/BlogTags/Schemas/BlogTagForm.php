@@ -4,6 +4,7 @@ namespace App\Filament\Resources\BlogTags\Schemas;
 
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Str;
 
 class BlogTagForm
 {
@@ -12,9 +13,14 @@ class BlogTagForm
         return $schema
             ->components([
                 TextInput::make('name')
-                    ->required(),
+                    ->required()
+                    ->maxLength(255)
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(fn ($state, callable $set) => $set('slug', Str::slug($state))),
                 TextInput::make('slug')
-                    ->required(),
+                    ->required()
+                    ->maxLength(255)
+                    ->unique(ignoreRecord: true),
             ]);
     }
 }
