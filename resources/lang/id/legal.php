@@ -18,6 +18,7 @@ return [
     'privacy_policy' => [
         'title' => 'Kebijakan Privasi',
         'meta_title' => 'Kebijakan Privasi - QashierWise',
+        'meta_description' => 'Kebijakan Privasi QashierWise. Pelajari bagaimana kami mengumpulkan, menggunakan, dan melindungi data Anda serta kepatuhan terhadap regulasi perlindungan data.',
         'last_updated_date' => '27 November 2025',
 
         'section_1' => [
@@ -195,6 +196,7 @@ return [
     'refund_policy' => [
         'title' => 'Kebijakan Pengembalian Dana',
         'meta_title' => 'Kebijakan Pengembalian Dana - QashierWise',
+        'meta_description' => 'Kebijakan Pengembalian Dana QashierWise. Ketentuan pengembalian dana, periode uji coba gratis, dan hak Anda sebagai pelanggan kami.',
         'last_updated_date' => '23 Januari 2026',
 
         'intro' => 'Di QashierWise, kami berkomitmen untuk memberikan layanan terbaik kepada pelanggan kami. Kebijakan pengembalian dana ini menjelaskan hak Anda terkait pengembalian dana untuk layanan berlangganan QashierWise.',

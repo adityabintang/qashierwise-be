@@ -18,6 +18,7 @@ return [
     'privacy_policy' => [
         'title' => 'Privacy Policy',
         'meta_title' => 'Privacy Policy - QashierWise',
+        'meta_description' => 'QashierWise Privacy Policy. Learn how we collect, use, and protect your data and our compliance with data protection regulations.',
         'last_updated_date' => 'November 27, 2025',
 
         'section_1' => [
@@ -195,6 +196,7 @@ return [
     'refund_policy' => [
         'title' => 'Refund Policy',
         'meta_title' => 'Refund Policy - QashierWise',
+        'meta_description' => 'QashierWise Refund Policy. Refund conditions, free trial period, and your rights as our customer.',
         'last_updated_date' => 'January 23, 2026',
 
         'intro' => 'At QashierWise, we are committed to providing the best service to our customers. This refund policy explains your rights regarding refunds for QashierWise subscription services.',
