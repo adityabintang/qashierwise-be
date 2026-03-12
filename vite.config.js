@@ -8,6 +8,7 @@ export default defineConfig({
             input: [
                 'resources/css/app.css',
                 'resources/js/app.js',
+                'resources/js/static.js',
                 'resources/js/welcome.js',
                 'resources/js/alpine-loader.js',
                 'resources/js/echo.js',

@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="{{ __('legal.terms_of_service.meta_description') }}">
     <title>{{ __('legal.terms_of_service.meta_title') }}</title>
-
-    <!-- Vite Assets (Tailwind CSS v4 + JS bundle with Alpine, Font Awesome, Inter font) -->
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-
+        <!-- Vite Assets (Tailwind CSS v4 + JS bundle with Alpine only) -->
+    @vite(['resources/css/app.css', 'resources/js/static.js'])
     <style>
         [x-cloak] { display: none !important; }
     </style>
