@@ -20,6 +20,16 @@
     <style>
         [x-cloak] { display: none !important; }
     </style>
+
+    <!-- Trigger Alpine.js to load immediately for legal pages (menu interaction) -->
+    <script>
+        // Trigger Alpine loading immediately by dispatching an event
+        // This overrides the 3s delay in static.js for better LCP
+        document.addEventListener('DOMContentLoaded', () => {
+            // Dispatch a click event to trigger Alpine loading from static.js
+            document.dispatchEvent(new Event('click'));
+        });
+    </script>
 </head>
 <body class="bg-white">
     <!-- Navigation -->
