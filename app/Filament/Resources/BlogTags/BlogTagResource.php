@@ -5,7 +5,9 @@ namespace App\Filament\Resources\BlogTags;
 use App\Filament\Resources\BlogTags\Pages\CreateBlogTag;
 use App\Filament\Resources\BlogTags\Pages\EditBlogTag;
 use App\Filament\Resources\BlogTags\Pages\ListBlogTags;
+use App\Filament\Resources\BlogTags\Pages\ViewBlogTag;
 use App\Filament\Resources\BlogTags\Schemas\BlogTagForm;
+use App\Filament\Resources\BlogTags\Schemas\BlogTagInfolist;
 use App\Filament\Resources\BlogTags\Tables\BlogTagsTable;
 use App\Models\BlogTag;
 use BackedEnum;
@@ -35,6 +37,11 @@ class BlogTagResource extends Resource
         return BlogTagsTable::configure($table);
     }
 
+    public static function infolist(Schema $schema): Schema
+    {
+        return BlogTagInfolist::configure($schema);
+    }
+
     public static function getRelations(): array
     {
         return [
@@ -47,6 +54,7 @@ class BlogTagResource extends Resource
         return [
             'index' => ListBlogTags::route('/'),
             'create' => CreateBlogTag::route('/create'),
+            'view' => ViewBlogTag::route('/{record}'),
             'edit' => EditBlogTag::route('/{record}/edit'),
         ];
     }

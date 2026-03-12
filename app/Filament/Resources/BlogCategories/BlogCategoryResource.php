@@ -5,7 +5,9 @@ namespace App\Filament\Resources\BlogCategories;
 use App\Filament\Resources\BlogCategories\Pages\CreateBlogCategory;
 use App\Filament\Resources\BlogCategories\Pages\EditBlogCategory;
 use App\Filament\Resources\BlogCategories\Pages\ListBlogCategories;
+use App\Filament\Resources\BlogCategories\Pages\ViewBlogCategory;
 use App\Filament\Resources\BlogCategories\Schemas\BlogCategoryForm;
+use App\Filament\Resources\BlogCategories\Schemas\BlogCategoryInfolist;
 use App\Filament\Resources\BlogCategories\Tables\BlogCategoriesTable;
 use App\Models\BlogCategory;
 use BackedEnum;
@@ -35,6 +37,11 @@ class BlogCategoryResource extends Resource
         return BlogCategoriesTable::configure($table);
     }
 
+    public static function infolist(Schema $schema): Schema
+    {
+        return BlogCategoryInfolist::configure($schema);
+    }
+
     public static function getRelations(): array
     {
         return [
@@ -47,6 +54,7 @@ class BlogCategoryResource extends Resource
         return [
             'index' => ListBlogCategories::route('/'),
             'create' => CreateBlogCategory::route('/create'),
+            'view' => ViewBlogCategory::route('/{record}'),
             'edit' => EditBlogCategory::route('/{record}/edit'),
         ];
     }
