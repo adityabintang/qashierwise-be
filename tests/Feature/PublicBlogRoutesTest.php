@@ -17,6 +17,12 @@ class PublicBlogRoutesTest extends TestCase
             'slug' => 'artikel-published',
         ]);
 
+        BlogPost::factory()->published()->create([
+            'title' => 'Artikel Published Future Timezone',
+            'slug' => 'artikel-published-future-timezone',
+            'published_at' => now()->addHours(7),
+        ]);
+
         BlogPost::factory()->create([
             'title' => 'Artikel Draft',
             'slug' => 'artikel-draft',
@@ -31,6 +37,7 @@ class PublicBlogRoutesTest extends TestCase
 
         $response->assertOk();
         $response->assertSee($publishedPost->title);
+        $response->assertSee('Artikel Published Future Timezone');
         $response->assertDontSee('Artikel Draft');
         $response->assertDontSee('Artikel Scheduled');
     }
