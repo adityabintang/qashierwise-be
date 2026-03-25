@@ -49,8 +49,12 @@
                         @endif
 
                         <div class="p-6">
-                            <div class="mb-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                                <span>{{ optional($post->published_at)->format('d M Y') }}</span>
+                            @php($publishedTimes = \App\Helpers\TimezoneDisplayHelper::formatForDisplay($post->published_at))
+
+                            <div class="mb-3 flex flex-wrap items-start gap-2 text-xs text-slate-500">
+                                @foreach ($publishedTimes as $label => $time)
+                                    <span>{{ $label }}: {{ $time }}</span>
+                                @endforeach
                                 @if ($post->category)
                                     <span class="rounded-full bg-primary/10 px-2.5 py-1 font-medium text-primary">{{ $post->category->name }}</span>
                                 @endif

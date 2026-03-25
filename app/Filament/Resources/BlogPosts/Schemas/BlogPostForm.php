@@ -3,16 +3,14 @@
 namespace App\Filament\Resources\BlogPosts\Schemas;
 
 use App\Enums\PostStatus;
-use App\Models\BlogCategory;
-use App\Models\BlogTag;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\RichEditor;
-use Filament\Schemas\Components\Section;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
 
@@ -90,7 +88,9 @@ class BlogPostForm
                             ->default(PostStatus::Draft)
                             ->required(),
                         DateTimePicker::make('published_at')
-                            ->label('Publish Date'),
+                            ->label('Publish Date')
+                            ->timezone('Asia/Jakarta')
+                            ->helperText('Input menggunakan WIB. Sistem tetap menyimpan waktu dalam UTC.'),
                         Select::make('tags')
                             ->relationship('tags', 'name')
                             ->multiple()

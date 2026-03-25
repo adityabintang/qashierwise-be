@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\BlogPosts\Tables;
 
 use App\Enums\PostStatus;
+use App\Helpers\TimezoneDisplayHelper;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -38,7 +39,8 @@ class BlogPostsTable
                     ->color(fn (PostStatus $state): string => $state->color())
                     ->sortable(),
                 TextColumn::make('published_at')
-                    ->dateTime('d M Y H:i')
+                    ->formatStateUsing(fn (mixed $state): string => TimezoneDisplayHelper::formatHtml($state))
+                    ->html()
                     ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()

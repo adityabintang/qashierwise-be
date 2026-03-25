@@ -73,4 +73,39 @@ class PublicBlogRoutesTest extends TestCase
         $response->assertOk();
         $response->assertSee('href="/blog"', false);
     }
+
+    public function test_blog_show_uses_indonesia_timezones_for_indonesian_locale(): void
+    {
+        $publishedPost = BlogPost::factory()->published()->create([
+            'slug' => 'artikel-zona-indonesia',
+            'published_at' => now(),
+        ]);
+
+        $response = $this->withHeaders([
+            'Accept-Language' => 'id-ID,id;q=0.9',
+        ])->get(route('blog.show', $publishedPost->slug));
+
+        $response->assertOk();
+        $response->assertSee('WIB:');
+        $response->assertSee('WITA:');
+        $response->assertSee('WIT:');
+    }
+
+    public function test_blog_show_uses_utc_for_non_indonesian_locale(): void
+    {
+        $publishedPost = BlogPost::factory()->published()->create([
+            'slug' => 'artikel-zona-utc',
+            'published_at' => now(),
+        ]);
+
+        $response = $this->withHeaders([
+            'Accept-Language' => 'en-US,en;q=0.9',
+        ])->get(route('blog.show', $publishedPost->slug));
+
+        $response->assertOk();
+        $response->assertSee('UTC:');
+        $response->assertDontSee('WIB:');
+        $response->assertDontSee('WITA:');
+        $response->assertDontSee('WIT:');
+    }
 }

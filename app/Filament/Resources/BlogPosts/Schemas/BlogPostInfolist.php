@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\BlogPosts\Schemas;
 
+use App\Helpers\TimezoneDisplayHelper;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
@@ -55,7 +56,8 @@ class BlogPostInfolist
                             ->badge()
                             ->color(fn ($state): string => $state->color()),
                         TextEntry::make('published_at')
-                            ->dateTime('d M Y H:i')
+                            ->formatStateUsing(fn (mixed $state): string => TimezoneDisplayHelper::formatHtml($state))
+                            ->html()
                             ->placeholder('—'),
                         TextEntry::make('tags.name')
                             ->badge()

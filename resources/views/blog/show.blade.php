@@ -30,8 +30,12 @@
             @endif
 
             <div class="p-6 sm:p-10">
+                @php($publishedTimes = \App\Helpers\TimezoneDisplayHelper::formatForDisplay($post->published_at))
+
                 <div class="mb-5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                    <span>{{ optional($post->published_at)->format('d M Y H:i') }}</span>
+                    @foreach ($publishedTimes as $label => $time)
+                        <span>{{ $label }}: {{ $time }}</span>
+                    @endforeach
                     @if ($post->category)
                         <span class="rounded-full bg-primary/10 px-2.5 py-1 font-medium text-primary">{{ $post->category->name }}</span>
                     @endif
@@ -63,12 +67,17 @@
                 <h2 class="mb-4 text-2xl font-bold text-slate-900">Artikel lain untuk Anda</h2>
                 <div class="grid gap-4 md:grid-cols-3">
                     @foreach ($relatedPosts as $relatedPost)
+                        @php($relatedPublishedTimes = \App\Helpers\TimezoneDisplayHelper::formatForDisplay($relatedPost->published_at))
                         <a href="{{ route('blog.show', $relatedPost->slug) }}" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-primary/30 hover:shadow-md">
                             <h3 class="text-base font-semibold text-slate-900">{{ $relatedPost->title }}</h3>
                             @if ($relatedPost->excerpt)
                                 <p class="mt-2 line-clamp-2 text-sm text-slate-600">{{ $relatedPost->excerpt }}</p>
                             @endif
-                            <p class="mt-3 text-xs text-slate-500">{{ optional($relatedPost->published_at)->format('d M Y') }}</p>
+                            <div class="mt-3 space-y-1 text-xs text-slate-500">
+                                @foreach ($relatedPublishedTimes as $label => $time)
+                                    <p>{{ $label }}: {{ $time }}</p>
+                                @endforeach
+                            </div>
                         </a>
                     @endforeach
                 </div>
