@@ -63,9 +63,11 @@ class BlogPostInfolist
                             ->badge()
                             ->separator(','),
                         TextEntry::make('created_at')
-                            ->dateTime('d M Y H:i'),
+                            ->formatStateUsing(fn (mixed $state): string => TimezoneDisplayHelper::formatHtml($state))
+                            ->html(),
                         TextEntry::make('updated_at')
-                            ->dateTime('d M Y H:i'),
+                            ->formatStateUsing(fn (mixed $state): string => TimezoneDisplayHelper::formatHtml($state))
+                            ->html(),
                     ])
                     ->columns(2),
             ]);

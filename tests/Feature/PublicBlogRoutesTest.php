@@ -86,9 +86,9 @@ class PublicBlogRoutesTest extends TestCase
         ])->get(route('blog.show', $publishedPost->slug));
 
         $response->assertOk();
-        $response->assertSee('WIB:');
-        $response->assertSee('WITA:');
-        $response->assertSee('WIT:');
+        $response->assertSee('WIB');
+        $response->assertDontSee('WITA');
+        $response->assertDontSee('WIT');
     }
 
     public function test_blog_show_uses_utc_for_non_indonesian_locale(): void
@@ -103,9 +103,9 @@ class PublicBlogRoutesTest extends TestCase
         ])->get(route('blog.show', $publishedPost->slug));
 
         $response->assertOk();
-        $response->assertSee('UTC:');
-        $response->assertDontSee('WIB:');
-        $response->assertDontSee('WITA:');
-        $response->assertDontSee('WIT:');
+        $response->assertSee('UTC');
+        $response->assertDontSee('WIB');
+        $response->assertDontSee('WITA');
+        $response->assertDontSee('WIT');
     }
 }

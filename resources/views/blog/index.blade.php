@@ -49,12 +49,8 @@
                         @endif
 
                         <div class="p-6">
-                            @php($publishedTimes = \App\Helpers\TimezoneDisplayHelper::formatForDisplay($post->published_at))
-
                             <div class="mb-3 flex flex-wrap items-start gap-2 text-xs text-slate-500">
-                                @foreach ($publishedTimes as $label => $time)
-                                    <span>{{ $label }}: {{ $time }}</span>
-                                @endforeach
+                                <span>{{ \App\Helpers\TimezoneDisplayHelper::formatWithLabel($post->published_at) }}</span>
                                 @if ($post->category)
                                     <span class="rounded-full bg-primary/10 px-2.5 py-1 font-medium text-primary">{{ $post->category->name }}</span>
                                 @endif
@@ -82,5 +78,7 @@
             </div>
         @endif
     </main>
+
+    <x-timezone-detector-script />
 </body>
 </html>

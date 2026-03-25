@@ -8,29 +8,38 @@ use Tests\TestCase;
 
 class TimezoneDisplayHelperTest extends TestCase
 {
-    public function test_it_returns_indonesia_timezones_for_id_locale(): void
+    public function test_it_formats_wib_for_indonesian_locale_by_default(): void
     {
         app()->setLocale('id');
 
-        $formatted = TimezoneDisplayHelper::formatForDisplay(
+        $formatted = TimezoneDisplayHelper::formatWithLabel(
             Carbon::parse('2026-03-25 02:39:00', 'UTC')
         );
 
-        $this->assertSame('25 Mar 2026 09:39', $formatted['WIB']);
-        $this->assertSame('25 Mar 2026 10:39', $formatted['WITA']);
-        $this->assertSame('25 Mar 2026 11:39', $formatted['WIT']);
+        $this->assertSame('25 Mar 2026 09:39 WIB', $formatted);
     }
 
-    public function test_it_returns_utc_for_non_indonesia_locale(): void
+    public function test_it_formats_utc_for_non_indonesia_locale(): void
     {
         app()->setLocale('en');
 
-        $formatted = TimezoneDisplayHelper::formatForDisplay(
+        $formatted = TimezoneDisplayHelper::formatWithLabel(
             Carbon::parse('2026-03-25 02:39:00', 'UTC')
         );
 
-        $this->assertArrayHasKey('UTC', $formatted);
-        $this->assertSame('25 Mar 2026 02:39', $formatted['UTC']);
-        $this->assertArrayNotHasKey('WIB', $formatted);
+        $this->assertSame('25 Mar 2026 02:39 UTC', $formatted);
+    }
+
+    public function test_it_uses_cookie_timezone_for_indonesia_wita(): void
+    {
+        app()->setLocale('en');
+
+        request()->cookies->set('viewer_timezone', 'Asia/Makassar');
+
+        $formatted = TimezoneDisplayHelper::formatWithLabel(
+            Carbon::parse('2026-03-25 02:39:00', 'UTC')
+        );
+
+        $this->assertSame('25 Mar 2026 10:39 WITA', $formatted);
     }
 }

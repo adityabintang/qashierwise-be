@@ -5,58 +5,76 @@ namespace App\Helpers;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use DateTimeInterface;
+use DateTimeZone;
 
 class TimezoneDisplayHelper
 {
-    /**
-     * @return array<string, string>
-     */
-    public static function getDisplayTimezones(): array
-    {
-        if (self::isIndonesiaContext()) {
-            return [
-                'WIB' => 'Asia/Jakarta',
-                'WITA' => 'Asia/Makassar',
-                'WIT' => 'Asia/Jayapura',
-            ];
-        }
-
-        return [
-            'UTC' => 'UTC',
-        ];
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    public static function formatForDisplay(mixed $dateTime, string $format = 'd M Y H:i'): array
+    public static function formatWithLabel(mixed $dateTime, string $format = 'd M Y H:i'): string
     {
         $normalizedDateTime = self::normalizeDateTime($dateTime);
 
         if ($normalizedDateTime === null) {
-            return [];
+            return '—';
         }
 
-        $formatted = [];
+        ['timezone' => $timezone, 'label' => $label] = self::resolveDisplayTimezone();
 
-        foreach (self::getDisplayTimezones() as $label => $timezone) {
-            $formatted[$label] = $normalizedDateTime->copy()->timezone($timezone)->format($format);
-        }
-
-        return $formatted;
+        return $normalizedDateTime->copy()->timezone($timezone)->format($format).' '.$label;
     }
 
     public static function formatHtml(mixed $dateTime, string $format = 'd M Y H:i'): string
     {
-        $formatted = self::formatForDisplay($dateTime, $format);
+        return e(self::formatWithLabel($dateTime, $format));
+    }
 
-        if ($formatted === []) {
-            return '—';
+    /**
+     * @return array{timezone: string, label: string}
+     */
+    public static function resolveDisplayTimezone(): array
+    {
+        $timezone = self::resolveViewerTimezone();
+
+        $indonesiaTimezoneMap = [
+            'Asia/Jakarta' => 'WIB',
+            'Asia/Pontianak' => 'WIB',
+            'Asia/Makassar' => 'WITA',
+            'Asia/Jayapura' => 'WIT',
+        ];
+
+        if (isset($indonesiaTimezoneMap[$timezone])) {
+            return [
+                'timezone' => $timezone,
+                'label' => $indonesiaTimezoneMap[$timezone],
+            ];
         }
 
-        return collect($formatted)
-            ->map(fn (string $value, string $label): string => "{$label}: {$value}")
-            ->implode('<br>');
+        return [
+            'timezone' => 'UTC',
+            'label' => 'UTC',
+        ];
+    }
+
+    private static function resolveViewerTimezone(): string
+    {
+        $request = request();
+
+        $cookieTimezone = $request?->cookie('viewer_timezone');
+
+        if (is_string($cookieTimezone) && self::isValidTimezoneIdentifier($cookieTimezone)) {
+            return $cookieTimezone;
+        }
+
+        $cloudflareTimezone = $request?->header('CF-Timezone');
+
+        if (is_string($cloudflareTimezone) && self::isValidTimezoneIdentifier($cloudflareTimezone)) {
+            return $cloudflareTimezone;
+        }
+
+        if (self::isIndonesiaContext()) {
+            return 'Asia/Jakarta';
+        }
+
+        return 'UTC';
     }
 
     private static function isIndonesiaContext(): bool
@@ -93,5 +111,10 @@ class TimezoneDisplayHelper
         }
 
         return null;
+    }
+
+    private static function isValidTimezoneIdentifier(string $timezone): bool
+    {
+        return in_array($timezone, DateTimeZone::listIdentifiers(), true);
     }
 }

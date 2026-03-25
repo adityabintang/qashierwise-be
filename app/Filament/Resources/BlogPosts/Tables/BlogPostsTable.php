@@ -43,7 +43,8 @@ class BlogPostsTable
                     ->html()
                     ->sortable(),
                 TextColumn::make('created_at')
-                    ->dateTime()
+                    ->formatStateUsing(fn (mixed $state): string => TimezoneDisplayHelper::formatHtml($state))
+                    ->html()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
