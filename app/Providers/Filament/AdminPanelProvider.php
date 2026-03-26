@@ -43,6 +43,10 @@ class AdminPanelProvider extends PanelProvider
                 AccountWidget::class,
             ])
             ->renderHook(
+                PanelsRenderHook::GLOBAL_SEARCH_AFTER,
+                fn (): string => view('filament.components.language-switcher')->render(),
+            )
+            ->renderHook(
                 PanelsRenderHook::BODY_START,
                 fn (): string => view('filament.components.save-progress-bar')->render(),
             )
@@ -64,6 +68,7 @@ class AdminPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
+                \App\Http\Middleware\LocalizationMiddleware::class,
             ])
             ->authMiddleware([
                 Authenticate::class,

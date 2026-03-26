@@ -22,7 +22,7 @@ class BlogTagsTable
                     ->searchable(),
                 TextColumn::make('posts_count')
                     ->counts('posts')
-                    ->label('Posts')
+                    ->label(__('admin.resources.blog_tag.fields.posts_count'))
                     ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()

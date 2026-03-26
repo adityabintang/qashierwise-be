@@ -26,7 +26,7 @@ class BlogCategoriesTable
                     ->sortable(),
                 TextColumn::make('posts_count')
                     ->counts('posts')
-                    ->label('Posts')
+                    ->label(__('admin.resources.blog_category.fields.posts_count'))
                     ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()

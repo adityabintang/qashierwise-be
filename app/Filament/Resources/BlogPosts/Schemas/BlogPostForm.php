@@ -31,11 +31,12 @@ class BlogPostForm
                         'lg' => 2,
                     ])
                     ->schema([
-                        Section::make('Content')
+                        Section::make(__('admin.resources.blog_post.sections.content'))
                             ->schema([
                                 Hidden::make('user_id')
                                     ->default(fn () => auth()->id()),
                                 TextInput::make('title')
+                                    ->label(__('admin.resources.blog_post.fields.title'))
                                     ->required()
                                     ->maxLength(255)
                                     ->live(onBlur: true)
@@ -45,7 +46,7 @@ class BlogPostForm
                                     ->maxLength(255)
                                     ->unique(ignoreRecord: true),
                                 Select::make('blog_category_id')
-                                    ->label('Category')
+                                    ->label(__('admin.resources.blog_post.fields.category'))
                                     ->relationship('category', 'name')
                                     ->searchable()
                                     ->preload()
@@ -54,9 +55,11 @@ class BlogPostForm
                                         TextInput::make('slug')->required(),
                                     ]),
                                 Textarea::make('excerpt')
+                                    ->label(__('admin.resources.blog_post.fields.excerpt'))
                                     ->rows(3)
                                     ->columnSpanFull(),
                                 RichEditor::make('content')
+                                    ->label(__('admin.resources.blog_post.fields.content'))
                                     ->required()
                                     ->fileAttachmentsDisk('r2')
                                     ->fileAttachmentsDirectory('blog/attachments')
@@ -71,9 +74,10 @@ class BlogPostForm
                         'lg' => 1,
                     ])
                     ->schema([
-                        Section::make('Media')
+                        Section::make(__('admin.resources.blog_post.sections.media'))
                             ->schema([
                                 FileUpload::make('featured_image')
+                                    ->label(__('admin.resources.blog_post.fields.featured_image'))
                                     ->image()
                                     ->disk('r2')
                                     ->directory('blog/featured')
@@ -82,19 +86,21 @@ class BlogPostForm
                                     ->imageResizeMode('contain')
                                     ->imageResizeTargetWidth('1920')
                                     ->imageResizeTargetHeight(null)
-                                    ->helperText('Gambar akan otomatis dikonversi ke WebP dan diresize maksimal 1920px lebar.')
+                                    ->helperText(__('admin.resources.blog_post.fields.featured_image_helper'))
                             ]),
 
-                        Section::make('SEO')
+                        Section::make(__('admin.resources.blog_post.sections.seo'))
                             ->schema([
                                 TextInput::make('seo_title')
+                                    ->label(__('admin.resources.blog_post.fields.seo_title'))
                                     ->maxLength(70),
                                 Textarea::make('seo_description')
+                                    ->label(__('admin.resources.blog_post.fields.seo_description'))
                                     ->maxLength(160)
                                     ->rows(3)
                                     ->columnSpanFull(),
                                 FileUpload::make('seo_image')
-                                    ->label('OG Image')
+                                    ->label(__('admin.resources.blog_post.fields.og_image'))
                                     ->image()
                                     ->disk('r2')
                                     ->directory('blog/seo')
@@ -102,22 +108,24 @@ class BlogPostForm
                                     ->imageResizeMode('contain')
                                     ->imageResizeTargetWidth('1200')
                                     ->imageResizeTargetHeight(null)
-                                    ->helperText('Gambar untuk preview saat di-share di social media (1200x630px). Jika tidak diupload, akan menggunakan gambar dari Media. Gambar akan otomatis dikonversi ke WebP dan diresize maksimal 1200px lebar.')
+                                    ->helperText(__('admin.resources.blog_post.fields.og_image_helper'))
                             ])
                             ->collapsible()
                             ->collapsed(),
 
-                        Section::make('Publishing')
+                        Section::make(__('admin.resources.blog_post.sections.publishing'))
                             ->schema([
                                 Select::make('status')
+                                    ->label(__('admin.resources.blog_post.fields.status'))
                                     ->options(PostStatus::class)
                                     ->default(PostStatus::Draft)
                                     ->required(),
                                 DateTimePicker::make('published_at')
-                                    ->label('Publish Date')
+                                    ->label(__('admin.resources.blog_post.fields.publish_date'))
                                     ->timezone('Asia/Jakarta')
-                                    ->helperText('Input menggunakan WIB. Sistem tetap menyimpan waktu dalam UTC.'),
+                                    ->helperText(__('admin.resources.blog_post.fields.publish_date_helper')),
                                 Select::make('tags')
+                                    ->label(__('admin.resources.blog_post.fields.tags'))
                                     ->relationship('tags', 'name')
                                     ->multiple()
                                     ->searchable()

@@ -28,11 +28,11 @@ class BlogPostsTable
                     ->sortable()
                     ->limit(50),
                 TextColumn::make('category.name')
-                    ->label('Category')
+                    ->label(__('admin.resources.blog_post.fields.category'))
                     ->badge()
                     ->sortable(),
                 TextColumn::make('author.name')
-                    ->label('Author')
+                    ->label(__('admin.resources.blog_post.fields.author'))
                     ->sortable(),
                 TextColumn::make('status')
                     ->badge()
@@ -51,9 +51,10 @@ class BlogPostsTable
             ->defaultSort('created_at', 'desc')
             ->filters([
                 SelectFilter::make('status')
+                    ->label(__('admin.resources.blog_post.filters.status'))
                     ->options(PostStatus::class),
                 SelectFilter::make('blog_category_id')
-                    ->label('Category')
+                    ->label(__('admin.resources.blog_post.filters.category'))
                     ->relationship('category', 'name'),
             ])
             ->recordActions([

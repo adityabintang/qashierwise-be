@@ -15,9 +15,10 @@ class BlogCategoryForm
     {
         return $schema
             ->components([
-                Section::make('Category Details')
+                Section::make(__('admin.resources.blog_category.sections.details'))
                     ->schema([
                         TextInput::make('name')
+                            ->label(__('admin.resources.blog_category.fields.name'))
                             ->required()
                             ->maxLength(255)
                             ->live(onBlur: true)
@@ -27,14 +28,16 @@ class BlogCategoryForm
                             ->maxLength(255)
                             ->unique(ignoreRecord: true),
                         Textarea::make('description')
+                            ->label(__('admin.resources.blog_category.fields.description'))
                             ->rows(3)
                             ->columnSpanFull(),
                         Toggle::make('is_active')
+                            ->label(__('admin.resources.blog_category.fields.is_active'))
                             ->default(true),
                     ])
                     ->columns(2),
 
-                Section::make('SEO')
+                Section::make(__('admin.resources.blog_post.sections.seo'))
                     ->schema([
                         TextInput::make('seo_title')
                             ->maxLength(70),
