@@ -29,6 +29,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->brandName('QashierWise CMS')
+            ->favicon(asset('favicon.ico'))
             ->colors([
                 'primary' => Color::Indigo,
             ])
@@ -42,8 +43,16 @@ class AdminPanelProvider extends PanelProvider
                 AccountWidget::class,
             ])
             ->renderHook(
+                PanelsRenderHook::BODY_START,
+                fn (): string => view('filament.components.save-progress-bar')->render(),
+            )
+            ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn (): string => view('components.timezone-detector-script')->render(),
+            )
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn (): string => view('components.upload-debug-script')->render(),
             )
             ->middleware([
                 EncryptCookies::class,

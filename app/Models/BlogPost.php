@@ -4,10 +4,12 @@ namespace App\Models;
 
 use App\Enums\PostStatus;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class BlogPost extends Model
@@ -33,12 +35,30 @@ class BlogPost extends Model
         'seo_image',
     ];
 
+    protected $appends = ['featured_image_url', 'seo_image_url'];
+
     protected function casts(): array
     {
         return [
             'status' => PostStatus::class,
             'published_at' => 'datetime',
         ];
+    }
+
+    protected function featuredImageUrl(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->featured_image ? Storage::disk('r2')->url($this->featured_image) : null
+        );
+    }
+
+    protected function seoImageUrl(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->seo_image 
+                ? Storage::disk('r2')->url($this->seo_image) 
+                : ($this->featured_image ? Storage::disk('r2')->url($this->featured_image) : null)
+        );
     }
 
     protected static function boot(): void

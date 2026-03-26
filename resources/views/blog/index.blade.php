@@ -3,6 +3,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    @if(config('app.env') === 'local')
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+    @endif
     <title>Blog | {{ config('app.name') }}</title>
     <meta name="description" content="Baca artikel terbaru dari {{ config('app.name') }}.">
 
@@ -44,7 +47,7 @@
                     <article class="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
                         @if ($post->featured_image)
                             <a href="{{ route('blog.show', $post->slug) }}" class="block">
-                                <img src="{{ asset('storage/' . $post->featured_image) }}" alt="{{ $post->title }}" class="h-52 w-full object-cover">
+                                <img src="{{ $post->featured_image_url }}" alt="{{ $post->title }}" class="h-52 w-full object-cover">
                             </a>
                         @endif
 

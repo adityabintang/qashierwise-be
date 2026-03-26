@@ -3,6 +3,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    @if(config('app.env') === 'local')
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+    @endif
     <title>{{ $post->seo_title ?: $post->title }} | {{ config('app.name') }}</title>
     <meta name="description" content="{{ $post->seo_description ?: ($post->excerpt ?: 'Artikel dari QashierWise') }}">
 
@@ -26,7 +29,7 @@
     <main class="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
         <article class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
             @if ($post->featured_image)
-                <img src="{{ asset('storage/' . $post->featured_image) }}" alt="{{ $post->title }}" class="h-64 w-full object-cover sm:h-80">
+                <img src="{{ $post->featured_image_url }}" alt="{{ $post->title }}" class="h-64 w-full object-cover sm:h-80">
             @endif
 
             <div class="p-6 sm:p-10">
