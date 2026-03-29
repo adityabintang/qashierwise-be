@@ -977,6 +977,390 @@ a, button, input, select, textarea {
     }
 }
 
+/* ===== Fly Blog Listing Replica ===== */
+
+@font-face {
+    font-family: 'Fricolage Grotesque';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('https://fly.io/static/fonts/fricolage-grotesque.var.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'Mackinac';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('https://fly.io/static/fonts/mackinac-medium.woff2') format('woff2');
+}
+
+.fly-blog-page {
+    background: linear-gradient(180deg, #120428 0%, #1a0736 45%, #f7f5ff 45%, #f7f5ff 100%);
+    color: #f4f0ff;
+    min-height: 100vh;
+    font-family: 'Fricolage Grotesque', 'Inter', sans-serif;
+}
+
+.fly-blog-navbar-wrap {
+    position: relative;
+    z-index: 30;
+}
+
+.fly-blog-navbar {
+    height: 96px;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.fly-blog-logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: #f8f5ff;
+    text-decoration: none;
+    flex-shrink: 0;
+}
+
+.fly-logo-badge {
+    width: 1.95rem;
+    height: 1.95rem;
+    border-radius: 0.55rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 28% 28%, #be7af1 0%, #7960e6 55%, #5046e4 100%);
+    color: #fff;
+    font-weight: 800;
+    font-size: 0.85rem;
+}
+
+.fly-logo-word {
+    font-family: 'Mackinac', serif;
+    font-size: 2rem;
+    line-height: 1;
+}
+
+.fly-blog-main-nav {
+    display: none;
+    align-items: center;
+    gap: 1.25rem;
+    margin: 0 auto;
+}
+
+.fly-blog-main-nav a {
+    color: rgba(241, 230, 255, 0.8);
+    font-size: 0.93rem;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.fly-blog-main-nav a:hover,
+.fly-blog-main-nav a.is-active {
+    color: #9c8bff;
+}
+
+.fly-blog-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.fly-btn {
+    border-radius: 0.72rem;
+    font-size: 0.95rem;
+    line-height: 1;
+    padding: 0.7rem 1rem;
+    text-decoration: none;
+    border: 1px solid transparent;
+}
+
+.fly-btn.ghost {
+    color: #faf8ff;
+    border-color: rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.fly-btn.primary {
+    color: #fff;
+    background: #7160f0;
+}
+
+.fly-hero-section {
+    position: relative;
+    margin-top: -96px;
+    padding-top: 10.5rem;
+    padding-bottom: 3.25rem;
+    overflow: hidden;
+}
+
+.fly-hero-bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.42;
+}
+
+.fly-hero-card {
+    position: relative;
+    display: grid;
+    gap: 2rem;
+    align-items: center;
+}
+
+.fly-hero-copy,
+.fly-post-card {
+    position: relative;
+}
+
+.fly-meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: 1.25rem;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.74);
+}
+
+.fly-line {
+    height: 1px;
+    flex: 1;
+    margin: 0 0.55rem;
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.fly-hero-copy h1 {
+    font-family: 'Mackinac', serif;
+    font-size: clamp(2.15rem, 3.5vw, 3.35rem);
+    line-height: 1.12;
+    margin-bottom: 1.15rem;
+    color: #f7f3ff;
+}
+
+.fly-hero-excerpt {
+    color: rgba(237, 226, 255, 0.76);
+    font-size: 1.12rem;
+    line-height: 1.62;
+    max-width: 44rem;
+    margin-bottom: 1.8rem;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+}
+
+.fly-readmore {
+    font-size: 1.25rem;
+    color: #ffde47;
+    font-weight: 700;
+}
+
+.fly-readmore.violet {
+    color: #6354db;
+    font-size: 1rem;
+    margin-top: auto;
+}
+
+.fly-overlay-link {
+    position: absolute;
+    inset: 0;
+}
+
+.fly-hero-image {
+    width: 100%;
+    border-radius: 1rem;
+    display: none;
+    min-height: 400px;
+    max-height: 500px;
+    object-fit: cover;
+}
+
+.fly-cards-grid {
+    margin-top: -3.7rem;
+    margin-bottom: 2rem;
+    display: grid;
+    gap: 1.5rem;
+}
+
+.fly-post-card {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    color: #453f57;
+    border-radius: 1.05rem;
+    padding: 1.35rem;
+    box-shadow: 0 2px 18px rgba(48, 20, 95, 0.08);
+    min-height: 100%;
+    border: 1px solid rgba(216, 210, 233, 0.75);
+}
+
+.fly-card-image {
+    aspect-ratio: 16 / 10;
+    width: 100%;
+    object-fit: cover;
+    border-radius: 0.8rem;
+    margin-bottom: 1.1rem;
+}
+
+.fly-post-card .card-meta {
+    color: #7f7a95;
+    margin-bottom: 0.9rem;
+}
+
+.fly-post-card .card-meta .fly-line {
+    background: #ebe8f5;
+}
+
+.fly-post-card h2 {
+    font-family: 'Mackinac', serif;
+    color: #1f163c;
+    font-size: clamp(1.45rem, 1.6vw, 1.6rem);
+    line-height: 1.22;
+    margin-bottom: 0.8rem;
+}
+
+.fly-card-excerpt {
+    color: #60597a;
+    font-size: 1.02rem;
+    line-height: 1.58;
+    margin-bottom: 1.25rem;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+}
+
+.fly-load-more {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    color: #f3ebff;
+    margin: 0 auto 4rem;
+}
+
+.fly-load-more p {
+    font-size: 0.92rem;
+    letter-spacing: 0.03em;
+    color: rgba(241, 229, 255, 0.83);
+}
+
+.fly-load-more.has-error p {
+    color: #ffd8da;
+}
+
+.fly-load-spinner {
+    width: 1.65rem;
+    height: 1.65rem;
+    border: 2px solid rgba(255, 255, 255, 0.22);
+    border-top-color: #f8efff;
+    border-radius: 9999px;
+    animation: fly-spin 0.9s linear infinite;
+}
+
+@keyframes fly-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.fly-empty-state {
+    background: #fff;
+    color: #1f163c;
+    border: 1px dashed #d8d0ec;
+    border-radius: 1rem;
+    padding: 2rem;
+    text-align: center;
+    margin: 2rem 0 4rem;
+}
+
+.fly-empty-state h2 {
+    font-family: 'Mackinac', serif;
+    font-size: 1.9rem;
+    margin-bottom: 0.5rem;
+}
+
+@media (min-width: 1024px) {
+    .fly-blog-main-nav {
+        display: inline-flex;
+    }
+
+    .fly-hero-card {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 2.2rem;
+    }
+
+    .fly-hero-copy {
+        padding-right: 3.4rem;
+    }
+
+    .fly-hero-image {
+        display: block;
+    }
+
+    .fly-cards-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .fly-post-card {
+        padding: 1.8rem;
+    }
+}
+
+@media (min-width: 1280px) {
+    .fly-cards-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 767px) {
+    .fly-blog-actions .fly-btn.ghost {
+        display: none;
+    }
+
+    .fly-blog-navbar {
+        gap: 0.8rem;
+    }
+
+    .fly-logo-word {
+        font-size: 1.6rem;
+    }
+
+    .fly-btn {
+        padding: 0.62rem 0.84rem;
+        font-size: 0.84rem;
+    }
+
+    .fly-hero-section {
+        padding-top: 8.3rem;
+        padding-bottom: 2.5rem;
+    }
+
+    .fly-meta-row {
+        font-size: 0.62rem;
+    }
+
+    .fly-readmore {
+        font-size: 1.1rem;
+    }
+
+    .fly-cards-grid {
+        margin-top: -2.4rem;
+        gap: 1.1rem;
+    }
+}
+
 /* ===== Tablet-Specific Spacing Utilities ===== */
 /* Requirements: 5.3 - Reduce spacing proportionally on tablet */
 

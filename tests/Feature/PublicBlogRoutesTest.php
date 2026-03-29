@@ -108,4 +108,33 @@ class PublicBlogRoutesTest extends TestCase
         $response->assertDontSee('WITA');
         $response->assertDontSee('WIT');
     }
+
+    public function test_blog_load_more_returns_published_posts_only(): void
+    {
+        BlogPost::factory()->published()->count(12)->create();
+        BlogPost::factory()->create([
+            'title' => 'Draft Should Not Appear',
+            'slug' => 'draft-should-not-appear',
+        ]);
+
+        $initialResponse = $this->get(route('blog.index'));
+        $initialResponse->assertOk();
+
+        preg_match('/data-next-cursor="([^"]+)"/', $initialResponse->getContent(), $matches);
+        $this->assertNotEmpty($matches[1] ?? null);
+
+        $response = $this->getJson(route('blog.load-more', [
+            'cursor' => $matches[1],
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonStructure([
+            'html',
+            'next_cursor',
+            'has_more',
+        ]);
+
+        $this->assertStringContainsString('Read more', $response->json('html'));
+        $this->assertStringNotContainsString('Draft Should Not Appear', $response->json('html'));
+    }
 }
