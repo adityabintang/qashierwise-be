@@ -10,14 +10,39 @@ use Illuminate\View\View;
 
 class BlogController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        $initialPosts = BlogPost::query()
+        $search = $request->query('search', '');
+        $sort = $request->query('sort', 'latest');
+
+        $query = BlogPost::query()
             ->published()
-            ->with(['author:id,name', 'category:id,name,slug'])
-            ->orderByDesc('published_at')
-            ->orderByDesc('id')
-            ->cursorPaginate(10);
+            ->with(['author:id,name', 'category:id,name,slug']);
+
+        // Apply search filter
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('excerpt', 'like', "%{$search}%")
+                    ->orWhere('content', 'like', "%{$search}%");
+            });
+        }
+
+        // Apply sorting
+        switch ($sort) {
+            case 'oldest':
+                $query->orderBy('published_at')->orderBy('id');
+                break;
+            case 'title':
+                $query->orderBy('title');
+                break;
+            case 'latest':
+            default:
+                $query->orderByDesc('published_at')->orderByDesc('id');
+                break;
+        }
+
+        $initialPosts = $query->cursorPaginate(10);
 
         $featuredPost = $initialPosts->getCollection()->first();
         $gridPosts = $initialPosts->getCollection()->slice(1)->values();
@@ -26,22 +51,49 @@ class BlogController extends Controller
             'featuredPost' => $featuredPost,
             'gridPosts' => $gridPosts,
             'nextCursor' => $initialPosts->nextCursor()?->encode(),
+            'search' => $search,
+            'sort' => $sort,
         ]);
     }
 
     public function loadMore(Request $request): JsonResponse
     {
         $encodedCursor = $request->query('cursor');
+        $search = $request->query('search', '');
+        $sort = $request->query('sort', 'latest');
+
         $cursor = is_string($encodedCursor) && $encodedCursor !== ''
             ? Cursor::fromEncoded($encodedCursor)
             : null;
 
-        $posts = BlogPost::query()
+        $query = BlogPost::query()
             ->published()
-            ->with(['author:id,name', 'category:id,name,slug'])
-            ->orderByDesc('published_at')
-            ->orderByDesc('id')
-            ->cursorPaginate(9, ['*'], 'cursor', $cursor);
+            ->with(['author:id,name', 'category:id,name,slug']);
+
+        // Apply search filter
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('excerpt', 'like', "%{$search}%")
+                    ->orWhere('content', 'like', "%{$search}%");
+            });
+        }
+
+        // Apply sorting
+        switch ($sort) {
+            case 'oldest':
+                $query->orderBy('published_at')->orderBy('id');
+                break;
+            case 'title':
+                $query->orderBy('title');
+                break;
+            case 'latest':
+            default:
+                $query->orderByDesc('published_at')->orderByDesc('id');
+                break;
+        }
+
+        $posts = $query->cursorPaginate(9, ['*'], 'cursor', $cursor);
 
         $html = view('blog.partials.post-cards', [
             'posts' => collect($posts->items()),

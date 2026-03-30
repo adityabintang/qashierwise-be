@@ -27,6 +27,26 @@ class BlogCategoryResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->can('view_blog_category') || auth()->user()->isSuperAdmin();
+    }
+
+    public static function canCreate(): bool
+    {
+        return auth()->user()->can('create_blog_category') || auth()->user()->isSuperAdmin();
+    }
+
+    public static function canEdit($record): bool
+    {
+        return auth()->user()->can('update_blog_category') || auth()->user()->isSuperAdmin();
+    }
+
+    public static function canDelete($record): bool
+    {
+        return auth()->user()->can('delete_blog_category') || auth()->user()->isSuperAdmin();
+    }
+
     public static function form(Schema $schema): Schema
     {
         return BlogCategoryForm::configure($schema);

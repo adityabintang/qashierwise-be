@@ -979,48 +979,52 @@ a, button, input, select, textarea {
 
 /* ===== Fly Blog Listing Replica ===== */
 
-@font-face {
-    font-family: 'Fricolage Grotesque';
-    font-style: normal;
-    font-weight: 100 900;
-    font-display: swap;
-    src: url('https://fly.io/static/fonts/fricolage-grotesque.var.woff2') format('woff2');
-}
-
-@font-face {
-    font-family: 'Mackinac';
-    font-style: normal;
-    font-weight: 500;
-    font-display: swap;
-    src: url('https://fly.io/static/fonts/mackinac-medium.woff2') format('woff2');
-}
-
 .fly-blog-page {
-    background: linear-gradient(180deg, #120428 0%, #1a0736 45%, #f7f5ff 45%, #f7f5ff 100%);
     color: #f4f0ff;
     min-height: 100vh;
-    font-family: 'Fricolage Grotesque', 'Inter', sans-serif;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
 
 .fly-blog-navbar-wrap {
     position: relative;
     z-index: 30;
+    background: transparent;
+}
+
+@media (max-width: 767px) {
+    .fly-blog-navbar-wrap {
+        background: rgb(51, 20, 69);
+    }
 }
 
 .fly-blog-navbar {
-    height: 96px;
+    height: 64px;
     display: flex;
     align-items: center;
-    gap: 1.5rem;
+    gap: 1rem;
+    background: transparent;
 }
 
 .fly-blog-logo {
     display: inline-flex;
     align-items: center;
-    gap: 0.6rem;
+    gap: 0.5rem;
     color: #f8f5ff;
     text-decoration: none;
     flex-shrink: 0;
+    transition: opacity 0.2s ease;
+}
+
+.fly-blog-logo:hover {
+    opacity: 0.8;
+}
+
+.fly-logo-icon {
+    width: 2rem;
+    height: 2rem;
+    object-fit: contain;
+    display: block;
+    border-radius: 0.5rem;
 }
 
 .fly-logo-badge {
@@ -1037,9 +1041,10 @@ a, button, input, select, textarea {
 }
 
 .fly-logo-word {
-    font-family: 'Mackinac', serif;
-    font-size: 2rem;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    font-size: 1.125rem;
     line-height: 1;
+    font-weight: 600;
 }
 
 .fly-blog-main-nav {
@@ -1051,7 +1056,7 @@ a, button, input, select, textarea {
 
 .fly-blog-main-nav a {
     color: rgba(241, 230, 255, 0.8);
-    font-size: 0.93rem;
+    font-size: 0.813rem;
     text-decoration: none;
     transition: color 0.2s ease;
 }
@@ -1063,24 +1068,197 @@ a, button, input, select, textarea {
 
 .fly-blog-actions {
     margin-left: auto;
-    display: flex;
+    display: none;
     align-items: center;
     gap: 0.65rem;
+    flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+    .fly-blog-actions {
+        display: flex;
+    }
+}
+
+/* Search and Sort Styles */
+.fly-blog-search-wrapper {
+    flex: 1;
+    max-width: 600px;
+    margin: 0 auto;
+    display: none;
+}
+
+@media (min-width: 768px) {
+    .fly-blog-search-wrapper {
+        display: block;
+    }
+}
+
+.fly-blog-search-form {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.fly-search-input-group {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+.fly-search-icon {
+    position: absolute;
+    left: 0.75rem;
+    width: 1rem;
+    height: 1rem;
+    color: rgba(241, 230, 255, 0.6);
+    pointer-events: none;
+}
+
+.fly-search-input {
+    width: 100%;
+    height: 38px;
+    padding: 0 2.5rem 0 2.5rem;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0.5rem;
+    color: #f8f5ff;
+    font-size: 0.813rem;
+    transition: all 0.2s ease;
+}
+
+.fly-search-input::placeholder {
+    color: rgba(241, 230, 255, 0.5);
+}
+
+.fly-search-input:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(157, 139, 255, 0.5);
+    box-shadow: 0 0 0 3px rgba(157, 139, 255, 0.1);
+}
+
+.fly-search-clear {
+    position: absolute;
+    right: 0.75rem;
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 50%;
+    color: rgba(241, 230, 255, 0.7);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.fly-search-clear:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #f8f5ff;
+}
+
+.fly-search-clear svg {
+    width: 0.875rem;
+    height: 0.875rem;
+}
+
+.fly-search-loading {
+    position: absolute;
+    right: 0.75rem;
+    width: 1.25rem;
+    height: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fly-spinner {
+    width: 1rem;
+    height: 1rem;
+    color: rgba(241, 230, 255, 0.7);
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.fly-sort-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.fly-sort-label {
+    color: rgba(241, 230, 255, 0.8);
+    font-size: 0.813rem;
+    font-weight: 500;
+}
+
+.fly-sort-select {
+    height: 38px;
+    padding: 0 2rem 0 0.75rem;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0.5rem;
+    color: #f8f5ff;
+    font-size: 0.813rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(241, 230, 255, 0.8)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 1rem;
+}
+
+.fly-sort-select:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.fly-sort-select:focus {
+    outline: none;
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(157, 139, 255, 0.5);
+    box-shadow: 0 0 0 3px rgba(157, 139, 255, 0.1);
+}
+
+.fly-sort-select option {
+    background: #1a1a2e;
+    color: #f8f5ff;
 }
 
 .fly-btn {
-    border-radius: 0.72rem;
-    font-size: 0.95rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
     line-height: 1;
-    padding: 0.7rem 1rem;
+    padding: 0.5rem 0.875rem;
     text-decoration: none;
     border: 1px solid transparent;
+    transition: all 0.2s ease;
+    font-weight: 500;
 }
 
 .fly-btn.ghost {
     color: #faf8ff;
-    border-color: rgba(255, 255, 255, 0.4);
+    border-color: rgba(255, 255, 255, 0.3);
     background: rgba(255, 255, 255, 0.04);
+}
+
+.fly-btn.ghost:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.4);
 }
 
 .fly-btn.primary {
@@ -1088,11 +1266,14 @@ a, button, input, select, textarea {
     background: #7160f0;
 }
 
+.fly-btn.primary:hover {
+    background: #5f4dd4;
+}
+
 .fly-hero-section {
     position: relative;
-    margin-top: -96px;
-    padding-top: 10.5rem;
-    padding-bottom: 3.25rem;
+    margin-top: -64px;
+    padding: 0;
     overflow: hidden;
 }
 
@@ -1102,7 +1283,7 @@ a, button, input, select, textarea {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    opacity: 0.42;
+    opacity: 1;
 }
 
 .fly-hero-card {
@@ -1110,6 +1291,7 @@ a, button, input, select, textarea {
     display: grid;
     gap: 2rem;
     align-items: center;
+    padding: 2rem 0 1rem 0;
 }
 
 .fly-hero-copy,
@@ -1123,7 +1305,7 @@ a, button, input, select, textarea {
     justify-content: space-between;
     width: 100%;
     margin-bottom: 1.25rem;
-    font-size: 0.68rem;
+    font-size: 0.625rem;
     letter-spacing: 0.08em;
     font-weight: 700;
     text-transform: uppercase;
@@ -1138,16 +1320,17 @@ a, button, input, select, textarea {
 }
 
 .fly-hero-copy h1 {
-    font-family: 'Mackinac', serif;
-    font-size: clamp(2.15rem, 3.5vw, 3.35rem);
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    font-size: clamp(1.875rem, 3vw, 2.875rem);
     line-height: 1.12;
     margin-bottom: 1.15rem;
     color: #f7f3ff;
+    font-weight: 700;
 }
 
 .fly-hero-excerpt {
     color: rgba(237, 226, 255, 0.76);
-    font-size: 1.12rem;
+    font-size: 0.938rem;
     line-height: 1.62;
     max-width: 44rem;
     margin-bottom: 1.8rem;
@@ -1159,14 +1342,14 @@ a, button, input, select, textarea {
 }
 
 .fly-readmore {
-    font-size: 1.25rem;
+    font-size: 1.063rem;
     color: #ffde47;
     font-weight: 700;
 }
 
 .fly-readmore.violet {
     color: #6354db;
-    font-size: 1rem;
+    font-size: 0.875rem;
     margin-top: auto;
 }
 
@@ -1184,8 +1367,14 @@ a, button, input, select, textarea {
     object-fit: cover;
 }
 
+.fly-cards-section {
+    margin-top: -2rem;
+    position: relative;
+    z-index: 10;
+}
+
 .fly-cards-grid {
-    margin-top: -3.7rem;
+    margin-top: 0;
     margin-bottom: 2rem;
     display: grid;
     gap: 1.5rem;
@@ -1197,7 +1386,7 @@ a, button, input, select, textarea {
     background: #fff;
     color: #453f57;
     border-radius: 1.05rem;
-    padding: 1.35rem;
+    padding: 1rem;
     box-shadow: 0 2px 18px rgba(48, 20, 95, 0.08);
     min-height: 100%;
     border: 1px solid rgba(216, 210, 233, 0.75);
@@ -1221,16 +1410,17 @@ a, button, input, select, textarea {
 }
 
 .fly-post-card h2 {
-    font-family: 'Mackinac', serif;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
     color: #1f163c;
-    font-size: clamp(1.45rem, 1.6vw, 1.6rem);
+    font-size: clamp(1.25rem, 1.4vw, 1.375rem);
     line-height: 1.22;
     margin-bottom: 0.8rem;
+    font-weight: 700;
 }
 
 .fly-card-excerpt {
     color: #60597a;
-    font-size: 1.02rem;
+    font-size: 0.875rem;
     line-height: 1.58;
     margin-bottom: 1.25rem;
     display: -webkit-box;
@@ -1251,7 +1441,7 @@ a, button, input, select, textarea {
 }
 
 .fly-load-more p {
-    font-size: 0.92rem;
+    font-size: 0.813rem;
     letter-spacing: 0.03em;
     color: rgba(241, 229, 255, 0.83);
 }
@@ -1292,6 +1482,19 @@ a, button, input, select, textarea {
 }
 
 @media (min-width: 1024px) {
+    .fly-hero-section {
+        min-height: auto;
+    }
+
+    .fly-hero-bg {
+        height: 100%;
+        inset: 0;
+    }
+
+    .fly-cards-section {
+        margin-top: -4rem;
+    }
+
     .fly-blog-main-nav {
         display: inline-flex;
     }
@@ -1299,6 +1502,7 @@ a, button, input, select, textarea {
     .fly-hero-card {
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         gap: 2.2rem;
+        padding: 10rem 0 6rem 0;
     }
 
     .fly-hero-copy {
@@ -1310,11 +1514,12 @@ a, button, input, select, textarea {
     }
 
     .fly-cards-grid {
+        margin-top: 2rem;
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .fly-post-card {
-        padding: 1.8rem;
+        padding: 10px;
     }
 }
 
@@ -1325,21 +1530,71 @@ a, button, input, select, textarea {
 }
 
 @media (max-width: 767px) {
-    .fly-blog-actions .fly-btn.ghost {
-        display: none;
+    .fly-blog-navbar {
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        height: auto;
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
     }
 
-    .fly-blog-navbar {
-        gap: 0.8rem;
+    .fly-blog-logo {
+        order: 1;
+    }
+
+    .fly-logo-icon {
+        width: 1.75rem;
+        height: 1.75rem;
     }
 
     .fly-logo-word {
-        font-size: 1.6rem;
+        font-size: 1rem;
+    }
+
+    .fly-blog-actions {
+        order: 2;
+        margin-left: auto;
+    }
+
+    .fly-blog-actions .fly-btn {
+        padding: 0.4rem 0.65rem;
+        font-size: 0.8rem;
+    }
+
+    .fly-blog-search-wrapper {
+        order: 3;
+        width: 100%;
+        margin-top: 0.5rem;
+    }
+
+    .fly-blog-search-form {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .fly-search-input {
+        height: 36px;
+        font-size: 0.813rem;
+    }
+
+    .fly-sort-group {
+        width: 100%;
+    }
+
+    .fly-sort-select {
+        flex: 1;
+        height: 36px;
     }
 
     .fly-btn {
-        padding: 0.62rem 0.84rem;
-        font-size: 0.84rem;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
+    }
+
+    .fly-hero-section {
+        margin-top: 0;
+        padding-top: 6rem;
+        padding-bottom: 2rem;
     }
 
     .fly-hero-section {
@@ -1348,15 +1603,15 @@ a, button, input, select, textarea {
     }
 
     .fly-meta-row {
-        font-size: 0.62rem;
+        font-size: 0.563rem;
     }
 
     .fly-readmore {
-        font-size: 1.1rem;
+        font-size: 0.938rem;
     }
 
     .fly-cards-grid {
-        margin-top: -2.4rem;
+        margin-top: 1.25rem;
         gap: 1.1rem;
     }
 }

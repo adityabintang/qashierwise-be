@@ -187,7 +187,7 @@ class User extends Authenticatable implements FilamentUser
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->isSuperAdmin() || $this->isMasterAdmin();
+        return $this->isSuperAdmin() || $this->isAuthor();
     }
 
     /**
@@ -196,6 +196,14 @@ class User extends Authenticatable implements FilamentUser
     public function isMasterAdmin(): bool
     {
         return $this->is_master_admin === true;
+    }
+
+    /**
+     * Check if the user is an author (blog content manager).
+     */
+    public function isAuthor(): bool
+    {
+        return $this->hasRole('author');
     }
 
     /**

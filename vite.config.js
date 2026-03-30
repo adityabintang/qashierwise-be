@@ -33,6 +33,11 @@ export default defineConfig({
     },
     server: {
         https: false,
-        host: 'localhost',
+        host: '0.0.0.0',
+        port: 5173,
+        strictPort: true,
+        hmr: {
+            host: 'localhost',
+        },
     },
 });

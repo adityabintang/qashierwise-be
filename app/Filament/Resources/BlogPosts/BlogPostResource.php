@@ -27,6 +27,26 @@ class BlogPostResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->can('view_blog_post') || auth()->user()->isSuperAdmin();
+    }
+
+    public static function canCreate(): bool
+    {
+        return auth()->user()->can('create_blog_post') || auth()->user()->isSuperAdmin();
+    }
+
+    public static function canEdit($record): bool
+    {
+        return auth()->user()->can('update_blog_post') || auth()->user()->isSuperAdmin();
+    }
+
+    public static function canDelete($record): bool
+    {
+        return auth()->user()->can('delete_blog_post') || auth()->user()->isSuperAdmin();
+    }
+
     public static function form(Schema $schema): Schema
     {
         return BlogPostForm::configure($schema);

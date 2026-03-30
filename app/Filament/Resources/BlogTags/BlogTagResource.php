@@ -27,6 +27,26 @@ class BlogTagResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->can('view_blog_tag') || auth()->user()->isSuperAdmin();
+    }
+
+    public static function canCreate(): bool
+    {
+        return auth()->user()->can('create_blog_tag') || auth()->user()->isSuperAdmin();
+    }
+
+    public static function canEdit($record): bool
+    {
+        return auth()->user()->can('update_blog_tag') || auth()->user()->isSuperAdmin();
+    }
+
+    public static function canDelete($record): bool
+    {
+        return auth()->user()->can('delete_blog_tag') || auth()->user()->isSuperAdmin();
+    }
+
     public static function form(Schema $schema): Schema
     {
         return BlogTagForm::configure($schema);

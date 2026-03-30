@@ -81,7 +81,7 @@ Route::prefix('reservations')->name('reservation.')->group(function () {
 });
 
 // Dashboard routes (protected by authentication middleware)
-Route::middleware(['web', 'check.web.auth'])->group(function () {
+Route::middleware(['web', 'check.web.auth', 'block.author.login'])->group(function () {
     Route::get('/dashboard', function () {
         return view('dashboard.index');
     })->name('dashboard');
