@@ -5,12 +5,12 @@ namespace App\Filament\Resources\BlogPosts\Schemas;
 use App\Enums\PostStatus;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
-use Filament\Schemas\Components\Grid;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
@@ -85,7 +85,7 @@ class BlogPostForm
                                     ->imageResizeMode('contain')
                                     ->imageResizeTargetWidth('1920')
                                     ->imageResizeTargetHeight(null)
-                                    ->helperText(__('admin.resources.blog_post.fields.featured_image_helper'))
+                                    ->helperText(__('admin.resources.blog_post.fields.featured_image_helper')),
                             ]),
 
                         Section::make(__('admin.resources.blog_post.sections.seo'))
@@ -107,7 +107,7 @@ class BlogPostForm
                                     ->imageResizeMode('contain')
                                     ->imageResizeTargetWidth('1200')
                                     ->imageResizeTargetHeight(null)
-                                    ->helperText(__('admin.resources.blog_post.fields.og_image_helper'))
+                                    ->helperText(__('admin.resources.blog_post.fields.og_image_helper')),
                             ])
                             ->collapsible()
                             ->collapsed(),
@@ -118,11 +118,31 @@ class BlogPostForm
                                     ->label(__('admin.resources.blog_post.fields.status'))
                                     ->options(PostStatus::class)
                                     ->default(PostStatus::Draft)
-                                    ->required(),
+                                    ->required()
+                                    ->live(),
                                 DateTimePicker::make('published_at')
                                     ->label(__('admin.resources.blog_post.fields.publish_date'))
                                     ->timezone('Asia/Jakarta')
-                                    ->helperText(__('admin.resources.blog_post.fields.publish_date_helper')),
+                                    ->maxDate(fn ($get) => $get('status') === PostStatus::Published->value ? now('Asia/Jakarta') : null)
+                                    ->helperText(fn ($get) => $get('status') === PostStatus::Published->value
+                                        ? 'Tanggal publikasi tidak boleh melebihi waktu saat ini untuk status Published (Timezone: Asia/Jakarta)'
+                                        : __('admin.resources.blog_post.fields.publish_date_helper')
+                                    )
+                                    ->rules([
+                                        fn ($get): \Closure => function (string $attribute, $value, \Closure $fail) use ($get) {
+                                            if ($get('status') === PostStatus::Published->value && $value) {
+                                                // Convert input datetime (Asia/Jakarta) to UTC
+                                                $publishedAtUtc = \Carbon\Carbon::parse($value, 'Asia/Jakarta')->setTimezone('UTC');
+                                                $nowUtc = \Carbon\Carbon::now('UTC');
+
+                                                if ($publishedAtUtc->isAfter($nowUtc)) {
+                                                    $fail('Tanggal publikasi tidak boleh melebihi waktu saat ini untuk status Published. '.
+                                                          'Waktu yang Anda pilih: '.$publishedAtUtc->format('Y-m-d H:i:s').' UTC, '.
+                                                          'Waktu sekarang: '.$nowUtc->format('Y-m-d H:i:s').' UTC');
+                                                }
+                                            }
+                                        },
+                                    ]),
                                 Select::make('tags')
                                     ->label(__('admin.resources.blog_post.fields.tags'))
                                     ->relationship('tags', 'name')

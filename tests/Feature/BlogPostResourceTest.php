@@ -10,6 +10,8 @@ use App\Models\BlogCategory;
 use App\Models\BlogPost;
 use App\Models\BlogTag;
 use App\Models\User;
+use Carbon\Carbon;
+use Filament\Notifications\Notification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -173,11 +175,48 @@ class BlogPostResourceTest extends TestCase
             ->call('save')
             ->assertHasNoFormErrors();
 
+        Notification::assertNotified('Blog Post Berhasil Disimpan');
+
         $this->assertDatabaseHas('blog_posts', [
             'id' => $post->id,
             'title' => 'Updated Title',
             'slug' => 'updated-title',
         ]);
+    }
+
+    public function test_edit_blog_post_rejects_future_publish_date_for_published_status_and_shows_footer_error(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-03-31 10:00:00', 'Asia/Jakarta'));
+
+        $post = BlogPost::factory()->create([
+            'user_id' => $this->admin->id,
+            'status' => PostStatus::Draft,
+            'published_at' => null,
+        ]);
+
+        Livewire::actingAs($this->admin, 'web')
+            ->test(EditBlogPost::class, ['record' => $post->getRouteKey()])
+            ->fillForm([
+                'title' => $post->title,
+                'slug' => $post->slug,
+                'content' => $post->content,
+                'status' => PostStatus::Published->value,
+                'published_at' => Carbon::now('Asia/Jakarta')->addHour()->format('Y-m-d H:i:s'),
+            ])
+            ->call('save')
+            ->assertSet('publishDateValidationDetailsHtml', fn (?string $value): bool => filled($value))
+            ->assertSee('Validasi Tanggal Publikasi Gagal')
+            ->assertSee('Status')
+            ->assertSee('Published');
+
+        Notification::assertNotified('Gagal Menyimpan Blog Post');
+
+        $post->refresh();
+
+        $this->assertSame('draft', $post->status->value);
+        $this->assertNull($post->published_at);
+
+        Carbon::setTestNow();
     }
 
     public function test_admin_can_delete_blog_post(): void
