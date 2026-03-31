@@ -230,7 +230,7 @@
     }
 
     /* Notification - Glass effect */
-    div[class*="fi-no-notification"] {
+    .fi-no-notification {
         background: rgba(255, 255, 255, 0.95) !important;
         backdrop-filter: blur(20px) !important;
         border: 1px solid rgba(139, 92, 246, 0.2) !important;
@@ -393,7 +393,7 @@
     }
 
     /* Dark mode - Notification */
-    .dark div[class*="fi-no-notification"] {
+    .dark .fi-no-notification {
         background: rgba(30, 41, 59, 0.95) !important;
         border: 1px solid rgba(139, 92, 246, 0.3) !important;
     }
