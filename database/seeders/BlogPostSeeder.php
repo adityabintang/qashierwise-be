@@ -8,8 +8,6 @@ use App\Models\BlogPost;
 use App\Models\BlogTag;
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class BlogPostSeeder extends Seeder
@@ -51,26 +49,6 @@ class BlogPostSeeder extends Seeder
                 ['slug' => Str::slug($tagName)],
                 ['name' => $tagName]
             );
-        }
-
-        // Download image from URL
-        $imageUrl = 'http://127.0.0.1:8000/blog.webp';
-        $imagePath = null;
-
-        try {
-            $this->command->info('Downloading image from '.$imageUrl);
-            $response = Http::timeout(10)->get($imageUrl);
-
-            if ($response->successful()) {
-                $imageName = 'blog-posts/'.Str::random(40).'.webp';
-                Storage::disk('r2')->put($imageName, $response->body());
-                $imagePath = $imageName;
-                $this->command->info('Image uploaded successfully: '.$imagePath);
-            } else {
-                $this->command->warn('Failed to download image. Posts will be created without images.');
-            }
-        } catch (\Exception $e) {
-            $this->command->warn('Error downloading image: '.$e->getMessage());
         }
 
         // Blog post data
@@ -159,12 +137,10 @@ class BlogPostSeeder extends Seeder
                 'slug' => Str::slug($postData['title']),
                 'excerpt' => $postData['excerpt'],
                 'content' => $postData['content'],
-                'featured_image' => $imagePath,
                 'status' => PostStatus::Published,
                 'published_at' => now()->subDays(10 - $index),
                 'seo_title' => $postData['title'],
                 'seo_description' => $postData['excerpt'],
-                'seo_image' => $imagePath,
             ]);
 
             // Attach tags

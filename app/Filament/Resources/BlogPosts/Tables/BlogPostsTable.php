@@ -26,7 +26,7 @@ class BlogPostsTable
                 TextColumn::make('title')
                     ->searchable()
                     ->sortable()
-                    ->limit(50),
+                    ->limit(30),
                 TextColumn::make('category.name')
                     ->label(__('admin.resources.blog_post.fields.category'))
                     ->badge()

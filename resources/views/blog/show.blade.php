@@ -28,9 +28,7 @@
 
     <main class="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
         <article class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-            @if ($post->featured_image)
-                <img src="{{ $post->featured_image_url }}" alt="{{ $post->title }}" class="h-64 w-full object-cover sm:h-80">
-            @endif
+            <img src="{{ $post->featured_image_url }}" alt="{{ $post->title }}" class="h-64 w-full object-cover sm:h-80">
 
             <div class="p-6 sm:p-10">
                 <div class="mb-5 flex flex-wrap items-center gap-2 text-xs text-slate-500">

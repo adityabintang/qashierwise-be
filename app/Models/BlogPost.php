@@ -48,7 +48,9 @@ class BlogPost extends Model
     protected function featuredImageUrl(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->featured_image ? Storage::disk('r2')->url($this->featured_image) : null
+            get: fn () => $this->featured_image 
+                ? Storage::disk('r2')->url($this->featured_image) 
+                : asset('blog.webp')
         );
     }
 
@@ -57,7 +59,7 @@ class BlogPost extends Model
         return Attribute::make(
             get: fn () => $this->seo_image 
                 ? Storage::disk('r2')->url($this->seo_image) 
-                : ($this->featured_image ? Storage::disk('r2')->url($this->featured_image) : null)
+                : ($this->featured_image ? Storage::disk('r2')->url($this->featured_image) : asset('blog.webp'))
         );
     }
 
