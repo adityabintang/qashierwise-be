@@ -14,4 +14,5 @@ return [
     'no_posts_desc' => 'Articles will show up here once they are published.',
     'home' => 'Home',
     'login' => 'Login',
+    'dashboard' => 'Dashboard',
 ];

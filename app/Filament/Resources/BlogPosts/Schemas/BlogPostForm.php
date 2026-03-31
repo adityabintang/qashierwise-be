@@ -82,7 +82,6 @@ class BlogPostForm
                                     ->disk('r2')
                                     ->directory('blog/featured')
                                     ->maxSize(5120)
-                                    ->imageEditor()
                                     ->imageResizeMode('contain')
                                     ->imageResizeTargetWidth('1920')
                                     ->imageResizeTargetHeight(null)
@@ -130,6 +129,7 @@ class BlogPostForm
                                     ->multiple()
                                     ->searchable()
                                     ->preload()
+                                    ->columnSpanFull()
                                     ->createOptionForm([
                                         TextInput::make('name')->required(),
                                         TextInput::make('slug')->required(),

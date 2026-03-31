@@ -14,4 +14,5 @@ return [
     'no_posts_desc' => 'Artikel akan muncul di sini setelah dipublikasikan.',
     'home' => 'Beranda',
     'login' => 'Masuk',
+    'dashboard' => 'Dashboard',
 ];

@@ -30,6 +30,7 @@ return [
     'password' => 'Password',
     'password_placeholder' => 'Enter your password',
     'sign_in' => 'Sign In',
+    'login_as_editor' => 'Login as Editor',
     'remember_me' => 'Remember Me',
     'forgot_password' => 'Forgot Your Password?',
     'login_button' => 'Login',

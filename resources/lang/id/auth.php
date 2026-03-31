@@ -30,6 +30,7 @@ return [
     'password' => 'Password',
     'password_placeholder' => 'Masukkan password',
     'sign_in' => 'Masuk',
+    'login_as_editor' => 'Masuk sebagai Editor',
     'remember_me' => 'Ingat Saya',
     'forgot_password' => 'Lupa Password?',
     'login_button' => 'Masuk',

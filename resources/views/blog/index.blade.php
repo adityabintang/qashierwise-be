@@ -78,7 +78,11 @@
                     <x-language-switcher />
 
                     <a href="/" class="fly-btn ghost">{{ __('blog.home') }}</a>
-                    <a href="/login" class="fly-btn primary">{{ __('blog.login') }}</a>
+                    @auth
+                        <a href="/dashboard" class="fly-btn primary">{{ __('blog.dashboard') }}</a>
+                    @else
+                        <a href="/login" class="fly-btn primary">{{ __('blog.login') }}</a>
+                    @endauth
                 </div>
         </div>
     </header>
