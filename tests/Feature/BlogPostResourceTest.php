@@ -95,6 +95,8 @@ class BlogPostResourceTest extends TestCase
             ->call('create')
             ->assertHasNoFormErrors();
 
+        Notification::assertNotified('Blog Post Berhasil Disimpan');
+
         $this->assertDatabaseHas('blog_posts', [
             'title' => 'My New Post',
             'slug' => 'my-new-post',
@@ -102,6 +104,36 @@ class BlogPostResourceTest extends TestCase
             'blog_category_id' => $category->id,
             'status' => 'draft',
         ]);
+    }
+
+    public function test_create_blog_post_rejects_future_publish_date_for_published_status_and_shows_footer_error(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-03-31 10:00:00', 'Asia/Jakarta'));
+
+        $category = BlogCategory::factory()->create();
+
+        Livewire::actingAs($this->admin, 'web')
+            ->test(CreateBlogPost::class)
+            ->fillForm([
+                'title' => 'Future Publish Post',
+                'slug' => 'future-publish-post',
+                'content' => '<p>Content</p>',
+                'blog_category_id' => $category->id,
+                'status' => PostStatus::Published->value,
+                'published_at' => Carbon::now('Asia/Jakarta')->addHour()->format('Y-m-d H:i:s'),
+            ])
+            ->call('create')
+            ->assertSet('publishDateValidationDetailsHtml', fn (?string $value): bool => filled($value))
+            ->assertSee('Validasi Tanggal Publikasi Gagal')
+            ->assertSee('Published');
+
+        Notification::assertNotified('Gagal Menyimpan Blog Post');
+
+        $this->assertDatabaseMissing('blog_posts', [
+            'slug' => 'future-publish-post',
+        ]);
+
+        Carbon::setTestNow();
     }
 
     public function test_create_blog_post_requires_title(): void

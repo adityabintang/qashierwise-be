@@ -6,13 +6,58 @@ use App\Filament\Resources\BlogPosts\BlogPostResource;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
+use Filament\Schemas\Components\Html;
+use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
 
 class CreateBlogPost extends CreateRecord
 {
     protected static string $resource = BlogPostResource::class;
+
+    public ?string $publishDateValidationDetailsHtml = null;
+
+    public function content(Schema $schema): Schema
+    {
+        $schema = parent::content($schema);
+
+        return $schema->components([
+            ...$schema->getComponents(),
+            Html::make(function (): string {
+                if (blank($this->publishDateValidationDetailsHtml)) {
+                    return '';
+                }
+
+                return view('filament.notifications.publish-date-error-footer', [
+                    'detailsHtml' => $this->publishDateValidationDetailsHtml,
+                ])->render();
+            })
+                ->key('publish-date-validation-footer')
+                ->columnSpanFull()
+                ->hidden(fn (): bool => blank($this->publishDateValidationDetailsHtml)),
+        ]);
+    }
+
+    protected function beforeValidate(): void
+    {
+        $this->publishDateValidationDetailsHtml = null;
+    }
+
+    protected function onValidationError(ValidationException $exception): void
+    {
+        parent::onValidationError($exception);
+
+        Notification::make()
+            ->danger()
+            ->title('Gagal Menyimpan Blog Post')
+            ->body('Periksa kembali input form yang belum valid.')
+            ->icon('heroicon-o-exclamation-triangle')
+            ->iconColor('danger')
+            ->duration(6000)
+            ->send();
+    }
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
@@ -39,18 +84,20 @@ class CreateBlogPost extends CreateRecord
                     $jakartaInput = Carbon::parse($data['published_at'], 'Asia/Jakarta');
                     $jakartaNow = $nowUtc->copy()->setTimezone('Asia/Jakarta');
 
+                    $this->publishDateValidationDetailsHtml = view('filament.notifications.invalid-publish-date', [
+                        'jakartaInput' => $jakartaInput->format('d M Y, H:i:s'),
+                        'utcInput' => $publishedAtUtc->format('d M Y, H:i:s'),
+                        'jakartaNow' => $jakartaNow->format('d M Y, H:i:s'),
+                        'utcNow' => $nowUtc->format('d M Y, H:i:s'),
+                    ])->render();
+
                     Notification::make()
                         ->danger()
-                        ->title('Tanggal Publikasi Tidak Valid')
-                        ->body(view('filament.notifications.invalid-publish-date', [
-                            'jakartaInput' => $jakartaInput->format('d M Y, H:i:s'),
-                            'utcInput' => $publishedAtUtc->format('d M Y, H:i:s'),
-                            'jakartaNow' => $jakartaNow->format('d M Y, H:i:s'),
-                            'utcNow' => $nowUtc->format('d M Y, H:i:s'),
-                        ])->render())
+                        ->title('Gagal Menyimpan Blog Post')
+                        ->body('Tanggal publikasi tidak boleh lebih besar dari waktu saat ini untuk status Published.')
                         ->icon('heroicon-o-exclamation-triangle')
                         ->iconColor('danger')
-                        ->duration(15000)
+                        ->duration(9000)
                         ->send();
 
                     $this->halt();
@@ -61,6 +108,17 @@ class CreateBlogPost extends CreateRecord
         $data = $this->processImages($data);
 
         return $data;
+    }
+
+    protected function getCreatedNotification(): ?Notification
+    {
+        return Notification::make()
+            ->success()
+            ->title('Blog Post Berhasil Disimpan')
+            ->body('Artikel "'.$this->record?->title.'" telah diperbarui.')
+            ->icon('heroicon-o-check-circle')
+            ->iconColor('success')
+            ->duration(5000);
     }
 
     protected function processImages(array $data): array
