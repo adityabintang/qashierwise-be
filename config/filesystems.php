@@ -71,6 +71,16 @@ return [
             'use_path_style_endpoint' => false,
             'visibility' => 'public',
             'throw' => true,
+            'options' => [
+                'CacheControl' => 'max-age=31536000',
+            ],
+        ],
+
+        'livewire' => [
+            'driver' => 'local',
+            'root' => storage_path('app/livewire-tmp'),
+            'visibility' => 'private',
+            'throw' => false,
         ],
 
     ],

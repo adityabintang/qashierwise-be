@@ -1,6 +1,5 @@
 <?php
 
-use App\Console\Commands\CleanupExpiredReservationSlots;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -15,3 +14,7 @@ Schedule::command('reservations:cleanup-expired-slots')
     ->timezone('Asia/Jakarta')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/reservation-cleanup.log'));
+
+Schedule::command('blog:publish-scheduled')
+    ->everyMinute()
+    ->withoutOverlapping();

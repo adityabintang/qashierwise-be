@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\BlogController;
 use Illuminate\Support\Facades\Route;
 
 // Language switching route
@@ -21,6 +22,11 @@ Route::get('/language/{locale}', function ($locale) {
 Route::get('/', function () {
     return view('welcome');
 });
+
+// Public blog routes
+Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
+Route::get('/blog/load-more', [BlogController::class, 'loadMore'])->name('blog.load-more');
+Route::get('/blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
 
 // Authentication routes
 Route::get('/login', function () {
@@ -75,7 +81,7 @@ Route::prefix('reservations')->name('reservation.')->group(function () {
 });
 
 // Dashboard routes (protected by authentication middleware)
-Route::middleware(['web', 'check.web.auth'])->group(function () {
+Route::middleware(['web', 'check.web.auth', 'block.author.login'])->group(function () {
     Route::get('/dashboard', function () {
         return view('dashboard.index');
     })->name('dashboard');

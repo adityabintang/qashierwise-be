@@ -62,6 +62,14 @@ class PermissionSeeder extends Seeder
 
             // Subscription: Manage Subscriptions
             'subscription.manage' => 'Manage Subscriptions',
+
+            // Blog: Content Management
+            'blog.view_posts' => 'View Blog Posts',
+            'blog.manage_posts' => 'Manage Blog Posts (Create/Edit/Delete)',
+            'blog.view_categories' => 'View Blog Categories',
+            'blog.manage_categories' => 'Manage Blog Categories (Create/Edit/Delete)',
+            'blog.view_tags' => 'View Blog Tags',
+            'blog.manage_tags' => 'Manage Blog Tags (Create/Edit/Delete)',
         ];
 
         foreach ($permissions as $permission => $description) {
