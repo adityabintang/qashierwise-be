@@ -1,4 +1,9 @@
 @extends('layouts.app')
+@include('components.dashboard-scripts')
+
+@push('head-scripts')
+    @vite('resources/js/apexcharts.js')
+@endpush
 
 @section('title', __('pos.reports.title') . ' - QashierWise POS')
 
@@ -175,7 +180,7 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<!-- ApexCharts is now loaded via Vite bundle (window.ApexCharts) -->
 <script>
 function reportsApp() {
     return {

@@ -1,4 +1,9 @@
 @extends('layouts.app')
+@include('components.dashboard-scripts')
+
+@push('head-scripts')
+    @vite('resources/js/apexcharts.js')
+@endpush
 
 @section('title', __('submerchant.balance_title'))
 

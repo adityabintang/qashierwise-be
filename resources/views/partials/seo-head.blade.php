@@ -6,6 +6,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/logo-32.png') }}">
 <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/logo-16.png') }}">
 <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/logo-180.png') }}">
+<link rel="preload" href="{{ asset('site.webmanifest') }}" as="fetch" crossorigin>
 <link rel="manifest" href="{{ asset('site.webmanifest') }}">
 <meta name="theme-color" content="#4910ce">
 
