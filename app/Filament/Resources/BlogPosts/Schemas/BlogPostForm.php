@@ -5,6 +5,7 @@ namespace App\Filament\Resources\BlogPosts\Schemas;
 use App\Enums\PostStatus;
 use App\Helpers\TimezoneDisplayHelper;
 use Carbon\Carbon;
+use DateTimeZone;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
@@ -19,7 +20,7 @@ use Illuminate\Support\Str;
 
 class BlogPostForm
 {
-    protected static function normalizeInputDateTimeToUtc(string $dateTime): Carbon
+    protected static function normalizeInputDateTimeToUtc(string $dateTime, ?string $viewerTimezone = null): Carbon
     {
         $hasExplicitTimezone = preg_match('/(Z|[+-]\d{2}:\d{2})$/', $dateTime) === 1;
 
@@ -27,9 +28,38 @@ class BlogPostForm
             return Carbon::parse($dateTime)->utc();
         }
 
-        $viewerTimezone = TimezoneDisplayHelper::resolveDisplayTimezone()['timezone'];
+        $viewerTimezone = self::resolveInputTimezone($viewerTimezone);
+        $systemTimezone = config('app.timezone', 'UTC');
+        $looksLikeLocalDatetimeInput = str_contains($dateTime, 'T');
 
-        return Carbon::parse($dateTime, $viewerTimezone)->utc();
+        $candidateFormats = $looksLikeLocalDatetimeInput
+            ? ['Y-m-d\\TH:i:s', 'Y-m-d\\TH:i']
+            : ['Y-m-d H:i:s', 'Y-m-d H:i'];
+
+        $sourceTimezone = $looksLikeLocalDatetimeInput ? $viewerTimezone : $systemTimezone;
+
+        foreach ($candidateFormats as $format) {
+            try {
+                $parsedDateTime = Carbon::createFromFormat($format, $dateTime, $sourceTimezone);
+
+                if ($parsedDateTime !== false) {
+                    return $parsedDateTime->utc();
+                }
+            } catch (\Throwable) {
+                // Fall through to generic parser below.
+            }
+        }
+
+        return Carbon::parse($dateTime, $sourceTimezone)->utc();
+    }
+
+    protected static function resolveInputTimezone(?string $viewerTimezone): string
+    {
+        if (is_string($viewerTimezone) && in_array($viewerTimezone, DateTimeZone::listIdentifiers(), true)) {
+            return $viewerTimezone;
+        }
+
+        return TimezoneDisplayHelper::resolveDisplayTimezone()['timezone'];
     }
 
     public static function configure(Schema $schema): Schema
@@ -50,6 +80,8 @@ class BlogPostForm
                             ->schema([
                                 Hidden::make('user_id')
                                     ->default(fn () => auth()->id()),
+                                Hidden::make('viewer_timezone')
+                                    ->default(fn () => TimezoneDisplayHelper::resolveDisplayTimezone()['timezone']),
                                 TextInput::make('title')
                                     ->label(__('admin.resources.blog_post.fields.title'))
                                     ->required()
@@ -137,9 +169,9 @@ class BlogPostForm
                                     ->live(),
                                 DateTimePicker::make('published_at')
                                     ->label(__('admin.resources.blog_post.fields.publish_date'))
-                                    ->timezone(fn () => TimezoneDisplayHelper::resolveDisplayTimezone()['timezone'])
+                                    ->timezone(fn ($get) => self::resolveInputTimezone($get('viewer_timezone')))
                                     ->maxDate(fn ($get) => $get('status') === PostStatus::Published->value
-                                        ? now(TimezoneDisplayHelper::resolveDisplayTimezone()['timezone'])
+                                        ? now(self::resolveInputTimezone($get('viewer_timezone')))
                                         : null)
                                     ->helperText(fn ($get) => match ($get('status')) {
                                         PostStatus::Published->value => 'Tanggal publikasi tidak boleh melebihi waktu saat ini (timezone lokal Anda, dibandingkan ke UTC sistem).',
@@ -149,7 +181,7 @@ class BlogPostForm
                                     ->rules([
                                         fn ($get): \Closure => function (string $attribute, $value, \Closure $fail) use ($get) {
                                             if ($get('status') === PostStatus::Published->value && $value) {
-                                                $publishedAtUtc = self::normalizeInputDateTimeToUtc($value);
+                                                $publishedAtUtc = self::normalizeInputDateTimeToUtc($value, $get('viewer_timezone'));
                                                 $nowUtc = Carbon::now('UTC');
 
                                                 if ($publishedAtUtc->isAfter($nowUtc)) {
@@ -166,7 +198,7 @@ class BlogPostForm
                                                     return;
                                                 }
 
-                                                $publishedAtUtc = self::normalizeInputDateTimeToUtc($value);
+                                                $publishedAtUtc = self::normalizeInputDateTimeToUtc($value, $get('viewer_timezone'));
                                                 $nowUtc = Carbon::now('UTC');
 
                                                 if (! $publishedAtUtc->isAfter($nowUtc)) {

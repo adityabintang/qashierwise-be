@@ -6,6 +6,7 @@ use App\Enums\PostStatus;
 use App\Filament\Resources\BlogPosts\BlogPostResource;
 use App\Helpers\TimezoneDisplayHelper;
 use Carbon\Carbon;
+use DateTimeZone;
 use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
@@ -18,7 +19,7 @@ class EditBlogPost extends EditRecord
 {
     protected static string $resource = BlogPostResource::class;
 
-    protected function normalizeInputDateTimeToUtc(string $dateTime): Carbon
+    protected function normalizeInputDateTimeToUtc(string $dateTime, ?string $viewerTimezone = null): Carbon
     {
         $hasExplicitTimezone = preg_match('/(Z|[+-]\d{2}:\d{2})$/', $dateTime) === 1;
 
@@ -26,9 +27,38 @@ class EditBlogPost extends EditRecord
             return Carbon::parse($dateTime)->utc();
         }
 
-        $viewerTimezone = TimezoneDisplayHelper::resolveDisplayTimezone()['timezone'];
+        $viewerTimezone = $this->resolveInputTimezone($viewerTimezone);
+        $systemTimezone = config('app.timezone', 'UTC');
+        $looksLikeLocalDatetimeInput = str_contains($dateTime, 'T');
 
-        return Carbon::parse($dateTime, $viewerTimezone)->utc();
+        $candidateFormats = $looksLikeLocalDatetimeInput
+            ? ['Y-m-d\\TH:i:s', 'Y-m-d\\TH:i']
+            : ['Y-m-d H:i:s', 'Y-m-d H:i'];
+
+        $sourceTimezone = $looksLikeLocalDatetimeInput ? $viewerTimezone : $systemTimezone;
+
+        foreach ($candidateFormats as $format) {
+            try {
+                $parsedDateTime = Carbon::createFromFormat($format, $dateTime, $sourceTimezone);
+
+                if ($parsedDateTime !== false) {
+                    return $parsedDateTime->utc();
+                }
+            } catch (\Throwable) {
+                // Fall through to generic parser below.
+            }
+        }
+
+        return Carbon::parse($dateTime, $sourceTimezone)->utc();
+    }
+
+    protected function resolveInputTimezone(?string $viewerTimezone): string
+    {
+        if (is_string($viewerTimezone) && in_array($viewerTimezone, DateTimeZone::listIdentifiers(), true)) {
+            return $viewerTimezone;
+        }
+
+        return TimezoneDisplayHelper::resolveDisplayTimezone()['timezone'];
     }
 
     protected function getHeaderActions(): array
@@ -66,23 +96,14 @@ class EditBlogPost extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        // Validate published_at for Published status
+        $viewerTimezone = is_string($data['viewer_timezone'] ?? null) ? $data['viewer_timezone'] : null;
+
         if (isset($data['status'])) {
-            // Convert enum to string if needed
             $status = is_object($data['status']) ? $data['status']->value : $data['status'];
 
             if ($status === PostStatus::Published->value && ! empty($data['published_at'])) {
-                $publishedAtUtc = $this->normalizeInputDateTimeToUtc($data['published_at']);
+                $publishedAtUtc = $this->normalizeInputDateTimeToUtc($data['published_at'], $viewerTimezone);
                 $nowUtc = Carbon::now('UTC');
-
-                // Log for debugging
-                \Log::info('Blog Post Validation', [
-                    'status' => $status,
-                    'published_at_input' => $data['published_at'],
-                    'published_at_utc' => $publishedAtUtc->toDateTimeString(),
-                    'now_utc' => $nowUtc->toDateTimeString(),
-                    'is_future' => $publishedAtUtc->isAfter($nowUtc),
-                ]);
 
                 if ($publishedAtUtc->isAfter($nowUtc)) {
                     Notification::make()
@@ -112,7 +133,7 @@ class EditBlogPost extends EditRecord
                     $this->halt();
                 }
 
-                $publishedAtUtc = $this->normalizeInputDateTimeToUtc($data['published_at']);
+                $publishedAtUtc = $this->normalizeInputDateTimeToUtc($data['published_at'], $viewerTimezone);
                 $nowUtc = Carbon::now('UTC');
 
                 if (! $publishedAtUtc->isAfter($nowUtc)) {
@@ -129,6 +150,8 @@ class EditBlogPost extends EditRecord
                 }
             }
         }
+
+        unset($data['viewer_timezone']);
 
         $data = $this->processImages($data);
 

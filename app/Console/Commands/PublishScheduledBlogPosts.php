@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Enums\PostStatus;
 use App\Models\BlogPost;
 use Illuminate\Console\Command;
 
@@ -27,14 +26,7 @@ class PublishScheduledBlogPosts extends Command
      */
     public function handle(): int
     {
-        $publishedCount = BlogPost::query()
-            ->where('status', PostStatus::Scheduled)
-            ->whereNotNull('published_at')
-            ->where('published_at', '<=', now())
-            ->update([
-                'status' => PostStatus::Published,
-                'updated_at' => now(),
-            ]);
+        $publishedCount = BlogPost::publishDueScheduledPosts();
 
         $this->info("Published {$publishedCount} scheduled blog post(s).");
 

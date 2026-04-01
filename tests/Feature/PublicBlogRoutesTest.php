@@ -42,6 +42,23 @@ class PublicBlogRoutesTest extends TestCase
         $response->assertDontSee('Artikel Scheduled');
     }
 
+    public function test_blog_index_transitions_due_scheduled_post_to_published_status(): void
+    {
+        $scheduledPost = BlogPost::factory()->scheduled()->create([
+            'title' => 'Artikel Scheduled Menjadi Published',
+            'slug' => 'artikel-scheduled-menjadi-published',
+            'published_at' => now()->subMinute(),
+        ]);
+
+        $this->assertSame('scheduled', $scheduledPost->status->value);
+
+        $this->get(route('blog.index'))->assertOk();
+
+        $scheduledPost->refresh();
+
+        $this->assertSame('published', $scheduledPost->status->value);
+    }
+
     public function test_blog_show_displays_published_post_by_slug(): void
     {
         $publishedPost = BlogPost::factory()->published()->create([

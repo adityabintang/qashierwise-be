@@ -12,6 +12,8 @@ class BlogController extends Controller
 {
     public function index(Request $request): View
     {
+        BlogPost::publishDueScheduledPosts();
+
         $search = $request->query('search', '');
         $sort = $request->query('sort', 'latest');
 
@@ -58,6 +60,8 @@ class BlogController extends Controller
 
     public function loadMore(Request $request): JsonResponse
     {
+        BlogPost::publishDueScheduledPosts();
+
         $encodedCursor = $request->query('cursor');
         $search = $request->query('search', '');
         $sort = $request->query('sort', 'latest');
@@ -108,6 +112,8 @@ class BlogController extends Controller
 
     public function show(string $slug): View
     {
+        BlogPost::publishDueScheduledPosts();
+
         $post = BlogPost::query()
             ->published()
             ->with(['author:id,name', 'category:id,name,slug', 'tags:id,name,slug'])

@@ -35,7 +35,7 @@ return [
                 'og_image_helper' => 'Gambar untuk preview saat di-share di social media (1200x630px). Jika tidak diupload, akan menggunakan gambar dari Media. Gambar akan otomatis dikonversi ke WebP dan diresize maksimal 1200px lebar.',
                 'status' => 'Status',
                 'publish_date' => 'Tanggal Publikasi',
-                'publish_date_helper' => 'Input menggunakan WIB. Sistem tetap menyimpan waktu dalam UTC.',
+                'publish_date_helper' => 'Input mengikuti timezone lokal pengguna (WIB/WITA/WIT/UTC). Sistem menyimpan dan membandingkan waktu dalam UTC.',
                 'tags' => 'Tag',
                 'author' => 'Penulis',
                 'published_at' => 'Dipublikasikan',

@@ -35,7 +35,7 @@ return [
                 'og_image_helper' => 'Image for social media preview (1200x630px). If not uploaded, the Media image will be used. Image will be automatically converted to WebP and resized to max 1200px width.',
                 'status' => 'Status',
                 'publish_date' => 'Publish Date',
-                'publish_date_helper' => 'Input uses WIB timezone. System stores time in UTC.',
+                'publish_date_helper' => 'Input follows the viewer local timezone (WIB/WITA/WIT/UTC). The system stores and compares time in UTC.',
                 'tags' => 'Tags',
                 'author' => 'Author',
                 'published_at' => 'Published At',

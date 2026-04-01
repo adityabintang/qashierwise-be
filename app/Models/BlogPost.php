@@ -48,8 +48,8 @@ class BlogPost extends Model
     protected function featuredImageUrl(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->featured_image 
-                ? Storage::disk('r2')->url($this->featured_image) 
+            get: fn () => $this->featured_image
+                ? Storage::disk('r2')->url($this->featured_image)
                 : asset('blog.webp')
         );
     }
@@ -57,8 +57,8 @@ class BlogPost extends Model
     protected function seoImageUrl(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->seo_image 
-                ? Storage::disk('r2')->url($this->seo_image) 
+            get: fn () => $this->seo_image
+                ? Storage::disk('r2')->url($this->seo_image)
                 : ($this->featured_image ? Storage::disk('r2')->url($this->featured_image) : asset('blog.webp'))
         );
     }
@@ -103,5 +103,17 @@ class BlogPost extends Model
     {
         return $query->where('status', PostStatus::Scheduled)
             ->where('published_at', '>', now());
+    }
+
+    public static function publishDueScheduledPosts(): int
+    {
+        return static::query()
+            ->where('status', PostStatus::Scheduled)
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now())
+            ->update([
+                'status' => PostStatus::Published,
+                'updated_at' => now(),
+            ]);
     }
 }

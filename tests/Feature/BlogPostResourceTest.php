@@ -134,6 +134,63 @@ class BlogPostResourceTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_create_blog_post_accepts_future_publish_date_for_scheduled_status(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-03-31 10:00:00', 'Asia/Jakarta'));
+
+        $category = BlogCategory::factory()->create();
+
+        Livewire::actingAs($this->admin, 'web')
+            ->test(CreateBlogPost::class)
+            ->fillForm([
+                'title' => 'Scheduled Create Post',
+                'slug' => 'scheduled-create-post',
+                'content' => '<p>Scheduled content</p>',
+                'blog_category_id' => $category->id,
+                'status' => PostStatus::Scheduled->value,
+                'published_at' => Carbon::now('Asia/Jakarta')->addHour()->format('Y-m-d H:i:s'),
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        Notification::assertNotified(__('admin.resources.blog_post.notifications.created_title'));
+
+        $this->assertDatabaseHas('blog_posts', [
+            'slug' => 'scheduled-create-post',
+            'status' => PostStatus::Scheduled->value,
+        ]);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_create_blog_post_rejects_non_future_publish_date_for_scheduled_status(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-03-31 10:00:00', 'Asia/Jakarta'));
+
+        $category = BlogCategory::factory()->create();
+
+        Livewire::actingAs($this->admin, 'web')
+            ->test(CreateBlogPost::class)
+            ->fillForm([
+                'title' => 'Invalid Scheduled Create Post',
+                'slug' => 'invalid-scheduled-create-post',
+                'content' => '<p>Scheduled content</p>',
+                'blog_category_id' => $category->id,
+                'status' => PostStatus::Scheduled->value,
+                'published_at' => Carbon::now('Asia/Jakarta')->format('Y-m-d H:i:s'),
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        Notification::assertNotified(__('admin.resources.blog_post.notifications.failed_title'));
+
+        $this->assertDatabaseMissing('blog_posts', [
+            'slug' => 'invalid-scheduled-create-post',
+        ]);
+
+        Carbon::setTestNow();
+    }
+
     public function test_create_blog_post_requires_title(): void
     {
         Livewire::actingAs($this->admin, 'web')

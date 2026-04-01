@@ -64,14 +64,6 @@ class AdminPanelProvider extends PanelProvider
                 PanelsRenderHook::BODY_END,
                 fn (): string => view('components.timezone-detector-script')->render(),
             )
-            ->renderHook(
-                PanelsRenderHook::BODY_END,
-                fn (): string => view('components.upload-debug-script')->render(),
-            )
-            ->renderHook(
-                PanelsRenderHook::BODY_END,
-                fn (): string => view('filament.admin.timezone-debug')->render(),
-            )
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
