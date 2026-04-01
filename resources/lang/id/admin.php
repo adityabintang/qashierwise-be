@@ -13,6 +13,7 @@ return [
                 'failed_title' => 'Gagal Menyimpan Blog Post',
                 'failed_body' => 'Periksa kembali input form yang belum valid.',
                 'invalid_publish_date_body' => 'Tanggal publikasi tidak boleh lebih besar dari waktu saat ini untuk status Published.',
+                'invalid_schedule_date_body' => 'Tanggal publikasi wajib lebih besar dari waktu saat ini untuk status Scheduled.',
             ],
             'sections' => [
                 'content' => 'Konten',

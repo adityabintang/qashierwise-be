@@ -3,6 +3,8 @@
 namespace App\Filament\Resources\BlogPosts\Schemas;
 
 use App\Enums\PostStatus;
+use App\Helpers\TimezoneDisplayHelper;
+use Carbon\Carbon;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
@@ -17,6 +19,19 @@ use Illuminate\Support\Str;
 
 class BlogPostForm
 {
+    protected static function normalizeInputDateTimeToUtc(string $dateTime): Carbon
+    {
+        $hasExplicitTimezone = preg_match('/(Z|[+-]\d{2}:\d{2})$/', $dateTime) === 1;
+
+        if ($hasExplicitTimezone) {
+            return Carbon::parse($dateTime)->utc();
+        }
+
+        $viewerTimezone = TimezoneDisplayHelper::resolveDisplayTimezone()['timezone'];
+
+        return Carbon::parse($dateTime, $viewerTimezone)->utc();
+    }
+
     public static function configure(Schema $schema): Schema
     {
         return $schema
@@ -122,23 +137,40 @@ class BlogPostForm
                                     ->live(),
                                 DateTimePicker::make('published_at')
                                     ->label(__('admin.resources.blog_post.fields.publish_date'))
-                                    ->timezone('Asia/Jakarta')
-                                    ->maxDate(fn ($get) => $get('status') === PostStatus::Published->value ? now('Asia/Jakarta') : null)
-                                    ->helperText(fn ($get) => $get('status') === PostStatus::Published->value
-                                        ? 'Tanggal publikasi tidak boleh melebihi waktu saat ini untuk status Published (Timezone: Asia/Jakarta)'
-                                        : __('admin.resources.blog_post.fields.publish_date_helper')
-                                    )
+                                    ->timezone(fn () => TimezoneDisplayHelper::resolveDisplayTimezone()['timezone'])
+                                    ->maxDate(fn ($get) => $get('status') === PostStatus::Published->value
+                                        ? now(TimezoneDisplayHelper::resolveDisplayTimezone()['timezone'])
+                                        : null)
+                                    ->helperText(fn ($get) => match ($get('status')) {
+                                        PostStatus::Published->value => 'Tanggal publikasi tidak boleh melebihi waktu saat ini (timezone lokal Anda, dibandingkan ke UTC sistem).',
+                                        PostStatus::Scheduled->value => 'Tanggal publikasi wajib lebih besar dari waktu saat ini (timezone lokal Anda, dibandingkan ke UTC sistem).',
+                                        default => __('admin.resources.blog_post.fields.publish_date_helper'),
+                                    })
                                     ->rules([
                                         fn ($get): \Closure => function (string $attribute, $value, \Closure $fail) use ($get) {
                                             if ($get('status') === PostStatus::Published->value && $value) {
-                                                // Convert input datetime (Asia/Jakarta) to UTC
-                                                $publishedAtUtc = \Carbon\Carbon::parse($value, 'Asia/Jakarta')->setTimezone('UTC');
-                                                $nowUtc = \Carbon\Carbon::now('UTC');
+                                                $publishedAtUtc = self::normalizeInputDateTimeToUtc($value);
+                                                $nowUtc = Carbon::now('UTC');
 
                                                 if ($publishedAtUtc->isAfter($nowUtc)) {
                                                     $fail('Tanggal publikasi tidak boleh melebihi waktu saat ini untuk status Published. '.
                                                           'Waktu yang Anda pilih: '.$publishedAtUtc->format('Y-m-d H:i:s').' UTC, '.
                                                           'Waktu sekarang: '.$nowUtc->format('Y-m-d H:i:s').' UTC');
+                                                }
+                                            }
+
+                                            if ($get('status') === PostStatus::Scheduled->value) {
+                                                if (empty($value)) {
+                                                    $fail(__('admin.resources.blog_post.notifications.invalid_schedule_date_body'));
+
+                                                    return;
+                                                }
+
+                                                $publishedAtUtc = self::normalizeInputDateTimeToUtc($value);
+                                                $nowUtc = Carbon::now('UTC');
+
+                                                if (! $publishedAtUtc->isAfter($nowUtc)) {
+                                                    $fail(__('admin.resources.blog_post.notifications.invalid_schedule_date_body'));
                                                 }
                                             }
                                         },

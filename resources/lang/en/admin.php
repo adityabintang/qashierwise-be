@@ -13,6 +13,7 @@ return [
                 'failed_title' => 'Failed to Save Blog Post',
                 'failed_body' => 'Please review the invalid form input.',
                 'invalid_publish_date_body' => 'Publish date cannot be greater than the current time for Published status.',
+                'invalid_schedule_date_body' => 'Publish date must be greater than the current time for Scheduled status.',
             ],
             'sections' => [
                 'content' => 'Content',

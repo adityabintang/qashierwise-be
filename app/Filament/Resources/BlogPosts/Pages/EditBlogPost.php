@@ -2,7 +2,9 @@
 
 namespace App\Filament\Resources\BlogPosts\Pages;
 
+use App\Enums\PostStatus;
 use App\Filament\Resources\BlogPosts\BlogPostResource;
+use App\Helpers\TimezoneDisplayHelper;
 use Carbon\Carbon;
 use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
@@ -15,6 +17,19 @@ use Intervention\Image\ImageManager;
 class EditBlogPost extends EditRecord
 {
     protected static string $resource = BlogPostResource::class;
+
+    protected function normalizeInputDateTimeToUtc(string $dateTime): Carbon
+    {
+        $hasExplicitTimezone = preg_match('/(Z|[+-]\d{2}:\d{2})$/', $dateTime) === 1;
+
+        if ($hasExplicitTimezone) {
+            return Carbon::parse($dateTime)->utc();
+        }
+
+        $viewerTimezone = TimezoneDisplayHelper::resolveDisplayTimezone()['timezone'];
+
+        return Carbon::parse($dateTime, $viewerTimezone)->utc();
+    }
 
     protected function getHeaderActions(): array
     {
@@ -56,9 +71,8 @@ class EditBlogPost extends EditRecord
             // Convert enum to string if needed
             $status = is_object($data['status']) ? $data['status']->value : $data['status'];
 
-            if ($status === 'published' && ! empty($data['published_at'])) {
-                // Convert input datetime (Asia/Jakarta) to UTC
-                $publishedAtUtc = Carbon::parse($data['published_at'], 'Asia/Jakarta')->setTimezone('UTC');
+            if ($status === PostStatus::Published->value && ! empty($data['published_at'])) {
+                $publishedAtUtc = $this->normalizeInputDateTimeToUtc($data['published_at']);
                 $nowUtc = Carbon::now('UTC');
 
                 // Log for debugging
@@ -75,6 +89,37 @@ class EditBlogPost extends EditRecord
                         ->danger()
                         ->title(__('admin.resources.blog_post.notifications.failed_title'))
                         ->body(__('admin.resources.blog_post.notifications.invalid_publish_date_body'))
+                        ->icon('heroicon-o-exclamation-triangle')
+                        ->iconColor('danger')
+                        ->duration(9000)
+                        ->send();
+
+                    $this->halt();
+                }
+            }
+
+            if ($status === PostStatus::Scheduled->value) {
+                if (empty($data['published_at'])) {
+                    Notification::make()
+                        ->danger()
+                        ->title(__('admin.resources.blog_post.notifications.failed_title'))
+                        ->body(__('admin.resources.blog_post.notifications.invalid_schedule_date_body'))
+                        ->icon('heroicon-o-exclamation-triangle')
+                        ->iconColor('danger')
+                        ->duration(9000)
+                        ->send();
+
+                    $this->halt();
+                }
+
+                $publishedAtUtc = $this->normalizeInputDateTimeToUtc($data['published_at']);
+                $nowUtc = Carbon::now('UTC');
+
+                if (! $publishedAtUtc->isAfter($nowUtc)) {
+                    Notification::make()
+                        ->danger()
+                        ->title(__('admin.resources.blog_post.notifications.failed_title'))
+                        ->body(__('admin.resources.blog_post.notifications.invalid_schedule_date_body'))
                         ->icon('heroicon-o-exclamation-triangle')
                         ->iconColor('danger')
                         ->duration(9000)

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\BlogPosts\Pages;
 
 use App\Filament\Resources\BlogPosts\BlogPostResource;
+use App\Helpers\TimezoneDisplayHelper;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
@@ -14,6 +15,19 @@ use Intervention\Image\ImageManager;
 class CreateBlogPost extends CreateRecord
 {
     protected static string $resource = BlogPostResource::class;
+
+    protected function normalizeInputDateTimeToUtc(string $dateTime): Carbon
+    {
+        $hasExplicitTimezone = preg_match('/(Z|[+-]\d{2}:\d{2})$/', $dateTime) === 1;
+
+        if ($hasExplicitTimezone) {
+            return Carbon::parse($dateTime)->utc();
+        }
+
+        $viewerTimezone = TimezoneDisplayHelper::resolveDisplayTimezone()['timezone'];
+
+        return Carbon::parse($dateTime, $viewerTimezone)->utc();
+    }
 
     protected function onValidationError(ValidationException $exception): void
     {
@@ -37,8 +51,7 @@ class CreateBlogPost extends CreateRecord
             $status = is_object($data['status']) ? $data['status']->value : $data['status'];
 
             if ($status === 'published' && ! empty($data['published_at'])) {
-                // Convert input datetime (Asia/Jakarta) to UTC
-                $publishedAtUtc = Carbon::parse($data['published_at'], 'Asia/Jakarta')->setTimezone('UTC');
+                $publishedAtUtc = $this->normalizeInputDateTimeToUtc($data['published_at']);
                 $nowUtc = Carbon::now('UTC');
 
                 // Log for debugging

@@ -246,6 +246,38 @@ class BlogPostResourceTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_edit_blog_post_rejects_non_future_publish_date_for_scheduled_status(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-03-31 10:00:00', 'Asia/Jakarta'));
+
+        $post = BlogPost::factory()->create([
+            'user_id' => $this->admin->id,
+            'status' => PostStatus::Draft,
+            'published_at' => null,
+        ]);
+
+        Livewire::actingAs($this->admin, 'web')
+            ->test(EditBlogPost::class, ['record' => $post->getRouteKey()])
+            ->fillForm([
+                'title' => $post->title,
+                'slug' => $post->slug,
+                'content' => $post->content,
+                'status' => PostStatus::Scheduled->value,
+                'published_at' => Carbon::now('Asia/Jakarta')->format('Y-m-d H:i:s'),
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        Notification::assertNotified(__('admin.resources.blog_post.notifications.failed_title'));
+
+        $post->refresh();
+
+        $this->assertSame(PostStatus::Draft, $post->status);
+        $this->assertNull($post->published_at);
+
+        Carbon::setTestNow();
+    }
+
     public function test_admin_can_delete_blog_post(): void
     {
         $post = BlogPost::factory()->create([
