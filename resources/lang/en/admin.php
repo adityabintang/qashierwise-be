@@ -5,6 +5,15 @@ return [
         'blog_post' => [
             'label' => 'Blog Post',
             'plural' => 'Blog Posts',
+            'notifications' => [
+                'created_title' => 'Blog Post Saved Successfully',
+                'created_body' => 'Article ":title" has been created.',
+                'updated_title' => 'Blog Post Saved Successfully',
+                'updated_body' => 'Article ":title" has been updated.',
+                'failed_title' => 'Failed to Save Blog Post',
+                'failed_body' => 'Please review the invalid form input.',
+                'invalid_publish_date_body' => 'Publish date cannot be greater than the current time for Published status.',
+            ],
             'sections' => [
                 'content' => 'Content',
                 'media' => 'Media',

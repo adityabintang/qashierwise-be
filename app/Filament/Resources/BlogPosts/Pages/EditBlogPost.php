@@ -7,8 +7,6 @@ use Carbon\Carbon;
 use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
-use Filament\Schemas\Components\Html;
-use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Intervention\Image\Drivers\Gd\Driver;
@@ -17,8 +15,6 @@ use Intervention\Image\ImageManager;
 class EditBlogPost extends EditRecord
 {
     protected static string $resource = BlogPostResource::class;
-
-    public ?string $publishDateValidationDetailsHtml = null;
 
     protected function getHeaderActions(): array
     {
@@ -39,40 +35,14 @@ class EditBlogPost extends EditRecord
         ];
     }
 
-    public function content(Schema $schema): Schema
-    {
-        $schema = parent::content($schema);
-
-        return $schema->components([
-            ...$schema->getComponents(),
-            Html::make(function (): string {
-                if (blank($this->publishDateValidationDetailsHtml)) {
-                    return '';
-                }
-
-                return view('filament.notifications.publish-date-error-footer', [
-                    'detailsHtml' => $this->publishDateValidationDetailsHtml,
-                ])->render();
-            })
-                ->key('publish-date-validation-footer')
-                ->columnSpanFull()
-                ->hidden(fn (): bool => blank($this->publishDateValidationDetailsHtml)),
-        ]);
-    }
-
-    protected function beforeValidate(): void
-    {
-        $this->publishDateValidationDetailsHtml = null;
-    }
-
     protected function onValidationError(ValidationException $exception): void
     {
         parent::onValidationError($exception);
 
         Notification::make()
             ->danger()
-            ->title('Gagal Menyimpan Blog Post')
-            ->body('Periksa kembali input form yang belum valid.')
+            ->title(__('admin.resources.blog_post.notifications.failed_title'))
+            ->body(__('admin.resources.blog_post.notifications.failed_body'))
             ->icon('heroicon-o-exclamation-triangle')
             ->iconColor('danger')
             ->duration(6000)
@@ -101,20 +71,10 @@ class EditBlogPost extends EditRecord
                 ]);
 
                 if ($publishedAtUtc->isAfter($nowUtc)) {
-                    $jakartaInput = Carbon::parse($data['published_at'], 'Asia/Jakarta');
-                    $jakartaNow = $nowUtc->copy()->setTimezone('Asia/Jakarta');
-
-                    $this->publishDateValidationDetailsHtml = view('filament.notifications.invalid-publish-date', [
-                        'jakartaInput' => $jakartaInput->format('d M Y, H:i:s'),
-                        'utcInput' => $publishedAtUtc->format('d M Y, H:i:s'),
-                        'jakartaNow' => $jakartaNow->format('d M Y, H:i:s'),
-                        'utcNow' => $nowUtc->format('d M Y, H:i:s'),
-                    ])->render();
-
                     Notification::make()
                         ->danger()
-                        ->title('Gagal Menyimpan Blog Post')
-                        ->body('Tanggal publikasi tidak boleh lebih besar dari waktu saat ini untuk status Published.')
+                        ->title(__('admin.resources.blog_post.notifications.failed_title'))
+                        ->body(__('admin.resources.blog_post.notifications.invalid_publish_date_body'))
                         ->icon('heroicon-o-exclamation-triangle')
                         ->iconColor('danger')
                         ->duration(9000)
@@ -134,8 +94,8 @@ class EditBlogPost extends EditRecord
     {
         return Notification::make()
             ->success()
-            ->title('Blog Post Berhasil Disimpan')
-            ->body('Artikel "'.$this->record->title.'" telah diperbarui.')
+            ->title(__('admin.resources.blog_post.notifications.updated_title'))
+            ->body(__('admin.resources.blog_post.notifications.updated_body', ['title' => $this->record->title]))
             ->icon('heroicon-o-check-circle')
             ->iconColor('success')
             ->duration(5000);

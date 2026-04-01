@@ -95,7 +95,7 @@ class BlogPostResourceTest extends TestCase
             ->call('create')
             ->assertHasNoFormErrors();
 
-        Notification::assertNotified('Blog Post Berhasil Disimpan');
+        Notification::assertNotified(__('admin.resources.blog_post.notifications.created_title'));
 
         $this->assertDatabaseHas('blog_posts', [
             'title' => 'My New Post',
@@ -123,11 +123,9 @@ class BlogPostResourceTest extends TestCase
                 'published_at' => Carbon::now('Asia/Jakarta')->addHour()->format('Y-m-d H:i:s'),
             ])
             ->call('create')
-            ->assertSet('publishDateValidationDetailsHtml', fn (?string $value): bool => filled($value))
-            ->assertSee('Validasi Tanggal Publikasi Gagal')
-            ->assertSee('Published');
+            ->assertHasNoFormErrors();
 
-        Notification::assertNotified('Gagal Menyimpan Blog Post');
+        Notification::assertNotified(__('admin.resources.blog_post.notifications.failed_title'));
 
         $this->assertDatabaseMissing('blog_posts', [
             'slug' => 'future-publish-post',
@@ -207,7 +205,7 @@ class BlogPostResourceTest extends TestCase
             ->call('save')
             ->assertHasNoFormErrors();
 
-        Notification::assertNotified('Blog Post Berhasil Disimpan');
+        Notification::assertNotified(__('admin.resources.blog_post.notifications.updated_title'));
 
         $this->assertDatabaseHas('blog_posts', [
             'id' => $post->id,
@@ -236,12 +234,9 @@ class BlogPostResourceTest extends TestCase
                 'published_at' => Carbon::now('Asia/Jakarta')->addHour()->format('Y-m-d H:i:s'),
             ])
             ->call('save')
-            ->assertSet('publishDateValidationDetailsHtml', fn (?string $value): bool => filled($value))
-            ->assertSee('Validasi Tanggal Publikasi Gagal')
-            ->assertSee('Status')
-            ->assertSee('Published');
+            ->assertHasNoFormErrors();
 
-        Notification::assertNotified('Gagal Menyimpan Blog Post');
+        Notification::assertNotified(__('admin.resources.blog_post.notifications.failed_title'));
 
         $post->refresh();
 
