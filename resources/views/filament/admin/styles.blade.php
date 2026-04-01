@@ -14,6 +14,78 @@
         background-attachment: fixed !important;
     }
 
+    /* Login page background */
+    body:has(.fi-simple-layout) {
+        background-image: url('/blog-cover.webp') !important;
+        background-size: cover !important;
+        background-position: center !important;
+        background-attachment: fixed !important;
+    }
+
+    /* Login card - Glassmorphism */
+    .fi-simple-main.fi-width-lg {
+        background: rgba(255, 255, 255, 0.05) !important;
+        backdrop-filter: blur(4px) saturate(120%) !important;
+        -webkit-backdrop-filter: blur(4px) saturate(120%) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 1.25rem !important;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+    }
+
+    /* Login page - text & labels */
+    .fi-simple-main.fi-width-lg h1,
+    .fi-simple-main.fi-width-lg h2,
+    .fi-simple-main.fi-width-lg p,
+    .fi-simple-main.fi-width-lg span,
+    .fi-simple-main.fi-width-lg label {
+        color: #ffffff !important;
+    }
+
+    /* Login page - input fields */
+    .fi-simple-main.fi-width-lg .fi-input-wrp {
+        background: rgba(255, 255, 255, 0.12) !important;
+        border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    }
+
+    .fi-simple-main.fi-width-lg input[type="email"],
+    .fi-simple-main.fi-width-lg input[type="password"],
+    .fi-simple-main.fi-width-lg input[type="text"] {
+        background: transparent !important;
+        color: #ffffff !important;
+    }
+
+    .fi-simple-main.fi-width-lg input::placeholder {
+        color: rgba(255, 255, 255, 0.5) !important;
+    }
+
+    .fi-simple-main.fi-width-lg .fi-input-wrp:focus-within {
+        border-color: rgba(255, 255, 255, 0.5) !important;
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15) !important;
+    }
+
+    /* Login page - eye icon */
+    .fi-simple-main.fi-width-lg .fi-input-wrp svg {
+        color: rgba(255, 255, 255, 0.7) !important;
+    }
+
+    /* Login page - brand name */
+    .fi-simple-main.fi-width-lg .fi-logo {
+        display: none !important;
+    }
+
+    /* Login page - submit button */
+    .fi-simple-main.fi-width-lg button[type="submit"] {
+        background: #7c3aed !important;
+        border-color: #7c3aed !important;
+        box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4) !important;
+    }
+
+    .fi-simple-main.fi-width-lg button[type="submit"]:hover {
+        background: #6d28d9 !important;
+        border-color: #6d28d9 !important;
+        box-shadow: 0 6px 20px rgba(124, 58, 237, 0.5) !important;
+    }
+
     /* Sidebar - Clean white with glass effect */
     aside[class*="fi-sidebar"] {
         background: rgba(255, 255, 255, 0.95) !important;

@@ -37,6 +37,15 @@ return [
     'processing' => 'Memproses...',
     'back_to_home' => 'Kembali ke beranda',
 
+    // Admin Login Page
+    'admin_login_heading' => 'Masuk ke akun Anda',
+    'admin_login_email' => 'Alamat email',
+    'admin_login_password' => 'Kata sandi',
+    'admin_login_remember' => 'Ingat saya',
+    'admin_login_button' => 'Masuk',
+    'admin_login_forgot' => 'Lupa kata sandi?',
+    'admin_login_back_home' => 'Beranda',
+
     // Register Page
     'free_trial' => 'Coba Gratis 14 Hari',
     'register_subtitle' => 'Buat akun dan mulai gunakan QashierWise sekarang',

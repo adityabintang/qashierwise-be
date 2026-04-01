@@ -37,6 +37,15 @@ return [
     'processing' => 'Processing...',
     'back_to_home' => 'Back to home',
 
+    // Admin Login Page
+    'admin_login_heading' => 'Sign in to your account',
+    'admin_login_email' => 'Email address',
+    'admin_login_password' => 'Password',
+    'admin_login_remember' => 'Remember me',
+    'admin_login_button' => 'Sign in',
+    'admin_login_forgot' => 'Forgot password?',
+    'admin_login_back_home' => 'Home',
+
     // Register Page
     'free_trial' => 'Try Free for 14 Days',
     'register_subtitle' => 'Create an account and start using QashierWise now',
