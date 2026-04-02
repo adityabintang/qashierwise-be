@@ -16,10 +16,7 @@
 
     /* Login page background */
     body:has(.fi-simple-layout) {
-        background-image: url('{{ asset('blog-cover.webp') }}') !important;
-        background-size: cover !important;
-        background-position: center !important;
-        background-attachment: fixed !important;
+        background: url('{{ asset('blog-cover.webp') }}') center/cover fixed !important;
     }
 
     /* Login card - Glassmorphism */
