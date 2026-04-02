@@ -526,7 +526,31 @@
 
 <script>
     // Add class to body if simple layout exists (for browsers that don't support :has())
-    if (document.querySelector('.fi-simple-layout')) {
-        document.body.classList.add('has-simple-layout');
+    const applySimpleLayoutClass = () => {
+        if (document.querySelector('.fi-simple-layout')) {
+            document.body.classList.add('has-simple-layout');
+            return true;
+        }
+
+        return false;
+    };
+
+    if (!applySimpleLayoutClass()) {
+        document.addEventListener('DOMContentLoaded', () => {
+            if (applySimpleLayoutClass()) {
+                return;
+            }
+
+            const observer = new MutationObserver(() => {
+                if (applySimpleLayoutClass()) {
+                    observer.disconnect();
+                }
+            });
+
+            observer.observe(document.documentElement, {
+                childList: true,
+                subtree: true,
+            });
+        });
     }
 </script>
