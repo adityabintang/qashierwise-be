@@ -529,6 +529,75 @@
     .dark div[class*="fi-page"] {
         background: transparent !important;
     }
+
+    /* ===== LANGUAGE SWITCHER - LIGHT MODE ===== */
+    [x-data*="open"] > button[aria-label="Switch language"] {
+        background: #fff !important;
+        border-color: #e5e7eb !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,.1) !important;
+    }
+
+    [x-data*="open"] > button[aria-label="Switch language"]:hover {
+        border-color: #6366f1 !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,.1) !important;
+    }
+
+    [x-data*="open"] > button[aria-label="Switch language"] span {
+        color: #374151 !important;
+    }
+
+    [x-data*="open"] > div[x-show="open"] {
+        background: #fff !important;
+        border-color: #e5e7eb !important;
+        box-shadow: 0 10px 25px rgba(0,0,0,.15) !important;
+    }
+
+    [x-data*="open"] > div[x-show="open"] a span:last-child {
+        color: #374151 !important;
+    }
+
+    /* ===== LANGUAGE SWITCHER - DARK MODE ===== */
+    .dark [x-data*="open"] > button[aria-label="Switch language"] {
+        background: rgba(30, 41, 59, 0.95) !important;
+        border-color: rgba(75, 85, 99, 0.5) !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,.3) !important;
+    }
+
+    .dark [x-data*="open"] > button[aria-label="Switch language"]:hover {
+        border-color: #818cf8 !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,.4) !important;
+    }
+
+    .dark [x-data*="open"] > button[aria-label="Switch language"] span {
+        color: #e5e7eb !important;
+    }
+
+    .dark [x-data*="open"] > button[aria-label="Switch language"] svg {
+        color: #818cf8 !important;
+    }
+
+    .dark [x-data*="open"] > div[x-show="open"] {
+        background: rgba(30, 41, 59, 0.98) !important;
+        border-color: rgba(75, 85, 99, 0.5) !important;
+        box-shadow: 0 10px 25px rgba(0,0,0,.5) !important;
+    }
+
+    .dark [x-data*="open"] > div[x-show="open"] a {
+        color: #e5e7eb !important;
+    }
+
+    .dark [x-data*="open"] > div[x-show="open"] a span:last-child {
+        color: #e5e7eb !important;
+    }
+
+    .dark [x-data*="open"] > div[x-show="open"] a[style*="background:rgba(99,102,241"] span:last-child {
+        color: #818cf8 !important;
+    }
+
+    .dark [x-data*="open"] > div[x-show="open"] a[style*="background:rgba(99,102,241"] {
+        background: rgba(129, 140, 248, 0.15) !important;
+        border-left-color: #818cf8 !important;
+    }
 </style>
 
 

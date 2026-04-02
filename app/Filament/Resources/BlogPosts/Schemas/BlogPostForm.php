@@ -132,6 +132,10 @@ class BlogPostForm
                                     ->imageResizeMode('contain')
                                     ->imageResizeTargetWidth('1920')
                                     ->imageResizeTargetHeight(null)
+                                    ->uploadingMessage('Uploading image...')
+                                    ->loadingIndicatorPosition('center')
+                                    ->removeUploadedFileButtonPosition('right')
+                                    ->uploadProgressIndicatorPosition('right')
                                     ->helperText(__('admin.resources.blog_post.fields.featured_image_helper')),
                             ]),
 
@@ -154,6 +158,10 @@ class BlogPostForm
                                     ->imageResizeMode('contain')
                                     ->imageResizeTargetWidth('1200')
                                     ->imageResizeTargetHeight(null)
+                                    ->uploadingMessage('Uploading SEO image...')
+                                    ->loadingIndicatorPosition('center')
+                                    ->removeUploadedFileButtonPosition('right')
+                                    ->uploadProgressIndicatorPosition('right')
                                     ->helperText(__('admin.resources.blog_post.fields.og_image_helper')),
                             ])
                             ->collapsible()

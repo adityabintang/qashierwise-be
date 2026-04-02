@@ -66,6 +66,10 @@ class AdminPanelProvider extends PanelProvider
                 fn (): string => view('components.timezone-detector-script')->render(),
             )
             ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn (): string => view('filament.components.upload-timeout-handler')->render(),
+            )
+            ->renderHook(
                 PanelsRenderHook::SIMPLE_LAYOUT_START,
                 fn (): string => '<a href="/" style="position:fixed;top:1.25rem;left:1.5rem;z-index:50;display:flex;align-items:center;gap:0.4rem;color:#ffffff;text-decoration:none;font-size:0.875rem;opacity:0.85;transition:opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.85"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12h18M3 12l7-7M3 12l7 7"/></svg>'.__('auth.admin_login_back_home').'</a>',
             )

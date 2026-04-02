@@ -69,6 +69,29 @@ class SecurityHeaders
             ->values()
             ->all();
 
+        // Add wildcard for R2 subdomains (for livewire temporary uploads)
+        $r2Wildcards = collect($r2Origins)
+            ->map(function (string $origin): ?string {
+                $parsed = parse_url($origin);
+                if (!is_array($parsed) || empty($parsed['host'])) {
+                    return null;
+                }
+                
+                // If it's a R2 cloudflarestorage.com domain, add wildcard
+                if (Str::contains($parsed['host'], '.r2.cloudflarestorage.com')) {
+                    return ($parsed['scheme'] ?? 'https') . '://*.' . Str::after($parsed['host'], '.');
+                }
+                
+                return null;
+            })
+            ->filter(fn ($value) => is_string($value) && $value !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        // Merge R2 origins with wildcards
+        $allR2Origins = array_merge($r2Origins, $r2Wildcards);
+
         // Add Vite dev server in development
         $viteDevServer = [];
         if (app()->environment('local')) {
@@ -95,6 +118,8 @@ class SecurityHeaders
                 'https://static.cloudflareinsights.com',
             ], $viteDevServer)),
 
+            "worker-src 'self' blob:",
+
             "style-src 'self' 'unsafe-inline' ".implode(' ', array_merge([
                 'https://fonts.googleapis.com',
                 'https://cdn.tailwindcss.com',
@@ -110,7 +135,7 @@ class SecurityHeaders
                 'https://www.google-analytics.com',
                 'https://api.dicebear.com',
                 'https://api.qrserver.com',
-                ...$r2Origins,
+                ...$allR2Origins,
             ]),
 
             "connect-src 'self' ".implode(' ', array_merge([
@@ -145,11 +170,11 @@ class SecurityHeaders
                 'https://api.midtrans.com',
                 'https://api.sandbox.midtrans.com',
                 'https://api.xendit.co',
-                ...$r2Origins,
+                ...$allR2Origins,
             ], $viteDevServer)),
 
             "media-src 'self' blob: https: ".implode(' ', [
-                ...$r2Origins,
+                ...$allR2Origins,
             ]),
 
             "frame-src 'self' ".implode(' ', [
@@ -162,6 +187,7 @@ class SecurityHeaders
                 'https://connect.facebook.net',
             ]),
 
+            "child-src 'self' blob:",
             "frame-ancestors 'none'",
             "base-uri 'self'",
             "form-action 'self'",
