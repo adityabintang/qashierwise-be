@@ -6,6 +6,7 @@ use App\Filament\Widgets\BlogPostsChartWidget;
 use App\Filament\Widgets\BlogStatsWidget;
 use App\Filament\Widgets\PopularCategoriesWidget;
 use App\Filament\Widgets\RecentBlogPostsWidget;
+use App\Http\Middleware\SecurityHeaders;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -32,7 +33,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->brandName('QashierWise CMS')
-            ->favicon(asset('favicon.ico?v=' . time()))
+            ->favicon($this->adminFaviconPath())
             ->colors([
                 'primary' => Color::Indigo,
             ])
@@ -66,7 +67,7 @@ class AdminPanelProvider extends PanelProvider
             )
             ->renderHook(
                 PanelsRenderHook::SIMPLE_LAYOUT_START,
-                fn (): string => '<a href="/" style="position:fixed;top:1.25rem;left:1.5rem;z-index:50;display:flex;align-items:center;gap:0.4rem;color:#ffffff;text-decoration:none;font-size:0.875rem;opacity:0.85;transition:opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.85"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12h18M3 12l7-7M3 12l7 7"/></svg>' . __('auth.admin_login_back_home') . '</a>',
+                fn (): string => '<a href="/" style="position:fixed;top:1.25rem;left:1.5rem;z-index:50;display:flex;align-items:center;gap:0.4rem;color:#ffffff;text-decoration:none;font-size:0.875rem;opacity:0.85;transition:opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.85"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12h18M3 12l7-7M3 12l7 7"/></svg>'.__('auth.admin_login_back_home').'</a>',
             )
             ->middleware([
                 EncryptCookies::class,
@@ -79,9 +80,20 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
                 \App\Http\Middleware\LocalizationMiddleware::class,
+                SecurityHeaders::class,
             ])
             ->authMiddleware([
                 Authenticate::class,
             ]);
+    }
+
+    private function adminFaviconPath(): string
+    {
+        $faviconPath = public_path('favicon.ico');
+        $version = file_exists($faviconPath)
+            ? (string) filemtime($faviconPath)
+            : (string) time();
+
+        return '/favicon.ico?v='.$version;
     }
 }

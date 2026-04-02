@@ -22,6 +22,14 @@
         background-attachment: fixed !important;
     }
 
+    /* Deterministic login background on the actual login layout element */
+    .fi-simple-layout {
+        background-image: url('{{ asset('blog-cover.webp') }}') !important;
+        background-size: cover !important;
+        background-position: center !important;
+        background-repeat: no-repeat !important;
+    }
+
     /* Fallback for browsers that don't support :has() */
     body.has-simple-layout {
         background-image: url('{{ asset('blog-cover.webp') }}') !important;
