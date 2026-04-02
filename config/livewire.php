@@ -130,7 +130,7 @@ return [
 
     'temporary_file_upload' => [
         'disk' => 'r2',                                       // Use R2 for temporary uploads
-        'rules' => ['required', 'file', 'max:10240'],         // Max 10MB
+        'rules' => ['required', 'file', 'max:20480'],         // Max 20MB
         'directory' => 'livewire-tmp',                        // Directory in R2 bucket
         'middleware' => 'throttle:60,1',                      // Rate limiting
         'preview_mimes' => [                                  // Supported file types for temporary pre-signed file URLs...
