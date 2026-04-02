@@ -16,7 +16,18 @@
 
     /* Login page background */
     body:has(.fi-simple-layout) {
-        background: url('{{ asset('blog-cover.webp') }}') center/cover fixed !important;
+        background-image: url('{{ asset('blog-cover.webp') }}') !important;
+        background-size: cover !important;
+        background-position: center !important;
+        background-attachment: fixed !important;
+    }
+
+    /* Fallback for browsers that don't support :has() */
+    body.has-simple-layout {
+        background-image: url('{{ asset('blog-cover.webp') }}') !important;
+        background-size: cover !important;
+        background-position: center !important;
+        background-attachment: fixed !important;
     }
 
     /* Login card - Glassmorphism */
@@ -511,3 +522,11 @@
         background: transparent !important;
     }
 </style>
+
+
+<script>
+    // Add class to body if simple layout exists (for browsers that don't support :has())
+    if (document.querySelector('.fi-simple-layout')) {
+        document.body.classList.add('has-simple-layout');
+    }
+</script>
