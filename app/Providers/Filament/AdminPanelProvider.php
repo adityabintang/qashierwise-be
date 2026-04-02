@@ -32,7 +32,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->brandName('QashierWise CMS')
-            ->favicon(asset('favicon.ico'))
+            ->favicon(asset('favicon.ico?v=' . time()))
             ->colors([
                 'primary' => Color::Indigo,
             ])
