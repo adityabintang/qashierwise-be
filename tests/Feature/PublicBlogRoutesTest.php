@@ -187,6 +187,29 @@ class PublicBlogRoutesTest extends TestCase
         $response->assertDontSee('Panduan Operasional Toko');
     }
 
+    public function test_blog_index_search_is_case_insensitive_for_title(): void
+    {
+        $technologyCategory = BlogCategory::factory()->create([
+            'name' => 'Technology',
+            'slug' => 'technology',
+        ]);
+
+        BlogPost::factory()->published()->create([
+            'title' => 'Analisis Data untuk Keputusan Bisnis yang Lebih Baik',
+            'slug' => 'analisis-data-untuk-keputusan-bisnis-yang-lebih-baik',
+            'blog_category_id' => $technologyCategory->id,
+        ]);
+
+        $response = $this->get(route('blog.index', [
+            'search' => 'anali',
+            'sort' => 'latest',
+            'category' => $technologyCategory->slug,
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Analisis Data untuk Keputusan Bisnis yang Lebih Baik');
+    }
+
     public function test_blog_load_more_can_filter_posts_by_category_slug(): void
     {
         $paymentCategory = BlogCategory::factory()->create([

@@ -7,6 +7,7 @@ use App\Models\BlogPost;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Cursor;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class BlogController extends Controller
@@ -18,6 +19,7 @@ class BlogController extends Controller
         $search = $request->query('search', '');
         $sort = $request->query('sort', 'latest');
         $selectedCategory = $request->query('category', '');
+        $searchOperator = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
 
         $query = BlogPost::query()
             ->published()
@@ -25,10 +27,10 @@ class BlogController extends Controller
 
         // Apply search filter
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                    ->orWhere('excerpt', 'like', "%{$search}%")
-                    ->orWhere('content', 'like', "%{$search}%");
+            $query->where(function ($q) use ($search, $searchOperator) {
+                $q->where('title', $searchOperator, "%{$search}%")
+                    ->orWhere('excerpt', $searchOperator, "%{$search}%")
+                    ->orWhere('content', $searchOperator, "%{$search}%");
             });
         }
 
@@ -83,6 +85,7 @@ class BlogController extends Controller
         $search = $request->query('search', '');
         $sort = $request->query('sort', 'latest');
         $selectedCategory = $request->query('category', '');
+        $searchOperator = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
 
         $cursor = is_string($encodedCursor) && $encodedCursor !== ''
             ? Cursor::fromEncoded($encodedCursor)
@@ -94,10 +97,10 @@ class BlogController extends Controller
 
         // Apply search filter
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                    ->orWhere('excerpt', 'like', "%{$search}%")
-                    ->orWhere('content', 'like', "%{$search}%");
+            $query->where(function ($q) use ($search, $searchOperator) {
+                $q->where('title', $searchOperator, "%{$search}%")
+                    ->orWhere('excerpt', $searchOperator, "%{$search}%")
+                    ->orWhere('content', $searchOperator, "%{$search}%");
             });
         }
 
