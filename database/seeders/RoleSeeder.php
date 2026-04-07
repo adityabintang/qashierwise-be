@@ -86,14 +86,6 @@ class RoleSeeder extends Seeder
                 'pos.manage_categories',
                 'pos.view_reports',
             ],
-            'Content Manager' => [
-                'blog.view_posts',
-                'blog.manage_posts',
-                'blog.view_categories',
-                'blog.manage_categories',
-                'blog.view_tags',
-                'blog.manage_tags',
-            ],
         ];
 
         foreach ($rolesWithPermissions as $roleName => $permissions) {
