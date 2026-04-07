@@ -62,11 +62,21 @@
                     </div>
                     
                     <div class="fly-sort-group">
-                        <label for="sort" class="fly-sort-label">{{ __('blog.sort_label') }}</label>
                         <select name="sort" id="sort" class="fly-sort-select">
                             <option value="latest" {{ ($sort ?? 'latest') === 'latest' ? 'selected' : '' }}>{{ __('blog.sort_latest') }}</option>
                             <option value="oldest" {{ ($sort ?? 'latest') === 'oldest' ? 'selected' : '' }}>{{ __('blog.sort_oldest') }}</option>
                             <option value="title" {{ ($sort ?? 'latest') === 'title' ? 'selected' : '' }}>{{ __('blog.sort_title') }}</option>
+                        </select>
+                    </div>
+
+                    <div class="fly-sort-group">
+                        <select name="category" id="category" class="fly-sort-select">
+                            <option value="">{{ __('blog.category_all') }}</option>
+                            @foreach(($categories ?? collect()) as $category)
+                                <option value="{{ $category->slug }}" {{ ($selectedCategory ?? '') === $category->slug ? 'selected' : '' }}>
+                                    {{ $category->name }}
+                                </option>
+                            @endforeach
                         </select>
                     </div>
                 </form>
@@ -88,7 +98,7 @@
     </header>
 
     <main>
-        <section class="fly-hero-section">
+        <section class="fly-hero-section {{ $featuredPost ? '' : 'is-empty' }}">
             <img
                 src="/blog-cover.webp"
                 alt="blog-cover"
@@ -126,7 +136,7 @@
             </div>
         </section>
 
-        <section class="fly-cards-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section class="fly-cards-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" id="blog-cards-section">
             @if (! $featuredPost)
                 <div class="fly-empty-state">
                     <h2>{{ __('blog.no_posts') }}</h2>
@@ -151,15 +161,18 @@
         document.addEventListener('DOMContentLoaded', () => {
             const searchInput = document.getElementById('searchInput');
             const sortSelect = document.getElementById('sort');
+            const categorySelect = document.getElementById('category');
             const clearButton = document.getElementById('clearSearch');
             const searchLoading = document.getElementById('searchLoading');
             const blogGrid = document.getElementById('blog-grid');
             const heroSection = document.querySelector('.fly-hero-section');
+            const cardsSection = document.getElementById('blog-cards-section');
             const loadTrigger = document.getElementById('blog-load-more');
             
             let searchTimeout = null;
             let currentSearch = searchInput?.value || '';
             let currentSort = sortSelect?.value || 'latest';
+            let currentCategory = categorySelect?.value || '';
 
             // Real-time search
             if (searchInput) {
@@ -185,6 +198,13 @@
                 });
             }
 
+            if (categorySelect) {
+                categorySelect.addEventListener('change', (e) => {
+                    currentCategory = e.target.value;
+                    performSearch();
+                });
+            }
+
             // Clear search
             if (clearButton) {
                 clearButton.addEventListener('click', () => {
@@ -198,6 +218,7 @@
                 const params = new URLSearchParams();
                 if (currentSearch) params.set('search', currentSearch);
                 if (currentSort) params.set('sort', currentSort);
+                if (currentCategory) params.set('category', currentCategory);
                 
                 const url = `{{ route('blog.index') }}${params.toString() ? '?' + params.toString() : ''}`;
                 
@@ -219,7 +240,27 @@
                     // Update hero section
                     const newHero = doc.querySelector('.fly-hero-section');
                     if (heroSection && newHero) {
+                        heroSection.className = newHero.className;
                         heroSection.innerHTML = newHero.innerHTML;
+                    }
+
+                    // Handle empty state when no matching results
+                    const newEmptyState = doc.querySelector('.fly-empty-state');
+                    const existingEmptyState = cardsSection?.querySelector('.fly-empty-state');
+                    if (cardsSection && newEmptyState) {
+                        if (blogGrid) {
+                            blogGrid.innerHTML = '';
+                        }
+
+                        if (loadTrigger) {
+                            loadTrigger.classList.add('hidden');
+                        }
+
+                        if (!existingEmptyState) {
+                            cardsSection.insertAdjacentHTML('afterbegin', newEmptyState.outerHTML);
+                        }
+                    } else if (existingEmptyState) {
+                        existingEmptyState.remove();
                     }
                     
                     // Update grid
@@ -281,7 +322,8 @@
                 try {
                     const searchParam = currentSearch || '';
                     const sortParam = currentSort || 'latest';
-                    const url = `{{ route('blog.load-more') }}?cursor=${encodeURIComponent(cursor)}&search=${encodeURIComponent(searchParam)}&sort=${encodeURIComponent(sortParam)}`;
+                    const categoryParam = currentCategory || '';
+                    const url = `{{ route('blog.load-more') }}?cursor=${encodeURIComponent(cursor)}&search=${encodeURIComponent(searchParam)}&sort=${encodeURIComponent(sortParam)}&category=${encodeURIComponent(categoryParam)}`;
                     
                     const response = await fetch(url, {
                         headers: {

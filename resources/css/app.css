@@ -1277,6 +1277,10 @@ a, button, input, select, textarea {
     overflow: hidden;
 }
 
+.fly-hero-section.is-empty {
+    min-height: 18rem;
+}
+
 .fly-hero-bg {
     position: absolute;
     inset: 0;
@@ -1470,6 +1474,7 @@ a, button, input, select, textarea {
     color: #1f163c;
     border: 1px dashed #d8d0ec;
     border-radius: 1rem;
+    box-shadow: 0 12px 30px rgba(56, 32, 92, 0.12);
     padding: 2rem;
     text-align: center;
     margin: 2rem 0 4rem;
@@ -1484,6 +1489,10 @@ a, button, input, select, textarea {
 @media (min-width: 1024px) {
     .fly-hero-section {
         min-height: auto;
+    }
+
+    .fly-hero-section.is-empty {
+        min-height: 24rem;
     }
 
     .fly-hero-bg {
@@ -1600,6 +1609,10 @@ a, button, input, select, textarea {
     .fly-hero-section {
         padding-top: 8.3rem;
         padding-bottom: 2.5rem;
+    }
+
+    .fly-hero-section.is-empty {
+        min-height: 13.5rem;
     }
 
     .fly-meta-row {
