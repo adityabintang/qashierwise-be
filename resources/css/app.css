@@ -1360,6 +1360,7 @@ a, button, input, select, textarea {
 .fly-overlay-link {
     position: absolute;
     inset: 0;
+    border-radius: inherit;
 }
 
 .fly-hero-image {
@@ -1394,6 +1395,13 @@ a, button, input, select, textarea {
     box-shadow: 0 2px 18px rgba(48, 20, 95, 0.08);
     min-height: 100%;
     border: 1px solid rgba(216, 210, 233, 0.75);
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+
+.fly-post-card:hover,
+.fly-post-card:focus-within {
+    transform: translateY(-4px);
+    box-shadow: 0 14px 34px rgba(48, 20, 95, 0.22);
 }
 
 .fly-card-image {
