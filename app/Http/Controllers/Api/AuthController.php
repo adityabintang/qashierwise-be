@@ -157,6 +157,12 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->firstOrFail();
 
+        // Block author from logging in via regular login (they should use /admin/login)
+        if ($user->isAuthor()) {
+            Auth::logout();
+            return ApiResponse::error(__('auth.author_must_use_admin_panel'), 403);
+        }
+
         // CRITICAL: Clear permission cache to prevent cross-tenant permission leakage
         // This ensures each user session starts with fresh permission data
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();

@@ -83,6 +83,7 @@ return [
     'token_expired' => 'Your session has expired. Please login again.',
     'token_invalid' => 'Invalid authentication token.',
     'email_not_registered' => 'The email is not registered in the application',
+    'author_must_use_admin_panel' => 'Authors must use the Editor panel at /admin/login',
 
     // Validation Messages (Auth-specific)
     'name_required' => 'Business name is required',

@@ -84,6 +84,7 @@ return [
     'token_expired' => 'Sesi Anda telah berakhir. Silakan login kembali.',
     'token_invalid' => 'Token autentikasi tidak valid.',
     'email_not_registered' => 'Email yang disebutkan atau diinputkan tidak terdaftar di aplikasi',
+    'author_must_use_admin_panel' => 'Author harus menggunakan panel Editor di /admin/login',
 
     // Validation Messages (Auth-specific)
     'name_required' => 'Nama bisnis wajib diisi',
