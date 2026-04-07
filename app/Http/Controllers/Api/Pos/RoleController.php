@@ -79,10 +79,18 @@ class RoleController extends Controller
 
     /**
      * Get available permissions.
+     * Only returns POS-related permissions (excludes blog permissions).
      */
     public function permissions(): JsonResponse
     {
         $permissions = Permission::where('guard_name', 'sanctum')
+            ->where(function ($query) {
+                // Only include POS permissions (exclude blog permissions)
+                $query->where('name', 'like', 'view_%')
+                      ->orWhere('name', 'like', 'manage_%')
+                      ->orWhere('name', 'like', 'process_%');
+            })
+            ->where('name', 'not like', '%_blog_%')
             ->orderBy('name', 'asc')
             ->get()
             ->mapWithKeys(function ($permission) {
