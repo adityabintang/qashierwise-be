@@ -155,6 +155,69 @@
         </section>
     </main>
 
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid md:grid-cols-4 gap-8 mb-12">
+                <!-- Company Info -->
+                <div>
+                    <div class="flex items-center space-x-2 mb-4">
+                        <img src="{{ asset('images/logo-48.png') }}" class="h-7 rounded-xl" alt="Logo" width="28" height="28" loading="lazy" style="width: 28px; height: 28px;">
+                        <span class="text-xl font-bold text-primary">QashierWise</span>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-4">
+                        {{ __('landing.footer.company_description') }}
+                    </p>
+                    <div class="text-sm text-gray-600">
+                        <p class="font-semibold text-gray-900 mb-1">{{ __('landing.footer.address_title') }}</p>
+                        <p>{!! __('landing.footer.address') !!}</p>
+                    </div>
+                </div>
+
+                <!-- Navigation -->
+                <div>
+                    <h3 class="text-gray-900 font-semibold mb-4 text-base">{{ __('landing.footer.navigation_title') }}</h3>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="/#fitur" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.features') }}</a></li>
+                        <li><a href="/#pricing" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.pricing') }}</a></li>
+                        <li><a href="/#about" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.about') }}</a></li>
+                        <li><a href="/#faq" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.faq') }}</a></li>
+                    </ul>
+                </div>
+
+                <!-- Legal -->
+                <div>
+                    <h3 class="text-gray-900 font-semibold mb-4 text-base">{{ __('landing.footer.legal_title') }}</h3>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="/privacy-policy" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.privacy_policy') }}</a></li>
+                        <li><a href="/terms-of-service" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.terms_of_service') }}</a></li>
+                        <li><a href="/refund-policy" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.refund_policy') }}</a></li>
+                    </ul>
+                </div>
+
+                 <!-- Product -->
+                 <div>
+                     <h3 class="text-gray-900 font-semibold mb-4 text-base">{{ __('landing.footer.product_title') }}</h3>
+                     <ul class="space-y-2 text-sm">
+                         <li><a href="#" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.console') }}</a></li>
+                         <li><a href="#" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.chatbot') }}</a></li>
+                     </ul>
+                 </div>
+
+                 <!-- Social Media -->
+                 <div>
+                     <h3 class="text-gray-900 font-semibold mb-4 text-base">{{ __('landing.footer.follow_us') }}</h3>
+                     <p class="text-sm text-gray-600 mb-4">{{ __('landing.footer.follow_us_desc') }}</p>
+                     <x-social-links :size="'md'" :showLabels="false" />
+                 </div>
+             </div>
+
+            <div class="border-t border-gray-200 pt-8 text-center text-sm text-gray-600">
+                <p>{!! __('landing.footer.copyright') !!}</p>
+            </div>
+        </div>
+    </footer>
+
     <x-timezone-detector-script />
 
     <script>
