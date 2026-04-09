@@ -67,6 +67,10 @@
             <i class="fas fa-robot w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_ai_agent') }}</span>
         </a>
+        <a href="/dashboard/customer-tags" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'customer-tags' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('customer-tags')">
+            <i class="fas fa-tags w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_customer_tags') }}</span>
+        </a>
 
         <!-- Reservation Section -->
         <div x-show="sidebarOpen || isMobile" x-transition class="pt-4">

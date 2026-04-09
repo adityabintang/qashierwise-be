@@ -110,6 +110,10 @@ Route::middleware(['web', 'check.web.auth', 'block.author.login'])->group(functi
         return view('dashboard.ai-agent');
     })->name('dashboard.ai-agent');
 
+    Route::get('/dashboard/customer-tags', function () {
+        return view('dashboard.customer-tags');
+    })->name('dashboard.customer-tags');
+
     // Reservation routes
     Route::get('/dashboard/reservations', function () {
         return view('dashboard.reservations.index');
