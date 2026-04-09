@@ -20,7 +20,7 @@
                         x-show="!isMobileMessages || mobileView === 'contacts'"
                     >
                         <!-- Search -->
-                        <div class="p-4 border-b border-[hsl(var(--border))]">
+                        <div class="p-4 pb-2 border-b border-[hsl(var(--border))]">
                             <div class="relative">
                                 <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none"></i>
                                 <input
@@ -31,6 +31,28 @@
                                     class="input w-full"
                                     style="padding-left: 2.5rem;"
                                 >
+                            </div>
+                            <!-- Tag Filter Bar -->
+                            <div x-show="allTags.length > 0" class="flex items-center gap-1.5 mt-2 overflow-x-auto pb-1 scroll-area" style="scrollbar-width: thin;">
+                                <button
+                                    @click="showTagManageModal = true"
+                                    class="flex-shrink-0 h-6 w-6 rounded-full flex items-center justify-center bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted-foreground)/0.2)] transition-colors"
+                                    title="Manage Tags"
+                                >
+                                    <i class="fas fa-cog text-[10px] text-[hsl(var(--muted-foreground))]"></i>
+                                </button>
+                                <template x-for="tag in allTags" :key="'filter-'+tag.id">
+                                    <button
+                                        @click="filterByTag(tag.id)"
+                                        class="flex-shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full transition-all duration-200 cursor-pointer border"
+                                        :style="`
+                                            background: ${selectedFilterTag == tag.id ? tag.color : tagBgColor(tag.color)};
+                                            color: ${selectedFilterTag == tag.id ? '#fff' : tag.color};
+                                            border-color: ${tag.color};
+                                        `"
+                                        x-text="tag.name"
+                                    ></button>
+                                </template>
                             </div>
                         </div>
                         <!-- Contacts List -->
@@ -83,6 +105,17 @@
                                                     <p class="text-[10px] text-[hsl(var(--muted-foreground))]" x-text="formatTime(contact.last_message_at)">-</p>
                                                 </div>
                                                 <p class="text-xs text-[hsl(var(--muted-foreground))] truncate mt-0.5" :class="{'font-medium': contact.unread_count > 0}" x-text="contact.last_message_text || 'No messages'">-</p>
+                                                <!-- Contact Tags -->
+                                                <div x-show="contact.tags && contact.tags.length > 0" class="flex items-center gap-1 mt-1 flex-wrap">
+                                                    <template x-for="tag in (contact.tags || []).slice(0, 3)" :key="'ctag-'+contact.id+'-'+tag.id">
+                                                        <span
+                                                            class="text-[9px] font-medium px-1.5 py-0 rounded-full leading-4"
+                                                            :style="`background: ${tagBgColor(tag.color)}; color: ${tag.color};`"
+                                                            x-text="tag.name"
+                                                        ></span>
+                                                    </template>
+                                                    <span x-show="(contact.tags || []).length > 3" class="text-[9px] text-[hsl(var(--muted-foreground))]" x-text="'+' + ((contact.tags || []).length - 3)"></span>
+                                                </div>
                                             </div>
                                         </div>
                                     </template>
@@ -155,10 +188,105 @@
                                             ></span>
                                         </button>
                                     </div>
+                                    <!-- Tag Assign Button -->
+                                    <div class="relative">
+                                        <button @click="showTagAssignPopover = !showTagAssignPopover" class="btn btn-ghost btn-icon min-h-[44px] min-w-[44px]" title="Manage contact tags">
+                                            <i class="fas fa-tags"></i>
+                                        </button>
+                                        <!-- Tag Assignment Popover -->
+                                        <div
+                                            x-show="showTagAssignPopover"
+                                            @click.away="showTagAssignPopover = false"
+                                            x-transition:enter="transition ease-out duration-200"
+                                            x-transition:enter-start="opacity-0 scale-95"
+                                            x-transition:enter-end="opacity-100 scale-100"
+                                            x-transition:leave="transition ease-in duration-100"
+                                            x-transition:leave-start="opacity-100 scale-100"
+                                            x-transition:leave-end="opacity-0 scale-95"
+                                            x-cloak
+                                            class="absolute right-0 top-12 w-64 bg-white rounded-xl shadow-xl border border-[hsl(var(--border))] z-50 overflow-hidden"
+                                        >
+                                            <div class="p-3 border-b border-[hsl(var(--border))]">
+                                                <p class="text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">Assign Tags</p>
+                                            </div>
+                                            <div class="max-h-48 overflow-y-auto scroll-area">
+                                                <template x-for="tag in allTags" :key="'assign-'+tag.id">
+                                                    <button
+                                                        @click="toggleContactTag(tag.id)"
+                                                        class="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[hsl(var(--muted))] transition-colors text-left"
+                                                    >
+                                                        <div
+                                                            class="h-4 w-4 rounded border-2 flex items-center justify-center transition-all duration-200 flex-shrink-0"
+                                                            :style="`border-color: ${tag.color}; background: ${contactHasTag(tag.id) ? tag.color : 'transparent'};`"
+                                                        >
+                                                            <i x-show="contactHasTag(tag.id)" class="fas fa-check text-white text-[8px]"></i>
+                                                        </div>
+                                                        <span
+                                                            class="text-xs font-medium px-2 py-0.5 rounded-full flex-1 truncate"
+                                                            :style="`background: ${tagBgColor(tag.color)}; color: ${tag.color};`"
+                                                            x-text="tag.name"
+                                                        ></span>
+                                                    </button>
+                                                </template>
+                                                <div x-show="allTags.length === 0" class="px-3 py-4 text-center">
+                                                    <p class="text-xs text-[hsl(var(--muted-foreground))]">No tags yet</p>
+                                                </div>
+                                            </div>
+                                            <!-- Inline Create Tag -->
+                                            <div class="p-3 border-t border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)]">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="relative flex-shrink-0">
+                                                        <div
+                                                            class="h-5 w-5 rounded-full cursor-pointer border-2 border-white shadow-sm"
+                                                            :style="`background: ${inlineTagColor};`"
+                                                            @click="
+                                                                const idx = tagPresetColors.indexOf(inlineTagColor);
+                                                                inlineTagColor = tagPresetColors[(idx + 1) % tagPresetColors.length];
+                                                            "
+                                                            title="Click to change color"
+                                                        ></div>
+                                                    </div>
+                                                    <input
+                                                        type="text"
+                                                        x-model="inlineTagName"
+                                                        @keydown.enter.prevent="createTagInline()"
+                                                        placeholder="New tag name..."
+                                                        class="input text-xs py-1 flex-1"
+                                                        maxlength="50"
+                                                    >
+                                                    <button
+                                                        @click="createTagInline()"
+                                                        :disabled="!inlineTagName.trim()"
+                                                        class="btn btn-primary btn-sm px-2 py-1 text-xs"
+                                                    >
+                                                        <i class="fas fa-plus"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <button @click="refreshMessages" class="btn btn-ghost btn-icon min-h-[44px] min-w-[44px]">
                                         <i class="fas fa-sync-alt" :class="{'animate-spin': loadingMessages}"></i>
                                     </button>
                                 </div>
+                            </div>
+                            <!-- Assigned Tags Pills -->
+                            <div x-show="(selectedContact?.tags || []).length > 0" class="flex items-center gap-1.5 pb-2 flex-wrap -mt-1">
+                                <template x-for="tag in (selectedContact?.tags || [])" :key="'hdr-tag-'+tag.id">
+                                    <span
+                                        class="inline-flex items-center gap-1 text-[10px] font-medium pl-2 pr-1 py-0.5 rounded-full transition-all duration-200"
+                                        :style="`background: ${tagBgColor(tag.color)}; color: ${tag.color};`"
+                                    >
+                                        <span x-text="tag.name"></span>
+                                        <button
+                                            @click="removeContactTag(tag.id)"
+                                            class="h-3.5 w-3.5 rounded-full flex items-center justify-center hover:bg-black/10 transition-colors"
+                                            title="Remove tag"
+                                        >
+                                            <i class="fas fa-times text-[7px]"></i>
+                                        </button>
+                                    </span>
+                                </template>
                             </div>
                         </div>
                         <!-- Messages -->
@@ -755,6 +883,95 @@
                         </form>
                     </div>
                 </div>
+                <!-- Tag Management Modal -->
+                <div x-show="showTagManageModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div class="fixed inset-0 bg-black/50" @click="showTagManageModal = false; cancelEditTag()"></div>
+                    <div class="card relative w-full max-w-md max-h-[85vh] overflow-hidden">
+                        <div class="p-4 border-b border-[hsl(var(--border))] flex items-center justify-between">
+                            <h3 class="font-semibold">Manage Tags</h3>
+                            <button @click="showTagManageModal = false; cancelEditTag()" class="btn btn-ghost btn-icon"><i class="fas fa-times"></i></button>
+                        </div>
+                        <!-- Create / Edit Tag Form -->
+                        <div class="p-4 border-b border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.2)]">
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="text-xs font-medium mb-1 block" x-text="editingTag ? 'Edit Tag' : 'Create New Tag'"></label>
+                                    <input
+                                        type="text"
+                                        x-model="tagForm.name"
+                                        @keydown.enter.prevent="saveTagFromModal()"
+                                        class="input w-full text-sm"
+                                        placeholder="Tag name (e.g. VIP, New Lead)"
+                                        maxlength="50"
+                                    >
+                                </div>
+                                <!-- Color Palette -->
+                                <div>
+                                    <label class="text-xs font-medium mb-1.5 block">Color</label>
+                                    <div class="flex flex-wrap gap-2">
+                                        <template x-for="color in tagPresetColors" :key="'palette-'+color">
+                                            <button
+                                                type="button"
+                                                @click="tagForm.color = color"
+                                                class="h-7 w-7 rounded-full transition-all duration-200 border-2 flex items-center justify-center"
+                                                :style="`background: ${color}; border-color: ${tagForm.color === color ? '#1e293b' : 'transparent'}; transform: ${tagForm.color === color ? 'scale(1.15)' : 'scale(1)'};`"
+                                            >
+                                                <i x-show="tagForm.color === color" class="fas fa-check text-white text-[10px]"></i>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </div>
+                                <!-- Preview -->
+                                <div x-show="tagForm.name.trim()" class="flex items-center gap-2">
+                                    <span class="text-xs text-[hsl(var(--muted-foreground))]">Preview:</span>
+                                    <span
+                                        class="text-xs font-medium px-2.5 py-0.5 rounded-full"
+                                        :style="`background: ${tagBgColor(tagForm.color)}; color: ${tagForm.color};`"
+                                        x-text="tagForm.name"
+                                    ></span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button
+                                        x-show="editingTag"
+                                        @click="cancelEditTag()"
+                                        class="btn btn-outline btn-sm flex-1"
+                                    >Cancel</button>
+                                    <button
+                                        @click="saveTagFromModal()"
+                                        :disabled="!tagForm.name.trim()"
+                                        class="btn btn-primary btn-sm flex-1"
+                                        x-text="editingTag ? 'Update Tag' : 'Create Tag'"
+                                    >Create Tag</button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Tags List -->
+                        <div class="max-h-64 overflow-y-auto scroll-area">
+                            <template x-for="tag in allTags" :key="'manage-'+tag.id">
+                                <div class="flex items-center justify-between px-4 py-3 border-b border-[hsl(var(--border)/0.5)] hover:bg-[hsl(var(--muted)/0.3)] transition-colors">
+                                    <div class="flex items-center gap-3 flex-1 min-w-0">
+                                        <div class="h-3 w-3 rounded-full flex-shrink-0" :style="`background: ${tag.color};`"></div>
+                                        <span class="text-sm font-medium truncate" x-text="tag.name"></span>
+                                        <span class="text-[10px] text-[hsl(var(--muted-foreground))] flex-shrink-0" x-text="(tag.contacts_count || 0) + ' contacts'"></span>
+                                    </div>
+                                    <div class="flex items-center gap-1 flex-shrink-0">
+                                        <button @click="editTag(tag)" class="btn btn-ghost btn-icon btn-sm" title="Edit tag">
+                                            <i class="fas fa-pen text-xs text-[hsl(var(--muted-foreground))]"></i>
+                                        </button>
+                                        <button @click="deleteTag(tag.id)" class="btn btn-ghost btn-icon btn-sm" title="Delete tag">
+                                            <i class="fas fa-trash text-xs text-red-400"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                            <div x-show="allTags.length === 0" class="empty-state py-12">
+                                <div class="empty-state-icon"><i class="fas fa-tags"></i></div>
+                                <p class="text-sm text-[hsl(var(--muted-foreground))] mt-2">No tags yet</p>
+                                <p class="text-xs text-[hsl(var(--muted-foreground))]">Create your first tag above</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
@@ -856,6 +1073,20 @@ function messagesManager() {
         showLocationModal: false, showButtonModal: false, showListModal: false, showAudioModal: false,
         showFormatBar: false, formatBarPosition: { top: 0, left: 0 },
         isTemplateMessage: false, selectedTemplateInfo: null,
+        // Tag system state
+        allTags: [],
+        selectedFilterTag: null,
+        showTagManageModal: false,
+        showTagAssignPopover: false,
+        tagForm: { name: '', color: '#a855f7' },
+        editingTag: null,
+        tagPresetColors: [
+            '#a855f7', '#3b82f6', '#06b6d4', '#14b8a6',
+            '#22c55e', '#84cc16', '#eab308', '#f97316',
+            '#ef4444', '#ec4899', '#f43f5e', '#64748b'
+        ],
+        inlineTagName: '',
+        inlineTagColor: '#a855f7',
         imageForm: { file: null, caption: '', preview: null },
         videoForm: { file: null, caption: '', preview: null },
         documentForm: { file: null, filename: '', caption: '' },
@@ -884,7 +1115,7 @@ function messagesManager() {
                 }, 150);
             });
 
-            await Promise.all([this.fetchContacts(), this.fetchTemplates()]);
+            await Promise.all([this.fetchContacts(), this.fetchTemplates(), this.fetchTags()]);
             const urlParams = new URLSearchParams(window.location.search);
             const contactId = urlParams.get('contact');
             if (contactId) { const contact = this.contacts.find(c => c.id == contactId); if (contact) this.selectContact(contact); }
@@ -928,7 +1159,9 @@ function messagesManager() {
             this.loadingContacts = true;
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${this.API_BASE_URL}/whatsapp/contacts`, { headers: { 'Authorization': `Bearer ${token}` } });
+                let url = `${this.API_BASE_URL}/whatsapp/contacts`;
+                if (this.selectedFilterTag) url += `?tag_id=${this.selectedFilterTag}`;
+                const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
                 const data = await res.json();
                 this.contacts = data.data || [];
                 this.filterContactList();
@@ -1558,6 +1791,186 @@ function messagesManager() {
             } catch (e) { console.error('Error:', e); }
             finally { this.sending = false; }
         },
+        // ==========================================
+        // Tag Management Methods
+        // ==========================================
+
+        async fetchTags() {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/tags`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const data = await res.json();
+                this.allTags = data.data || [];
+            } catch (e) { console.error('Error fetching tags:', e); }
+        },
+
+        async createTag(name, color) {
+            if (!name || !name.trim()) return;
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/tags`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name.trim(), color: color })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    await this.fetchTags();
+                    return data.data;
+                } else {
+                    alert(data.message || 'Failed to create tag');
+                    return null;
+                }
+            } catch (e) { console.error('Error creating tag:', e); return null; }
+        },
+
+        async saveTagFromModal() {
+            if (this.editingTag) {
+                await this.updateTag(this.editingTag.id, this.tagForm.name, this.tagForm.color);
+            } else {
+                await this.createTag(this.tagForm.name, this.tagForm.color);
+            }
+            this.tagForm = { name: '', color: '#a855f7' };
+            this.editingTag = null;
+        },
+
+        editTag(tag) {
+            this.editingTag = tag;
+            this.tagForm = { name: tag.name, color: tag.color };
+        },
+
+        cancelEditTag() {
+            this.editingTag = null;
+            this.tagForm = { name: '', color: '#a855f7' };
+        },
+
+        async updateTag(id, name, color) {
+            try {
+                const token = localStorage.getItem('token');
+                const payload = {};
+                if (name) payload.name = name.trim();
+                if (color) payload.color = color;
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/tags/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.success) await this.fetchTags();
+                else alert(data.message || 'Failed to update tag');
+            } catch (e) { console.error('Error updating tag:', e); }
+        },
+
+        async deleteTag(id) {
+            if (!confirm('Delete this tag? It will be removed from all contacts.')) return;
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/tags/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    await this.fetchTags();
+                    // If the deleted tag was the active filter, clear it
+                    if (this.selectedFilterTag == id) {
+                        this.selectedFilterTag = null;
+                        await this.fetchContacts();
+                    }
+                    // Update the currently selected contact's tags if visible
+                    if (this.selectedContact) {
+                        this.selectedContact.tags = (this.selectedContact.tags || []).filter(t => t.id != id);
+                    }
+                } else alert(data.message || 'Failed to delete tag');
+            } catch (e) { console.error('Error deleting tag:', e); }
+        },
+
+        // Toggle a tag on/off for the currently selected contact
+        async toggleContactTag(tagId) {
+            if (!this.selectedContact) return;
+            const currentTags = this.selectedContact.tags || [];
+            const hasTag = currentTags.some(t => t.id == tagId);
+            let newTagIds;
+
+            if (hasTag) {
+                // Remove this tag
+                newTagIds = currentTags.filter(t => t.id != tagId).map(t => t.id);
+            } else {
+                // Add this tag
+                newTagIds = [...currentTags.map(t => t.id), tagId];
+            }
+
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/contacts/${this.selectedContact.id}/tags`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tag_ids: newTagIds })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.selectedContact.tags = data.data.tags || [];
+                    // Also update in the contacts list
+                    const idx = this.contacts.findIndex(c => c.id == this.selectedContact.id);
+                    if (idx !== -1) this.contacts[idx].tags = this.selectedContact.tags;
+                } else alert(data.message || 'Failed to update tags');
+            } catch (e) { console.error('Error toggling tag:', e); }
+        },
+
+        // Remove a single tag from the selected contact (used by tag pill X button)
+        async removeContactTag(tagId) {
+            if (!this.selectedContact) return;
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/contacts/${this.selectedContact.id}/tags/${tagId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.selectedContact.tags = data.data.tags || [];
+                    const idx = this.contacts.findIndex(c => c.id == this.selectedContact.id);
+                    if (idx !== -1) this.contacts[idx].tags = this.selectedContact.tags;
+                }
+            } catch (e) { console.error('Error removing tag:', e); }
+        },
+
+        // Create tag inline from the assign popover
+        async createTagInline() {
+            if (!this.inlineTagName.trim()) return;
+            const newTag = await this.createTag(this.inlineTagName, this.inlineTagColor);
+            if (newTag) {
+                this.inlineTagName = '';
+                this.inlineTagColor = '#a855f7';
+                // Automatically assign the new tag to the current contact
+                await this.toggleContactTag(newTag.id);
+            }
+        },
+
+        // Filter contacts by tag
+        async filterByTag(tagId) {
+            if (this.selectedFilterTag == tagId) {
+                this.selectedFilterTag = null; // Toggle off
+            } else {
+                this.selectedFilterTag = tagId;
+            }
+            await this.fetchContacts();
+        },
+
+        // Check if contact has a specific tag
+        contactHasTag(tagId) {
+            return (this.selectedContact?.tags || []).some(t => t.id == tagId);
+        },
+
+        // Get tag color with opacity for background
+        tagBgColor(color) {
+            // Convert hex to RGB and add opacity
+            const r = parseInt(color.slice(1, 3), 16);
+            const g = parseInt(color.slice(3, 5), 16);
+            const b = parseInt(color.slice(5, 7), 16);
+            return `rgba(${r}, ${g}, ${b}, 0.15)`;
+        },
+
         scrollToBottom(smooth = false) {
             const c = this.$refs.messagesContainer;
             if (c) {
