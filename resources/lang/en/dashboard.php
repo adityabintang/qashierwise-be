@@ -19,6 +19,7 @@ return [
     'profile_title' => 'Business Profile - QashierWise',
     'whatsapp_account_title' => 'WhatsApp Account - QashierWise',
     'ai_agent_title' => 'AI Agent - QashierWise',
+    'customer_tags_title' => 'Customer Tags - QashierWise',
     'reservations_title' => 'Reservations - QashierWise',
 
     // Main Navigation Menu Items
@@ -29,6 +30,8 @@ return [
     'menu_business_profile' => 'Business Profile',
     'menu_whatsapp_account' => 'WhatsApp Account',
     'menu_ai_agent' => 'AI Agent',
+    'menu_customer_tags' => 'Customer Tags',
+    'customer_tags_description' => 'Manage tags for your WhatsApp contacts',
 
     // POS Section Headers
     'section_point_of_sale' => 'Point of Sale',
