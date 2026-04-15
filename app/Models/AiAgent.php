@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Log;
 
 class AiAgent extends Model
 {
@@ -134,12 +135,28 @@ class AiAgent extends Model
     {
         $user = $this->getUser();
         if (! $user) {
+            Log::warning('getSubMerchant: no user found for AI agent', [
+                'ai_agent_id' => $this->id,
+                'whatsapp_account_id' => $this->whatsapp_account_id,
+            ]);
+
             return null;
         }
 
-        return SubMerchant::where('user_id', $user->id)
+        $subMerchant = SubMerchant::where('user_id', $user->id)
             ->where('is_active', true)
             ->first();
+
+        if (! $subMerchant) {
+            Log::warning('getSubMerchant: no active SubMerchant found', [
+                'ai_agent_id' => $this->id,
+                'user_id' => $user->id,
+                'total_submerchants' => SubMerchant::where('user_id', $user->id)->count(),
+                'inactive_submerchants' => SubMerchant::where('user_id', $user->id)->where('is_active', false)->count(),
+            ]);
+        }
+
+        return $subMerchant;
     }
 
     /**
