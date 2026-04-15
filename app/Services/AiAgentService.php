@@ -2402,7 +2402,9 @@ class AiAgentService
             }
 
             // Get WhatsApp contact and account
-            $contact = $conversation->whatsappContact;
+            $contact = $conversation->whatsappContact()
+                ->withoutGlobalScope('userContacts')
+                ->first();
             $aiAgent = $conversation->aiAgent;
 
             if (! $contact || ! $aiAgent) {
@@ -2415,7 +2417,9 @@ class AiAgentService
                 return;
             }
 
-            $account = $aiAgent->whatsappAccount;
+            $account = $aiAgent->whatsappAccount()
+                ->withoutGlobalScope('userAccounts')
+                ->first();
             if (! $account || ! $account->is_active) {
                 Log::warning('WhatsApp account not available for payment confirmation', [
                     'ai_agent_id' => $aiAgent->id,
