@@ -71,6 +71,12 @@ class AiAgentService
             // Check if there's a pending order confirmation
             $pendingOrder = $conversation->getPendingOrder();
             if ($pendingOrder && $this->isConfirmation($messageText)) {
+                Log::info('User confirmed order, calling confirmAndCreateOrder', [
+                    'ai_agent_id' => $aiAgent->id,
+                    'qris_enabled' => $aiAgent->qris_enabled,
+                    'contact_wa_id' => $contact->wa_id,
+                ]);
+
                 $this->confirmAndCreateOrder($conversation, $account, $contact);
 
                 return;
@@ -2251,8 +2257,22 @@ class AiAgentService
             $conversation->clearPendingOrder();
 
             // Check if QRIS is enabled - auto generate QRIS
+            Log::info('QRIS check during order confirmation', [
+                'ai_agent_id' => $aiAgent->id,
+                'qris_enabled' => $aiAgent->qris_enabled,
+                'has_active_submerchant' => $aiAgent->hasActiveSubMerchant(),
+                'is_qris_enabled' => $aiAgent->isQrisEnabled(),
+                'order_id' => $order->id,
+                'order_total' => $order->total,
+            ]);
+
             if ($aiAgent->isQrisEnabled()) {
                 $subMerchant = $aiAgent->getSubMerchant();
+
+                Log::info('QRIS enabled, attempting generation', [
+                    'submerchant_found' => $subMerchant !== null,
+                    'submerchant_id' => $subMerchant?->id,
+                ]);
 
                 if ($subMerchant) {
                     try {
@@ -2311,6 +2331,12 @@ class AiAgentService
             }
 
             // Send confirmation without QRIS (fallback or QRIS not enabled)
+            Log::warning('Order confirmed without QRIS', [
+                'ai_agent_id' => $aiAgent->id,
+                'is_qris_enabled' => $aiAgent->isQrisEnabled(),
+                'order_id' => $order->id,
+            ]);
+
             $response = "✅ Pesanan Berhasil Dibuat!\n\n";
             $response .= "📋 No. Pesanan: {$order->order_number}\n";
             $response .= '💰 Total: Rp '.number_format($order->total, 0, ',', '.')."\n\n";
