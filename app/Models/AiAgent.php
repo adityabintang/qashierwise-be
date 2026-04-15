@@ -88,13 +88,12 @@ class AiAgent extends Model
 
     /**
      * Check if QRIS feature is properly enabled.
-     * Requires qris_enabled flag, active SubMerchant, and active payment provider.
+     * Requires qris_enabled flag and active SubMerchant.
      */
     public function isQrisEnabled(): bool
     {
         return $this->qris_enabled
-            && $this->hasActiveSubMerchant()
-            && $this->hasActivePaymentProvider();
+            && $this->hasActiveSubMerchant();
     }
 
     /**
@@ -176,10 +175,6 @@ class AiAgent extends Model
 
         if (! $this->hasActiveSubMerchant()) {
             $errors[] = 'Sub-merchant belum dikonfigurasi atau tidak aktif. Silakan daftarkan sub-merchant terlebih dahulu.';
-        }
-
-        if (! $this->hasActivePaymentProvider()) {
-            $errors[] = 'Payment provider belum dikonfigurasi atau tidak valid. Silakan konfigurasi provider di menu Provider Settings.';
         }
 
         return $errors;
