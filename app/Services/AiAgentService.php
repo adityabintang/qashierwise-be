@@ -59,7 +59,6 @@ class AiAgentService
             // Get AI Agent for this account
             $aiAgent = AiAgent::where('whatsapp_account_id', $account->id)
                 ->where('is_active', true)
-                ->with('whatsappAccount.user')
                 ->first();
 
             if (! $aiAgent) {

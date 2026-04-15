@@ -125,9 +125,12 @@ class AiAgent extends Model
      */
     public function getUser(): ?User
     {
-        $account = $this->whatsappAccount;
+        $account = $this->whatsappAccount()
+            ->withoutGlobalScope('userAccounts')
+            ->first();
+
         if (! $account) {
-            Log::warning('getUser: whatsappAccount relationship is null', [
+            Log::warning('getUser: whatsappAccount not found (without global scope)', [
                 'ai_agent_id' => $this->id,
                 'whatsapp_account_id' => $this->whatsapp_account_id,
             ]);
@@ -135,16 +138,7 @@ class AiAgent extends Model
             return null;
         }
 
-        $user = $account->user;
-        if (! $user) {
-            Log::warning('getUser: whatsappAccount exists but user is null', [
-                'ai_agent_id' => $this->id,
-                'whatsapp_account_id' => $account->id,
-                'account_user_id' => $account->user_id,
-            ]);
-        }
-
-        return $user;
+        return $account->user;
     }
 
     /**
