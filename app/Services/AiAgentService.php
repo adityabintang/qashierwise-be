@@ -59,6 +59,7 @@ class AiAgentService
             // Get AI Agent for this account
             $aiAgent = AiAgent::where('whatsapp_account_id', $account->id)
                 ->where('is_active', true)
+                ->with('whatsappAccount.user')
                 ->first();
 
             if (! $aiAgent) {
@@ -77,7 +78,7 @@ class AiAgentService
                     'contact_wa_id' => $contact->wa_id,
                 ]);
 
-                $this->confirmAndCreateOrder($conversation, $account, $contact);
+                $this->confirmAndCreateOrder($conversation, $account, $contact, $aiAgent);
 
                 return;
             } elseif ($pendingOrder && $this->isRejection($messageText)) {
@@ -2212,11 +2213,11 @@ class AiAgentService
     protected function confirmAndCreateOrder(
         AiAgentConversation $conversation,
         WhatsAppAccount $account,
-        WhatsAppContact $contact
+        WhatsAppContact $contact,
+        AiAgent $aiAgent
     ): void {
         try {
             $pendingOrder = $conversation->getPendingOrder();
-            $aiAgent = $conversation->aiAgent;
 
             if (! $aiAgent->default_store_id) {
                 $this->sendReply(

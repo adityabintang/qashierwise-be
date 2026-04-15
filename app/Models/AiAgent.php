@@ -125,7 +125,26 @@ class AiAgent extends Model
      */
     public function getUser(): ?User
     {
-        return $this->whatsappAccount?->user;
+        $account = $this->whatsappAccount;
+        if (! $account) {
+            Log::warning('getUser: whatsappAccount relationship is null', [
+                'ai_agent_id' => $this->id,
+                'whatsapp_account_id' => $this->whatsapp_account_id,
+            ]);
+
+            return null;
+        }
+
+        $user = $account->user;
+        if (! $user) {
+            Log::warning('getUser: whatsappAccount exists but user is null', [
+                'ai_agent_id' => $this->id,
+                'whatsapp_account_id' => $account->id,
+                'account_user_id' => $account->user_id,
+            ]);
+        }
+
+        return $user;
     }
 
     /**
