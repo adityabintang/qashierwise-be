@@ -188,24 +188,6 @@
     }
     </script>
 
-    <!-- Structured Data - BreadcrumbList -->
-    <script type="application/ld+json">
-    {
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        "itemListElement": [
-            @foreach(App\Helpers\SeoHelper::getBreadcrumbItems(__('landing.meta_title')) as $index => $item)
-            {
-                "@type": "ListItem",
-                "position": {{ $index + 1 }},
-                "name": "{{ $item['label'] }}",
-                "item": "{{ $item['url'] }}"
-            }{{ !$loop->last ? ',' : '' }}
-            @endforeach
-        ]
-    }
-    </script>
-
     <!-- Structured Data - Product/Pricing -->
     <script type="application/ld+json">
     {
@@ -318,6 +300,24 @@
     }
     </script>
     @endverbatim
+
+    <!-- Structured Data - BreadcrumbList (Dynamic) -->
+    <script type="application/ld+json">
+@php
+$breadcrumbData = [
+    '@context' => 'https://schema.org',
+    '@type' => 'BreadcrumbList',
+    'itemListElement' => collect(App\Helpers\SeoHelper::getBreadcrumbItems(__('landing.meta_title')))
+        ->map(fn($item, $index) => [
+            '@type' => 'ListItem',
+            'position' => $index + 1,
+            'name' => $item['label'],
+            'item' => $item['url']
+        ])->values()->toArray()
+];
+echo json_encode($breadcrumbData, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+@endphp
+    </script>
 
     <style>
         [x-cloak] { display: none !important; }
