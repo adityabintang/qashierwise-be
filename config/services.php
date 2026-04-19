@@ -71,4 +71,21 @@ return [
         'redirect_uri' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Meta Pixel & Conversions API (CAPI)
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for Meta (Facebook) Pixel tracking and Conversions API.
+    | The Pixel ID is used for browser-side tracking, while the CAPI token
+    | is used for server-side event tracking (e.g., purchase events).
+    |
+    */
+
+    'meta' => [
+        'pixel_id' => env('META_PIXEL_ID'),
+        'capi_token' => env('META_CAPI_TOKEN'),
+        'test_event_code' => env('META_TEST_EVENT_CODE'), // Optional: for testing events
+    ],
+
 ];

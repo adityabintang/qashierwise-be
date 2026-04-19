@@ -390,6 +390,9 @@
             }
         };
     </script>
+
+    <!-- Meta Pixel -->
+    <x-meta-pixel />
 </head>
 <body class="bg-white">
     <!-- Breadcrumb Navigation -->

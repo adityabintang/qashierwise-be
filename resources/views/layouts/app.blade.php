@@ -20,6 +20,9 @@
 
     <!-- Google Analytics 4 -->
     <x-google-analytics />
+
+    <!-- Meta Pixel -->
+    <x-meta-pixel />
 </head>
 <body class="min-h-screen bg-[hsl(var(--background))] font-sans antialiased">
     @yield('content')

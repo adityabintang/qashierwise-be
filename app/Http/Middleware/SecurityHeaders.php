@@ -115,6 +115,7 @@ class SecurityHeaders
                 'https://app.midtrans.com',
                 'https://app.sandbox.midtrans.com',
                 'https://connect.facebook.net',
+                'https://connect.facebook.com',
                 'https://static.cloudflareinsights.com',
             ], $viteDevServer)),
 
@@ -141,6 +142,11 @@ class SecurityHeaders
             "connect-src 'self' ".implode(' ', array_merge([
                 'https://www.google-analytics.com',
                 'https://region1.google-analytics.com',
+                // Meta Pixel & Facebook
+                'https://connect.facebook.net',
+                'https://connect.facebook.com',
+                'https://www.facebook.com',
+                'https://graph.facebook.com',
                 // Pusher WebSocket connections (all regions)
                 'wss://*.pusher.com',
                 'https://*.pusher.com',
@@ -185,12 +191,14 @@ class SecurityHeaders
                 'https://app.midtrans.com',
                 'https://app.sandbox.midtrans.com',
                 'https://connect.facebook.net',
+                'https://connect.facebook.com',
+                'https://www.facebook.com',
             ]),
 
             "child-src 'self' blob:",
             "frame-ancestors 'none'",
             "base-uri 'self'",
-            "form-action 'self'",
+            "form-action 'self' https://www.facebook.com",
             'upgrade-insecure-requests',
         ];
 
