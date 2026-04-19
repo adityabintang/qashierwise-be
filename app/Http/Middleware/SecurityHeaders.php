@@ -117,7 +117,7 @@ class SecurityHeaders
                 'https://connect.facebook.net',
                 'https://connect.facebook.com',
                 'https://www.facebook.com',
-                'https://static.xx.fbcdn.net',
+                'https://web.facebook.com',
                 'https://static.cloudflareinsights.com',
             ], $viteDevServer)),
 
@@ -138,8 +138,6 @@ class SecurityHeaders
                 'https://www.google-analytics.com',
                 'https://api.dicebear.com',
                 'https://api.qrserver.com',
-                'https://*.fbcdn.net',
-                'https://*.facebook.com',
                 ...$allR2Origins,
             ]),
 
@@ -197,12 +195,11 @@ class SecurityHeaders
                 'https://connect.facebook.net',
                 'https://connect.facebook.com',
                 'https://www.facebook.com',
-                'https://*.facebook.com',
-                'https://*.fbcdn.net',
+                'https://web.facebook.com',
             ]),
 
             "child-src 'self' blob:",
-            "frame-ancestors 'self' https://www.facebook.com https://web.facebook.com https://business.facebook.com",
+            "frame-ancestors 'self' https://www.facebook.com https://web.facebook.com",
             "base-uri 'self'",
             "form-action 'self' https://www.facebook.com",
             'upgrade-insecure-requests',
