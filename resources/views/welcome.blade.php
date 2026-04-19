@@ -1029,7 +1029,7 @@ echo json_encode($breadcrumbData, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
             </div>
 
             <!-- Tablet/Desktop: grid layout -->
-            <div class="hidden md:grid md:grid-cols-2 gap-6 lg:gap-8 max-w-4xl mx-auto">
+            <div class="!hidden md:!grid md:grid-cols-2 gap-6 lg:gap-8 max-w-4xl mx-auto relative" style="z-index: 1;">
                 <!-- Basic Plan -->
                 <div class="bg-white rounded-2xl p-6 lg:p-8 border border-gray-200 relative">
                     <template x-if="token && isCurrentPlan('free_trial')">
