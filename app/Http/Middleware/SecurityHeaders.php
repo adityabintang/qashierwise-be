@@ -129,7 +129,7 @@ class SecurityHeaders
                 'https://cdnjs.cloudflare.com',
             ], $viteDevServer)),
 
-            "font-src 'self' ".implode(' ', [
+            "font-src 'self' data: ".implode(' ', [
                 'https://fonts.gstatic.com',
                 'https://cdnjs.cloudflare.com',
             ]),
@@ -148,7 +148,9 @@ class SecurityHeaders
                 'https://connect.facebook.net',
                 'https://connect.facebook.com',
                 'https://www.facebook.com',
+                'https://web.facebook.com',
                 'https://graph.facebook.com',
+                'https://api.facebook.com',
                 // Pusher WebSocket connections (all regions)
                 'wss://*.pusher.com',
                 'https://*.pusher.com',
