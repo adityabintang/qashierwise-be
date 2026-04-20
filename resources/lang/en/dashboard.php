@@ -213,8 +213,10 @@ return [
 
     // Confirmation Messages
     'confirm_delete' => 'Are you sure you want to delete this?',
+    'confirm_delete_message' => 'Are you sure you want to delete this? This action cannot be undone.',
     'confirm_action' => 'Are you sure you want to proceed?',
     'action_cannot_undone' => 'This action cannot be undone',
+    'deleting' => 'Deleting',
 
     // Loading States
     'loading_data' => 'Loading data...',

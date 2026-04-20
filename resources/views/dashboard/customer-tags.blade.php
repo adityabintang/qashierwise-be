@@ -339,6 +339,62 @@
             </div>
         </div>
     </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div x-show="showDeleteModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4" @keydown.escape.window="!deletingTag && closeDeleteModal()">
+        <div x-show="showDeleteModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="fixed inset-0 bg-black/50" @click="!deletingTag && closeDeleteModal()"></div>
+        <div x-show="showDeleteModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="card relative w-full max-w-md">
+            <!-- Loading Overlay -->
+            <div x-show="deletingTag" x-transition class="absolute inset-0 bg-white/80 z-10 flex items-center justify-center rounded-lg">
+                <div class="text-center">
+                    <i class="fas fa-spinner fa-spin text-3xl text-red-500 mb-3"></i>
+                    <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('dashboard.deleting') }}...</p>
+                </div>
+            </div>
+
+            <!-- Modal Header -->
+            <div class="p-6 border-b border-[hsl(var(--border))] flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-red-600">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    {{ __('dashboard.delete') }} Tag
+                </h3>
+                <button @click="closeDeleteModal" :disabled="deletingTag" class="btn btn-ghost btn-icon"><i class="fas fa-times"></i></button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-6">
+                <p class="text-[hsl(var(--muted-foreground))] mb-4">
+                    {{ __('dashboard.confirm_delete_message') }}
+                </p>
+                <div class="bg-[hsl(var(--muted)/0.5)] rounded-lg p-4">
+                    <p class="text-xs text-[hsl(var(--muted-foreground))] mb-1">Tag Name</p>
+                    <div class="flex items-center gap-2">
+                        <span
+                            class="text-sm font-semibold px-3 py-1 rounded-full"
+                            :style="`background: ${tagBgColor(tagToDelete?.color)}; color: ${tagToDelete?.color};`"
+                            x-text="tagToDelete?.name"
+                        ></span>
+                    </div>
+                    <p class="text-xs text-[hsl(var(--muted-foreground))] mt-3">
+                        <i class="fas fa-users text-[10px] mr-1"></i>
+                        <span x-text="(tagToDelete?.contacts_count || 0) + ' {{ strtolower(__('dashboard.menu_contacts')) }} will be untagged'"></span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-6 border-t border-[hsl(var(--border))] flex gap-3">
+                <button @click="closeDeleteModal" :disabled="deletingTag" class="btn btn-outline btn-md flex-1">
+                    {{ __('dashboard.cancel') }}
+                </button>
+                <button type="button" @click="confirmDelete" :disabled="deletingTag" class="btn btn-md bg-red-600 hover:bg-red-700 text-white flex-1">
+                    <i x-show="deletingTag" class="fas fa-spinner fa-spin mr-2"></i>
+                    <i x-show="!deletingTag" class="fas fa-trash mr-2"></i>
+                    <span>{{ __('dashboard.delete') }}</span>
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 @push('scripts')
@@ -361,8 +417,11 @@ function customerTagsApp() {
 
         // Modal state
         showCreateModal: false,
+        showDeleteModal: false,
         editingTag: null,
+        tagToDelete: null,
         savingTag: false,
+        deletingTag: false,
         tagForm: { name: '', color: '#a855f7' },
         tagPresetColors: [
             '#a855f7', '#3b82f6', '#06b6d4', '#14b8a6',
@@ -471,23 +530,42 @@ function customerTagsApp() {
         },
 
         async deleteTag(id) {
-            if (!confirm('{{ __('dashboard.confirm_delete') }}')) return;
+            const tag = this.allTags.find(t => t.id == id);
+            if (!tag) return;
+            this.tagToDelete = tag;
+            this.showDeleteModal = true;
+        },
+
+        closeDeleteModal() {
+            this.showDeleteModal = false;
+            this.tagToDelete = null;
+        },
+
+        async confirmDelete() {
+            if (!this.tagToDelete) return;
+            this.deletingTag = true;
             try {
-                const res = await fetch(`${this.API_BASE_URL}/whatsapp/tags/${id}`, {
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/tags/${this.tagToDelete.id}`, {
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${this.getToken()}` }
                 });
                 const data = await res.json();
                 if (data.success) {
                     await this.fetchTags();
-                    if (this.activeFilterTag?.id == id) {
+                    if (this.activeFilterTag?.id == this.tagToDelete.id) {
                         this.activeFilterTag = null;
                     }
                     await this.fetchContacts();
+                    this.closeDeleteModal();
                 } else {
                     alert(data.message || 'Failed');
                 }
-            } catch (e) { console.error('Error deleting tag:', e); }
+            } catch (e) {
+                console.error('Error deleting tag:', e);
+                alert('Failed to delete tag');
+            } finally {
+                this.deletingTag = false;
+            }
         },
 
         // ---- Tag Assignment ----

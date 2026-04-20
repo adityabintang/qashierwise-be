@@ -213,8 +213,10 @@ return [
 
     // Confirmation Messages
     'confirm_delete' => 'Apakah Anda yakin ingin menghapus ini?',
+    'confirm_delete_message' => 'Apakah Anda yakin ingin menghapus ini? Tindakan ini tidak dapat dibatalkan.',
     'confirm_action' => 'Apakah Anda yakin ingin melanjutkan?',
     'action_cannot_undone' => 'Tindakan ini tidak dapat dibatalkan',
+    'deleting' => 'Menghapus',
 
     // Loading States
     'loading_data' => 'Memuat data...',
