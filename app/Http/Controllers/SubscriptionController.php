@@ -124,9 +124,13 @@ class SubscriptionController extends Controller
             return redirect()->back()->with('error', 'Subscription service is not configured. Please contact support.');
         }
 
-        // Check if user already has an active subscription (with null safety)
+        // Check if user already has an active subscription (with null safety).
+        // Use isActive() instead of raw status check: status='active' alone is
+        // not sufficient because the field is not auto-updated when the period
+        // ends. isActive() also verifies current_period_end is in the future,
+        // so an expired-but-still-flagged-active subscription can be renewed.
         $existingSubscription = $user->subscription;
-        if ($existingSubscription !== null && $existingSubscription->status === 'active') {
+        if ($existingSubscription !== null && $existingSubscription->isActive()) {
             Log::info('User already has active subscription', [
                 'event' => 'checkout.already_subscribed',
                 'userId' => $user->id,

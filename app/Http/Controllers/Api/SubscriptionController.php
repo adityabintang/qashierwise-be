@@ -253,6 +253,11 @@ class SubscriptionController extends Controller
                 'status' => 'pending',
                 'current_period_start' => now(),
                 'current_period_end' => now()->addMonthsNoOverflow($months),
+                // Reset cancelled_at: starting a new checkout means the user is no
+                // longer cancelled. Without this reset, a previously cancelled
+                // subscription would be re-evaluated as STATUS_CANCELLED (not
+                // expired) and incorrectly grant pro access before payment.
+                'cancelled_at' => null,
                 'metadata' => json_encode([
                     'reference_id' => $result['reference_id'] ?? null,
                     'amount' => $finalAmount,

@@ -70,6 +70,15 @@ class SubscriptionService
             return $this->getTrialStatus($user);
         }
 
+        // A 'pending' subscription means the checkout was initiated but the
+        // payment has not been confirmed yet. The user must NOT receive paid
+        // tier benefits until the Xendit/Midtrans webhook activates it. Treat
+        // pending as if the user has no paid subscription so they fall back to
+        // trial logic (and downstream feature checks block pro features).
+        if ($subscription->status === 'pending') {
+            return $this->getTrialStatus($user);
+        }
+
         // If subscription is cancelled but still within period
         if ($subscription->isCancelled() && ! $subscription->isExpired()) {
             return new SubscriptionStatus(
