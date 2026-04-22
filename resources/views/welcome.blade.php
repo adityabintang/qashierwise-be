@@ -1278,6 +1278,7 @@
                 selectedPlan: null,
                 selectedDuration: '1_month', // Default to monthly
                 currentPlan: null,
+                currentPlanStatus: null,
                 token: null,
 
                 // Promo code state
@@ -1419,6 +1420,7 @@
                             const data = await response.json();
                             if (data.success && data.data.subscription) {
                                 this.currentPlan = data.data.subscription.plan_name;
+                                this.currentPlanStatus = data.data.subscription.status;
                             }
                         }
                     } catch (e) {
@@ -1427,7 +1429,7 @@
                 },
 
                 isCurrentPlan(plan) {
-                    return this.currentPlan === plan;
+                    return this.currentPlan === plan && this.currentPlanStatus === 'active';
                 },
 
                 async checkout(planId) {
