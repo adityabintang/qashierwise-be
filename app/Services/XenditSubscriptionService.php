@@ -216,6 +216,7 @@ class XenditSubscriptionService
                 'recurring_action' => 'PAYMENT',
                 'currency' => $plan['currency'] ?? 'IDR',
                 'amount' => (int) $durationDetails['price'],
+                'payment_method_types' => ['CARD', 'DIRECT_DEBIT'],
                 'schedule' => [
                     'reference_id' => $scheduleReferenceId,
                     'interval' => 'MONTH',
