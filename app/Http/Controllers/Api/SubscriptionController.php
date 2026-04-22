@@ -28,11 +28,75 @@ class SubscriptionController extends Controller
     ) {}
 
     /**
+     * Reconcile a pending local subscription with Xendit's authoritative state.
+     *
+     * Subscriptions land in 'pending' status the moment a checkout is created.
+     * They normally transition to 'active' via the Xendit webhook
+     * `recurring.plan.activated`. When that webhook is delayed, lost, or
+     * unreachable (local dev, behind NAT), this fallback queries Xendit
+     * directly so the user's status reflects reality on the next dashboard
+     * load. Failures are swallowed: a sync error must not break the status
+     * endpoint, the user can simply retry.
+     */
+    private function syncPendingSubscriptionWithProvider(\App\Models\User $user): void
+    {
+        $masterAdmin = $user->isMasterAdmin() ? $user : $user->getMasterAdmin();
+        $subscription = $masterAdmin?->subscription;
+
+        if ($subscription === null
+            || $subscription->status !== 'pending'
+            || empty($subscription->xendit_subscription_id)
+            || ! $this->xenditSubscriptionService->isConfigured()
+        ) {
+            return;
+        }
+
+        try {
+            $xenditPlan = $this->xenditSubscriptionService->getRecurringPlan(
+                $subscription->xendit_subscription_id
+            );
+
+            if ($xenditPlan === null) {
+                return;
+            }
+
+            $xenditStatus = strtoupper((string) ($xenditPlan['status'] ?? ''));
+
+            if ($xenditStatus === 'ACTIVE') {
+                $subscription->update([
+                    'status' => 'active',
+                    // Defensive: clear cancelled_at in case it carried over from
+                    // a prior cancellation that pre-dated this checkout.
+                    'cancelled_at' => null,
+                ]);
+
+                Log::info('Subscription auto-activated from Xendit sync', [
+                    'subscription_id' => $subscription->id,
+                    'xendit_subscription_id' => $subscription->xendit_subscription_id,
+                    'user_id' => $masterAdmin->id,
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::warning('Failed to sync pending subscription with Xendit', [
+                'subscription_id' => $subscription->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
      * Get current user's subscription status.
      */
     public function status(Request $request): JsonResponse
     {
         $user = $request->user();
+
+        // Auto-sync pending subscriptions with the payment provider before
+        // computing status. The webhook (recurring.plan.activated) is the
+        // canonical activator, but it can be delayed or — in local/dev
+        // environments — never reach the server at all. Without this sync the
+        // user would see "trial" forever after a successful payment.
+        $this->syncPendingSubscriptionWithProvider($user);
 
         $status = $this->subscriptionService->getUserSubscriptionStatus($user);
         $subscription = $user->subscription;
@@ -253,6 +317,11 @@ class SubscriptionController extends Controller
                 'status' => 'pending',
                 'current_period_start' => now(),
                 'current_period_end' => now()->addMonthsNoOverflow($months),
+                // Reset cancelled_at: starting a new checkout means the user is no
+                // longer cancelled. Without this reset, a previously cancelled
+                // subscription would be re-evaluated as STATUS_CANCELLED (not
+                // expired) and incorrectly grant pro access before payment.
+                'cancelled_at' => null,
                 'metadata' => json_encode([
                     'reference_id' => $result['reference_id'] ?? null,
                     'amount' => $finalAmount,

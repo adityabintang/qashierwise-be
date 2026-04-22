@@ -434,6 +434,17 @@ class XenditSubscriptionService
                 ->post("{$this->baseUrl}/recurring/plans/{$planId}/stop");
 
             if (! $response->successful()) {
+                // 404 means the plan no longer exists in Xendit — treat as already cancelled.
+                // This happens when the plan expired/was cleaned up on Xendit's side, or when
+                // API credentials changed between environments.
+                if ($response->status() === 404) {
+                    Log::warning('Xendit: Recurring plan not found, treating as already cancelled', [
+                        'plan_id' => $planId,
+                    ]);
+
+                    return ['status' => 'STOPPED', 'already_gone' => true];
+                }
+
                 $errorMessage = $response->json('message') ?? 'Failed to stop recurring plan';
 
                 Log::error('Xendit: Failed to stop recurring plan', [
