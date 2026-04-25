@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Events\MessageStatusUpdated;
 use App\Events\NewWhatsAppMessage;
+use App\Events\TemplateStatusUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
@@ -763,6 +764,10 @@ class WhatsAppWebhookController extends Controller
             'reason' => $reason,
             'rejection_info' => $rejectionInfo,
         ]);
+
+        if ($oldStatus !== $newStatus) {
+            TemplateStatusUpdated::dispatch($template, $oldStatus);
+        }
 
         // If template was deleted, optionally remove from database
         if ($newStatus === 'DELETED') {

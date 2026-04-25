@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\QrisController;
 use App\Http\Controllers\Api\ResendWebhookController;
 use App\Http\Controllers\Api\SubMerchantController;
 use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\WebhookController;
 use App\Http\Controllers\Api\WhatsAppController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
 use App\Http\Controllers\Api\WithdrawalController;
@@ -114,6 +115,16 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
     // Promo Code routes
     Route::prefix('promo-codes')->group(function () {
         Route::post('/validate', [\App\Http\Controllers\Api\PromoCodeController::class, 'validate']);
+    });
+
+    // Webhook routes
+    Route::prefix('webhooks')->group(function () {
+        Route::post('/', [WebhookController::class, 'store']);
+        Route::get('/', [WebhookController::class, 'index']);
+        Route::get('/{webhook}', [WebhookController::class, 'show']);
+        Route::put('/{webhook}', [WebhookController::class, 'update']);
+        Route::delete('/{webhook}', [WebhookController::class, 'destroy']);
+        Route::get('/{webhook}/deliveries', [WebhookController::class, 'deliveries']);
     });
 
     // WhatsApp Business API routes

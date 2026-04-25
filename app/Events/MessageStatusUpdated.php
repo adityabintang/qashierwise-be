@@ -2,6 +2,7 @@
 
 namespace App\Events;
 
+use App\Jobs\DeliverWebhook;
 use App\Models\WhatsAppMessage;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
@@ -31,6 +32,41 @@ class MessageStatusUpdated implements ShouldBroadcastNow
             'status' => $message->status,
             'has_user_id' => ! empty($message->user_id),
         ]);
+
+        $this->dispatchWebhooks();
+    }
+
+    private function dispatchWebhooks(): void
+    {
+        $webhooks = $this->message->user()?->webhooks()
+            ->active()
+            ->whereJsonContains('events', 'message.status_updated')
+            ->get();
+
+        if (!$webhooks || $webhooks->isEmpty()) {
+            return;
+        }
+
+        $payload = [
+            'event' => 'message.status_updated',
+            'timestamp' => now()->unix(),
+            'data' => [
+                'message_id' => $this->message->id,
+                'wa_message_id' => $this->message->message_id,
+                'contact_id' => $this->message->contact_id,
+                'status' => $this->message->status,
+                'delivered_at' => $this->message->delivered_at?->toIso8601String(),
+                'read_at' => $this->message->read_at?->toIso8601String(),
+            ],
+        ];
+
+        foreach ($webhooks as $webhook) {
+            DeliverWebhook::dispatch(
+                $webhook->id,
+                'message.status_updated',
+                $payload
+            );
+        }
     }
 
     /**
