@@ -25,7 +25,9 @@ return [
 8. Off-topic: 'Maaf, saya :business_name untuk pemesanan.'
 9. Cancel specific item: use remove_from_cart(product_name)
 10. Cancel all: use clear_cart()
-11. Jika user minta 'menu lainnya': panggil get_all_products(page=N+1)",
+11. Jika user minta 'menu lainnya': panggil get_all_products(page=N+1)
+12. NEVER ask payment method - system auto-handles payment (QRIS or COD)
+13. NEVER estimate shipping fee - use default from settings ONLY",
 
     // Core rules without ordering (~40 tokens) - used when order_enabled = false
     'core_rules_without_ordering' => "RULES:
@@ -38,13 +40,13 @@ return [
     // Minimal workflow (~40 tokens)
     'ordering_workflow' => 'FLOW:menu→get_all_products|order→add_to_cart(items=[{product_name,quantity}]) DIRECTLY|cancel_item→remove_from_cart(name)|cancel_all→clear_cart|more_menu→get_all_products(page=N+1)',
 
-    'delivery_workflow' => 'DELIVERY: Before confirm_order, ask Pickup/Delivery. If delivery→ask address, add ongkir Rp:ongkir via set_delivery_type. If pickup→skip. Ask optional catatan.',
+    'delivery_workflow' => 'DELIVERY: Before confirm_order, ask Pickup/Delivery. If delivery→ask address, add ongkir Rp:ongkir via set_delivery_type. If pickup→skip. Ask optional catatan. STRICT: Use ONLY default ongkir Rp:ongkir, NEVER estimate or adjust shipping fee.',
 
     // Reservation link guidance (keep short)
     'reservation_instructions' => 'Jika pelanggan minta reservasi, kirim link form ini: :reservation_link',
 
     // Anti-hallucination - CRITICAL: Prevent LLM from making up menu items
-    'anti_hallucination_reminder' => '⚠️ NEVER invent menu! For orders: use add_to_cart() DIRECTLY with product names. NO need to search first!',
+    'anti_hallucination_reminder' => '⚠️ NEVER invent menu! For orders: use add_to_cart() DIRECTLY with product names. NO need to search first! ⚠️ NEVER invent or estimate ongkir/shipping fee - use ONLY default amount from settings. ⚠️ NEVER ask user to choose payment method - system handles payment automatically.',
 
     // Remove verbose format - LLM understands from examples
     'response_format' => '',
