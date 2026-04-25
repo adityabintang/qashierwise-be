@@ -2526,16 +2526,25 @@ class AiAgentService
                     } catch (\Exception $e) {
                         Log::error('QRIS generation failed during order confirmation', [
                             'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
                             'order_id' => $order->id,
                         ]);
                         // Fall through to send order without QRIS
                     }
+                } else {
+                    // SubMerchant not found despite QRIS being enabled
+                    Log::warning('QRIS enabled but no active SubMerchant found', [
+                        'ai_agent_id' => $aiAgent->id,
+                        'order_id' => $order->id,
+                    ]);
                 }
             }
 
             // Send confirmation without QRIS (fallback or QRIS not enabled)
             Log::warning('Order confirmed without QRIS', [
                 'ai_agent_id' => $aiAgent->id,
+                'qris_enabled' => $aiAgent->qris_enabled,
+                'has_active_submerchant' => $aiAgent->hasActiveSubMerchant(),
                 'is_qris_enabled' => $aiAgent->isQrisEnabled(),
                 'order_id' => $order->id,
             ]);
