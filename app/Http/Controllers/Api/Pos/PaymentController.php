@@ -43,6 +43,7 @@ class PaymentController extends Controller
             'amount' => 'required|numeric|min:0.01',
             'reference' => 'nullable|string|max:255',
             'metadata' => 'nullable|array',
+            'customer_email' => 'nullable|email|max:255',
         ]);
 
         try {
@@ -57,16 +58,31 @@ class PaymentController extends Controller
                 }
             }
 
+            $responseData = [
+                'payment' => $payment,
+                'order' => $order->fresh()->load(['payments']),
+                'change' => $change,
+                'remaining' => $this->paymentService->getRemainingAmount($order->fresh()),
+                'is_fully_paid' => $this->paymentService->isFullyPaid($order->fresh()),
+            ];
+
+            // Include QRIS details if payment method is QRIS
+            if ($validated['method'] === Payment::METHOD_QRIS && $payment->qris_transaction_id) {
+                $qrisTransaction = $payment->qrisTransaction;
+                $responseData['qris'] = [
+                    'id' => $qrisTransaction->id,
+                    'order_id' => $qrisTransaction->order_id,
+                    'qr_code_url' => $qrisTransaction->qr_code_url,
+                    'amount' => $qrisTransaction->amount,
+                    'expires_at' => $qrisTransaction->expires_at,
+                    'status' => $qrisTransaction->status,
+                ];
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Payment processed successfully',
-                'data' => [
-                    'payment' => $payment,
-                    'order' => $order->fresh()->load(['payments']),
-                    'change' => $change,
-                    'remaining' => $this->paymentService->getRemainingAmount($order->fresh()),
-                    'is_fully_paid' => $this->paymentService->isFullyPaid($order->fresh()),
-                ],
+                'data' => $responseData,
             ], 201);
         } catch (\InvalidArgumentException $e) {
             return response()->json([
@@ -88,21 +104,41 @@ class PaymentController extends Controller
             'payments.*.amount' => 'required|numeric|min:0.01',
             'payments.*.reference' => 'nullable|string|max:255',
             'payments.*.metadata' => 'nullable|array',
+            'payments.*.customer_email' => 'nullable|email|max:255',
         ]);
 
         try {
             $order = Order::findOrFail($validated['order_id']);
             $payments = $this->paymentService->splitPayment($order, $validated['payments'], true);
 
+            $responseData = [
+                'payments' => $payments,
+                'order' => $order->fresh()->load(['payments']),
+                'remaining' => $this->paymentService->getRemainingAmount($order->fresh()),
+                'is_fully_paid' => $this->paymentService->isFullyPaid($order->fresh()),
+                'qris_details' => [],
+            ];
+
+            // Include QRIS details for all QRIS payments
+            foreach ($payments as $payment) {
+                if ($payment->method === Payment::METHOD_QRIS && $payment->qris_transaction_id) {
+                    $qrisTransaction = $payment->qrisTransaction;
+                    $responseData['qris_details'][] = [
+                        'payment_id' => $payment->id,
+                        'id' => $qrisTransaction->id,
+                        'order_id' => $qrisTransaction->order_id,
+                        'qr_code_url' => $qrisTransaction->qr_code_url,
+                        'amount' => $qrisTransaction->amount,
+                        'expires_at' => $qrisTransaction->expires_at,
+                        'status' => $qrisTransaction->status,
+                    ];
+                }
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Split payment processed successfully',
-                'data' => [
-                    'payments' => $payments,
-                    'order' => $order->fresh()->load(['payments']),
-                    'remaining' => $this->paymentService->getRemainingAmount($order->fresh()),
-                    'is_fully_paid' => $this->paymentService->isFullyPaid($order->fresh()),
-                ],
+                'data' => $responseData,
             ], 201);
         } catch (\InvalidArgumentException $e) {
             return response()->json([

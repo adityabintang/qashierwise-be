@@ -17,7 +17,8 @@ class PaymentService
     public function __construct(
         protected OrderService $orderService,
         protected SubMerchantService $subMerchantService,
-        protected BalanceService $balanceService
+        protected BalanceService $balanceService,
+        protected QrisService $qrisService
     ) {}
 
     /**
@@ -61,6 +62,13 @@ class PaymentService
         }
 
         return DB::transaction(function () use ($order, $paymentData, $amount, $method, $autoComplete) {
+            $qrisTransaction = null;
+
+            // If payment method is QRIS, generate QRIS code first
+            if ($method === Payment::METHOD_QRIS) {
+                $qrisTransaction = $this->generateQrisForPayment($order, $amount, $paymentData);
+            }
+
             // Create payment record
             $payment = Payment::create([
                 'order_id' => $order->id,
@@ -68,6 +76,7 @@ class PaymentService
                 'amount' => $amount,
                 'reference' => $paymentData['reference'] ?? null,
                 'metadata' => $paymentData['metadata'] ?? null,
+                'qris_transaction_id' => $qrisTransaction?->id,
             ]);
 
             // Check if order is fully paid
@@ -88,13 +97,72 @@ class PaymentService
                 }
 
                 // If payment method is QRIS and payment was created via POS, create QrisTransaction
-                if ($method === Payment::METHOD_QRIS && $autoComplete) {
+                if ($method === Payment::METHOD_QRIS && $autoComplete && ! $qrisTransaction) {
                     $this->createQrisTransactionForPayment($order, $payment);
                 }
             }
 
             return $payment;
         });
+    }
+
+    /**
+     * Generate QRIS code for a payment.
+     *
+     * @param  Order  $order  The order
+     * @param  float  $amount  Payment amount
+     * @param  array  $paymentData  Additional payment data
+     * @return QrisTransaction The generated QRIS transaction
+     *
+     * @throws InvalidArgumentException If QRIS generation fails
+     */
+    protected function generateQrisForPayment(Order $order, float $amount, array $paymentData): QrisTransaction
+    {
+        try {
+            $store = $order->store;
+            $user = $store->user;
+
+            $subMerchant = $this->subMerchantService->findByUserId($user->id);
+
+            if (! $subMerchant) {
+                throw new InvalidArgumentException('Sub-merchant not found for this user');
+            }
+
+            if (! $subMerchant->is_active) {
+                throw new InvalidArgumentException('Sub-merchant is not active');
+            }
+
+            // Generate QRIS via service
+            $qrisTransaction = $this->qrisService->generateQris(
+                $subMerchant,
+                $amount,
+                [
+                    'description' => "Order {$order->order_number}",
+                    'customer_name' => $order->customer_name,
+                    'customer_email' => $paymentData['customer_email'] ?? null,
+                ]
+            );
+
+            // Link QRIS transaction to order
+            $qrisTransaction->update(['linked_order_id' => $order->id]);
+
+            Log::info('QRIS generated for POS payment', [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'qris_transaction_id' => $qrisTransaction->id,
+                'amount' => $amount,
+            ]);
+
+            return $qrisTransaction;
+        } catch (\Exception $e) {
+            Log::error('Failed to generate QRIS for payment', [
+                'order_id' => $order->id,
+                'amount' => $amount,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new InvalidArgumentException('Failed to generate QRIS: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -174,12 +242,20 @@ class PaymentService
             $createdPayments = [];
 
             foreach ($payments as $paymentData) {
+                $qrisTransaction = null;
+
+                // If payment method is QRIS, generate QRIS code first
+                if ($paymentData['method'] === Payment::METHOD_QRIS) {
+                    $qrisTransaction = $this->generateQrisForPayment($order, (float) $paymentData['amount'], $paymentData);
+                }
+
                 $payment = Payment::create([
                     'order_id' => $order->id,
                     'method' => $paymentData['method'] ?? Payment::METHOD_CASH,
                     'amount' => (float) $paymentData['amount'],
                     'reference' => $paymentData['reference'] ?? null,
                     'metadata' => $paymentData['metadata'] ?? null,
+                    'qris_transaction_id' => $qrisTransaction?->id,
                 ]);
                 $createdPayments[] = $payment;
             }
@@ -201,10 +277,10 @@ class PaymentService
                     $order->save();
                 }
 
-                // Check if any payment method is QRIS and create QRIS transaction
+                // Check if any payment method is QRIS and create QRIS transaction (for backward compatibility)
                 $qrisPayment = null;
                 foreach ($createdPayments as $createdPayment) {
-                    if ($createdPayment->method === Payment::METHOD_QRIS) {
+                    if ($createdPayment->method === Payment::METHOD_QRIS && ! $createdPayment->qris_transaction_id) {
                         $qrisPayment = $createdPayment;
                         break;
                     }
