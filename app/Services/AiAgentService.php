@@ -1326,7 +1326,7 @@ class AiAgentService
                     return $this->prepareOrderConfirmation($conversation, $userId, $aiAgent);
 
                 case 'set_delivery_type':
-                    return $this->setDeliveryType($conversation, $arguments, $aiAgent);
+                    return $this->setDeliveryType($conversation, $arguments, $aiAgent, $userId);
 
                 case 'remove_from_cart':
                     if (! isset($arguments['product_name'])) {
@@ -2115,7 +2115,7 @@ class AiAgentService
         return "🗑️ Keranjang berhasil dikosongkan.\n\nSilakan mulai pesan lagi jika berubah pikiran! 😊";
     }
 
-    protected function setDeliveryType(AiAgentConversation $conversation, array $arguments, ?AiAgent $aiAgent): string
+    protected function setDeliveryType(AiAgentConversation $conversation, array $arguments, ?AiAgent $aiAgent, int $userId = 0): string
     {
         $deliveryType = $arguments['delivery_type'] ?? null;
         if (! in_array($deliveryType, ['pickup', 'delivery'])) {
@@ -2125,6 +2125,9 @@ class AiAgentService
         $conversation->setDeliveryType($deliveryType);
 
         $ongkir = 0;
+        $address = null;
+        $notes = null;
+
         if ($deliveryType === 'delivery') {
             $ongkir = $aiAgent ? (float) $aiAgent->default_ongkir : 0;
             $address = $arguments['address'] ?? null;
@@ -2143,28 +2146,17 @@ class AiAgentService
         }
         $conversation->setOngkir($ongkir);
 
-        if ($deliveryType === 'delivery') {
-            $address = $arguments['address'] ?? null;
-            $notes = $arguments['notes'] ?? null;
+        // If delivery needs address but none provided, ask for it
+        if ($deliveryType === 'delivery' && ! $address) {
             $formattedOngkir = 'Rp '.number_format($ongkir, 0, ',', '.');
-
-            $response = "✅ Delivery dipilih.\n";
-            if ($address) {
-                $response .= "📍 Alamat: {$address}\n";
-            }
-            $response .= "🚚 Ongkir: {$formattedOngkir}\n";
-            if ($notes) {
-                $response .= "📝 Catatan: {$notes}\n";
-            }
-
-            if (! $address) {
-                $response .= "\nSilakan kirim alamat pengiriman.";
-            }
+            $response = "✅ Delivery dipilih. Ongkir: {$formattedOngkir}\n";
+            $response .= "\nSilakan kirim alamat pengiriman.";
 
             return $response;
         }
 
-        return '✅ Pickup dipilih. Ongkir: Rp 0.';
+        // Delivery type complete — auto-show order confirmation so user can confirm immediately
+        return $this->prepareOrderConfirmation($conversation, $userId, $aiAgent);
     }
 
     /**
@@ -2199,14 +2191,11 @@ class AiAgentService
             $response .= '  Rp '.number_format($subtotal, 0, ',', '.')."\n";
         }
 
-        $ongkir = 0;
         $deliveryType = $conversation->getDeliveryType();
         $deliveryAddress = $conversation->getDeliveryAddress();
         $deliveryNotes = $conversation->getDeliveryNotes();
-
-        if ($deliveryType === 'delivery') {
-            $ongkir = $aiAgent ? (float) $aiAgent->default_ongkir : 0;
-        }
+        // Use ongkir already set in conversation context (set by setDeliveryType)
+        $ongkir = (float) $conversation->getOngkir();
 
         $tax = round($total * 0.11, 2);
         $grandTotal = round($total + $tax + $ongkir, 2);
