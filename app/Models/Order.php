@@ -24,6 +24,10 @@ class Order extends Model
     /**
      * Order source constants.
      */
+    const DELIVERY_TYPE_PICKUP = 'pickup';
+
+    const DELIVERY_TYPE_DELIVERY = 'delivery';
+
     const SOURCE_POS = 'pos';
 
     const SOURCE_WHATSAPP_AI = 'whatsapp_ai';
@@ -42,6 +46,10 @@ class Order extends Model
         'source',
         'customer_name',
         'customer_phone',
+        'delivery_type',
+        'alamat',
+        'ongkir',
+        'catatan',
         'subtotal',
         'tax_amount',
         'discount_amount',
@@ -56,6 +64,7 @@ class Order extends Model
     protected function casts(): array
     {
         return [
+            'ongkir' => 'decimal:2',
             'subtotal' => 'decimal:2',
             'tax_amount' => 'decimal:2',
             'discount_amount' => 'decimal:2',

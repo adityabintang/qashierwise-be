@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreAiAgentRequest extends FormRequest
@@ -17,7 +18,7 @@ class StoreAiAgentRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -33,6 +34,8 @@ class StoreAiAgentRequest extends FormRequest
             'order_enabled' => 'nullable|boolean',
             'qris_enabled' => 'nullable|boolean',
             'reservation_enabled' => 'nullable|boolean',
+            'delivery_enabled' => 'nullable|boolean',
+            'default_ongkir' => 'nullable|numeric|min:0',
             'is_active' => 'nullable|boolean',
             'settings' => 'nullable|array',
         ];

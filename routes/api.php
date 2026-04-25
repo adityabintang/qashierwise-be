@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\BalanceController;
 use App\Http\Controllers\Api\BankAccountController;
 use App\Http\Controllers\Api\BroadcastAuthController;
 use App\Http\Controllers\Api\EmbeddedSignupController;
+use App\Http\Controllers\Api\Internal\ReservationReminderController;
+use App\Http\Controllers\Api\MidtransWebhookController;
 use App\Http\Controllers\Api\Pos\CategoryController;
 use App\Http\Controllers\Api\Pos\OrderController;
 use App\Http\Controllers\Api\Pos\PaymentController;
@@ -16,14 +18,20 @@ use App\Http\Controllers\Api\Pos\RoleController;
 use App\Http\Controllers\Api\Pos\StoreController;
 use App\Http\Controllers\Api\Pos\TableController;
 use App\Http\Controllers\Api\Pos\TransactionController;
+use App\Http\Controllers\Api\PromoCodeController;
 use App\Http\Controllers\Api\QrisController;
 use App\Http\Controllers\Api\ResendWebhookController;
+use App\Http\Controllers\Api\ReservationConfigController;
+use App\Http\Controllers\Api\ReservationController;
 use App\Http\Controllers\Api\SubMerchantController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\WhatsAppController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
 use App\Http\Controllers\Api\WithdrawalController;
 use App\Http\Controllers\Api\XenditWebhookController;
+use App\Http\Controllers\MonitoringDashboardController;
+use App\Http\Middleware\LogBroadcastingAuth;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -62,18 +70,18 @@ Route::post('/webhooks/resend', [ResendWebhookController::class, 'handleNotifica
     ->middleware('throttle:60,1'); // Rate limit: 60 requests per minute
 
 // Subscription Webhook (must be public for Midtrans to access)
-Route::post('/webhooks/midtrans/subscription', [\App\Http\Controllers\Api\MidtransWebhookController::class, 'handleSubscriptionWebhook'])
+Route::post('/webhooks/midtrans/subscription', [MidtransWebhookController::class, 'handleSubscriptionWebhook'])
     ->middleware('throttle:60,1'); // Rate limit: 60 requests per minute
 
 // Reservation Reminder Webhook (called by Qstash)
-Route::post('/internal/reservation-reminder', \App\Http\Controllers\Api\Internal\ReservationReminderController::class.'@handle');
+Route::post('/internal/reservation-reminder', ReservationReminderController::class.'@handle');
 
 // Health Check Endpoint (public for monitoring services)
-Route::get('/health/subscription', [\App\Http\Controllers\MonitoringDashboardController::class, 'status']);
+Route::get('/health/subscription', [MonitoringDashboardController::class, 'status']);
 
 // Broadcast authentication - Custom controller for Sanctum token auth
 Route::post('/broadcasting/auth', [BroadcastAuthController::class, 'authenticate'])
-    ->middleware(['auth:sanctum', \App\Http\Middleware\LogBroadcastingAuth::class]);
+    ->middleware(['auth:sanctum', LogBroadcastingAuth::class]);
 
 // Protected routes
 Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function () {
@@ -85,7 +93,7 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
     Route::post('/user/check-permission', [AuthController::class, 'checkPermission']);
 
     // DEBUG: Direct permission test
-    Route::get('/user/permissions/debug', function (\Illuminate\Http\Request $request) {
+    Route::get('/user/permissions/debug', function (Request $request) {
         $user = $request->user();
         $user->load('roles.permissions');
 
@@ -113,7 +121,7 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
 
     // Promo Code routes
     Route::prefix('promo-codes')->group(function () {
-        Route::post('/validate', [\App\Http\Controllers\Api\PromoCodeController::class, 'validate']);
+        Route::post('/validate', [PromoCodeController::class, 'validate']);
     });
 
     // WhatsApp Business API routes
@@ -178,6 +186,7 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::get('/contacts', [WhatsAppController::class, 'getContacts']);
         Route::get('/contacts/{id}/messages', [WhatsAppController::class, 'getContactMessages']);
         Route::post('/contacts/{id}/mark-read', [WhatsAppController::class, 'markContactMessagesAsRead']);
+        Route::put('/contacts/{id}/toggle-ai', [WhatsAppController::class, 'toggleContactAi']);
     });
 
     // AI Agent routes
@@ -186,6 +195,7 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::post('/', [AiAgentController::class, 'store']);
         Route::put('/toggle-active', [AiAgentController::class, 'toggleActive']);
         Route::put('/toggle-order', [AiAgentController::class, 'toggleOrder']);
+        Route::put('/toggle-delivery', [AiAgentController::class, 'toggleDelivery']);
         Route::put('/toggle-qris', [AiAgentController::class, 'toggleQris']);
         Route::post('/test', [AiAgentController::class, 'test']);
         Route::delete('/conversations/test', [AiAgentController::class, 'clearTestConversation']);
@@ -194,22 +204,22 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
 
     // Reservation Management routes
     Route::prefix('reservations')->group(function () {
-        Route::get('/', [\App\Http\Controllers\Api\ReservationController::class, 'index']);
-        Route::get('/calendar', [\App\Http\Controllers\Api\ReservationController::class, 'calendar']);
-        Route::get('/stats', [\App\Http\Controllers\Api\ReservationController::class, 'stats']);
-        Route::get('/{id}', [\App\Http\Controllers\Api\ReservationController::class, 'show']);
-        Route::post('/{id}/complete', [\App\Http\Controllers\Api\ReservationController::class, 'complete']);
-        Route::post('/{id}/cancel', [\App\Http\Controllers\Api\ReservationController::class, 'cancel']);
+        Route::get('/', [ReservationController::class, 'index']);
+        Route::get('/calendar', [ReservationController::class, 'calendar']);
+        Route::get('/stats', [ReservationController::class, 'stats']);
+        Route::get('/{id}', [ReservationController::class, 'show']);
+        Route::post('/{id}/complete', [ReservationController::class, 'complete']);
+        Route::post('/{id}/cancel', [ReservationController::class, 'cancel']);
     });
 
     // Reservation Configuration routes
     Route::prefix('reservation-config')->group(function () {
-        Route::get('/', [\App\Http\Controllers\Api\ReservationConfigController::class, 'index']);
-        Route::post('/generate-slots', [\App\Http\Controllers\Api\ReservationConfigController::class, 'generateSlots']);
-        Route::post('/', [\App\Http\Controllers\Api\ReservationConfigController::class, 'store']);
-        Route::get('/{id}', [\App\Http\Controllers\Api\ReservationConfigController::class, 'show']);
-        Route::put('/{id}', [\App\Http\Controllers\Api\ReservationConfigController::class, 'update']);
-        Route::delete('/{id}', [\App\Http\Controllers\Api\ReservationConfigController::class, 'destroy']);
+        Route::get('/', [ReservationConfigController::class, 'index']);
+        Route::post('/generate-slots', [ReservationConfigController::class, 'generateSlots']);
+        Route::post('/', [ReservationConfigController::class, 'store']);
+        Route::get('/{id}', [ReservationConfigController::class, 'show']);
+        Route::put('/{id}', [ReservationConfigController::class, 'update']);
+        Route::delete('/{id}', [ReservationConfigController::class, 'destroy']);
     });
 
     // POS (Point of Sale) API routes

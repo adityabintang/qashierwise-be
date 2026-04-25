@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\UserIntent;
+use App\Services\AiAgentPromptBuilder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,6 +28,8 @@ class AiAgent extends Model
         'order_enabled',
         'qris_enabled',
         'reservation_enabled',
+        'delivery_enabled',
+        'default_ongkir',
         'is_active',
         'settings',
         'use_optimized_prompt',
@@ -46,6 +50,8 @@ class AiAgent extends Model
             'order_enabled' => 'boolean',
             'qris_enabled' => 'boolean',
             'reservation_enabled' => 'boolean',
+            'delivery_enabled' => 'boolean',
+            'default_ongkir' => 'decimal:2',
             'is_active' => 'boolean',
             'settings' => 'array',
             'use_optimized_prompt' => 'boolean',
@@ -103,6 +109,11 @@ class AiAgent extends Model
     public function isReservationEnabled(): bool
     {
         return $this->reservation_enabled;
+    }
+
+    public function isDeliveryEnabled(): bool
+    {
+        return $this->delivery_enabled;
     }
 
     /**
@@ -218,8 +229,8 @@ class AiAgent extends Model
     public function buildSystemPrompt(int $userId, ?string $userMessage = null): string
     {
         // Always use optimized prompt builder (TOON format supported)
-        $intent = $userMessage ? \App\Enums\UserIntent::detect($userMessage) : null;
-        $builder = new \App\Services\AiAgentPromptBuilder($this, $userId, $intent);
+        $intent = $userMessage ? UserIntent::detect($userMessage) : null;
+        $builder = new AiAgentPromptBuilder($this, $userId, $intent);
 
         return $builder->build();
     }

@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\UserIntent;
 use App\Http\Requests\StoreAiAgentRequest;
 use App\Models\AiAgent;
 use App\Models\AiAgentConversation;
+use App\Models\Order;
 use App\Models\Payment;
+use App\Models\Product;
 use App\Models\QrisTransaction;
+use App\Models\Store;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
 use App\Services\AiAgentService;
@@ -71,6 +75,8 @@ class AiAgentController extends Controller
                     'order_enabled' => $aiAgent->order_enabled,
                     'qris_enabled' => $aiAgent->qris_enabled,
                     'reservation_enabled' => $aiAgent->reservation_enabled,
+                    'delivery_enabled' => $aiAgent->delivery_enabled,
+                    'default_ongkir' => $aiAgent->default_ongkir,
                     'is_active' => $aiAgent->is_active,
                     'settings' => $aiAgent->settings,
                     'created_at' => $aiAgent->created_at,
@@ -106,7 +112,7 @@ class AiAgentController extends Controller
 
             // Validate default_store_id belongs to user
             if ($request->filled('default_store_id')) {
-                $storeExists = \App\Models\Store::where('id', $request->default_store_id)
+                $storeExists = Store::where('id', $request->default_store_id)
                     ->where('user_id', $userId)
                     ->exists();
 
@@ -128,6 +134,8 @@ class AiAgentController extends Controller
                     'order_enabled' => $request->boolean('order_enabled', false),
                     'qris_enabled' => $request->boolean('qris_enabled', false),
                     'reservation_enabled' => $request->boolean('reservation_enabled', false),
+                    'delivery_enabled' => $request->boolean('delivery_enabled', false),
+                    'default_ongkir' => $request->filled('default_ongkir') ? $request->input('default_ongkir') : 0,
                     'is_active' => $request->boolean('is_active', false),
                     'settings' => $request->settings,
                 ]
@@ -145,6 +153,8 @@ class AiAgentController extends Controller
                     'order_enabled' => $aiAgent->order_enabled,
                     'qris_enabled' => $aiAgent->qris_enabled,
                     'reservation_enabled' => $aiAgent->reservation_enabled,
+                    'delivery_enabled' => $aiAgent->delivery_enabled,
+                    'default_ongkir' => $aiAgent->default_ongkir,
                     'is_active' => $aiAgent->is_active,
                     'settings' => $aiAgent->settings,
                 ],
@@ -259,6 +269,60 @@ class AiAgentController extends Controller
     }
 
     /**
+     * Toggle delivery feature.
+     */
+    public function toggleDelivery(Request $request): JsonResponse
+    {
+        try {
+            $userId = auth()->user()->getEffectiveUserId();
+
+            $whatsappAccount = WhatsAppAccount::where('user_id', $userId)->first();
+
+            if (! $whatsappAccount) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'WhatsApp account not connected',
+                ], 404);
+            }
+
+            $aiAgent = AiAgent::where('whatsapp_account_id', $whatsappAccount->id)->first();
+
+            if (! $aiAgent) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'AI Agent not configured yet',
+                ], 404);
+            }
+
+            if (! $aiAgent->order_enabled) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot enable delivery. Please enable order feature first.',
+                ], 422);
+            }
+
+            $aiAgent->delivery_enabled = ! $aiAgent->delivery_enabled;
+            $aiAgent->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Delivery feature '.($aiAgent->delivery_enabled ? 'enabled' : 'disabled'),
+                'data' => [
+                    'delivery_enabled' => $aiAgent->delivery_enabled,
+                    'default_ongkir' => $aiAgent->default_ongkir,
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to toggle delivery feature',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Toggle QRIS feature with validation.
      */
     public function toggleQris(Request $request): JsonResponse
@@ -351,7 +415,9 @@ class AiAgentController extends Controller
             }
 
             // Create or reuse test contact for this user (use fixed wa_id to avoid creating new contacts)
-            $testContact = WhatsAppContact::firstOrCreate(
+            // withoutGlobalScopes() is needed to avoid unique constraint violation:
+            // the global scope filters SELECT results, causing firstOrCreate to miss existing records
+            $testContact = WhatsAppContact::withoutGlobalScopes()->firstOrCreate(
                 [
                     'user_id' => $userId,
                     'wa_id' => 'test_user_'.$userId,
@@ -406,7 +472,7 @@ class AiAgentController extends Controller
             }
 
             // Detect user intent for optimization
-            $userIntent = \App\Enums\UserIntent::detect($request->message);
+            $userIntent = UserIntent::detect($request->message);
 
             // Build system prompt with intent-based optimization
             $systemPrompt = $aiAgent->buildSystemPrompt($userId, $request->message);
@@ -486,12 +552,12 @@ class AiAgentController extends Controller
      * Greeting, off-topic, and business info intents don't need tools.
      * This saves ~500-800 tokens per request for simple messages.
      */
-    protected function intentNeedsTools(\App\Enums\UserIntent $intent): bool
+    protected function intentNeedsTools(UserIntent $intent): bool
     {
         $noToolIntents = [
-            \App\Enums\UserIntent::GREETING,
-            \App\Enums\UserIntent::OFF_TOPIC,
-            \App\Enums\UserIntent::BUSINESS_INFO,
+            UserIntent::GREETING,
+            UserIntent::OFF_TOPIC,
+            UserIntent::BUSINESS_INFO,
         ];
 
         return ! in_array($intent, $noToolIntents);
@@ -587,6 +653,29 @@ class AiAgentController extends Controller
                     'name' => 'check_payment_status',
                     'description' => 'Check payment',
                     'parameters' => ['type' => 'object', 'properties' => []],
+                ],
+            ];
+        }
+
+        // Add delivery tools if enabled
+        if ($aiAgent->isDeliveryEnabled()) {
+            $tools[] = [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'set_delivery_type',
+                    'description' => 'Set delivery or pickup',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'delivery_type' => [
+                                'type' => 'string',
+                                'enum' => ['pickup', 'delivery'],
+                            ],
+                            'address' => ['type' => 'string'],
+                            'notes' => ['type' => 'string'],
+                        ],
+                        'required' => ['delivery_type'],
+                    ],
                 ],
             ];
         }
@@ -728,6 +817,23 @@ class AiAgentController extends Controller
 
                 case 'confirm_order':
                     return $this->confirmOrder($conversation, $aiAgent, $userId);
+
+                case 'set_delivery_type':
+                    if (! isset($arguments['delivery_type'])) {
+                        return 'Maaf, parameter tidak lengkap. Mohon berikan tipe pengiriman (pickup/delivery).';
+                    }
+                    $validTypes = [Order::DELIVERY_TYPE_PICKUP, Order::DELIVERY_TYPE_DELIVERY];
+                    if (! in_array($arguments['delivery_type'], $validTypes)) {
+                        return 'Maaf, tipe pengiriman tidak valid. Gunakan "pickup" atau "delivery".';
+                    }
+
+                    return $this->setDeliveryType(
+                        $conversation,
+                        $aiAgent,
+                        $arguments['delivery_type'],
+                        $arguments['address'] ?? null,
+                        $arguments['notes'] ?? null
+                    );
 
                 case 'generate_qris':
                     if (! isset($arguments['amount'])) {
@@ -888,7 +994,7 @@ class AiAgentController extends Controller
      */
     protected function searchProducts(int $userId, string $query): string
     {
-        $productsQuery = \App\Models\Product::where('user_id', $userId)
+        $productsQuery = Product::where('user_id', $userId)
             ->where('is_active', true);
 
         // If query is empty or generic like "menu", get all products
@@ -953,7 +1059,7 @@ class AiAgentController extends Controller
             $cleanQuery = trim(strtolower($query));
             $keywords = explode(' ', $cleanQuery);
 
-            $products = \App\Models\Product::where('user_id', $userId)
+            $products = Product::where('user_id', $userId)
                 ->where('is_active', true)
                 ->where(function ($q) use ($cleanQuery, $keywords) {
                     $q->whereRaw('LOWER(name) LIKE ?', ["%{$cleanQuery}%"])
@@ -1014,7 +1120,7 @@ class AiAgentController extends Controller
         $offset = ($page - 1) * $perPage;
 
         // Get total count
-        $totalProducts = \App\Models\Product::where('user_id', $userId)
+        $totalProducts = Product::where('user_id', $userId)
             ->where('is_active', true)
             ->count();
 
@@ -1025,7 +1131,7 @@ class AiAgentController extends Controller
         $totalPages = ceil($totalProducts / $perPage);
 
         // Get products with category
-        $products = \App\Models\Product::where('user_id', $userId)
+        $products = Product::where('user_id', $userId)
             ->where('is_active', true)
             ->with('category:id,name')
             ->orderBy('category_id', 'asc')
@@ -1084,7 +1190,7 @@ class AiAgentController extends Controller
             return 'Maaf, ID produk tidak valid.';
         }
 
-        $product = \App\Models\Product::where('id', $productId)
+        $product = Product::where('id', $productId)
             ->where('user_id', $userId)
             ->where('is_active', true)
             ->first(['id', 'name', 'price', 'stock_quantity', 'description', 'sku']);
@@ -1130,7 +1236,7 @@ class AiAgentController extends Controller
         }
 
         // Validate product exists and belongs to user
-        $product = \App\Models\Product::where('id', $productId)
+        $product = Product::where('id', $productId)
             ->where('user_id', $userId)
             ->where('is_active', true)
             ->first(['id', 'name', 'price', 'stock_quantity']);
@@ -1220,7 +1326,7 @@ class AiAgentController extends Controller
                 continue;
             }
 
-            $product = \App\Models\Product::where('id', $productId)
+            $product = Product::where('id', $productId)
                 ->where('user_id', $userId)
                 ->where('is_active', true)
                 ->first(['id', 'name', 'price', 'stock_quantity']);
@@ -1314,7 +1420,7 @@ class AiAgentController extends Controller
             // Search product by name (case-insensitive)
             $cleanName = trim(strtolower($productName));
 
-            $product = \App\Models\Product::where('user_id', $userId)
+            $product = Product::where('user_id', $userId)
                 ->where('is_active', true)
                 ->where(function ($q) use ($cleanName) {
                     $q->whereRaw('LOWER(name) LIKE ?', ["%{$cleanName}%"]);
@@ -1410,7 +1516,7 @@ class AiAgentController extends Controller
         // Search product by name (case-insensitive)
         $cleanName = trim(strtolower($productName));
 
-        $product = \App\Models\Product::where('user_id', $userId)
+        $product = Product::where('user_id', $userId)
             ->where('is_active', true)
             ->where(function ($q) use ($cleanName) {
                 $q->whereRaw('LOWER(name) LIKE ?', ["%{$cleanName}%"]);
@@ -1495,13 +1601,16 @@ class AiAgentController extends Controller
                         number_format($itemSubtotal, 0, ',', '.')."\n\n";
         }
 
-        // Calculate tax (11%) - use round(..., 2) to match OrderService
         $taxAmount = round($subtotal * 0.11, 2);
-        $total = round($subtotal + $taxAmount, 2);
+        $ongkir = $conversation->getOngkir();
+        $total = round($subtotal + $taxAmount + $ongkir, 2);
 
         $response .= "━━━━━━━━━━━━━━━━━━━━\n";
         $response .= 'Subtotal: Rp '.number_format($subtotal, 0, ',', '.')."\n";
         $response .= 'Pajak (11%): Rp '.number_format($taxAmount, 0, ',', '.')."\n";
+        if ($ongkir > 0) {
+            $response .= '🚚 Ongkir: Rp '.number_format($ongkir, 0, ',', '.')."\n";
+        }
         $response .= '💰 Total: Rp '.number_format($total, 0, ',', '.')."\n\n";
         $response .= "📝 Anda masih bisa:\n";
         $response .= "• Tambah pesanan lagi\n";
@@ -1569,6 +1678,61 @@ class AiAgentController extends Controller
     }
 
     /**
+     * Set delivery type for test endpoint.
+     */
+    protected function setDeliveryType(
+        AiAgentConversation $conversation,
+        AiAgent $aiAgent,
+        string $deliveryType,
+        ?string $address = null,
+        ?string $notes = null
+    ): string {
+        if (! $aiAgent->isDeliveryEnabled()) {
+            return 'Maaf, fitur delivery belum diaktifkan.';
+        }
+
+        $conversation->setDeliveryType($deliveryType);
+
+        if ($deliveryType === Order::DELIVERY_TYPE_DELIVERY && $address) {
+            $conversation->setDeliveryAddress($address);
+        }
+
+        if ($notes) {
+            $conversation->setDeliveryNotes($notes);
+        }
+
+        $ongkir = 0;
+        if ($deliveryType === Order::DELIVERY_TYPE_DELIVERY) {
+            $ongkir = (float) ($aiAgent->default_ongkir ?? 0);
+        }
+        $conversation->setOngkir($ongkir);
+
+        if ($deliveryType === Order::DELIVERY_TYPE_DELIVERY) {
+            $ongkir = $aiAgent->default_ongkir ?? 0;
+            $formattedOngkir = 'Rp '.number_format($ongkir, 0, ',', '.');
+            $response = "🚚 Delivery dipilih.\n";
+            if ($address) {
+                $response .= "📍 Alamat: {$address}\n";
+            }
+            $response .= "💰 Ongkir: {$formattedOngkir}\n";
+            if ($notes) {
+                $response .= "📝 Catatan: {$notes}\n";
+            }
+            $response .= "\nKetik 'lihat keranjang' untuk ringkasan atau 'konfirmasi' untuk checkout.";
+
+            return $response;
+        }
+
+        $response = "🏪 Pickup dipilih.\n";
+        if ($notes) {
+            $response .= "📝 Catatan: {$notes}\n";
+        }
+        $response .= "\nKetik 'lihat keranjang' untuk ringkasan atau 'konfirmasi' untuk checkout.";
+
+        return $response;
+    }
+
+    /**
      * Confirm order and create Order record.
      */
     protected function confirmOrder(
@@ -1594,24 +1758,33 @@ class AiAgentController extends Controller
 
         try {
             return DB::transaction(function () use ($conversation, $aiAgent, $userId, $cart) {
-                // Get contact for customer info
                 $contact = $conversation->whatsappContact;
+
+                $deliveryType = $conversation->getDeliveryType();
+                $deliveryAddress = $conversation->getDeliveryAddress();
+                $deliveryNotes = $conversation->getDeliveryNotes();
+                $ongkir = $conversation->getOngkir();
 
                 Log::info('Creating order via test endpoint', [
                     'user_id' => $userId,
                     'store_id' => $aiAgent->default_store_id,
                     'cart_items' => count($cart),
                     'qris_enabled' => $aiAgent->isQrisEnabled(),
+                    'delivery_type' => $deliveryType,
+                    'ongkir' => $ongkir,
                 ]);
 
-                // Create order using OrderService
                 $order = $this->orderService->create([
                     'store_id' => $aiAgent->default_store_id,
                     'table_id' => null,
                     'pos_user_id' => null,
-                    'source' => \App\Models\Order::SOURCE_WHATSAPP_AI,
+                    'source' => Order::SOURCE_WHATSAPP_AI,
                     'customer_name' => $contact->name ?? 'Test Customer',
                     'customer_phone' => $contact->wa_id ?? 'test',
+                    'delivery_type' => $deliveryType ?? Order::DELIVERY_TYPE_PICKUP,
+                    'alamat' => $deliveryAddress,
+                    'ongkir' => $ongkir,
+                    'catatan' => $deliveryNotes,
                 ]);
 
                 Log::info('Order created', [
@@ -1621,7 +1794,7 @@ class AiAgentController extends Controller
 
                 // Add order items using OrderService
                 foreach ($cart as $item) {
-                    $product = \App\Models\Product::find($item['product_id']);
+                    $product = Product::find($item['product_id']);
                     if ($product) {
                         $this->orderService->addItem($order, $product, $item['quantity']);
                         Log::debug('Order item added', [
@@ -1644,6 +1817,9 @@ class AiAgentController extends Controller
 
                 // Clear cart
                 $conversation->clearCart();
+
+                // Clear delivery context
+                $conversation->clearDeliveryContext();
 
                 Log::info('Order completed successfully', [
                     'order_id' => $order->id,
@@ -1671,12 +1847,12 @@ class AiAgentController extends Controller
                             $qrisTransaction->save();
 
                             // Create Payment record
-                            \App\Models\Payment::create([
+                            Payment::create([
                                 'order_id' => $order->id,
                                 'qris_transaction_id' => $qrisTransaction->id,
-                                'method' => \App\Models\Payment::METHOD_QRIS,
+                                'method' => Payment::METHOD_QRIS,
                                 'amount' => $order->total,
-                                'status' => \App\Models\Payment::STATUS_PENDING,
+                                'status' => Payment::STATUS_PENDING,
                             ]);
 
                             // Store QRIS transaction in conversation

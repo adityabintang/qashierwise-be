@@ -381,6 +381,76 @@
                             </div>
                         </div>
 
+                        <!-- Delivery Feature Card -->
+                        <div class="card" x-show="config.order_enabled && form.default_store_id">
+                            <div class="card-header border-b border-[hsl(var(--border))]">
+                                <h3 class="card-title flex items-center gap-2">
+                                    <i class="fas fa-truck text-orange-500"></i>
+                                    Delivery
+                                </h3>
+                                <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                                    Aktifkan fitur delivery agar pelanggan bisa memilih pickup atau delivery saat order via chat
+                                </p>
+                            </div>
+                            <div class="p-4 sm:p-6 space-y-5">
+                                <!-- Delivery Toggle -->
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl" :class="config.delivery_enabled ? 'bg-orange-100 border border-orange-400 shadow-sm shadow-orange-100' : 'bg-gray-50 border border-gray-200'">
+                                    <div class="flex-1">
+                                        <p class="font-medium" :class="config.delivery_enabled ? 'text-orange-950' : 'text-gray-600'">Enable Delivery</p>
+                                        <p class="text-sm" :class="config.delivery_enabled ? 'text-orange-800' : 'text-gray-500'">
+                                            <span x-show="config.delivery_enabled">AI akan bertanya "Pickup atau Delivery?" sebelum checkout</span>
+                                            <span x-show="!config.delivery_enabled">Pelanggan hanya bisa pickup</span>
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        @click="config.delivery_enabled = !config.delivery_enabled"
+                                        :class="config.delivery_enabled ? 'bg-orange-600 ring-2 ring-orange-200' : 'bg-gray-300'"
+                                        class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 flex-shrink-0 cursor-pointer"
+                                    >
+                                        <span
+                                            :class="config.delivery_enabled ? 'translate-x-6' : 'translate-x-1'"
+                                            class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md"
+                                        ></span>
+                                    </button>
+                                </div>
+
+                                <!-- Default Ongkir -->
+                                <div x-show="config.delivery_enabled" x-transition class="space-y-2">
+                                    <label class="block text-sm font-medium text-[hsl(var(--foreground))]">
+                                        <i class="fas fa-money-bill-wave text-orange-400 mr-1.5"></i>
+                                        Biaya Ongkir Default (Rp)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        x-model.number="form.default_ongkir"
+                                        min="0"
+                                        step="500"
+                                        placeholder="Contoh: 10000"
+                                        class="w-full h-10 px-3 rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--background))] text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                                    >
+                                    <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                                        Ongkir akan otomatis ditambahkan ke total pesanan saat pelanggan memilih delivery
+                                    </p>
+                                </div>
+
+                                <!-- Delivery Info -->
+                                <div x-show="config.delivery_enabled" x-transition class="bg-orange-50 border border-orange-200 rounded-xl p-4">
+                                    <p class="text-sm text-orange-800 font-medium">
+                                        <i class="fas fa-check-circle mr-2"></i>
+                                        Delivery aktif! Alur AI Agent:
+                                    </p>
+                                    <ul class="text-sm text-orange-700 mt-2 ml-6 list-disc space-y-1">
+                                        <li>Pelanggan pilih menu → tambah ke keranjang</li>
+                                        <li>AI bertanya: "Pickup atau Delivery?"</li>
+                                        <li>Jika delivery → AI tanya alamat → ongkir otomatis ditambahkan</li>
+                                        <li>Pelanggan bisa tambah catatan (catatan)</li>
+                                        <li>Konfirmasi pesanan dengan semua detail</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Action Buttons -->
                         <div class="card">
                             <div class="p-4 sm:p-6">
@@ -548,6 +618,7 @@ function aiAgentApp() {
             order_enabled: false,
             qris_enabled: false,
             reservation_enabled: false,
+            delivery_enabled: false,
         },
         form: {
             bot_name: '',
@@ -559,6 +630,7 @@ function aiAgentApp() {
                 phone: '',
             },
             default_store_id: '',
+            default_ongkir: 0,
         },
         // Test modal
         showTestModal: false,
@@ -629,6 +701,7 @@ function aiAgentApp() {
                         order_enabled: data.data.order_enabled,
                         qris_enabled: data.data.qris_enabled || false,
                         reservation_enabled: data.data.reservation_enabled || false,
+                        delivery_enabled: data.data.delivery_enabled || false,
                     };
                     this.form = {
                         bot_name: data.data.bot_name || '',
@@ -640,6 +713,7 @@ function aiAgentApp() {
                             phone: data.data.business_info?.phone || '',
                         },
                         default_store_id: data.data.default_store_id || '',
+                        default_ongkir: data.data.default_ongkir || 0,
                     };
                     if (data.data.updated_at) {
                         this.lastSaved = new Date(data.data.updated_at).toLocaleString('id-ID');
@@ -676,6 +750,8 @@ function aiAgentApp() {
                         order_enabled: this.config.order_enabled,
                         qris_enabled: this.config.qris_enabled,
                         reservation_enabled: this.config.reservation_enabled,
+                        delivery_enabled: this.config.delivery_enabled,
+                        default_ongkir: this.form.default_ongkir || 0,
                     }),
                 });
 

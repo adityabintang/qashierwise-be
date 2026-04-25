@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\UserIntent;
 use App\Models\AiAgent;
 use App\Models\AiAgentConversation;
 use App\Models\Order;
@@ -87,6 +88,13 @@ class AiAgentService
                     $contact->wa_id,
                     'Baik, pesanan dibatalkan. Ada yang bisa saya bantu lagi?'
                 );
+
+                return;
+            }
+
+            // Check if user wants next menu page (deterministic pagination)
+            if ($aiAgent->isOrderEnabled() && $this->isNextMenuPageIntent($messageText)) {
+                $this->handleNextMenuPage($conversation, $account, $contact, $aiAgent);
 
                 return;
             }
@@ -189,7 +197,7 @@ class AiAgentService
             }
 
             // Detect user intent for optimization
-            $userIntent = \App\Enums\UserIntent::detect($messageText);
+            $userIntent = UserIntent::detect($messageText);
 
             // Build system prompt with intent-based optimization
             $systemPrompt = $aiAgent->buildSystemPrompt($account->user_id, $messageText);
@@ -568,6 +576,22 @@ class AiAgentService
                     'parameters' => ['type' => 'object', 'properties' => []],
                 ],
             ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'set_delivery_type',
+                    'description' => 'Set delivery method. Ask user Pickup or Delivery first. If delivery, also ask address.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'delivery_type' => ['type' => 'string', 'description' => 'pickup or delivery'],
+                            'address' => ['type' => 'string', 'description' => 'Delivery address (only for delivery)'],
+                            'notes' => ['type' => 'string', 'description' => 'Optional order notes/catatan'],
+                        ],
+                        'required' => ['delivery_type'],
+                    ],
+                ],
+            ],
         ];
     }
 
@@ -576,13 +600,13 @@ class AiAgentService
      * Greeting, off-topic, and business info intents don't need tools.
      * This saves ~500-800 tokens per request for simple messages.
      */
-    protected function intentNeedsTools(\App\Enums\UserIntent $intent): bool
+    protected function intentNeedsTools(UserIntent $intent): bool
     {
         // These intents don't need product/order tools
         $noToolIntents = [
-            \App\Enums\UserIntent::GREETING,
-            \App\Enums\UserIntent::OFF_TOPIC,
-            \App\Enums\UserIntent::BUSINESS_INFO,
+            UserIntent::GREETING,
+            UserIntent::OFF_TOPIC,
+            UserIntent::BUSINESS_INFO,
         ];
 
         return ! in_array($intent, $noToolIntents);
@@ -627,6 +651,27 @@ class AiAgentService
             'konfirmasi pesanan',
             'jual apa',
             'ada apa aja',
+        ];
+
+        foreach ($keywords as $keyword) {
+            if (str_contains($text, $keyword)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function isNextMenuPageIntent(string $messageText): bool
+    {
+        $text = strtolower(trim($messageText));
+        $keywords = [
+            'menu lainnya', 'menu selanjutnya', 'menu berikutnya',
+            'menu lagi', 'lihat lagi', 'lihat selanjutnya',
+            'masih ada lagi', 'masih ada yang lain',
+            'ada lagi', 'ada yang lain', 'lainnya',
+            'lebih banyak', 'selanjutnya', 'next menu',
+            'page berikutnya', 'halaman berikutnya',
         ];
 
         foreach ($keywords as $keyword) {
@@ -753,7 +798,7 @@ class AiAgentService
             if (in_array($functionName, ['search_products', 'search_multiple_products', 'get_all_products'])) {
                 $hasSearchCall = true;
             }
-            if (in_array($functionName, ['add_to_cart', 'confirm_order', 'get_cart_summary', 'generate_qris', 'check_payment_status', 'remove_from_cart', 'clear_cart'])) {
+            if (in_array($functionName, ['add_to_cart', 'confirm_order', 'get_cart_summary', 'generate_qris', 'check_payment_status', 'remove_from_cart', 'clear_cart', 'set_delivery_type'])) {
                 $hasFinalAction = true;
             }
 
@@ -1206,7 +1251,13 @@ class AiAgentService
                     $page = isset($arguments['page']) ? (int) $arguments['page'] : 1;
                     $search = $arguments['search'] ?? null;
 
-                    return $this->getAllProducts($userId, $useToon, $page, $search);
+                    $result = $this->getAllProducts($userId, $useToon, $page, $search);
+
+                    if ($conversation && ! str_starts_with($result, 'EMPTY')) {
+                        $conversation->setCurrentMenuPage($page);
+                    }
+
+                    return $result;
 
                 case 'search_products':
                     if (! isset($arguments['query'])) {
@@ -1269,10 +1320,13 @@ class AiAgentService
                     }
 
                 case 'get_cart_summary':
-                    return $this->getCartSummary($conversation, $userId);
+                    return $this->getCartSummary($conversation, $userId, $aiAgent);
 
                 case 'confirm_order':
-                    return $this->prepareOrderConfirmation($conversation, $userId);
+                    return $this->prepareOrderConfirmation($conversation, $userId, $aiAgent);
+
+                case 'set_delivery_type':
+                    return $this->setDeliveryType($conversation, $arguments, $aiAgent);
 
                 case 'remove_from_cart':
                     if (! isset($arguments['product_name'])) {
@@ -1493,12 +1547,68 @@ class AiAgentService
         return $response;
     }
 
+    protected function handleNextMenuPage(
+        AiAgentConversation $conversation,
+        WhatsAppAccount $account,
+        WhatsAppContact $contact,
+        AiAgent $aiAgent
+    ): void {
+        $currentPage = $conversation->getCurrentMenuPage();
+        $nextPage = $currentPage + 1;
+        $useToon = $aiAgent->use_toon_format ?? false;
+
+        $result = $this->getAllProducts($account->user_id, $useToon, $nextPage);
+
+        if (str_starts_with($result, 'EMPTY')) {
+            $conversation->addMessage('human', 'menu lainnya');
+            $conversation->addMessage('ai', 'Sudah tidak ada menu lagi. Itu semua menu yang tersedia! 😊 Mau pesan yang mana?');
+            $this->sendReply($account, $contact->wa_id, 'Sudah tidak ada menu lagi. Itu semua menu yang tersedia! 😊 Mau pesan yang mana?');
+
+            return;
+        }
+
+        $conversation->setCurrentMenuPage($nextPage);
+
+        $conversation->addMessage('human', 'menu lainnya');
+
+        $systemPrompt = $aiAgent->buildSystemPrompt($account->user_id);
+        $messages = $conversation->getRecentMessages(2);
+        $messages[] = ['role' => 'user', 'content' => "Berikut adalah menu halaman {$nextPage} yang perlu ditampilkan ke user dalam format yang ramah:\n\n{$result}"];
+
+        $response = $this->callLLM($systemPrompt, $messages, null, $aiAgent);
+        $assistantMessage = $response['content'] ?? '';
+
+        if (empty(trim($assistantMessage))) {
+            $assistantMessage = $this->formatMenuFallback($result, $nextPage);
+        }
+
+        $conversation->addMessage('ai', $assistantMessage);
+        $this->sendReply($account, $contact->wa_id, $assistantMessage);
+    }
+
+    protected function formatMenuFallback(string $rawResult, int $page): string
+    {
+        $lines = explode("\n", $rawResult);
+        $menuItems = [];
+        foreach ($lines as $line) {
+            if (str_contains($line, 'Rp')) {
+                $menuItems[] = $line;
+            }
+        }
+
+        $response = "📋 Menu (Halaman {$page}):\n\n";
+        $response .= implode("\n", $menuItems);
+        $response .= "\n\nMau pesan yang mana? Atau ketik 'menu lainnya' untuk lihat lebih banyak.";
+
+        return $response;
+    }
+
     /**
-     * Get all active products with pagination (20 per page), grouped by category.
+     * Get all active products with pagination (10 per page), grouped by category.
      */
     protected function getAllProducts(int $userId, bool $useToon = false, int $page = 1, ?string $search = null): string
     {
-        $perPage = 20;
+        $perPage = 10;
         $offset = ($page - 1) * $perPage;
 
         // Build base query
@@ -1572,6 +1682,13 @@ class AiAgentService
         }
 
         // Clear instruction for LLM - use product_name not product_id
+        $paginationInfo = "Halaman {$page} dari {$totalPages}";
+        if ($page < $totalPages) {
+            $paginationInfo .= ". Ada menu lainnya! Jika user bertanya 'ada yang lain', panggil get_all_products(page=".($page + 1).')';
+        } else {
+            $paginationInfo .= '. Ini halaman terakhir.';
+        }
+        $lines[] = $paginationInfo;
         $lines[] = 'ACT:show menu to user,order→add_to_cart(items=[{product_name:"nama",quantity:X}])';
 
         return implode("\n", $lines);
@@ -1888,7 +2005,7 @@ class AiAgentService
     /**
      * Get cart summary.
      */
-    protected function getCartSummary(AiAgentConversation $conversation, int $userId): string
+    protected function getCartSummary(AiAgentConversation $conversation, int $userId, ?AiAgent $aiAgent = null): string
     {
         $cart = $conversation->getCart();
 
@@ -1908,12 +2025,22 @@ class AiAgentService
             $response .= '  Subtotal: Rp '.number_format($subtotal, 0, ',', '.')."\n\n";
         }
 
-        // Use round(..., 2) to match OrderService calculation
+        $ongkir = 0;
+        if ($aiAgent && $aiAgent->isDeliveryEnabled()) {
+            $deliveryType = $conversation->getDeliveryType();
+            if ($deliveryType === 'delivery') {
+                $ongkir = (float) $aiAgent->default_ongkir;
+            }
+        }
+
         $tax = round($total * 0.11, 2);
-        $grandTotal = round($total + $tax, 2);
+        $grandTotal = round($total + $tax + $ongkir, 2);
 
         $response .= 'Subtotal: Rp '.number_format($total, 0, ',', '.')."\n";
         $response .= 'Pajak (11%): Rp '.number_format($tax, 0, ',', '.')."\n";
+        if ($ongkir > 0) {
+            $response .= 'Ongkir: Rp '.number_format($ongkir, 0, ',', '.')."\n";
+        }
         $response .= 'Total: Rp '.number_format($grandTotal, 0, ',', '.')."\n\n";
         $response .= "Ketik 'konfirmasi pesanan' untuk melanjutkan checkout.";
 
@@ -1988,10 +2115,62 @@ class AiAgentService
         return "🗑️ Keranjang berhasil dikosongkan.\n\nSilakan mulai pesan lagi jika berubah pikiran! 😊";
     }
 
+    protected function setDeliveryType(AiAgentConversation $conversation, array $arguments, ?AiAgent $aiAgent): string
+    {
+        $deliveryType = $arguments['delivery_type'] ?? null;
+        if (! in_array($deliveryType, ['pickup', 'delivery'])) {
+            return 'Maaf, pilihan tidak valid. Pilih Pickup atau Delivery.';
+        }
+
+        $conversation->setDeliveryType($deliveryType);
+
+        $ongkir = 0;
+        if ($deliveryType === 'delivery') {
+            $ongkir = $aiAgent ? (float) $aiAgent->default_ongkir : 0;
+            $address = $arguments['address'] ?? null;
+            if ($address) {
+                $conversation->setDeliveryAddress($address);
+            }
+            $notes = $arguments['notes'] ?? null;
+            if ($notes) {
+                $conversation->setDeliveryNotes($notes);
+            }
+        } else {
+            $notes = $arguments['notes'] ?? null;
+            if ($notes) {
+                $conversation->setDeliveryNotes($notes);
+            }
+        }
+        $conversation->setOngkir($ongkir);
+
+        if ($deliveryType === 'delivery') {
+            $address = $arguments['address'] ?? null;
+            $notes = $arguments['notes'] ?? null;
+            $formattedOngkir = 'Rp '.number_format($ongkir, 0, ',', '.');
+
+            $response = "✅ Delivery dipilih.\n";
+            if ($address) {
+                $response .= "📍 Alamat: {$address}\n";
+            }
+            $response .= "🚚 Ongkir: {$formattedOngkir}\n";
+            if ($notes) {
+                $response .= "📝 Catatan: {$notes}\n";
+            }
+
+            if (! $address) {
+                $response .= "\nSilakan kirim alamat pengiriman.";
+            }
+
+            return $response;
+        }
+
+        return '✅ Pickup dipilih. Ongkir: Rp 0.';
+    }
+
     /**
      * Prepare order confirmation.
      */
-    protected function prepareOrderConfirmation(AiAgentConversation $conversation, int $userId): string
+    protected function prepareOrderConfirmation(AiAgentConversation $conversation, int $userId, ?AiAgent $aiAgent = null): string
     {
         $cart = $conversation->getCart();
 
@@ -1999,10 +2178,16 @@ class AiAgentService
             return 'Keranjang belanja Anda masih kosong. Silakan tambahkan produk terlebih dahulu.';
         }
 
-        // Save to pending order
+        if ($aiAgent && $aiAgent->isDeliveryEnabled()) {
+            $deliveryType = $conversation->getDeliveryType();
+            if (! $deliveryType) {
+                return "Sebelum konfirmasi, mau Pickup atau Delivery?\n".
+                       "Ketik 'pickup' atau 'delivery'.";
+            }
+        }
+
         $conversation->setPendingOrder($cart);
 
-        // Build confirmation message
         $response = "📝 Konfirmasi Pesanan:\n\n";
         $total = 0;
 
@@ -2014,14 +2199,33 @@ class AiAgentService
             $response .= '  Rp '.number_format($subtotal, 0, ',', '.')."\n";
         }
 
-        // Use round(..., 2) to match OrderService calculation
+        $ongkir = 0;
+        $deliveryType = $conversation->getDeliveryType();
+        $deliveryAddress = $conversation->getDeliveryAddress();
+        $deliveryNotes = $conversation->getDeliveryNotes();
+
+        if ($deliveryType === 'delivery') {
+            $ongkir = $aiAgent ? (float) $aiAgent->default_ongkir : 0;
+        }
+
         $tax = round($total * 0.11, 2);
-        $grandTotal = round($total + $tax, 2);
+        $grandTotal = round($total + $tax + $ongkir, 2);
 
         $response .= "\nSubtotal: Rp ".number_format($total, 0, ',', '.')."\n";
         $response .= 'Pajak (11%): Rp '.number_format($tax, 0, ',', '.')."\n";
-        $response .= 'Total: Rp '.number_format($grandTotal, 0, ',', '.')."\n\n";
-        $response .= "Apakah Anda yakin ingin melanjutkan pesanan ini?\n";
+        if ($ongkir > 0) {
+            $response .= 'Ongkir: Rp '.number_format($ongkir, 0, ',', '.')."\n";
+        }
+        $response .= 'Total: Rp '.number_format($grandTotal, 0, ',', '.')."\n";
+
+        if ($deliveryType === 'delivery' && $deliveryAddress) {
+            $response .= "\n📍 Alamat: {$deliveryAddress}\n";
+        }
+        if ($deliveryNotes) {
+            $response .= "📝 Catatan: {$deliveryNotes}\n";
+        }
+
+        $response .= "\nApakah Anda yakin ingin melanjutkan pesanan ini?\n";
         $response .= "Balas 'Ya' untuk konfirmasi atau 'Tidak' untuk membatalkan.";
 
         return $response;
@@ -2228,6 +2432,11 @@ class AiAgentService
                 return;
             }
 
+            $deliveryType = $conversation->getDeliveryType() ?? 'pickup';
+            $deliveryAddress = $conversation->getDeliveryAddress();
+            $deliveryNotes = $conversation->getDeliveryNotes();
+            $ongkir = $conversation->getOngkir();
+
             // Create order with source and customer info
             $order = $this->orderService->create([
                 'store_id' => $aiAgent->default_store_id,
@@ -2236,6 +2445,10 @@ class AiAgentService
                 'source' => Order::SOURCE_WHATSAPP_AI,
                 'customer_name' => $contact->name ?? 'WhatsApp Customer',
                 'customer_phone' => $contact->wa_id,
+                'delivery_type' => $deliveryType,
+                'alamat' => $deliveryType === 'delivery' ? $deliveryAddress : null,
+                'ongkir' => $ongkir,
+                'catatan' => $deliveryNotes,
             ]);
 
             // Add items
@@ -2255,6 +2468,7 @@ class AiAgentService
             // Clear cart and pending order
             $conversation->clearCart();
             $conversation->clearPendingOrder();
+            $conversation->clearDeliveryContext();
 
             // Check if QRIS is enabled - auto generate QRIS
             Log::info('QRIS check during order confirmation', [

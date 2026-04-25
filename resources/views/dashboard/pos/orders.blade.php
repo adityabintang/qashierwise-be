@@ -215,6 +215,32 @@
                                 </template>
                             </select>
                         </div>
+                        <!-- Delivery Type -->
+                        <div>
+                            <label class="text-sm font-medium mb-1.5 block">Delivery Type</label>
+                            <div class="flex gap-2">
+                                <button type="button" @click="createForm.delivery_type = 'pickup'" class="flex-1 h-10 rounded-lg text-sm font-medium transition-all" :class="createForm.delivery_type === 'pickup' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">
+                                    <i class="fas fa-store mr-1"></i> Pickup
+                                </button>
+                                <button type="button" @click="createForm.delivery_type = 'delivery'" class="flex-1 h-10 rounded-lg text-sm font-medium transition-all" :class="createForm.delivery_type === 'delivery' ? 'bg-orange-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">
+                                    <i class="fas fa-truck mr-1"></i> Delivery
+                                </button>
+                            </div>
+                        </div>
+                        <div x-show="createForm.delivery_type === 'delivery'" x-transition class="space-y-3">
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Alamat <span class="text-red-500">*</span></label>
+                                <input type="text" x-model="createForm.alamat" placeholder="Alamat pengiriman..." class="input w-full min-h-[44px]">
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Ongkir (Rp)</label>
+                                <input type="number" x-model.number="createForm.ongkir" min="0" step="500" placeholder="0" class="input w-full min-h-[44px]">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium mb-1.5 block">Catatan (Optional)</label>
+                            <input type="text" x-model="createForm.catatan" placeholder="Catatan pesanan..." class="input w-full min-h-[44px]">
+                        </div>
                         <!-- Product Selection -->
                         <div>
                             <label class="text-sm font-medium mb-1.5 block">Add Products</label>
@@ -275,6 +301,7 @@
                         <div class="bg-[hsl(var(--muted)/0.5)] rounded-lg p-4 space-y-2">
                             <div class="flex justify-between text-sm"><span>Subtotal</span><span x-text="formatCurrency(orderSubtotal)"></span></div>
                             <div class="flex justify-between text-sm"><span>Tax (10%)</span><span x-text="formatCurrency(orderTax)"></span></div>
+                            <div x-show="createForm.delivery_type === 'delivery' && createForm.ongkir" class="flex justify-between text-sm"><span>Ongkir</span><span x-text="formatCurrency(parseFloat(createForm.ongkir) || 0)"></span></div>
                             <div class="flex justify-between font-bold text-lg pt-2 border-t border-[hsl(var(--border))]"><span>Total</span><span x-text="formatCurrency(orderTotal)"></span></div>
                         </div>
                     </div>
@@ -310,6 +337,8 @@
                     <div class="grid grid-cols-2 gap-4 text-sm">
                         <div><span class="text-[hsl(var(--muted-foreground))]">Store:</span><p class="font-medium" x-text="selectedOrder?.store?.name || '-'"></p></div>
                         <div><span class="text-[hsl(var(--muted-foreground))]">Table:</span><p class="font-medium" x-text="selectedOrder?.table?.number ? 'Table ' + selectedOrder.table.number : '-'"></p></div>
+                        <div x-show="selectedOrder?.delivery_type"><span class="text-[hsl(var(--muted-foreground))]">Delivery:</span><p class="font-medium capitalize" x-text="selectedOrder?.delivery_type || '-'"></p></div>
+                        <div x-show="selectedOrder?.alamat"><span class="text-[hsl(var(--muted-foreground))]">Alamat:</span><p class="font-medium" x-text="selectedOrder?.alamat || '-'"></p></div>
                     </div>
                     <div class="border-t border-[hsl(var(--border))] pt-4">
                         <h5 class="font-medium mb-3">Items</h5>
@@ -326,7 +355,12 @@
                         <div class="flex justify-between text-sm"><span>Subtotal</span><span x-text="formatCurrency(selectedOrder?.subtotal)"></span></div>
                         <div class="flex justify-between text-sm"><span>Tax</span><span x-text="formatCurrency(selectedOrder?.tax_amount)"></span></div>
                         <div class="flex justify-between text-sm"><span>Discount</span><span x-text="'-' + formatCurrency(selectedOrder?.discount_amount || 0)"></span></div>
+                        <div x-show="selectedOrder?.ongkir > 0" class="flex justify-between text-sm"><span>Ongkir</span><span x-text="formatCurrency(selectedOrder?.ongkir)"></span></div>
                         <div class="flex justify-between font-bold text-lg pt-2 border-t border-[hsl(var(--border))]"><span>Total</span><span x-text="formatCurrency(selectedOrder?.total)"></span></div>
+                    </div>
+                    <div x-show="selectedOrder?.catatan" class="border-t border-[hsl(var(--border))] pt-4">
+                        <h5 class="font-medium mb-2">Catatan</h5>
+                        <p class="text-sm text-[hsl(var(--muted-foreground))] bg-amber-50 p-3 rounded-lg" x-text="selectedOrder?.catatan"></p>
                     </div>
                     <div class="border-t border-[hsl(var(--border))] pt-4">
                         <h5 class="font-medium mb-3">Payment Method</h5>
@@ -359,7 +393,7 @@ function ordersApp() {
         search: '', statusFilter: '', storeFilter: '', productSearch: '',
         showCreateModal: false, showViewModal: false,
         selectedOrder: null,
-        createForm: { store_id: '', table_id: '' },
+        createForm: { store_id: '', table_id: '', delivery_type: 'pickup', alamat: '', ongkir: 0, catatan: '' },
         pagination: { currentPage: 1, lastPage: 1, from: 0, to: 0, total: 0 },
         sidebarOpen: window.innerWidth >= 1024, isMobile: window.innerWidth < 768, user: null, notifications: [],
         searchTimeout: null,
@@ -481,14 +515,14 @@ function ordersApp() {
 
         get orderSubtotal() { return this.orderItems.reduce((t, i) => t + (i.price * i.quantity), 0); },
         get orderTax() { return this.orderSubtotal * 0.1; },
-        get orderTotal() { return this.orderSubtotal + this.orderTax; },
+        get orderTotal() { return this.orderSubtotal + this.orderTax + (this.createForm.delivery_type === 'delivery' ? (parseFloat(this.createForm.ongkir) || 0) : 0); },
 
         addToOrder(product) { const existing = this.orderItems.find(i => i.product_id === product.id); if (existing) { existing.quantity++; } else { this.orderItems.push({ product_id: product.id, name: product.name, price: product.price, quantity: 1 }); } },
         increaseQty(i) { this.orderItems[i].quantity++; },
         decreaseQty(i) { if (this.orderItems[i].quantity > 1) this.orderItems[i].quantity--; else this.removeItem(i); },
         removeItem(i) { this.orderItems.splice(i, 1); },
 
-        async openCreateModal() { this.createForm = { store_id: '', table_id: '' }; this.orderItems = []; this.products = []; this.productSearch = ''; await this.fetchProducts(); this.showCreateModal = true; },
+        async openCreateModal() { this.createForm = { store_id: '', table_id: '', delivery_type: 'pickup', alamat: '', ongkir: 0, catatan: '' }; this.orderItems = []; this.products = []; this.productSearch = ''; await this.fetchProducts(); this.showCreateModal = true; },
         closeCreateModal() { this.showCreateModal = false; },
 
         async createOrder() {
@@ -501,7 +535,7 @@ function ordersApp() {
             this.creating = true;
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${this.API_BASE_URL}/orders`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ store_id: this.createForm.store_id, table_id: this.createForm.table_id || null, items: this.orderItems.map(i => ({ product_id: i.product_id, quantity: i.quantity })) }) });
+                const res = await fetch(`${this.API_BASE_URL}/orders`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ store_id: this.createForm.store_id, table_id: this.createForm.table_id || null, delivery_type: this.createForm.delivery_type, alamat: this.createForm.delivery_type === 'delivery' ? this.createForm.alamat : null, ongkir: this.createForm.delivery_type === 'delivery' ? (parseFloat(this.createForm.ongkir) || 0) : 0, catatan: this.createForm.catatan || null, items: this.orderItems.map(i => ({ product_id: i.product_id, quantity: i.quantity })) }) });
                 const data = await res.json();
                 if (data.success) { this.closeCreateModal(); await this.fetchOrders(); } else { alert(data.message || 'Failed'); }
             } catch (e) { console.error('Error:', e); alert('Failed'); } finally { this.creating = false; }
