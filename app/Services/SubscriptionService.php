@@ -205,7 +205,6 @@ class SubscriptionService
             'reference_id' => $referenceId,
         ]);
 
-        // Find subscription by Xendit subscription ID
         $subscription = Subscription::where('xendit_subscription_id', $subscriptionId)->first();
 
         if ($subscription === null) {
@@ -216,37 +215,60 @@ class SubscriptionService
             return;
         }
 
-        // Update subscription status to active
-        $subscription->update([
-            'status' => 'active',
-        ]);
+        $subscription->update(['status' => 'active']);
 
-        // Get metadata for payment details
+        $this->recordXenditPayment($subscription, $subscriptionId, $referenceId, $data);
+
+        Log::info('Xendit subscription activated and updated', [
+            'subscription_id' => $subscription->id,
+            'xendit_subscription_id' => $subscriptionId,
+        ]);
+    }
+
+    /**
+     * Record a payment in the billing history for a Xendit activation.
+     *
+     * Idempotent: skips creation if a record for the same transaction_id
+     * already exists, so it's safe to call from both the webhook path and
+     * the polling/redirect fallback paths without creating duplicates.
+     */
+    public function recordXenditPayment(
+        Subscription $subscription,
+        string $xenditSubscriptionId,
+        ?string $referenceId = null,
+        array $xenditData = []
+    ): void {
+        // Idempotency: one billing-history row per Xendit plan activation
+        $alreadyRecorded = \App\Models\SubscriptionPayment::where('transaction_id', $xenditSubscriptionId)
+            ->where('status', 'settlement')
+            ->exists();
+
+        if ($alreadyRecorded) {
+            return;
+        }
+
         $metadata = is_string($subscription->metadata)
             ? json_decode($subscription->metadata, true)
-            : $subscription->metadata;
+            : ($subscription->metadata ?? []);
 
-        // Create payment record for billing history
         \App\Models\SubscriptionPayment::create([
             'subscription_id' => $subscription->id,
             'user_id' => $subscription->user_id,
-            'order_id' => $data['reference_id'] ?? 'xendit_'.$subscriptionId,
-            'transaction_id' => $subscriptionId,
+            'order_id' => $referenceId ?? 'xendit_'.$xenditSubscriptionId,
+            'transaction_id' => $xenditSubscriptionId,
             'plan_name' => $subscription->plan_name,
-            'duration' => $metadata['duration'] ?? '1_month',
+            'duration' => $metadata['duration'] ?? ($metadata['months'] ? $metadata['months'].'_months' : '1_month'),
             'gross_amount' => $metadata['amount'] ?? 0,
             'currency' => $metadata['currency'] ?? 'IDR',
             'payment_type' => 'xendit_recurring',
             'status' => 'settlement',
             'transaction_time' => now(),
-            'metadata' => [
-                'xendit_data' => $data,
-            ],
+            'metadata' => ! empty($xenditData) ? ['xendit_data' => $xenditData] : null,
         ]);
 
-        Log::info('Xendit subscription activated and updated', [
+        Log::info('Xendit payment recorded in billing history', [
             'subscription_id' => $subscription->id,
-            'xendit_subscription_id' => $subscriptionId,
+            'transaction_id' => $xenditSubscriptionId,
         ]);
     }
 
