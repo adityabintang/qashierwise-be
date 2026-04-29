@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
+use App\Jobs\SendMetaCapiEvent;
 use App\Models\PosUser;
 use App\Models\Store;
 use App\Models\User;
@@ -92,6 +93,8 @@ class AuthController extends Controller
         $otp = $this->otpService->generate($user->email, 'email_verification');
         $user->notify(new SendOtpNotification($otp, 'email_verification', (int) config('otp.expiration_minutes')));
 
+        $this->dispatchCompleteRegistrationCapi($request, $user, $hasStore);
+
         // Create token with expiration (1 month)
         $expirationMinutes = (int) config('sanctum.expiration', 43200);
         $expiresAt = now()->addMinutes($expirationMinutes);
@@ -118,6 +121,37 @@ class AuthController extends Controller
             'token_type' => 'Bearer',
             'expires_at' => $expiresAt->toIso8601String(),
         ], 'messages.success.created', 201);
+    }
+
+    /**
+     * Send a CompleteRegistration event to Meta CAPI for the freshly created
+     * user. The event_id is the user's UUID-shaped string so the frontend can
+     * dedupe with a Pixel `track('CompleteRegistration', …, { eventID })`.
+     */
+    private function dispatchCompleteRegistrationCapi(Request $request, User $user, bool $hasStore): void
+    {
+        if (empty(config('services.meta.capi_token'))) {
+            return;
+        }
+
+        SendMetaCapiEvent::dispatch(
+            eventName: 'CompleteRegistration',
+            userData: [
+                'em' => $user->email,
+                'fn' => $user->name,
+                'external_id' => (string) $user->id,
+            ],
+            customData: [
+                'status' => $hasStore ? 'merchant_with_store' : 'user_only',
+                'content_name' => 'registration',
+            ],
+            eventId: 'reg_'.$user->id,
+            eventSourceUrl: $request->headers->get('referer') ?? $request->fullUrl(),
+            clientIp: $request->ip(),
+            clientUserAgent: $request->userAgent(),
+            fbp: $request->cookie('_fbp'),
+            fbc: $request->cookie('_fbc'),
+        );
     }
 
     /**
