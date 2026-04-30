@@ -85,7 +85,12 @@ return [
     'meta' => [
         'pixel_id' => env('META_PIXEL_ID'),
         'capi_token' => env('META_CAPI_TOKEN'),
-        'test_event_code' => env('META_TEST_EVENT_CODE'), // Optional: for testing events
+        'test_event_code' => env('META_TEST_EVENT_CODE'),
+    ],
+
+    'ml_tagging' => [
+        'url'                  => env('ML_TAGGING_URL', 'http://localhost:8000'),
+        'confidence_threshold' => env('ML_TAGGING_CONFIDENCE', 0.4),
     ],
 
 ];

@@ -187,6 +187,10 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::delete('/tags/{id}', [ContactTagController::class, 'destroy']);
         Route::post('/contacts/{id}/tags', [ContactTagController::class, 'assignTags']);
         Route::delete('/contacts/{id}/tags/{tagId}', [ContactTagController::class, 'removeTag']);
+
+        // Auto-tagging toggle
+        Route::get('/auto-tagging', [ContactTagController::class, 'getAutoTagging']);
+        Route::put('/auto-tagging', [ContactTagController::class, 'updateAutoTagging']);
     });
 
     // AI Agent routes

@@ -101,6 +101,7 @@ class ContactTagController extends Controller
 
     /**
      * Update an existing tag.
+     * System tags (is_system = true) cannot be modified by merchants.
      */
     public function update(Request $request, $id): JsonResponse
     {
@@ -128,6 +129,13 @@ class ContactTagController extends Controller
 
             // RLS global scope ensures tag belongs to user
             $tag = ContactTag::findOrFail($id);
+
+            if ($tag->is_system) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'System tags cannot be modified.',
+                ], 403);
+            }
 
             // Check for duplicate name if name is being changed
             if ($request->has('name') && $request->name !== $tag->name) {
@@ -180,6 +188,14 @@ class ContactTagController extends Controller
 
             // RLS global scope ensures tag belongs to user
             $tag = ContactTag::findOrFail($id);
+
+            if ($tag->is_system) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'System tags cannot be deleted.',
+                ], 403);
+            }
+
             $tag->delete();
 
             return response()->json([
@@ -247,6 +263,45 @@ class ContactTagController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Get auto-tagging status for the current user.
+     */
+    public function getAutoTagging(): JsonResponse
+    {
+        $user = auth()->user();
+        $effectiveUserId = $user->getEffectiveUserId();
+
+        $owner = \App\Models\User::find($effectiveUserId);
+
+        return response()->json([
+            'success' => true,
+            'data' => ['auto_tagging_enabled' => (bool) ($owner?->auto_tagging_enabled ?? false)],
+        ]);
+    }
+
+    /**
+     * Toggle auto-tagging on/off for the current user.
+     */
+    public function updateAutoTagging(Request $request): JsonResponse
+    {
+        $request->validate(['enabled' => 'required|boolean']);
+
+        $effectiveUserId = auth()->user()->getEffectiveUserId();
+        $owner = \App\Models\User::find($effectiveUserId);
+
+        if (! $owner) {
+            return response()->json(['success' => false, 'message' => 'User not found'], 404);
+        }
+
+        $owner->update(['auto_tagging_enabled' => $request->boolean('enabled')]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $request->boolean('enabled') ? 'Auto-tagging enabled' : 'Auto-tagging disabled',
+            'data' => ['auto_tagging_enabled' => $owner->auto_tagging_enabled],
+        ]);
     }
 
     /**

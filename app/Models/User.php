@@ -52,6 +52,7 @@ class User extends Authenticatable implements FilamentUser
         'language_preference',
         'is_master_admin',
         'slug',
+        'auto_tagging_enabled',
     ];
 
     /**
@@ -75,6 +76,7 @@ class User extends Authenticatable implements FilamentUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_master_admin' => 'boolean',
+            'auto_tagging_enabled' => 'boolean',
         ];
     }
 

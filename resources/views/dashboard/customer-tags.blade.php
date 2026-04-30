@@ -43,13 +43,37 @@
                                         </p>
                                     </div>
                                 </div>
-                                <button
-                                    @click="showCreateModal = true; tagForm = { name: '', color: '#a855f7' }; editingTag = null"
-                                    class="btn btn-primary btn-md gap-2"
-                                >
-                                    <i class="fas fa-plus"></i>
-                                    <span x-text="'{{ __('dashboard.create') }} Tag'"></span>
-                                </button>
+                                <div class="flex items-center gap-3">
+                                    <!-- Auto-tagging Toggle -->
+                                    <div class="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)]">
+                                        <div class="flex flex-col leading-tight">
+                                            <span class="text-xs font-semibold text-[hsl(var(--foreground))]">Auto-tagging</span>
+                                            <span class="text-[10px] text-[hsl(var(--muted-foreground))]" x-text="autoTaggingEnabled ? 'Aktif' : 'Nonaktif'"></span>
+                                        </div>
+                                        <button
+                                            @click="toggleAutoTagging()"
+                                            :disabled="autoTaggingLoading"
+                                            class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+                                            :class="autoTaggingEnabled ? 'bg-purple-500' : 'bg-[hsl(var(--muted))]'"
+                                            :title="autoTaggingEnabled ? 'Klik untuk nonaktifkan auto-tagging' : 'Klik untuk aktifkan auto-tagging'"
+                                        >
+                                            <span
+                                                class="inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                                                :class="autoTaggingEnabled ? 'translate-x-5' : 'translate-x-0'"
+                                            ></span>
+                                            <span x-show="autoTaggingLoading" class="absolute inset-0 flex items-center justify-center">
+                                                <i class="fas fa-spinner animate-spin text-[8px]" :class="autoTaggingEnabled ? 'text-white' : 'text-[hsl(var(--muted-foreground))]'"></i>
+                                            </span>
+                                        </button>
+                                    </div>
+                                    <button
+                                        @click="showCreateModal = true; tagForm = { name: '', color: '#a855f7' }; editingTag = null"
+                                        class="btn btn-primary btn-md gap-2"
+                                    >
+                                        <i class="fas fa-plus"></i>
+                                        <span x-text="'{{ __('dashboard.create') }} Tag'"></span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -415,6 +439,10 @@ function customerTagsApp() {
         searchQuery: '',
         activeFilterTag: null,
 
+        // Auto-tagging
+        autoTaggingEnabled: false,
+        autoTaggingLoading: false,
+
         // Modal state
         showCreateModal: false,
         showDeleteModal: false,
@@ -433,7 +461,7 @@ function customerTagsApp() {
 
         async init() {
             this.initSidebar();
-            await Promise.all([this.fetchTags(), this.fetchContacts()]);
+            await Promise.all([this.fetchTags(), this.fetchContacts(), this.fetchAutoTagging()]);
             this.loading = false;
         },
 
@@ -477,6 +505,32 @@ function customerTagsApp() {
                 this.contacts = data.data || [];
                 this.filterContacts();
             } catch (e) { console.error('Error fetching contacts:', e); }
+        },
+
+        async fetchAutoTagging() {
+            try {
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/auto-tagging`, {
+                    headers: { 'Authorization': `Bearer ${this.getToken()}` }
+                });
+                const data = await res.json();
+                this.autoTaggingEnabled = data.data?.auto_tagging_enabled ?? false;
+            } catch (e) { console.error('Error fetching auto-tagging setting:', e); }
+        },
+
+        async toggleAutoTagging() {
+            this.autoTaggingLoading = true;
+            try {
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/auto-tagging`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${this.getToken()}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: !this.autoTaggingEnabled })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.autoTaggingEnabled = data.data.auto_tagging_enabled;
+                }
+            } catch (e) { console.error('Error toggling auto-tagging:', e); }
+            finally { this.autoTaggingLoading = false; }
         },
 
         filterContacts() {

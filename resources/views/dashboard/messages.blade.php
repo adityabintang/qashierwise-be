@@ -1211,7 +1211,13 @@ function messagesManager() {
             } catch (e) { console.error('Error:', e); }
             finally { this.loadingMessages = false; }
         },
-        async refreshMessages() { await this.fetchMessages(); },
+        async refreshMessages() {
+            await Promise.all([this.fetchMessages(), this.updateContactsList()]);
+            if (this.selectedContact) {
+                const updated = this.contacts.find(c => c.id === this.selectedContact.id);
+                if (updated) this.selectedContact = updated;
+            }
+        },
 
         // Mark all messages from contact as read
         async markContactAsRead(contactId) {

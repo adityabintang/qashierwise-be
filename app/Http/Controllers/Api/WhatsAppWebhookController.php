@@ -365,6 +365,15 @@ class WhatsAppWebhookController extends Controller
             'contact_id' => $contact->id,
         ]);
 
+        // Auto-tag contact via ML service (text messages only, if enabled by merchant)
+        if ($type === 'text' && ! empty($content)) {
+            $owner = \App\Models\User::find($userId);
+            if ($owner && $owner->auto_tagging_enabled) {
+                \App\Jobs\AutoTagContactJob::dispatch($contact->id, $content)
+                    ->onQueue('default');
+            }
+        }
+
         // Check if AI Agent is active for this account
         $aiAgent = \App\Models\AiAgent::where('whatsapp_account_id', $whatsappAccount->id)
             ->where('is_active', true)

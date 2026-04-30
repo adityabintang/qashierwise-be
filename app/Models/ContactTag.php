@@ -21,7 +21,10 @@ class ContactTag extends Model
         static::addGlobalScope('userTags', function (Builder $builder) {
             if (auth()->check()) {
                 $userId = auth()->user()->getEffectiveUserId();
-                $builder->where('user_id', $userId);
+                // Include merchant's own tags AND shared system tags (user_id = null)
+                $builder->where(function ($q) use ($userId) {
+                    $q->where('user_id', $userId)->orWhere('is_system', true);
+                });
             } else {
                 $builder->whereRaw('1 = 0');
             }
@@ -32,6 +35,11 @@ class ContactTag extends Model
         'user_id',
         'name',
         'color',
+        'is_system',
+    ];
+
+    protected $casts = [
+        'is_system' => 'boolean',
     ];
 
     /**
@@ -50,6 +58,17 @@ class ContactTag extends Model
         '#ec4899', // pink
         '#f43f5e', // rose
         '#64748b', // slate
+    ];
+
+    /**
+     * System tags managed by ML auto-tagging — not editable by merchant.
+     */
+    public const SYSTEM_TAGS = [
+        ['name' => 'potential_buyer',   'color' => '#22c55e'],  // green
+        ['name' => 'inquiry',           'color' => '#3b82f6'],  // blue
+        ['name' => 'complaint',         'color' => '#ef4444'],  // red
+        ['name' => 'churning',          'color' => '#f97316'],  // orange
+        ['name' => 'feedback_positive', 'color' => '#a855f7'],  // purple
     ];
 
     public function user()
