@@ -80,8 +80,8 @@
                                 </div>
 
                                 <form @submit.prevent="submitWithdrawal" class="space-y-5">
-                                    <div>
-                                        <label class="block text-sm font-bold text-[hsl(var(--foreground))] mb-3">
+                                    <div class="space-y-4">
+                                        <label class="block text-sm font-bold text-[hsl(var(--foreground))]">
                                             <i class="fas fa-coins mr-2 text-purple-600"></i>Jumlah Withdrawal (Rp)
                                         </label>
                                         <div class="relative">
@@ -89,9 +89,9 @@
                                             <input type="number" x-model="withdrawalAmount" min="10000" :max="availableBalance"
                                                 class="input w-full pl-16 pr-4 py-4 text-xl font-bold border-2 focus:border-purple-500 rounded-xl" placeholder="10.000">
                                         </div>
-                                        <div class="flex items-center gap-2 mt-2 px-3 py-2 bg-purple-50 rounded-lg">
-                                            <i class="fas fa-info-circle text-purple-600 text-sm"></i>
-                                            <p class="text-xs text-purple-700 font-medium">Minimum withdrawal: Rp 10.000</p>
+                                        <div class="flex items-center gap-3 px-4 py-3 bg-purple-50 rounded-lg border border-purple-200">
+                                            <i class="fas fa-info-circle text-purple-600 flex-shrink-0"></i>
+                                            <p class="text-sm text-purple-700 font-medium">Minimum withdrawal: Rp 10.000</p>
                                         </div>
                                     </div>
 
