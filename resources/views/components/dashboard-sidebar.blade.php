@@ -183,6 +183,10 @@
                 </div>
             </div>
         </template>
+        <a href="/dashboard/sub-merchant/" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'sub-merchant' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('sub-merchant')">
+            <i class="fas fa-store w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Pengaturan QRIS</span>
+        </a>
         <a href="/dashboard/sub-merchant/qris" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'sub-merchant-qris' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('sub-merchant')">
             <i class="fas fa-qrcode w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_generate_qris') }}</span>
