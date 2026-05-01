@@ -47,6 +47,7 @@ class OrderController extends Controller
             ->whereHas('store', fn ($q) => $q->where('user_id', $effectiveUserId))
             ->when($request->input('store_id'), fn ($q, $storeId) => $q->where('store_id', $storeId))
             ->when($request->input('status'), fn ($q, $status) => $q->where('status', $status))
+            ->when($request->input('delivery_type'), fn ($q, $type) => $q->where('delivery_type', $type))
             ->when($search, fn ($q) => $q->where('order_number', 'like', '%'.$search.'%')
             )
             ->orderBy('created_at', 'desc')

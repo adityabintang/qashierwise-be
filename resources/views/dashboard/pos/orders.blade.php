@@ -18,12 +18,26 @@
                         <h2 class="text-lg font-semibold">Sales Orders</h2>
                         <p class="text-sm text-[hsl(var(--muted-foreground))] hidden sm:block">Create and manage customer orders</p>
                     </div>
-                    <template x-if="hasPermission('create_orders') || hasPermission('manage_orders')">
-                        <button @click="openCreateModal()" class="btn btn-primary btn-md">
-                            <i class="fas fa-plus"></i>
-                            <span>New Order</span>
-                        </button>
-                    </template>
+                    <div class="flex items-center gap-3">
+                        <!-- Delivery / Pickup Toggle -->
+                        <div class="flex items-center bg-[hsl(var(--muted)/0.6)] rounded-lg p-1 gap-1">
+                            <button @click="setViewMode('all')" class="px-3 py-1.5 rounded-md text-sm font-medium transition-all" :class="viewMode === 'all' ? 'bg-white shadow text-[hsl(var(--foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'">
+                                Semua
+                            </button>
+                            <button @click="setViewMode('pickup')" class="px-3 py-1.5 rounded-md text-sm font-medium transition-all" :class="viewMode === 'pickup' ? 'bg-white shadow text-emerald-700' : 'text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'">
+                                <i class="fas fa-store mr-1"></i>Pickup
+                            </button>
+                            <button @click="setViewMode('delivery')" class="px-3 py-1.5 rounded-md text-sm font-medium transition-all" :class="viewMode === 'delivery' ? 'bg-white shadow text-orange-600' : 'text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'">
+                                <i class="fas fa-truck mr-1"></i>Delivery
+                            </button>
+                        </div>
+                        <template x-if="hasPermission('create_orders') || hasPermission('manage_orders')">
+                            <button @click="openCreateModal()" class="btn btn-primary btn-md">
+                                <i class="fas fa-plus"></i>
+                                <span>New Order</span>
+                            </button>
+                        </template>
+                    </div>
                 </div>
 
                 <!-- Filters -->
@@ -99,7 +113,8 @@
                 <!-- Desktop Table View -->
                 <div class="hidden lg:block card overflow-hidden">
                     <div class="overflow-x-auto">
-                        <table class="w-full">
+                        <!-- Pickup / All Table -->
+                        <table x-show="viewMode !== 'delivery'" class="w-full">
                             <thead class="bg-[hsl(var(--muted)/0.5)]">
                                 <tr>
                                     <th class="text-left p-4 text-sm font-medium text-[hsl(var(--muted-foreground))]">Order #</th>
@@ -134,6 +149,70 @@
                                             <td class="p-4 text-sm" x-text="order.store?.name || '-'"></td>
                                             <td class="p-4 text-sm" x-text="order.table?.number ? 'Table ' + order.table.number : '-'"></td>
                                             <td class="p-4 text-right text-sm" x-text="order.items?.length || 0"></td>
+                                            <td class="p-4 text-right font-medium" x-text="formatCurrency(order.total)"></td>
+                                            <td class="p-4 text-center">
+                                                <span class="badge text-xs" :class="getStatusClass(order.status)" x-text="order.status"></span>
+                                            </td>
+                                            <td class="p-4 text-sm text-[hsl(var(--muted-foreground))]" x-text="formatDate(order.created_at)"></td>
+                                            <td class="p-4 text-right">
+                                                <div class="flex items-center justify-end gap-2">
+                                                    <button @click="viewOrder(order)" class="btn btn-ghost btn-sm"><i class="fas fa-eye"></i></button>
+                                                    <template x-if="order.status === 'pending'">
+                                                        <button @click="cancelOrder(order)" class="btn btn-ghost btn-sm text-red-600"><i class="fas fa-times"></i></button>
+                                                    </template>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </template>
+                            </tbody>
+                        </table>
+
+                        <!-- Delivery Table -->
+                        <table x-show="viewMode === 'delivery'" class="w-full">
+                            <thead class="bg-[hsl(var(--muted)/0.5)]">
+                                <tr>
+                                    <th class="text-left p-4 text-sm font-medium text-[hsl(var(--muted-foreground))]">Order #</th>
+                                    <th class="text-left p-4 text-sm font-medium text-[hsl(var(--muted-foreground))]">Store</th>
+                                    <th class="text-left p-4 text-sm font-medium text-[hsl(var(--muted-foreground))]">Alamat</th>
+                                    <th class="text-left p-4 text-sm font-medium text-[hsl(var(--muted-foreground))]">Catatan</th>
+                                    <th class="text-right p-4 text-sm font-medium text-[hsl(var(--muted-foreground))]">Total</th>
+                                    <th class="text-center p-4 text-sm font-medium text-[hsl(var(--muted-foreground))]">Status</th>
+                                    <th class="text-left p-4 text-sm font-medium text-[hsl(var(--muted-foreground))]">Date</th>
+                                    <th class="text-right p-4 text-sm font-medium text-[hsl(var(--muted-foreground))]">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-[hsl(var(--border))]">
+                                <template x-if="loading">
+                                    <template x-for="i in 5" :key="'del-skeleton-'+i">
+                                        <tr>
+                                            <td class="p-4"><div class="skeleton h-4 w-20"></div></td>
+                                            <td class="p-4"><div class="skeleton h-4 w-24"></div></td>
+                                            <td class="p-4"><div class="skeleton h-4 w-40"></div></td>
+                                            <td class="p-4"><div class="skeleton h-4 w-32"></div></td>
+                                            <td class="p-4"><div class="skeleton h-4 w-20 ml-auto"></div></td>
+                                            <td class="p-4"><div class="skeleton h-6 w-16 mx-auto rounded-full"></div></td>
+                                            <td class="p-4"><div class="skeleton h-4 w-24"></div></td>
+                                            <td class="p-4"><div class="skeleton h-8 w-24 ml-auto"></div></td>
+                                        </tr>
+                                    </template>
+                                </template>
+                                <template x-if="!loading">
+                                    <template x-for="order in orders" :key="order.id">
+                                        <tr class="hover:bg-[hsl(var(--muted)/0.3)] transition-colors">
+                                            <td class="p-4 font-medium" x-text="'#' + order.order_number"></td>
+                                            <td class="p-4 text-sm" x-text="order.store?.name || '-'"></td>
+                                            <td class="p-4 text-sm max-w-[200px]">
+                                                <span x-text="order.alamat || '-'" class="block truncate cursor-default"
+                                                    @mouseenter="showTooltip($el, order.alamat, 'Alamat')"
+                                                    @mouseleave="hideTooltip()"></span>
+                                            </td>
+                                            <td class="p-4 text-sm max-w-[180px]">
+                                                <span x-text="order.catatan || '-'"
+                                                    :class="order.catatan ? 'block truncate text-amber-700 bg-amber-50 px-2 py-0.5 rounded cursor-default' : 'text-[hsl(var(--muted-foreground))]'"
+                                                    @mouseenter="showTooltip($el, order.catatan, 'Catatan')"
+                                                    @mouseleave="hideTooltip()"></span>
+                                            </td>
                                             <td class="p-4 text-right font-medium" x-text="formatCurrency(order.total)"></td>
                                             <td class="p-4 text-center">
                                                 <span class="badge text-xs" :class="getStatusClass(order.status)" x-text="order.status"></span>
@@ -317,6 +396,17 @@
         </div>
     </div>
 
+    <!-- Global Tooltip -->
+    <div x-show="tooltip.show" x-cloak
+        :style="`position:fixed;left:${tooltip.x}px;top:${tooltip.y}px;transform:translateY(-100%);z-index:9999;pointer-events:auto`"
+        @mouseenter="tooltip.show=true" @mouseleave="tooltip.show=false"
+        class="max-w-xs bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl"
+        style="white-space:pre-wrap;word-break:break-word;">
+        <div class="font-medium text-gray-400 mb-1" x-text="tooltip.label"></div>
+        <span x-text="tooltip.text"></span>
+        <div class="absolute top-full left-4 border-4 border-transparent border-t-gray-900"></div>
+    </div>
+
     <!-- View Order Modal -->
     <div x-show="showViewModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4">
         <div x-show="showViewModal" x-transition class="fixed inset-0 bg-black/50" @click="closeViewModal()"></div>
@@ -391,6 +481,7 @@ function ordersApp() {
         loading: true, creating: false,
         orders: [], stores: [], tables: [], products: [], orderItems: [],
         search: '', statusFilter: '', storeFilter: '', productSearch: '',
+        viewMode: 'all',
         showCreateModal: false, showViewModal: false,
         selectedOrder: null,
         createForm: { store_id: '', table_id: '', delivery_type: 'pickup', alamat: '', ongkir: 0, catatan: '' },
@@ -464,6 +555,8 @@ function ordersApp() {
                 if (this.search) params.append('search', this.search);
                 if (this.statusFilter) params.append('status', this.statusFilter);
                 if (this.storeFilter) params.append('store_id', this.storeFilter);
+                if (this.viewMode === 'delivery') params.append('delivery_type', 'delivery');
+                else if (this.viewMode === 'pickup') params.append('delivery_type', 'pickup');
                 const res = await fetch(`${this.API_BASE_URL}/orders?${params}`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
                 const data = await res.json();
                 if (data.success) {
@@ -507,6 +600,7 @@ function ordersApp() {
             return this.products.filter(p => p.name.toLowerCase().includes(search));
         },
 
+        setViewMode(mode) { this.viewMode = mode; this.pagination.currentPage = 1; this.fetchOrders(); },
         get paginationPages() { const p = [], c = this.pagination.currentPage, l = this.pagination.lastPage; for (let i = Math.max(1, c - 2); i <= Math.min(l, c + 2); i++) p.push(i); return p; },
         goToPage(page) { if (page >= 1 && page <= this.pagination.lastPage) { this.pagination.currentPage = page; this.fetchOrders(); } },
         formatCurrency(a) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(a || 0); },
@@ -580,6 +674,14 @@ function ordersApp() {
                 if (data.success) { await this.fetchOrders(); } else { alert(data.message || 'Failed'); }
             } catch (e) { console.error('Error:', e); alert('Failed'); }
         },
+
+        tooltip: { show: false, text: '', label: '', x: 0, y: 0 },
+        showTooltip(el, text, label) {
+            if (!text) return;
+            const r = el.getBoundingClientRect();
+            this.tooltip = { show: true, text, label, x: r.left, y: r.top - 8 };
+        },
+        hideTooltip() { this.tooltip.show = false; },
 
         logout() { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/login'; },
         addNotification() {}, clearNotifications() {}, removeNotification() {}, formatNotificationTime() { return ''; }

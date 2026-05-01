@@ -586,9 +586,22 @@ class AiAgentService
                         'properties' => [
                             'delivery_type' => ['type' => 'string', 'description' => 'pickup or delivery'],
                             'address' => ['type' => 'string', 'description' => 'Delivery address (only for delivery)'],
-                            'notes' => ['type' => 'string', 'description' => 'Optional order notes/catatan'],
                         ],
                         'required' => ['delivery_type'],
+                    ],
+                ],
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'set_order_notes',
+                    'description' => 'Save special instructions/catatan from customer. Call when user provides notes or says "tidak ada".',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'notes' => ['type' => 'string', 'description' => 'Customer notes, e.g. tidak pedas, tanpa bawang. Use empty string if customer has no notes.'],
+                        ],
+                        'required' => ['notes'],
                     ],
                 ],
             ],
@@ -798,7 +811,7 @@ class AiAgentService
             if (in_array($functionName, ['search_products', 'search_multiple_products', 'get_all_products'])) {
                 $hasSearchCall = true;
             }
-            if (in_array($functionName, ['add_to_cart', 'confirm_order', 'get_cart_summary', 'generate_qris', 'check_payment_status', 'remove_from_cart', 'clear_cart', 'set_delivery_type'])) {
+            if (in_array($functionName, ['add_to_cart', 'confirm_order', 'get_cart_summary', 'generate_qris', 'check_payment_status', 'remove_from_cart', 'clear_cart', 'set_delivery_type', 'set_order_notes'])) {
                 $hasFinalAction = true;
             }
 
@@ -1327,6 +1340,9 @@ class AiAgentService
 
                 case 'set_delivery_type':
                     return $this->setDeliveryType($conversation, $arguments, $aiAgent);
+
+                case 'set_order_notes':
+                    return $this->setOrderNotes($conversation, $arguments);
 
                 case 'remove_from_cart':
                     if (! isset($arguments['product_name'])) {
@@ -2131,21 +2147,11 @@ class AiAgentService
             if ($address) {
                 $conversation->setDeliveryAddress($address);
             }
-            $notes = $arguments['notes'] ?? null;
-            if ($notes) {
-                $conversation->setDeliveryNotes($notes);
-            }
-        } else {
-            $notes = $arguments['notes'] ?? null;
-            if ($notes) {
-                $conversation->setDeliveryNotes($notes);
-            }
         }
         $conversation->setOngkir($ongkir);
 
         if ($deliveryType === 'delivery') {
             $address = $arguments['address'] ?? null;
-            $notes = $arguments['notes'] ?? null;
             $formattedOngkir = 'Rp '.number_format($ongkir, 0, ',', '.');
 
             $response = "✅ Delivery dipilih.\n";
@@ -2153,18 +2159,37 @@ class AiAgentService
                 $response .= "📍 Alamat: {$address}\n";
             }
             $response .= "🚚 Ongkir: {$formattedOngkir}\n";
-            if ($notes) {
-                $response .= "📝 Catatan: {$notes}\n";
-            }
 
             if (! $address) {
-                $response .= "\nSilakan kirim alamat pengiriman.";
+                $response .= "\nSilakan kirim alamat pengiriman Anda.";
+
+                return $response;
             }
+
+            $response .= "\nAda catatan khusus untuk pesanan? (contoh: tidak pedas, tanpa bawang)\nKetik 'tidak ada' jika tidak ada catatan.";
 
             return $response;
         }
 
-        return '✅ Pickup dipilih. Ongkir: Rp 0.';
+        $response = "✅ Pickup dipilih. Ongkir: Rp 0.\n\n";
+        $response .= "Ada catatan khusus untuk pesanan? (contoh: tidak pedas, tanpa bawang)\nKetik 'tidak ada' jika tidak ada catatan.";
+
+        return $response;
+    }
+
+    protected function setOrderNotes(AiAgentConversation $conversation, array $arguments): string
+    {
+        $notes = trim($arguments['notes'] ?? '');
+
+        if ($notes === '' || strtolower($notes) === 'tidak ada') {
+            $conversation->setDeliveryNotes(null);
+
+            return "✅ Tidak ada catatan khusus.\n\nKetik 'konfirmasi' untuk melanjutkan checkout.";
+        }
+
+        $conversation->setDeliveryNotes($notes);
+
+        return "📝 Catatan tersimpan: {$notes}\n\nKetik 'konfirmasi' untuk melanjutkan checkout.";
     }
 
     /**
@@ -2332,26 +2357,49 @@ class AiAgentService
         try {
             $qrisTransaction = $conversation->getCurrentQrisTransaction();
 
+            // currentQrisTransaction is null when clearPaymentContext() was already called
+            // (e.g. after webhook fires). Fall back to last_qris_transaction_id in order_context.
+            if (! $qrisTransaction) {
+                $lastId = $conversation->order_context['last_qris_transaction_id'] ?? null;
+                if ($lastId) {
+                    $qrisTransaction = QrisTransaction::find($lastId);
+                }
+            }
+
             if (! $qrisTransaction) {
                 return 'Tidak ada pembayaran yang sedang diproses. Silakan buat pesanan terlebih dahulu.';
             }
 
-            // Refresh from database
+            // Refresh from database to get latest status
             $qrisTransaction->refresh();
 
             $formattedAmount = 'Rp '.number_format($qrisTransaction->amount, 0, ',', '.');
 
             switch ($qrisTransaction->status) {
                 case QrisTransaction::STATUS_SETTLEMENT:
-                    // Clear payment context after successful payment
+                    // Build confirmation message with delivery info
+                    $response = "✅ Pembayaran Berhasil!\n\n";
+                    $response .= "Jumlah: {$formattedAmount}\n";
+                    $response .= "No. Transaksi: {$qrisTransaction->order_id}\n\n";
+
+                    $deliveryType = $conversation->order_context['delivery_type'] ?? null;
+                    if ($deliveryType === Order::DELIVERY_TYPE_DELIVERY) {
+                        $address = $conversation->order_context['delivery_address'] ?? null;
+                        $response .= "🚚 Pesanan Anda sedang disiapkan dan akan segera diantar";
+                        if ($address) {
+                            $response .= " ke:\n📍 {$address}";
+                        }
+                        $response .= "\n\nMohon siapkan diri untuk menerima pesanan. Terima kasih! 🙏";
+                    } else {
+                        $response .= "Pesanan Anda sedang diproses. Terima kasih atas pembayaran Anda! 🙏";
+                    }
+
+                    // Clear payment context so it's not double-counted
                     $conversation->clearPaymentContext();
                     $conversation->clearCart();
                     $conversation->clearPendingOrder();
 
-                    return "✅ Pembayaran Berhasil!\n\n".
-                           "Jumlah: {$formattedAmount}\n".
-                           "No. Transaksi: {$qrisTransaction->order_id}\n\n".
-                           'Terima kasih atas pembayaran Anda! Pesanan sedang diproses. 🙏';
+                    return $response;
 
                 case QrisTransaction::STATUS_PENDING:
                     if ($qrisTransaction->isExpired()) {
@@ -2654,7 +2702,17 @@ class AiAgentService
                 $message .= "No. Pesanan: {$order->order_number}\n";
             }
 
-            $message .= "\nTerima kasih atas pembayaran Anda! Pesanan sedang diproses. 🙏";
+            $deliveryType = $conversation->order_context['delivery_type'] ?? null;
+            if ($deliveryType === Order::DELIVERY_TYPE_DELIVERY) {
+                $address = $conversation->order_context['delivery_address'] ?? null;
+                $message .= "\n🚚 Pesanan Anda sedang disiapkan dan akan segera diantar";
+                if ($address) {
+                    $message .= " ke:\n📍 {$address}";
+                }
+                $message .= "\n\nMohon siapkan diri untuk menerima pesanan. Terima kasih! 🙏";
+            } else {
+                $message .= "\nTerima kasih atas pembayaran Anda! Pesanan sedang diproses. 🙏";
+            }
 
             // Send WhatsApp message
             $this->sendReply($account, $contact->wa_id, $message);

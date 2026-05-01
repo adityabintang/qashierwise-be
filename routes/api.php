@@ -198,6 +198,7 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::put('/toggle-delivery', [AiAgentController::class, 'toggleDelivery']);
         Route::put('/toggle-qris', [AiAgentController::class, 'toggleQris']);
         Route::post('/test', [AiAgentController::class, 'test']);
+        Route::post('/test/stream', [AiAgentController::class, 'testStream']);
         Route::delete('/conversations/test', [AiAgentController::class, 'clearTestConversation']);
         Route::delete('/conversations/{contactId}', [AiAgentController::class, 'clearConversation']);
     });

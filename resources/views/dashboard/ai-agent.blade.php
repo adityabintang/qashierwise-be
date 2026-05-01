@@ -1,6 +1,16 @@
 @extends('layouts.app')
 @include('components.dashboard-scripts')
 
+@push('styles')
+<style>
+/* Markdown rendering inside test-chat assistant bubbles */
+.prose-chat strong { font-weight: 600; }
+.prose-chat em     { font-style: italic; }
+.prose-chat li     { display: list-item; margin-left: 1.25rem; list-style-type: disc; }
+.prose-chat code   { font-family: ui-monospace, monospace; font-size: 0.75rem; }
+</style>
+@endpush
+
 @section('title', __('dashboard.ai_agent_title'))
 
 @section('content')
@@ -555,13 +565,27 @@
                 <!-- Messages -->
                 <template x-for="(msg, index) in testMessages" :key="index">
                     <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
-                        <div :class="msg.role === 'user' ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-800'" class="rounded-lg px-4 py-2 max-w-[80%]">
-                            <p class="text-sm whitespace-pre-wrap" x-text="msg.content"></p>
-                        </div>
+                        <!-- User bubble: plain text, no markdown -->
+                        <template x-if="msg.role === 'user'">
+                            <div class="bg-purple-500 text-white rounded-lg px-4 py-2 max-w-[80%]">
+                                <p class="text-sm whitespace-pre-wrap" x-text="msg.content"></p>
+                            </div>
+                        </template>
+                        <!-- Assistant bubble: render markdown as HTML -->
+                        <template x-if="msg.role === 'assistant'">
+                            <div class="bg-gray-100 text-gray-800 rounded-lg px-4 py-2 max-w-[80%]">
+                                <div class="text-sm prose-chat" x-html="parseMarkdown(msg.content)"></div>
+                                <!-- blinking cursor while streaming -->
+                                <span
+                                    x-show="msg.streaming"
+                                    class="inline-block w-0.5 h-3.5 bg-gray-500 ml-0.5 align-middle animate-pulse"
+                                ></span>
+                            </div>
+                        </template>
                     </div>
                 </template>
 
-                <!-- Loading State -->
+                <!-- Initial loading spinner (shown before first token arrives) -->
                 <div x-show="testLoading" class="flex justify-start">
                     <div class="bg-gray-100 rounded-lg px-4 py-2">
                         <i class="fas fa-spinner animate-spin text-gray-500"></i>
@@ -894,42 +918,120 @@ function aiAgentApp() {
             this.testInput = '';
             this.testLoading = true;
 
-            // Scroll to bottom
-            this.$nextTick(() => {
-                const chatArea = document.getElementById('testChatArea');
-                if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
-            });
+            const scrollToBottom = () => {
+                this.$nextTick(() => {
+                    const chatArea = document.getElementById('testChatArea');
+                    if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
+                });
+            };
+            scrollToBottom();
 
             const token = localStorage.getItem('token');
 
             try {
-                const response = await fetch('/api/ai-agent/test', {
+                const response = await fetch('/api/ai-agent/test/stream', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json',
+                        'Accept': 'text/event-stream',
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({ message }),
                 });
 
-                const data = await response.json();
-
-                if (data.success) {
-                    this.testMessages.push({ role: 'assistant', content: data.data.ai_response });
-                } else {
-                    this.testMessages.push({ role: 'assistant', content: 'Error: ' + (data.message || 'Failed to get response') });
+                if (!response.ok || !response.body) {
+                    throw new Error('Stream unavailable (HTTP ' + response.status + ')');
                 }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                // Add empty assistant bubble that will be filled token by token
+                const bubbleIndex = this.testMessages.length;
+                this.testMessages.push({ role: 'assistant', content: '', streaming: true });
+                this.testLoading = false; // hide spinner once bubble is visible
+                scrollToBottom();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // keep incomplete line
+
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        let event;
+                        try { event = JSON.parse(line.slice(6)); } catch { continue; }
+
+                        if (event.type === 'token') {
+                            this.testMessages[bubbleIndex].content += event.content;
+                            scrollToBottom();
+                        } else if (event.type === 'done') {
+                            this.testMessages[bubbleIndex].streaming = false;
+                            scrollToBottom();
+                        } else if (event.type === 'error') {
+                            this.testMessages[bubbleIndex].content = 'Error: ' + event.message;
+                            this.testMessages[bubbleIndex].streaming = false;
+                        }
+                    }
+                }
+
+                // Ensure streaming flag is cleared if stream ended without 'done' event
+                if (this.testMessages[bubbleIndex]?.streaming) {
+                    this.testMessages[bubbleIndex].streaming = false;
+                }
+
             } catch (error) {
-                console.error('Test error:', error);
-                this.testMessages.push({ role: 'assistant', content: 'Error: Failed to connect to AI Agent' });
+                console.error('Test stream error:', error);
+                this.testMessages.push({ role: 'assistant', content: 'Error: Gagal terhubung ke AI Agent', streaming: false });
+                scrollToBottom();
             } finally {
                 this.testLoading = false;
-                this.$nextTick(() => {
-                    const chatArea = document.getElementById('testChatArea');
-                    if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
-                });
             }
+        },
+
+        /**
+         * Convert a subset of Markdown to safe HTML for the chat bubble.
+         * Only processes: bold, italic, inline code, headings, bullet lists, newlines.
+         * HTML-escapes the input first to prevent XSS.
+         */
+        parseMarkdown(text) {
+            if (!text) return '';
+
+            // 1. Escape HTML entities to prevent XSS
+            let html = text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+
+            // 2. Headings (### ## #) — before bold so # isn't confused
+            html = html.replace(/^### (.+)$/gm, '<strong class="block text-sm">$1</strong>');
+            html = html.replace(/^## (.+)$/gm,  '<strong class="block text-sm">$1</strong>');
+            html = html.replace(/^# (.+)$/gm,   '<strong class="block text-sm">$1</strong>');
+
+            // 3. Bold **text** or __text__
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/__(.+?)__/g,     '<strong>$1</strong>');
+
+            // 4. Italic *text* or _text_ (single, not double)
+            html = html.replace(/\*([^*\n]+?)\*/g, '<em>$1</em>');
+            html = html.replace(/_([^_\n]+?)_/g,   '<em>$1</em>');
+
+            // 5. Inline code `text`
+            html = html.replace(/`([^`]+)`/g, '<code class="bg-gray-200 rounded px-1 text-xs font-mono">$1</code>');
+
+            // 6. Bullet list items (- item or • item at line start)
+            html = html.replace(/^[ \t]*[-•]\s+(.+)$/gm, '<li class="ml-4 list-disc">$1</li>');
+
+            // 7. Newlines → <br> (but collapse consecutive <br> after list items)
+            html = html.replace(/\n/g, '<br>');
+            html = html.replace(/(<\/li>)<br>/g, '$1');
+
+            return html;
         },
 
         showNotification(message, type = 'info') {

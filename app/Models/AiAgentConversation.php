@@ -193,10 +193,17 @@ class AiAgentConversation extends Model
 
     /**
      * Set the current QRIS transaction for this conversation.
+     * Also stores the ID in order_context so it can be recovered
+     * if clearPaymentContext() is called before the user checks status.
      */
     public function setCurrentQrisTransaction(int $transactionId): void
     {
         $this->current_qris_transaction_id = $transactionId;
+
+        $orderContext = $this->order_context ?? [];
+        $orderContext['last_qris_transaction_id'] = $transactionId;
+        $this->order_context = $orderContext;
+
         $this->save();
     }
 

@@ -20,6 +20,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AiAgentController extends Controller
 {
@@ -548,6 +549,131 @@ class AiAgentController extends Controller
     }
 
     /**
+     * Test AI Agent with streaming SSE response (word-by-word typing effect).
+     * Same logic as test(), but streams the response incrementally.
+     */
+    public function testStream(Request $request): StreamedResponse
+    {
+        $request->validate([
+            'message' => 'required|string',
+        ]);
+
+        // Resolve everything before entering the stream closure
+        try {
+            $userId = auth()->user()->getEffectiveUserId();
+
+            $whatsappAccount = WhatsAppAccount::where('user_id', $userId)->first();
+            if (! $whatsappAccount) {
+                return $this->sseError('WhatsApp account not connected');
+            }
+
+            $aiAgent = AiAgent::where('whatsapp_account_id', $whatsappAccount->id)
+                ->where('is_active', true)
+                ->first();
+            if (! $aiAgent) {
+                return $this->sseError('AI Agent not configured or not active');
+            }
+
+            $testContact = WhatsAppContact::withoutGlobalScopes()->firstOrCreate(
+                [
+                    'user_id' => $userId,
+                    'wa_id' => 'test_user_'.$userId,
+                    'phone_number_id' => $whatsappAccount->phone_number_id,
+                ],
+                ['name' => 'Test Contact']
+            );
+
+            $conversation = $this->aiAgentService->getOrCreateConversation(
+                $aiAgent->id,
+                $testContact->id
+            );
+
+            $conversation->addMessage('human', $request->message);
+
+            // Hard guard: block order flow when ordering is disabled
+            if (! $aiAgent->isOrderEnabled() && $this->aiAgentService->isOrderMenuIntent($request->message)) {
+                $responseContent = $this->aiAgentService->getOrderDisabledMessage($aiAgent);
+                $conversation->addMessage('ai', $responseContent);
+
+                return $this->sseStream($responseContent);
+            }
+
+            $userIntent = UserIntent::detect($request->message);
+            $systemPrompt = $aiAgent->buildSystemPrompt($userId, $request->message);
+            $tools = $this->intentNeedsTools($userIntent)
+                ? $this->getTestToolDefinitions($aiAgent)
+                : null;
+
+            $response = $this->aiAgentService->callLLM(
+                $systemPrompt,
+                $conversation->messages ?? [],
+                $tools,
+                $aiAgent
+            );
+
+            $responseContent = isset($response['tool_calls'])
+                ? $this->handleTestToolCalls($response['tool_calls'], $userId, $conversation, $aiAgent)
+                : ($response['content'] ?? 'No response generated');
+
+            $conversation->addMessage('ai', $responseContent);
+
+        } catch (\Exception $e) {
+            Log::error('Test AI Agent stream failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->sseError('Failed to process message: '.$e->getMessage());
+        }
+
+        return $this->sseStream($responseContent);
+    }
+
+    /** Stream $text word-by-word as Server-Sent Events. */
+    private function sseStream(string $text): StreamedResponse
+    {
+        return response()->stream(function () use ($text) {
+            // Disable output buffering so chunks reach the browser immediately
+            if (ob_get_level()) {
+                ob_end_clean();
+            }
+
+            // Split into words, preserving the space after each word
+            $words = preg_split('/(\s+)/', $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+
+            foreach ($words as $word) {
+                echo 'data: '.json_encode(['type' => 'token', 'content' => $word])."\n\n";
+                flush();
+                usleep(30000); // 30 ms between tokens — adjust for feel
+            }
+
+            echo 'data: '.json_encode(['type' => 'done'])."\n\n";
+            flush();
+        }, 200, [
+            'Content-Type'      => 'text/event-stream',
+            'Cache-Control'     => 'no-cache, no-store',
+            'X-Accel-Buffering' => 'no',  // disable nginx buffering
+            'Connection'        => 'keep-alive',
+        ]);
+    }
+
+    /** Return an immediate SSE stream that sends a single error event. */
+    private function sseError(string $message): StreamedResponse
+    {
+        return response()->stream(function () use ($message) {
+            if (ob_get_level()) {
+                ob_end_clean();
+            }
+            echo 'data: '.json_encode(['type' => 'error', 'message' => $message])."\n\n";
+            flush();
+        }, 200, [
+            'Content-Type'      => 'text/event-stream',
+            'Cache-Control'     => 'no-cache, no-store',
+            'X-Accel-Buffering' => 'no',
+            'Connection'        => 'keep-alive',
+        ]);
+    }
+
+    /**
      * Check if user intent requires tools to be loaded.
      * Greeting, off-topic, and business info intents don't need tools.
      * This saves ~500-800 tokens per request for simple messages.
@@ -672,9 +798,23 @@ class AiAgentController extends Controller
                                 'enum' => ['pickup', 'delivery'],
                             ],
                             'address' => ['type' => 'string'],
-                            'notes' => ['type' => 'string'],
                         ],
                         'required' => ['delivery_type'],
+                    ],
+                ],
+            ];
+
+            $tools[] = [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'set_order_notes',
+                    'description' => 'Save special instructions/catatan. Call when user provides notes or says "tidak ada".',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'notes' => ['type' => 'string', 'description' => 'Customer notes. Use empty string if no notes.'],
+                        ],
+                        'required' => ['notes'],
                     ],
                 ],
             ];
@@ -831,9 +971,11 @@ class AiAgentController extends Controller
                         $conversation,
                         $aiAgent,
                         $arguments['delivery_type'],
-                        $arguments['address'] ?? null,
-                        $arguments['notes'] ?? null
+                        $arguments['address'] ?? null
                     );
+
+                case 'set_order_notes':
+                    return $this->setOrderNotes($conversation, $arguments['notes'] ?? '');
 
                 case 'generate_qris':
                     if (! isset($arguments['amount'])) {
@@ -949,43 +1091,73 @@ class AiAgentController extends Controller
         try {
             $qrisTransaction = $conversation->getCurrentQrisTransaction();
 
+            // currentQrisTransaction is null when clearPaymentContext() was already called
+            // (e.g. after webhook fires). Fall back to last_qris_transaction_id in order_context.
             if (! $qrisTransaction) {
-                return 'Tidak ada pembayaran yang sedang diproses.';
+                $lastId = $conversation->order_context['last_qris_transaction_id'] ?? null;
+                if ($lastId) {
+                    $qrisTransaction = QrisTransaction::find($lastId);
+                }
             }
 
-            // Refresh from database
+            if (! $qrisTransaction) {
+                return 'Tidak ada pembayaran yang sedang diproses. Silakan buat pesanan terlebih dahulu.';
+            }
+
+            // Refresh from database to get latest status
             $qrisTransaction->refresh();
 
             $formattedAmount = 'Rp '.number_format($qrisTransaction->amount, 0, ',', '.');
 
             switch ($qrisTransaction->status) {
                 case QrisTransaction::STATUS_SETTLEMENT:
-                    return "✅ Pembayaran Berhasil!\n\n".
-                           "Jumlah: {$formattedAmount}\n".
-                           "No. Transaksi: {$qrisTransaction->order_id}";
+                    // Build confirmation message with delivery info
+                    $response = "✅ Pembayaran Berhasil!\n\n";
+                    $response .= "Jumlah: {$formattedAmount}\n";
+                    $response .= "No. Transaksi: {$qrisTransaction->order_id}\n\n";
+
+                    // Add delivery-specific confirmation
+                    $deliveryType = $conversation->order_context['delivery_type'] ?? null;
+                    if ($deliveryType === Order::DELIVERY_TYPE_DELIVERY) {
+                        $address = $conversation->order_context['delivery_address'] ?? null;
+                        $response .= "🚚 Pesanan Anda sedang disiapkan dan akan segera diantar";
+                        if ($address) {
+                            $response .= " ke:\n📍 {$address}";
+                        }
+                        $response .= "\n\n";
+                        $response .= "Mohon siapkan diri untuk menerima pesanan. Terima kasih! 🙏";
+                    } else {
+                        $response .= "Pesanan Anda sedang diproses. Terima kasih! 🙏";
+                    }
+
+                    // Clear payment context so it's not double-counted
+                    $conversation->clearPaymentContext();
+
+                    return $response;
 
                 case QrisTransaction::STATUS_PENDING:
                     if ($qrisTransaction->isExpired()) {
-                        return '⏰ Kode pembayaran sudah kadaluarsa.';
+                        return '⏰ Kode pembayaran sudah kadaluarsa. Ketik \'buat qris baru\' untuk melanjutkan.';
                     }
                     $remainingMinutes = ceil($qrisTransaction->getRemainingTimeInSeconds() / 60);
 
                     return "⏳ Pembayaran Menunggu\n\n".
                            "Jumlah: {$formattedAmount}\n".
-                           "Sisa waktu: {$remainingMinutes} menit";
+                           "Sisa waktu: {$remainingMinutes} menit\n\n".
+                           'Silakan selesaikan pembayaran melalui link yang sudah diberikan.';
 
                 case QrisTransaction::STATUS_EXPIRE:
-                    return '⏰ Kode pembayaran sudah kadaluarsa.';
+                    return '⏰ Kode pembayaran sudah kadaluarsa. Ketik \'buat qris baru\' untuk mendapatkan kode baru.';
 
                 case QrisTransaction::STATUS_CANCEL:
-                    return '❌ Pembayaran dibatalkan.';
+                    return '❌ Pembayaran dibatalkan. Silakan buat pesanan baru jika ingin melanjutkan.';
 
                 default:
-                    return "Status: {$qrisTransaction->status}";
+                    return "Status pembayaran: {$qrisTransaction->status}";
             }
 
         } catch (\Exception $e) {
-            return 'Maaf, terjadi kesalahan saat mengecek status pembayaran.';
+            return 'Maaf, terjadi kesalahan saat mengecek status pembayaran. Silakan coba lagi.';
         }
     }
 
@@ -1684,8 +1856,7 @@ class AiAgentController extends Controller
         AiAgentConversation $conversation,
         AiAgent $aiAgent,
         string $deliveryType,
-        ?string $address = null,
-        ?string $notes = null
+        ?string $address = null
     ): string {
         if (! $aiAgent->isDeliveryEnabled()) {
             return 'Maaf, fitur delivery belum diaktifkan.';
@@ -1693,43 +1864,53 @@ class AiAgentController extends Controller
 
         $conversation->setDeliveryType($deliveryType);
 
-        if ($deliveryType === Order::DELIVERY_TYPE_DELIVERY && $address) {
-            $conversation->setDeliveryAddress($address);
-        }
-
-        if ($notes) {
-            $conversation->setDeliveryNotes($notes);
-        }
-
         $ongkir = 0;
         if ($deliveryType === Order::DELIVERY_TYPE_DELIVERY) {
             $ongkir = (float) ($aiAgent->default_ongkir ?? 0);
+            if ($address) {
+                $conversation->setDeliveryAddress($address);
+            }
         }
         $conversation->setOngkir($ongkir);
 
         if ($deliveryType === Order::DELIVERY_TYPE_DELIVERY) {
-            $ongkir = $aiAgent->default_ongkir ?? 0;
             $formattedOngkir = 'Rp '.number_format($ongkir, 0, ',', '.');
             $response = "🚚 Delivery dipilih.\n";
             if ($address) {
                 $response .= "📍 Alamat: {$address}\n";
             }
             $response .= "💰 Ongkir: {$formattedOngkir}\n";
-            if ($notes) {
-                $response .= "📝 Catatan: {$notes}\n";
+
+            if (! $address) {
+                $response .= "\nSilakan kirim alamat pengiriman Anda.";
+
+                return $response;
             }
-            $response .= "\nKetik 'lihat keranjang' untuk ringkasan atau 'konfirmasi' untuk checkout.";
+
+            $response .= "\nAda catatan khusus untuk pesanan? (contoh: tidak pedas, tanpa bawang)\nKetik 'tidak ada' jika tidak ada catatan.";
 
             return $response;
         }
 
-        $response = "🏪 Pickup dipilih.\n";
-        if ($notes) {
-            $response .= "📝 Catatan: {$notes}\n";
-        }
-        $response .= "\nKetik 'lihat keranjang' untuk ringkasan atau 'konfirmasi' untuk checkout.";
+        $response = "🏪 Pickup dipilih. Ongkir: Rp 0.\n\n";
+        $response .= "Ada catatan khusus untuk pesanan? (contoh: tidak pedas, tanpa bawang)\nKetik 'tidak ada' jika tidak ada catatan.";
 
         return $response;
+    }
+
+    protected function setOrderNotes(AiAgentConversation $conversation, string $notes): string
+    {
+        $notes = trim($notes);
+
+        if ($notes === '' || strtolower($notes) === 'tidak ada') {
+            $conversation->setDeliveryNotes(null);
+
+            return "✅ Tidak ada catatan khusus.\n\nKetik 'konfirmasi' untuk melanjutkan checkout.";
+        }
+
+        $conversation->setDeliveryNotes($notes);
+
+        return "📝 Catatan tersimpan: {$notes}\n\nKetik 'konfirmasi' untuk melanjutkan checkout.";
     }
 
     /**
