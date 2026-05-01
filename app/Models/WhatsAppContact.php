@@ -51,10 +51,12 @@ class WhatsAppContact extends Model
         'last_message_at',
         'last_message_text',
         'unread_count',
+        'ai_active',
     ];
 
     protected $casts = [
         'last_message_at' => 'datetime',
+        'ai_active' => 'boolean',
     ];
 
     protected $appends = ['phone_number'];

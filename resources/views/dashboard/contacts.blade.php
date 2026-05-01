@@ -112,6 +112,9 @@
 
                                 <!-- Actions -->
                                 <div class="flex gap-2">
+                                    <button @click.stop="toggleAi(contact)" class="btn btn-icon md:btn-md" :class="contact.ai_active !== false ? 'btn-primary' : 'btn-outline text-gray-400'" :title="contact.ai_active !== false ? 'AI Active - Click to disable' : 'AI Inactive - Click to enable'">
+                                        <i class="fas fa-robot"></i>
+                                    </button>
                                     <button @click.stop="sendMessage(contact)" class="btn btn-primary btn-icon md:btn-md md:flex-1">
                                         <i class="fas fa-paper-plane"></i>
                                         <span class="hidden md:inline">Message</span>
@@ -214,6 +217,28 @@
                                         <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">{{ __('whatsapp.last_activity') }}</label>
                                         <p class="mt-1" x-text="formatDate(selectedContact?.last_message_at || selectedContact?.created_at)">-</p>
                                     </div>
+                                </div>
+                                <div class="flex items-center justify-between p-3 rounded-lg" :class="selectedContact?.ai_active !== false ? 'bg-purple-50 border border-purple-200' : 'bg-gray-50 border border-gray-200'">
+                                    <div>
+                                        <p class="font-medium text-sm flex items-center gap-2">
+                                            <i class="fas fa-robot" :class="selectedContact?.ai_active !== false ? 'text-purple-600' : 'text-gray-400'"></i>
+                                            AI Agent
+                                        </p>
+                                        <p class="text-xs" :class="selectedContact?.ai_active !== false ? 'text-purple-600' : 'text-gray-500'">
+                                            <span x-show="selectedContact?.ai_active !== false">AI aktif untuk kontak ini</span>
+                                            <span x-show="selectedContact?.ai_active === false">AI nonaktif untuk kontak ini</span>
+                                        </p>
+                                    </div>
+                                    <button
+                                        @click="toggleAi(selectedContact)"
+                                        :class="selectedContact?.ai_active !== false ? 'bg-purple-600' : 'bg-gray-300'"
+                                        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 cursor-pointer"
+                                    >
+                                        <span
+                                            :class="selectedContact?.ai_active !== false ? 'translate-x-6' : 'translate-x-1'"
+                                            class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow"
+                                        ></span>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -367,6 +392,22 @@ function contactsManager() {
                 this.filterContacts();
             } catch (e) { console.error('Error:', e); }
             finally { this.loading = false; }
+        },
+
+        async toggleAi(contact) {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/contacts/${contact.id}/toggle-ai`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    contact.ai_active = data.data.ai_active;
+                    this.contacts = [...this.contacts];
+                    this.filterContacts();
+                }
+            } catch (e) { console.error('Toggle AI error:', e); }
         },
 
         filterContacts() {

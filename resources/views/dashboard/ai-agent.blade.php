@@ -1,6 +1,16 @@
 @extends('layouts.app')
 @include('components.dashboard-scripts')
 
+@push('styles')
+<style>
+/* Markdown rendering inside test-chat assistant bubbles */
+.prose-chat strong { font-weight: 600; }
+.prose-chat em     { font-style: italic; }
+.prose-chat li     { display: list-item; margin-left: 1.25rem; list-style-type: disc; }
+.prose-chat code   { font-family: ui-monospace, monospace; font-size: 0.75rem; }
+</style>
+@endpush
+
 @section('title', __('dashboard.ai_agent_title'))
 
 @section('content')
@@ -381,6 +391,76 @@
                             </div>
                         </div>
 
+                        <!-- Delivery Feature Card -->
+                        <div class="card" x-show="config.order_enabled && form.default_store_id">
+                            <div class="card-header border-b border-[hsl(var(--border))]">
+                                <h3 class="card-title flex items-center gap-2">
+                                    <i class="fas fa-truck text-orange-500"></i>
+                                    Delivery
+                                </h3>
+                                <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                                    Aktifkan fitur delivery agar pelanggan bisa memilih pickup atau delivery saat order via chat
+                                </p>
+                            </div>
+                            <div class="p-4 sm:p-6 space-y-5">
+                                <!-- Delivery Toggle -->
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl" :class="config.delivery_enabled ? 'bg-orange-100 border border-orange-400 shadow-sm shadow-orange-100' : 'bg-gray-50 border border-gray-200'">
+                                    <div class="flex-1">
+                                        <p class="font-medium" :class="config.delivery_enabled ? 'text-orange-950' : 'text-gray-600'">Enable Delivery</p>
+                                        <p class="text-sm" :class="config.delivery_enabled ? 'text-orange-800' : 'text-gray-500'">
+                                            <span x-show="config.delivery_enabled">AI akan bertanya "Pickup atau Delivery?" sebelum checkout</span>
+                                            <span x-show="!config.delivery_enabled">Pelanggan hanya bisa pickup</span>
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        @click="config.delivery_enabled = !config.delivery_enabled"
+                                        :class="config.delivery_enabled ? 'bg-orange-600 ring-2 ring-orange-200' : 'bg-gray-300'"
+                                        class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 flex-shrink-0 cursor-pointer"
+                                    >
+                                        <span
+                                            :class="config.delivery_enabled ? 'translate-x-6' : 'translate-x-1'"
+                                            class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md"
+                                        ></span>
+                                    </button>
+                                </div>
+
+                                <!-- Default Ongkir -->
+                                <div x-show="config.delivery_enabled" x-transition class="space-y-2">
+                                    <label class="block text-sm font-medium text-[hsl(var(--foreground))]">
+                                        <i class="fas fa-money-bill-wave text-orange-400 mr-1.5"></i>
+                                        Biaya Ongkir Default (Rp)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        x-model.number="form.default_ongkir"
+                                        min="0"
+                                        step="500"
+                                        placeholder="Contoh: 10000"
+                                        class="w-full h-10 px-3 rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--background))] text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                                    >
+                                    <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                                        Ongkir akan otomatis ditambahkan ke total pesanan saat pelanggan memilih delivery
+                                    </p>
+                                </div>
+
+                                <!-- Delivery Info -->
+                                <div x-show="config.delivery_enabled" x-transition class="bg-orange-50 border border-orange-200 rounded-xl p-4">
+                                    <p class="text-sm text-orange-800 font-medium">
+                                        <i class="fas fa-check-circle mr-2"></i>
+                                        Delivery aktif! Alur AI Agent:
+                                    </p>
+                                    <ul class="text-sm text-orange-700 mt-2 ml-6 list-disc space-y-1">
+                                        <li>Pelanggan pilih menu → tambah ke keranjang</li>
+                                        <li>AI bertanya: "Pickup atau Delivery?"</li>
+                                        <li>Jika delivery → AI tanya alamat → ongkir otomatis ditambahkan</li>
+                                        <li>Pelanggan bisa tambah catatan (catatan)</li>
+                                        <li>Konfirmasi pesanan dengan semua detail</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Action Buttons -->
                         <div class="card">
                             <div class="p-4 sm:p-6">
@@ -485,13 +565,27 @@
                 <!-- Messages -->
                 <template x-for="(msg, index) in testMessages" :key="index">
                     <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
-                        <div :class="msg.role === 'user' ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-800'" class="rounded-lg px-4 py-2 max-w-[80%]">
-                            <p class="text-sm whitespace-pre-wrap" x-text="msg.content"></p>
-                        </div>
+                        <!-- User bubble: plain text, no markdown -->
+                        <template x-if="msg.role === 'user'">
+                            <div class="bg-purple-500 text-white rounded-lg px-4 py-2 max-w-[80%]">
+                                <p class="text-sm whitespace-pre-wrap" x-text="msg.content"></p>
+                            </div>
+                        </template>
+                        <!-- Assistant bubble: render markdown as HTML -->
+                        <template x-if="msg.role === 'assistant'">
+                            <div class="bg-gray-100 text-gray-800 rounded-lg px-4 py-2 max-w-[80%]">
+                                <div class="text-sm prose-chat" x-html="parseMarkdown(msg.content)"></div>
+                                <!-- blinking cursor while streaming -->
+                                <span
+                                    x-show="msg.streaming"
+                                    class="inline-block w-0.5 h-3.5 bg-gray-500 ml-0.5 align-middle animate-pulse"
+                                ></span>
+                            </div>
+                        </template>
                     </div>
                 </template>
 
-                <!-- Loading State -->
+                <!-- Initial loading spinner (shown before first token arrives) -->
                 <div x-show="testLoading" class="flex justify-start">
                     <div class="bg-gray-100 rounded-lg px-4 py-2">
                         <i class="fas fa-spinner animate-spin text-gray-500"></i>
@@ -548,6 +642,7 @@ function aiAgentApp() {
             order_enabled: false,
             qris_enabled: false,
             reservation_enabled: false,
+            delivery_enabled: false,
         },
         form: {
             bot_name: '',
@@ -559,6 +654,7 @@ function aiAgentApp() {
                 phone: '',
             },
             default_store_id: '',
+            default_ongkir: 0,
         },
         // Test modal
         showTestModal: false,
@@ -629,6 +725,7 @@ function aiAgentApp() {
                         order_enabled: data.data.order_enabled,
                         qris_enabled: data.data.qris_enabled || false,
                         reservation_enabled: data.data.reservation_enabled || false,
+                        delivery_enabled: data.data.delivery_enabled || false,
                     };
                     this.form = {
                         bot_name: data.data.bot_name || '',
@@ -640,6 +737,7 @@ function aiAgentApp() {
                             phone: data.data.business_info?.phone || '',
                         },
                         default_store_id: data.data.default_store_id || '',
+                        default_ongkir: data.data.default_ongkir || 0,
                     };
                     if (data.data.updated_at) {
                         this.lastSaved = new Date(data.data.updated_at).toLocaleString('id-ID');
@@ -676,6 +774,8 @@ function aiAgentApp() {
                         order_enabled: this.config.order_enabled,
                         qris_enabled: this.config.qris_enabled,
                         reservation_enabled: this.config.reservation_enabled,
+                        delivery_enabled: this.config.delivery_enabled,
+                        default_ongkir: this.form.default_ongkir || 0,
                     }),
                 });
 
@@ -818,42 +918,120 @@ function aiAgentApp() {
             this.testInput = '';
             this.testLoading = true;
 
-            // Scroll to bottom
-            this.$nextTick(() => {
-                const chatArea = document.getElementById('testChatArea');
-                if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
-            });
+            const scrollToBottom = () => {
+                this.$nextTick(() => {
+                    const chatArea = document.getElementById('testChatArea');
+                    if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
+                });
+            };
+            scrollToBottom();
 
             const token = localStorage.getItem('token');
 
             try {
-                const response = await fetch('/api/ai-agent/test', {
+                const response = await fetch('/api/ai-agent/test/stream', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json',
+                        'Accept': 'text/event-stream',
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({ message }),
                 });
 
-                const data = await response.json();
-
-                if (data.success) {
-                    this.testMessages.push({ role: 'assistant', content: data.data.ai_response });
-                } else {
-                    this.testMessages.push({ role: 'assistant', content: 'Error: ' + (data.message || 'Failed to get response') });
+                if (!response.ok || !response.body) {
+                    throw new Error('Stream unavailable (HTTP ' + response.status + ')');
                 }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                // Add empty assistant bubble that will be filled token by token
+                const bubbleIndex = this.testMessages.length;
+                this.testMessages.push({ role: 'assistant', content: '', streaming: true });
+                this.testLoading = false; // hide spinner once bubble is visible
+                scrollToBottom();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // keep incomplete line
+
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        let event;
+                        try { event = JSON.parse(line.slice(6)); } catch { continue; }
+
+                        if (event.type === 'token') {
+                            this.testMessages[bubbleIndex].content += event.content;
+                            scrollToBottom();
+                        } else if (event.type === 'done') {
+                            this.testMessages[bubbleIndex].streaming = false;
+                            scrollToBottom();
+                        } else if (event.type === 'error') {
+                            this.testMessages[bubbleIndex].content = 'Error: ' + event.message;
+                            this.testMessages[bubbleIndex].streaming = false;
+                        }
+                    }
+                }
+
+                // Ensure streaming flag is cleared if stream ended without 'done' event
+                if (this.testMessages[bubbleIndex]?.streaming) {
+                    this.testMessages[bubbleIndex].streaming = false;
+                }
+
             } catch (error) {
-                console.error('Test error:', error);
-                this.testMessages.push({ role: 'assistant', content: 'Error: Failed to connect to AI Agent' });
+                console.error('Test stream error:', error);
+                this.testMessages.push({ role: 'assistant', content: 'Error: Gagal terhubung ke AI Agent', streaming: false });
+                scrollToBottom();
             } finally {
                 this.testLoading = false;
-                this.$nextTick(() => {
-                    const chatArea = document.getElementById('testChatArea');
-                    if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
-                });
             }
+        },
+
+        /**
+         * Convert a subset of Markdown to safe HTML for the chat bubble.
+         * Only processes: bold, italic, inline code, headings, bullet lists, newlines.
+         * HTML-escapes the input first to prevent XSS.
+         */
+        parseMarkdown(text) {
+            if (!text) return '';
+
+            // 1. Escape HTML entities to prevent XSS
+            let html = text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+
+            // 2. Headings (### ## #) — before bold so # isn't confused
+            html = html.replace(/^### (.+)$/gm, '<strong class="block text-sm">$1</strong>');
+            html = html.replace(/^## (.+)$/gm,  '<strong class="block text-sm">$1</strong>');
+            html = html.replace(/^# (.+)$/gm,   '<strong class="block text-sm">$1</strong>');
+
+            // 3. Bold **text** or __text__
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/__(.+?)__/g,     '<strong>$1</strong>');
+
+            // 4. Italic *text* or _text_ (single, not double)
+            html = html.replace(/\*([^*\n]+?)\*/g, '<em>$1</em>');
+            html = html.replace(/_([^_\n]+?)_/g,   '<em>$1</em>');
+
+            // 5. Inline code `text`
+            html = html.replace(/`([^`]+)`/g, '<code class="bg-gray-200 rounded px-1 text-xs font-mono">$1</code>');
+
+            // 6. Bullet list items (- item or • item at line start)
+            html = html.replace(/^[ \t]*[-•]\s+(.+)$/gm, '<li class="ml-4 list-disc">$1</li>');
+
+            // 7. Newlines → <br> (but collapse consecutive <br> after list items)
+            html = html.replace(/\n/g, '<br>');
+            html = html.replace(/(<\/li>)<br>/g, '$1');
+
+            return html;
         },
 
         showNotification(message, type = 'info') {

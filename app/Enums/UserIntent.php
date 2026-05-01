@@ -5,6 +5,7 @@ namespace App\Enums;
 enum UserIntent: string
 {
     case GREETING = 'greeting';
+    case NEXT_MENU_PAGE = 'next_menu_page';
     case VIEW_MENU = 'view_menu';
     case SEARCH_PRODUCT = 'search_product';
     case ORDER = 'order';
@@ -21,6 +22,11 @@ enum UserIntent: string
         // Greeting
         if (preg_match('/^(hai|halo|hi|hello|hei|assalamualaikum)/', $message)) {
             return self::GREETING;
+        }
+
+        // Next Menu Page (check before View Menu - more specific)
+        if (preg_match('/(menu (lainnya|selanjutnya|berikutnya|lagi)|lihat (lagi|selanjutnya)|masih ada (lagi|yang lain)|ada (lagi|yang lain)|selanjutnya|next|lebih banyak|lainnya)/i', $message)) {
+            return self::NEXT_MENU_PAGE;
         }
 
         // View Menu
@@ -77,6 +83,7 @@ enum UserIntent: string
         return in_array($this, [
             self::VIEW_MENU,
             self::SEARCH_PRODUCT,
+            self::NEXT_MENU_PAGE,
         ]);
     }
 

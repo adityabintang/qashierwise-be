@@ -193,10 +193,17 @@ class AiAgentConversation extends Model
 
     /**
      * Set the current QRIS transaction for this conversation.
+     * Also stores the ID in order_context so it can be recovered
+     * if clearPaymentContext() is called before the user checks status.
      */
     public function setCurrentQrisTransaction(int $transactionId): void
     {
         $this->current_qris_transaction_id = $transactionId;
+
+        $orderContext = $this->order_context ?? [];
+        $orderContext['last_qris_transaction_id'] = $transactionId;
+        $this->order_context = $orderContext;
+
         $this->save();
     }
 
@@ -324,6 +331,90 @@ class AiAgentConversation extends Model
     {
         $this->cache_response_id = null;
         $this->cache_expires_at = null;
+        $this->save();
+    }
+
+    public function getCurrentMenuPage(): int
+    {
+        return $this->order_context['current_menu_page'] ?? 1;
+    }
+
+    public function setCurrentMenuPage(int $page): void
+    {
+        $orderContext = $this->order_context ?? [];
+        $orderContext['current_menu_page'] = $page;
+        $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    public function clearCurrentMenuPage(): void
+    {
+        $orderContext = $this->order_context ?? [];
+        unset($orderContext['current_menu_page']);
+        $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    public function getDeliveryType(): ?string
+    {
+        return $this->order_context['delivery_type'] ?? null;
+    }
+
+    public function setDeliveryType(string $type): void
+    {
+        $orderContext = $this->order_context ?? [];
+        $orderContext['delivery_type'] = $type;
+        $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    public function getDeliveryAddress(): ?string
+    {
+        return $this->order_context['delivery_address'] ?? null;
+    }
+
+    public function setDeliveryAddress(string $address): void
+    {
+        $orderContext = $this->order_context ?? [];
+        $orderContext['delivery_address'] = $address;
+        $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    public function getDeliveryNotes(): ?string
+    {
+        return $this->order_context['delivery_notes'] ?? null;
+    }
+
+    public function setDeliveryNotes(?string $notes): void
+    {
+        $orderContext = $this->order_context ?? [];
+        $orderContext['delivery_notes'] = $notes;
+        $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    public function getOngkir(): float
+    {
+        return (float) ($this->order_context['ongkir'] ?? 0);
+    }
+
+    public function setOngkir(float $ongkir): void
+    {
+        $orderContext = $this->order_context ?? [];
+        $orderContext['ongkir'] = $ongkir;
+        $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    public function clearDeliveryContext(): void
+    {
+        $orderContext = $this->order_context ?? [];
+        unset($orderContext['delivery_type']);
+        unset($orderContext['delivery_address']);
+        unset($orderContext['delivery_notes']);
+        unset($orderContext['ongkir']);
+        $this->order_context = $orderContext;
         $this->save();
     }
 }

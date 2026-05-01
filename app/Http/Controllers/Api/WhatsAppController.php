@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\NewWhatsAppMessage;
+use App\Events\ProfileUpdated;
 use App\Exceptions\WhatsAppNotConnectedException;
 use App\Http\Controllers\Controller;
 use App\Models\WhatsAppAccount;
@@ -15,6 +17,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 use Netflie\WhatsAppCloudApi\Message\ButtonReply\Button;
 use Netflie\WhatsAppCloudApi\Message\ButtonReply\ButtonAction;
 use Netflie\WhatsAppCloudApi\Message\Media\LinkID;
@@ -201,7 +204,7 @@ class WhatsAppController extends Controller
         ]);
 
         // Broadcast the new message event (include sender so message appears in their UI)
-        broadcast(new \App\Events\NewWhatsAppMessage($message->load('contact'), $contact));
+        broadcast(new NewWhatsAppMessage($message->load('contact'), $contact));
 
         return $message;
     }
@@ -1124,7 +1127,7 @@ class WhatsAppController extends Controller
             // Broadcast profile update event
             $userId = auth()->user()->getEffectiveUserId();
             if ($userId) {
-                broadcast(new \App\Events\ProfileUpdated($userId, $data, 'business_profile'));
+                broadcast(new ProfileUpdated($userId, $data, 'business_profile'));
             }
 
             return response()->json([
@@ -1138,7 +1141,7 @@ class WhatsAppController extends Controller
                 'error_code' => $e->getErrorCode(),
                 'message' => $e->getMessage(),
             ], $e->getCode());
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
@@ -1582,7 +1585,6 @@ class WhatsAppController extends Controller
 
             $perPage = $request->get('per_page', 15);
 
-            // RLS in model automatically filters by user_id
             $contacts = WhatsAppContact::withCount('messages')
                 ->orderBy('last_message_at', 'desc')
                 ->paginate($perPage);
@@ -1601,6 +1603,26 @@ class WhatsAppController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve contacts',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function toggleContactAi($contactId): JsonResponse
+    {
+        try {
+            $contact = WhatsAppContact::findOrFail($contactId);
+            $contact->ai_active = ! $contact->ai_active;
+            $contact->save();
+
+            return response()->json([
+                'success' => true,
+                'data' => ['ai_active' => $contact->ai_active],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to toggle AI for contact',
                 'error' => $e->getMessage(),
             ], 500);
         }

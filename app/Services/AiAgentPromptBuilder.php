@@ -111,6 +111,12 @@ class AiAgentPromptBuilder
             $prompt .= "\n".config('ai_agent_prompts.ordering_workflow');
         }
 
+        if ($this->agent->isDeliveryEnabled()) {
+            $deliveryPrompt = config('ai_agent_prompts.delivery_workflow');
+            $deliveryPrompt = str_replace(':ongkir', number_format($this->agent->default_ongkir, 0, ',', '.'), $deliveryPrompt);
+            $prompt .= "\n".$deliveryPrompt;
+        }
+
         if ($this->shouldIncludeReservationInstructions()) {
             $reservationInstructions = $this->getReservationInstructions();
             if ($reservationInstructions !== '') {
@@ -361,7 +367,7 @@ class AiAgentPromptBuilder
 
             $lines = ['## Produk (Sample):'];
             $lines[] = Toon::convert(['menu' => $categorizedArray]);
-            $lines[] = "Total: {$totalProducts} produk | Full: get_all_products(page=1) | 20/page | Hide ID";
+            $lines[] = "Total: {$totalProducts} produk | Full: get_all_products(page=1) | 10/page | Hide ID";
 
             return implode("\n", $lines);
         }
@@ -377,7 +383,7 @@ class AiAgentPromptBuilder
             }
         }
 
-        $lines[] = "\n**PENTING**: Ini hanya sample. Untuk menu lengkap: `get_all_products(page=1)` (20 produk per halaman, dikategorikan)";
+        $lines[] = "\n**PENTING**: Ini hanya sample. Untuk menu lengkap: `get_all_products(page=1)` (10 produk per halaman, dikategorikan)";
         $lines[] = "Jika user minta 'menu lainnya': `get_all_products(page=2)`, dst.";
         $lines[] = 'Jangan tampilkan [ID:X] ke user!';
 
@@ -473,44 +479,44 @@ class AiAgentPromptBuilder
         return $this->agent->isReservationEnabled();
     }
 
-    /**
-     * Get few-shot examples for early conversations
-     */
-    public static function getFewShotExamples(): array
-    {
-        return [
-            [
-                'role' => 'user',
-                'content' => 'menunya apa aja?',
-            ],
-            [
-                'role' => 'assistant',
-                'content' => null,
-                'tool_calls' => [
-                    [
-                        'id' => 'call_example_1',
-                        'type' => 'function',
-                        'function' => [
-                            'name' => 'get_all_products',
-                            'arguments' => '{}',
-                        ],
-                    ],
-                ],
-            ],
-            [
-                'role' => 'tool',
-                'tool_call_id' => 'call_example_1',
-                'content' => json_encode([
-                    'products' => [
-                        ['name' => 'Dimsum Keju', 'price' => 40000],
-                        ['name' => 'Teh Jumbo', 'price' => 5000],
-                    ],
-                ]),
-            ],
-            [
-                'role' => 'assistant',
-                'content' => "Berikut menu kami:\n\n1. Dimsum Keju - Rp 40.000\n2. Teh Jumbo - Rp 5.000\n\nMau pesan yang mana? 😊",
-            ],
-        ];
-    }
+    // /**
+    //  * Get few-shot examples for early conversations
+    //  */
+    // public static function getFewShotExamples(): array
+    // {
+    //     return [
+    //         [
+    //             'role' => 'user',
+    //             'content' => 'menunya apa aja?',
+    //         ],
+    //         [
+    //             'role' => 'assistant',
+    //             'content' => null,
+    //             'tool_calls' => [
+    //                 [
+    //                     'id' => 'call_example_1',
+    //                     'type' => 'function',
+    //                     'function' => [
+    //                         'name' => 'get_all_products',
+    //                         'arguments' => '{}',
+    //                     ],
+    //                 ],
+    //             ],
+    //         ],
+    //         [
+    //             'role' => 'tool',
+    //             'tool_call_id' => 'call_example_1',
+    //             'content' => json_encode([
+    //                 'products' => [
+    //                     ['name' => 'Dimsum Keju', 'price' => 40000],
+    //                     ['name' => 'Teh Jumbo', 'price' => 5000],
+    //                 ],
+    //             ]),
+    //         ],
+    //         [
+    //             'role' => 'assistant',
+    //             'content' => "Berikut menu kami:\n\n1. Dimsum Keju - Rp 40.000\n2. Teh Jumbo - Rp 5.000\n\nMau pesan yang mana? 😊",
+    //         ],
+    //     ];
+    // }
 }

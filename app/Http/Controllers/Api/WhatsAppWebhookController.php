@@ -5,12 +5,16 @@ namespace App\Http\Controllers\Api;
 use App\Events\MessageStatusUpdated;
 use App\Events\NewWhatsAppMessage;
 use App\Http\Controllers\Controller;
+use App\Jobs\ProcessAiAgentMessage;
+use App\Models\AiAgent;
+use App\Models\Reservation;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
 use App\Models\WhatsAppMessage;
 use App\Models\WhatsAppTemplate;
 use App\Services\MediaStorageService;
 use App\Services\WhatsAppAccountService;
+use App\Services\WhatsAppFlowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -366,13 +370,22 @@ class WhatsAppWebhookController extends Controller
         ]);
 
         // Check if AI Agent is active for this account
-        $aiAgent = \App\Models\AiAgent::where('whatsapp_account_id', $whatsappAccount->id)
+        $aiAgent = AiAgent::where('whatsapp_account_id', $whatsappAccount->id)
             ->where('is_active', true)
             ->first();
 
         if ($aiAgent && $type === 'text') {
+            $contact->refresh();
+            if (! $contact->ai_active) {
+                Log::info('AI disabled for this contact, skipping', [
+                    'contact_id' => $contact->id,
+                ]);
+
+                return $messageData;
+            }
+
             // Dispatch AI Agent processing to queue
-            \App\Jobs\ProcessAiAgentMessage::dispatch(
+            ProcessAiAgentMessage::dispatch(
                 $whatsappAccount,
                 $contact,
                 $content
@@ -399,11 +412,12 @@ class WhatsAppWebhookController extends Controller
     {
         $messageId = $message['id'] ?? null;
 
-        if (!$messageId) {
+        if (! $messageId) {
             Log::warning('Message echo missing message_id, skipping', [
                 'user_id' => $userId,
                 'message' => $message,
             ]);
+
             return;
         }
 
@@ -485,7 +499,7 @@ class WhatsAppWebhookController extends Controller
 
             case 'location':
                 $location = $message['location'] ?? [];
-                $content = "Location: " . ($location['latitude'] ?? 0) . ", " . ($location['longitude'] ?? 0);
+                $content = 'Location: '.($location['latitude'] ?? 0).', '.($location['longitude'] ?? 0);
                 $metadata = $location;
                 break;
 
@@ -1074,7 +1088,7 @@ class WhatsAppWebhookController extends Controller
         WhatsAppContact $contact
     ): void {
         try {
-            $flowService = app(\App\Services\WhatsAppFlowService::class);
+            $flowService = app(WhatsAppFlowService::class);
 
             // Add flow_id to response data
             $responseData['flow_id'] = $flowId;
@@ -1108,7 +1122,7 @@ class WhatsAppWebhookController extends Controller
     /**
      * Send reservation confirmation message to customer
      */
-    protected function sendReservationConfirmation(int $userId, WhatsAppContact $contact, \App\Models\Reservation $reservation): void
+    protected function sendReservationConfirmation(int $userId, WhatsAppContact $contact, Reservation $reservation): void
     {
         try {
             $whatsappClient = $this->whatsAppAccountService->getClientForUser($userId);

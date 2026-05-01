@@ -58,30 +58,18 @@ class SubMerchantService
             ]);
 
             // Create XenPlatform sub-account (OWNED)
-            try {
-                $xenditAccount = $this->xenPlatformService->createSubAccount($subMerchant);
+            // Throws RuntimeException on failure, which rolls back the transaction
+            $xenditAccount = $this->xenPlatformService->createSubAccount($subMerchant);
 
-                $subMerchant->update([
-                    'xendit_account_id' => $xenditAccount['id'],
-                    'xendit_account_status' => 'active',
-                ]);
+            $subMerchant->update([
+                'xendit_account_id' => $xenditAccount['id'],
+                'xendit_account_status' => 'active',
+            ]);
 
-                Log::info('XenPlatform sub-account created', [
-                    'sub_merchant_id' => $subMerchant->id,
-                    'xendit_account_id' => $xenditAccount['id'],
-                ]);
-            } catch (\Exception $e) {
-                // Don't fail registration if XenPlatform API fails
-                // The account can be created later via retry
-                Log::error('Failed to create XenPlatform sub-account, will retry later', [
-                    'sub_merchant_id' => $subMerchant->id,
-                    'error' => $e->getMessage(),
-                ]);
-
-                $subMerchant->update([
-                    'xendit_account_status' => 'failed',
-                ]);
-            }
+            Log::info('XenPlatform sub-account created', [
+                'sub_merchant_id' => $subMerchant->id,
+                'xendit_account_id' => $xenditAccount['id'],
+            ]);
 
             return $subMerchant->fresh(['balance']);
         });

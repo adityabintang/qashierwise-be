@@ -18,12 +18,26 @@
                         <h2 class="text-lg font-semibold">Sales Orders</h2>
                         <p class="text-sm text-[hsl(var(--muted-foreground))] hidden sm:block">Create and manage customer orders</p>
                     </div>
-                    <template x-if="hasPermission('create_orders') || hasPermission('manage_orders')">
-                        <button @click="openCreateModal()" class="btn btn-primary btn-md">
-                            <i class="fas fa-plus"></i>
-                            <span>New Order</span>
-                        </button>
-                    </template>
+                    <div class="flex items-center gap-3">
+                        <!-- Delivery / Pickup Toggle -->
+                        <div class="flex items-center bg-[hsl(var(--muted)/0.6)] rounded-lg p-1 gap-1">
+                            <button @click="setViewMode('all')" class="px-3 py-1.5 rounded-md text-sm font-medium transition-all" :class="viewMode === 'all' ? 'bg-white shadow text-[hsl(var(--foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'">
+                                Semua
+                            </button>
+                            <button @click="setViewMode('pickup')" class="px-3 py-1.5 rounded-md text-sm font-medium transition-all" :class="viewMode === 'pickup' ? 'bg-white shadow text-emerald-700' : 'text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'">
+                                <i class="fas fa-store mr-1"></i>Pickup
+                            </button>
+                            <button @click="setViewMode('delivery')" class="px-3 py-1.5 rounded-md text-sm font-medium transition-all" :class="viewMode === 'delivery' ? 'bg-white shadow text-orange-600' : 'text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'">
+                                <i class="fas fa-truck mr-1"></i>Delivery
+                            </button>
+                        </div>
+                        <template x-if="hasPermission('create_orders') || hasPermission('manage_orders')">
+                            <button @click="openCreateModal()" class="btn btn-primary btn-md">
+                                <i class="fas fa-plus"></i>
+                                <span>New Order</span>
+                            </button>
+                        </template>
+                    </div>
                 </div>
 
                 <!-- Filters -->
@@ -99,7 +113,8 @@
                 <!-- Desktop Table View -->
                 <div class="hidden lg:block card overflow-hidden">
                     <div class="overflow-x-auto">
-                        <table class="w-full">
+                        <!-- Pickup / All Table -->
+                        <table x-show="viewMode !== 'delivery'" class="w-full">
                             <thead class="bg-[hsl(var(--muted)/0.5)]">
                                 <tr>
                                     <th class="text-left p-4 text-sm font-medium text-[hsl(var(--muted-foreground))]">Order #</th>
@@ -134,6 +149,70 @@
                                             <td class="p-4 text-sm" x-text="order.store?.name || '-'"></td>
                                             <td class="p-4 text-sm" x-text="order.table?.number ? 'Table ' + order.table.number : '-'"></td>
                                             <td class="p-4 text-right text-sm" x-text="order.items?.length || 0"></td>
+                                            <td class="p-4 text-right font-medium" x-text="formatCurrency(order.total)"></td>
+                                            <td class="p-4 text-center">
+                                                <span class="badge text-xs" :class="getStatusClass(order.status)" x-text="order.status"></span>
+                                            </td>
+                                            <td class="p-4 text-sm text-[hsl(var(--muted-foreground))]" x-text="formatDate(order.created_at)"></td>
+                                            <td class="p-4 text-right">
+                                                <div class="flex items-center justify-end gap-2">
+                                                    <button @click="viewOrder(order)" class="btn btn-ghost btn-sm"><i class="fas fa-eye"></i></button>
+                                                    <template x-if="order.status === 'pending'">
+                                                        <button @click="cancelOrder(order)" class="btn btn-ghost btn-sm text-red-600"><i class="fas fa-times"></i></button>
+                                                    </template>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </template>
+                            </tbody>
+                        </table>
+
+                        <!-- Delivery Table -->
+                        <table x-show="viewMode === 'delivery'" class="w-full">
+                            <thead class="bg-[hsl(var(--muted)/0.5)]">
+                                <tr>
+                                    <th class="text-left p-4 text-sm font-medium text-[hsl(var(--muted-foreground))]">Order #</th>
+                                    <th class="text-left p-4 text-sm font-medium text-[hsl(var(--muted-foreground))]">Store</th>
+                                    <th class="text-left p-4 text-sm font-medium text-[hsl(var(--muted-foreground))]">Alamat</th>
+                                    <th class="text-left p-4 text-sm font-medium text-[hsl(var(--muted-foreground))]">Catatan</th>
+                                    <th class="text-right p-4 text-sm font-medium text-[hsl(var(--muted-foreground))]">Total</th>
+                                    <th class="text-center p-4 text-sm font-medium text-[hsl(var(--muted-foreground))]">Status</th>
+                                    <th class="text-left p-4 text-sm font-medium text-[hsl(var(--muted-foreground))]">Date</th>
+                                    <th class="text-right p-4 text-sm font-medium text-[hsl(var(--muted-foreground))]">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-[hsl(var(--border))]">
+                                <template x-if="loading">
+                                    <template x-for="i in 5" :key="'del-skeleton-'+i">
+                                        <tr>
+                                            <td class="p-4"><div class="skeleton h-4 w-20"></div></td>
+                                            <td class="p-4"><div class="skeleton h-4 w-24"></div></td>
+                                            <td class="p-4"><div class="skeleton h-4 w-40"></div></td>
+                                            <td class="p-4"><div class="skeleton h-4 w-32"></div></td>
+                                            <td class="p-4"><div class="skeleton h-4 w-20 ml-auto"></div></td>
+                                            <td class="p-4"><div class="skeleton h-6 w-16 mx-auto rounded-full"></div></td>
+                                            <td class="p-4"><div class="skeleton h-4 w-24"></div></td>
+                                            <td class="p-4"><div class="skeleton h-8 w-24 ml-auto"></div></td>
+                                        </tr>
+                                    </template>
+                                </template>
+                                <template x-if="!loading">
+                                    <template x-for="order in orders" :key="order.id">
+                                        <tr class="hover:bg-[hsl(var(--muted)/0.3)] transition-colors">
+                                            <td class="p-4 font-medium" x-text="'#' + order.order_number"></td>
+                                            <td class="p-4 text-sm" x-text="order.store?.name || '-'"></td>
+                                            <td class="p-4 text-sm max-w-[200px]">
+                                                <span x-text="order.alamat || '-'" class="block truncate cursor-default"
+                                                    @mouseenter="showTooltip($el, order.alamat, 'Alamat')"
+                                                    @mouseleave="hideTooltip()"></span>
+                                            </td>
+                                            <td class="p-4 text-sm max-w-[180px]">
+                                                <span x-text="order.catatan || '-'"
+                                                    :class="order.catatan ? 'block truncate text-amber-700 bg-amber-50 px-2 py-0.5 rounded cursor-default' : 'text-[hsl(var(--muted-foreground))]'"
+                                                    @mouseenter="showTooltip($el, order.catatan, 'Catatan')"
+                                                    @mouseleave="hideTooltip()"></span>
+                                            </td>
                                             <td class="p-4 text-right font-medium" x-text="formatCurrency(order.total)"></td>
                                             <td class="p-4 text-center">
                                                 <span class="badge text-xs" :class="getStatusClass(order.status)" x-text="order.status"></span>
@@ -215,6 +294,32 @@
                                 </template>
                             </select>
                         </div>
+                        <!-- Delivery Type -->
+                        <div>
+                            <label class="text-sm font-medium mb-1.5 block">Delivery Type</label>
+                            <div class="flex gap-2">
+                                <button type="button" @click="createForm.delivery_type = 'pickup'" class="flex-1 h-10 rounded-lg text-sm font-medium transition-all" :class="createForm.delivery_type === 'pickup' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">
+                                    <i class="fas fa-store mr-1"></i> Pickup
+                                </button>
+                                <button type="button" @click="createForm.delivery_type = 'delivery'" class="flex-1 h-10 rounded-lg text-sm font-medium transition-all" :class="createForm.delivery_type === 'delivery' ? 'bg-orange-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">
+                                    <i class="fas fa-truck mr-1"></i> Delivery
+                                </button>
+                            </div>
+                        </div>
+                        <div x-show="createForm.delivery_type === 'delivery'" x-transition class="space-y-3">
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Alamat <span class="text-red-500">*</span></label>
+                                <input type="text" x-model="createForm.alamat" placeholder="Alamat pengiriman..." class="input w-full min-h-[44px]">
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Ongkir (Rp)</label>
+                                <input type="number" x-model.number="createForm.ongkir" min="0" step="500" placeholder="0" class="input w-full min-h-[44px]">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium mb-1.5 block">Catatan (Optional)</label>
+                            <input type="text" x-model="createForm.catatan" placeholder="Catatan pesanan..." class="input w-full min-h-[44px]">
+                        </div>
                         <!-- Product Selection -->
                         <div>
                             <label class="text-sm font-medium mb-1.5 block">Add Products</label>
@@ -275,6 +380,7 @@
                         <div class="bg-[hsl(var(--muted)/0.5)] rounded-lg p-4 space-y-2">
                             <div class="flex justify-between text-sm"><span>Subtotal</span><span x-text="formatCurrency(orderSubtotal)"></span></div>
                             <div class="flex justify-between text-sm"><span>Tax (10%)</span><span x-text="formatCurrency(orderTax)"></span></div>
+                            <div x-show="createForm.delivery_type === 'delivery' && createForm.ongkir" class="flex justify-between text-sm"><span>Ongkir</span><span x-text="formatCurrency(parseFloat(createForm.ongkir) || 0)"></span></div>
                             <div class="flex justify-between font-bold text-lg pt-2 border-t border-[hsl(var(--border))]"><span>Total</span><span x-text="formatCurrency(orderTotal)"></span></div>
                         </div>
                     </div>
@@ -288,6 +394,17 @@
                 </button>
             </div>
         </div>
+    </div>
+
+    <!-- Global Tooltip -->
+    <div x-show="tooltip.show" x-cloak
+        :style="`position:fixed;left:${tooltip.x}px;top:${tooltip.y}px;transform:translateY(-100%);z-index:9999;pointer-events:auto`"
+        @mouseenter="tooltip.show=true" @mouseleave="tooltip.show=false"
+        class="max-w-xs bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl"
+        style="white-space:pre-wrap;word-break:break-word;">
+        <div class="font-medium text-gray-400 mb-1" x-text="tooltip.label"></div>
+        <span x-text="tooltip.text"></span>
+        <div class="absolute top-full left-4 border-4 border-transparent border-t-gray-900"></div>
     </div>
 
     <!-- View Order Modal -->
@@ -310,6 +427,8 @@
                     <div class="grid grid-cols-2 gap-4 text-sm">
                         <div><span class="text-[hsl(var(--muted-foreground))]">Store:</span><p class="font-medium" x-text="selectedOrder?.store?.name || '-'"></p></div>
                         <div><span class="text-[hsl(var(--muted-foreground))]">Table:</span><p class="font-medium" x-text="selectedOrder?.table?.number ? 'Table ' + selectedOrder.table.number : '-'"></p></div>
+                        <div x-show="selectedOrder?.delivery_type"><span class="text-[hsl(var(--muted-foreground))]">Delivery:</span><p class="font-medium capitalize" x-text="selectedOrder?.delivery_type || '-'"></p></div>
+                        <div x-show="selectedOrder?.alamat"><span class="text-[hsl(var(--muted-foreground))]">Alamat:</span><p class="font-medium" x-text="selectedOrder?.alamat || '-'"></p></div>
                     </div>
                     <div class="border-t border-[hsl(var(--border))] pt-4">
                         <h5 class="font-medium mb-3">Items</h5>
@@ -326,7 +445,12 @@
                         <div class="flex justify-between text-sm"><span>Subtotal</span><span x-text="formatCurrency(selectedOrder?.subtotal)"></span></div>
                         <div class="flex justify-between text-sm"><span>Tax</span><span x-text="formatCurrency(selectedOrder?.tax_amount)"></span></div>
                         <div class="flex justify-between text-sm"><span>Discount</span><span x-text="'-' + formatCurrency(selectedOrder?.discount_amount || 0)"></span></div>
+                        <div x-show="selectedOrder?.ongkir > 0" class="flex justify-between text-sm"><span>Ongkir</span><span x-text="formatCurrency(selectedOrder?.ongkir)"></span></div>
                         <div class="flex justify-between font-bold text-lg pt-2 border-t border-[hsl(var(--border))]"><span>Total</span><span x-text="formatCurrency(selectedOrder?.total)"></span></div>
+                    </div>
+                    <div x-show="selectedOrder?.catatan" class="border-t border-[hsl(var(--border))] pt-4">
+                        <h5 class="font-medium mb-2">Catatan</h5>
+                        <p class="text-sm text-[hsl(var(--muted-foreground))] bg-amber-50 p-3 rounded-lg" x-text="selectedOrder?.catatan"></p>
                     </div>
                     <div class="border-t border-[hsl(var(--border))] pt-4">
                         <h5 class="font-medium mb-3">Payment Method</h5>
@@ -357,9 +481,10 @@ function ordersApp() {
         loading: true, creating: false,
         orders: [], stores: [], tables: [], products: [], orderItems: [],
         search: '', statusFilter: '', storeFilter: '', productSearch: '',
+        viewMode: 'all',
         showCreateModal: false, showViewModal: false,
         selectedOrder: null,
-        createForm: { store_id: '', table_id: '' },
+        createForm: { store_id: '', table_id: '', delivery_type: 'pickup', alamat: '', ongkir: 0, catatan: '' },
         pagination: { currentPage: 1, lastPage: 1, from: 0, to: 0, total: 0 },
         sidebarOpen: window.innerWidth >= 1024, isMobile: window.innerWidth < 768, user: null, notifications: [],
         searchTimeout: null,
@@ -430,6 +555,8 @@ function ordersApp() {
                 if (this.search) params.append('search', this.search);
                 if (this.statusFilter) params.append('status', this.statusFilter);
                 if (this.storeFilter) params.append('store_id', this.storeFilter);
+                if (this.viewMode === 'delivery') params.append('delivery_type', 'delivery');
+                else if (this.viewMode === 'pickup') params.append('delivery_type', 'pickup');
                 const res = await fetch(`${this.API_BASE_URL}/orders?${params}`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
                 const data = await res.json();
                 if (data.success) {
@@ -473,6 +600,7 @@ function ordersApp() {
             return this.products.filter(p => p.name.toLowerCase().includes(search));
         },
 
+        setViewMode(mode) { this.viewMode = mode; this.pagination.currentPage = 1; this.fetchOrders(); },
         get paginationPages() { const p = [], c = this.pagination.currentPage, l = this.pagination.lastPage; for (let i = Math.max(1, c - 2); i <= Math.min(l, c + 2); i++) p.push(i); return p; },
         goToPage(page) { if (page >= 1 && page <= this.pagination.lastPage) { this.pagination.currentPage = page; this.fetchOrders(); } },
         formatCurrency(a) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(a || 0); },
@@ -481,14 +609,14 @@ function ordersApp() {
 
         get orderSubtotal() { return this.orderItems.reduce((t, i) => t + (i.price * i.quantity), 0); },
         get orderTax() { return this.orderSubtotal * 0.1; },
-        get orderTotal() { return this.orderSubtotal + this.orderTax; },
+        get orderTotal() { return this.orderSubtotal + this.orderTax + (this.createForm.delivery_type === 'delivery' ? (parseFloat(this.createForm.ongkir) || 0) : 0); },
 
         addToOrder(product) { const existing = this.orderItems.find(i => i.product_id === product.id); if (existing) { existing.quantity++; } else { this.orderItems.push({ product_id: product.id, name: product.name, price: product.price, quantity: 1 }); } },
         increaseQty(i) { this.orderItems[i].quantity++; },
         decreaseQty(i) { if (this.orderItems[i].quantity > 1) this.orderItems[i].quantity--; else this.removeItem(i); },
         removeItem(i) { this.orderItems.splice(i, 1); },
 
-        async openCreateModal() { this.createForm = { store_id: '', table_id: '' }; this.orderItems = []; this.products = []; this.productSearch = ''; await this.fetchProducts(); this.showCreateModal = true; },
+        async openCreateModal() { this.createForm = { store_id: '', table_id: '', delivery_type: 'pickup', alamat: '', ongkir: 0, catatan: '' }; this.orderItems = []; this.products = []; this.productSearch = ''; await this.fetchProducts(); this.showCreateModal = true; },
         closeCreateModal() { this.showCreateModal = false; },
 
         async createOrder() {
@@ -501,7 +629,7 @@ function ordersApp() {
             this.creating = true;
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${this.API_BASE_URL}/orders`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ store_id: this.createForm.store_id, table_id: this.createForm.table_id || null, items: this.orderItems.map(i => ({ product_id: i.product_id, quantity: i.quantity })) }) });
+                const res = await fetch(`${this.API_BASE_URL}/orders`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ store_id: this.createForm.store_id, table_id: this.createForm.table_id || null, delivery_type: this.createForm.delivery_type, alamat: this.createForm.delivery_type === 'delivery' ? this.createForm.alamat : null, ongkir: this.createForm.delivery_type === 'delivery' ? (parseFloat(this.createForm.ongkir) || 0) : 0, catatan: this.createForm.catatan || null, items: this.orderItems.map(i => ({ product_id: i.product_id, quantity: i.quantity })) }) });
                 const data = await res.json();
                 if (data.success) { this.closeCreateModal(); await this.fetchOrders(); } else { alert(data.message || 'Failed'); }
             } catch (e) { console.error('Error:', e); alert('Failed'); } finally { this.creating = false; }
@@ -546,6 +674,14 @@ function ordersApp() {
                 if (data.success) { await this.fetchOrders(); } else { alert(data.message || 'Failed'); }
             } catch (e) { console.error('Error:', e); alert('Failed'); }
         },
+
+        tooltip: { show: false, text: '', label: '', x: 0, y: 0 },
+        showTooltip(el, text, label) {
+            if (!text) return;
+            const r = el.getBoundingClientRect();
+            this.tooltip = { show: true, text, label, x: r.left, y: r.top - 8 };
+        },
+        hideTooltip() { this.tooltip.show = false; },
 
         logout() { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/login'; },
         addNotification() {}, clearNotifications() {}, removeNotification() {}, formatNotificationTime() { return ''; }

@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Api\Pos;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\PosUser;
 use App\Models\Product;
 use App\Services\OrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Spatie\Permission\Models\Role;
 
 class OrderController extends Controller
 {
@@ -45,6 +47,7 @@ class OrderController extends Controller
             ->whereHas('store', fn ($q) => $q->where('user_id', $effectiveUserId))
             ->when($request->input('store_id'), fn ($q, $storeId) => $q->where('store_id', $storeId))
             ->when($request->input('status'), fn ($q, $status) => $q->where('status', $status))
+            ->when($request->input('delivery_type'), fn ($q, $type) => $q->where('delivery_type', $type))
             ->when($search, fn ($q) => $q->where('order_number', 'like', '%'.$search.'%')
             )
             ->orderBy('created_at', 'desc')
@@ -65,6 +68,10 @@ class OrderController extends Controller
             'store_id' => 'required|exists:stores,id',
             'table_id' => 'nullable|exists:tables,id',
             'pos_user_id' => 'nullable|exists:pos_users,id',
+            'delivery_type' => 'nullable|in:pickup,delivery',
+            'alamat' => 'nullable|string',
+            'ongkir' => 'nullable|numeric|min:0',
+            'catatan' => 'nullable|string',
             'items' => 'nullable|array',
             'items.*.product_id' => 'required_with:items|exists:products,id',
             'items.*.quantity' => 'required_with:items|integer|min:1',
@@ -74,13 +81,13 @@ class OrderController extends Controller
         if (empty($validated['pos_user_id'])) {
             $user = $request->user();
             if ($user) {
-                $posUser = \App\Models\PosUser::where('user_id', $user->id)
+                $posUser = PosUser::where('user_id', $user->id)
                     ->where('is_active', true)
                     ->first();
 
                 // If no PosUser exists, create one with default Spatie role
                 if (! $posUser) {
-                    $defaultRole = \Spatie\Permission\Models\Role::where('name', 'Cashier')
+                    $defaultRole = Role::where('name', 'Cashier')
                         ->where('guard_name', 'sanctum')
                         ->first();
 
@@ -91,7 +98,7 @@ class OrderController extends Controller
                         ], 500);
                     }
 
-                    $posUser = \App\Models\PosUser::create([
+                    $posUser = PosUser::create([
                         'user_id' => $user->id,
                         'store_id' => $validated['store_id'],
                         'role_id' => $defaultRole->id,
@@ -119,7 +126,7 @@ class OrderController extends Controller
             // Add items if provided
             if (! empty($validated['items'])) {
                 foreach ($validated['items'] as $itemData) {
-                    $product = \App\Models\Product::find($itemData['product_id']);
+                    $product = Product::find($itemData['product_id']);
                     if ($product) {
                         $this->orderService->addItem($order, $product, $itemData['quantity']);
                     }
