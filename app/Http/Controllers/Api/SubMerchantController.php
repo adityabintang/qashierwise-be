@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
+use RuntimeException;
 
 /**
  * Controller for sub-merchant registration and management API endpoints.
@@ -111,6 +112,19 @@ class SubMerchantController extends Controller
                     'message' => $e->getMessage(),
                 ],
             ], 422);
+        } catch (RuntimeException $e) {
+            Log::error('Sub-merchant registration failed: XenPlatform error', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'PAYMENT_PROVIDER_ERROR',
+                    'message' => 'Failed to register with payment provider. Please try again later.',
+                ],
+            ], 503);
         }
     }
 
