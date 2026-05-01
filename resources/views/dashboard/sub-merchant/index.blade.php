@@ -141,7 +141,8 @@
                                 </div>
                                 <div class="card-content">
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <a href="/dashboard/sub-merchant/provider-settings" class="flex items-center gap-4 p-4 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors">
+                                        <!-- Provider Settings - Temporarily Hidden -->
+                                        <a href="/dashboard/sub-merchant/provider-settings" class="hidden flex items-center gap-4 p-4 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors">
                                             <div class="h-12 w-12 rounded-xl bg-purple-500 flex items-center justify-center">
                                                 <i class="fas fa-cogs text-xl text-white"></i>
                                             </div>
