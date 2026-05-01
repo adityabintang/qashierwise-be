@@ -107,7 +107,7 @@ class XenditWebhookController extends Controller
 
         // Recurring/Subscription events
         if (str_starts_with($eventType, 'recurring.')) {
-            return $this->handleRecurringWebhook($eventType, $data);
+            return $this->handleRecurringWebhook($eventType, $data, $signature);
         }
 
         // Account events - just log and acknowledge
@@ -289,11 +289,28 @@ class XenditWebhookController extends Controller
      * - recurring.plan.inactivated: Subscription cancelled/stopped
      * - recurring.cycle.succeeded: Payment successful for a cycle
      * - recurring.cycle.failed: Payment failed for a cycle
+     *
+     * Signature verification is mandatory. Without it, anyone who knows a
+     * xendit_subscription_id (returned by the checkout endpoint) can POST a
+     * fake recurring.plan.activated event and obtain free access.
      */
-    protected function handleRecurringWebhook(string $eventType, array $data): JsonResponse
+    protected function handleRecurringWebhook(string $eventType, array $data, string $signature): JsonResponse
     {
         $subscriptionId = $data['id'] ?? null;
         $referenceId = $data['reference_id'] ?? null;
+
+        // Verify webhook authenticity before processing any subscription state change.
+        $xenPlatformService = app(\App\Services\XenPlatformService::class);
+        if (! $xenPlatformService->verifyWebhookSignature($signature)) {
+            Log::warning('Xendit Recurring webhook signature verification failed', [
+                'event' => $eventType,
+                'subscription_id' => $subscriptionId,
+            ]);
+
+            $errorResponse = ErrorResponse::unauthorized('Invalid webhook signature');
+
+            return response()->json($errorResponse->toArray(), $errorResponse->statusCode);
+        }
 
         Log::info('Xendit Recurring webhook received', [
             'event' => $eventType,

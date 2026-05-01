@@ -117,6 +117,32 @@ class XenditSubscriptionService
     }
 
     /**
+     * Verify that a customer ID still exists in Xendit.
+     *
+     * @return bool True if the customer exists, false if 404 or on any error
+     */
+    public function customerExistsInXendit(string $customerId): bool
+    {
+        $this->ensureApiKey();
+
+        try {
+            $response = Http::withBasicAuth($this->apiKey, '')
+                ->withHeaders(['Content-Type' => 'application/json'])
+                ->timeout(30)
+                ->get("{$this->baseUrl}/customers/{$customerId}");
+
+            return $response->successful();
+        } catch (\Exception $e) {
+            Log::warning('Xendit: Error verifying customer existence', [
+                'customer_id' => $customerId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
      * Get an existing customer by reference ID.
      *
      * @return string|null The customer ID or null if not found
@@ -169,7 +195,8 @@ class XenditSubscriptionService
     public function createRecurringPlan(
         User $user,
         string $planId,
-        string $duration
+        string $duration,
+        ?string $requestBaseUrl = null
     ): array {
         $this->ensureApiKey();
 
@@ -205,8 +232,9 @@ class XenditSubscriptionService
         try {
             // Get success/cancel URLs
             $urls = config('subscription.urls', []);
-            $successUrl = $urls['success'] ?? config('app.url').'/subscription/success';
-            $cancelUrl = $urls['cancel'] ?? config('app.url').'/subscription/cancelled';
+            $base = $requestBaseUrl ?? config('app.url');
+            $successUrl = $urls['success'] ?? $base.'/subscription/success';
+            $cancelUrl = $urls['cancel'] ?? $base.'/subscription/cancelled';
 
             // Build payload according to Xendit API specification
             // See: https://docs.xendit.co/apidocs/create-recurring-plan
@@ -472,13 +500,28 @@ class XenditSubscriptionService
 
     /**
      * Get or create a customer for a user.
+     *
+     * Always verifies that a stored customer ID still exists in Xendit before
+     * reusing it. If the stored ID returns 404 (e.g. expired/cleaned up on
+     * Xendit's side), the stale ID is cleared and a fresh customer is created.
      */
     private function getOrCreateCustomer(User $user): string
     {
-        // Check if user already has a Xendit customer ID stored
         $subscription = $user->subscription;
+
         if ($subscription && ! empty($subscription->xendit_customer_id)) {
-            return $subscription->xendit_customer_id;
+            $storedId = $subscription->xendit_customer_id;
+
+            if ($this->customerExistsInXendit($storedId)) {
+                return $storedId;
+            }
+
+            // Stored customer no longer exists in Xendit — clear the stale ID
+            Log::warning('Xendit: Stored customer ID no longer valid, will create a new one', [
+                'user_id' => $user->id,
+                'stale_customer_id' => $storedId,
+            ]);
+            $subscription->update(['xendit_customer_id' => null]);
         }
 
         // Try to find existing customer by reference ID
@@ -486,7 +529,6 @@ class XenditSubscriptionService
         $existingCustomerId = $this->getCustomerByReferenceId($referenceId);
 
         if ($existingCustomerId) {
-            // Save to subscription if exists
             if ($subscription) {
                 $subscription->update(['xendit_customer_id' => $existingCustomerId]);
             }
@@ -497,7 +539,6 @@ class XenditSubscriptionService
         // Create new customer
         $customerId = $this->createCustomer($user);
 
-        // Save to subscription if exists
         if ($subscription) {
             $subscription->update(['xendit_customer_id' => $customerId]);
         }

@@ -369,6 +369,13 @@ class SubscriptionController extends Controller
                     'status' => 'active',
                 ]);
 
+                // Record payment in billing history (idempotent).
+                $this->subscriptionService->recordXenditPayment(
+                    $subscription,
+                    $subscription->xendit_subscription_id,
+                    $xenditPlan['reference_id'] ?? null,
+                );
+
                 return redirect()->route('dashboard')->with('success', 'Payment successful! Your subscription is now active.');
             }
 

@@ -10,6 +10,7 @@ use App\Services\SubscriptionService;
 use App\Services\XenditSubscriptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
@@ -30,13 +31,13 @@ class SubscriptionController extends Controller
     /**
      * Reconcile a pending local subscription with Xendit's authoritative state.
      *
-     * Subscriptions land in 'pending' status the moment a checkout is created.
-     * They normally transition to 'active' via the Xendit webhook
-     * `recurring.plan.activated`. When that webhook is delayed, lost, or
-     * unreachable (local dev, behind NAT), this fallback queries Xendit
-     * directly so the user's status reflects reality on the next dashboard
-     * load. Failures are swallowed: a sync error must not break the status
-     * endpoint, the user can simply retry.
+     * Webhook `recurring.plan.activated` is the canonical activator. This
+     * fallback exists for two scenarios: (1) local/dev where Xendit cannot
+     * reach the server, and (2) webhook delivery failures in production.
+     *
+     * Rate-limited to one Xendit API call per subscription per 60 seconds so
+     * that a frontend polling the status endpoint rapidly does not flood the
+     * Xendit API.
      */
     private function syncPendingSubscriptionWithProvider(\App\Models\User $user): void
     {
@@ -50,6 +51,13 @@ class SubscriptionController extends Controller
         ) {
             return;
         }
+
+        // Throttle: at most one Xendit API call per subscription per 60 seconds.
+        $cacheKey = 'xendit_sync_'.$subscription->id;
+        if (Cache::has($cacheKey)) {
+            return;
+        }
+        Cache::put($cacheKey, true, now()->addSeconds(60));
 
         try {
             $xenditPlan = $this->xenditSubscriptionService->getRecurringPlan(
@@ -65,10 +73,16 @@ class SubscriptionController extends Controller
             if ($xenditStatus === 'ACTIVE') {
                 $subscription->update([
                     'status' => 'active',
-                    // Defensive: clear cancelled_at in case it carried over from
-                    // a prior cancellation that pre-dated this checkout.
                     'cancelled_at' => null,
                 ]);
+
+                // Record payment in billing history (idempotent — safe to call even
+                // if webhook already recorded it).
+                $this->subscriptionService->recordXenditPayment(
+                    $subscription,
+                    $subscription->xendit_subscription_id,
+                    $xenditPlan['reference_id'] ?? null,
+                );
 
                 Log::info('Subscription auto-activated from Xendit sync', [
                     'subscription_id' => $subscription->id,
@@ -281,11 +295,42 @@ class SubscriptionController extends Controller
         }
 
         try {
-            // Create Xendit recurring plan
+            // Stop any existing Xendit plan before creating a new one.
+            // Without this, the old plan remains in REQUIRES_ACTION or AUTHORIZING
+            // state in Xendit. When the user tries to authorize the new plan,
+            // Xendit returns INTENT_UNPROCESSABLE_ERROR because a previous intent
+            // for the same customer is still in AUTHORIZING state.
+            $masterAdminForCleanup = $user->isMasterAdmin() ? $user : $user->getMasterAdmin();
+            $existingForCleanup = $masterAdminForCleanup?->subscription;
+            if ($existingForCleanup && ! empty($existingForCleanup->xendit_subscription_id)) {
+                try {
+                    $this->xenditSubscriptionService->stopRecurringPlan(
+                        $existingForCleanup->xendit_subscription_id
+                    );
+                    Log::info('Stopped previous Xendit plan before new checkout', [
+                        'userId' => $user->id,
+                        'old_xendit_subscription_id' => $existingForCleanup->xendit_subscription_id,
+                    ]);
+                } catch (\Exception $e) {
+                    // Non-fatal: log and continue. stopRecurringPlan already handles 404
+                    // (plan already gone), so this only fires on unexpected errors.
+                    Log::warning('Could not stop previous Xendit plan, proceeding anyway', [
+                        'userId' => $user->id,
+                        'old_xendit_subscription_id' => $existingForCleanup->xendit_subscription_id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // Create Xendit recurring plan, passing the actual request origin so
+            // the success/cancel return URLs use the same host the user is on.
+            // This prevents localStorage mismatch when APP_URL differs from the
+            // host in the browser (e.g. localhost vs 127.0.0.1 in local dev).
             $result = $this->xenditSubscriptionService->createRecurringPlan(
                 $user,
                 $planId,
-                $duration
+                $duration,
+                $request->getSchemeAndHttpHost()
             );
 
             Log::info('Xendit checkout session created successfully', [
