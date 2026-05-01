@@ -370,7 +370,8 @@
                                         <li>Pelanggan dapat scan QR code untuk bayar</li>
                                         <li>Setelah pembayaran sukses, AI akan mengirim konfirmasi dengan Order ID, nama produk, dan total harga</li>
                                     </ul>
-                                    <p class="text-xs text-blue-600 mt-3 flex items-center gap-1">
+                                    <!-- Provider Settings info - Temporarily Hidden -->
+                                    <p class="hidden text-xs text-blue-600 mt-3 flex items-center gap-1">
                                         <i class="fas fa-info-circle"></i>
                                         Pastikan payment provider sudah dikonfigurasi di <a href="/dashboard/sub-merchant/provider-settings" class="underline hover:no-underline">Provider Settings</a>
                                     </p>
