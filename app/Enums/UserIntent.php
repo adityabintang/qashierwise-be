@@ -19,9 +19,13 @@ enum UserIntent: string
     {
         $message = strtolower($message);
 
-        // Greeting
+        // Greeting - only if no menu/order/cart keywords follow the greeting
         if (preg_match('/^(hai|halo|hi|hello|hei|assalamualaikum)/', $message)) {
-            return self::GREETING;
+            $hasOrderMenuKeyword = preg_match('/(menu|pesan|beli|order|keranjang|checkout|bayar|produk|daftar|jual apa|ada apa)/i', $message);
+            if (! $hasOrderMenuKeyword) {
+                return self::GREETING;
+            }
+            // Fall through to check more specific intents below
         }
 
         // Next Menu Page (check before View Menu - more specific)

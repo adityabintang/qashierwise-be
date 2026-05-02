@@ -807,11 +807,12 @@ class AiAgentService
             $result = $this->executeToolCall($functionName, $arguments, $account->user_id, $conversation, $aiAgent);
 
             // Track what type of calls we have
-            // get_all_products is also a "search" type call that needs LLM to format for user
-            if (in_array($functionName, ['search_products', 'search_multiple_products', 'get_all_products'])) {
+            // search_products/search_multiple_products are internal - need LLM to format for user
+            // get_all_products returns user-friendly text directly
+            if (in_array($functionName, ['search_products', 'search_multiple_products'])) {
                 $hasSearchCall = true;
             }
-            if (in_array($functionName, ['add_to_cart', 'confirm_order', 'get_cart_summary', 'generate_qris', 'check_payment_status', 'remove_from_cart', 'clear_cart', 'set_delivery_type', 'set_order_notes'])) {
+            if (in_array($functionName, ['add_to_cart', 'confirm_order', 'get_cart_summary', 'generate_qris', 'check_payment_status', 'remove_from_cart', 'clear_cart', 'set_delivery_type', 'set_order_notes', 'get_all_products'])) {
                 $hasFinalAction = true;
             }
 
@@ -933,9 +934,15 @@ class AiAgentService
         // For final actions or if follow-up failed, send results to user
         $userFacingResults = [];
         foreach ($toolResults as $tr) {
-            // Don't show raw search/menu results to user - they're internal and need LLM formatting
-            if (! in_array($tr['function_name'], ['search_products', 'search_multiple_products', 'get_all_products'])) {
-                $userFacingResults[] = $tr['result'];
+            // Don't show raw search results to user - they're internal and need LLM formatting
+            // get_all_products now returns user-friendly text directly
+            if (! in_array($tr['function_name'], ['search_products', 'search_multiple_products'])) {
+                $result = $tr['result'];
+                // Strip EMPTY sentinel prefix from getAllProducts empty-page responses
+                if (str_starts_with($result, 'EMPTY\n')) {
+                    $result = substr($result, 6);
+                }
+                $userFacingResults[] = $result;
             }
         }
 
@@ -1573,33 +1580,21 @@ class AiAgentService
         $nextPage = $currentPage + 1;
         $useToon = $aiAgent->use_toon_format ?? false;
 
-        $result = $this->getAllProducts($account->user_id, $useToon, $nextPage);
+        $result = $this->getAllProducts($account->user_id, false, $nextPage);
 
         if (str_starts_with($result, 'EMPTY')) {
+            $msg = 'Sudah tidak ada menu lagi. Itu semua menu yang tersedia! 😊 Mau pesan yang mana?';
             $conversation->addMessage('human', 'menu lainnya');
-            $conversation->addMessage('ai', 'Sudah tidak ada menu lagi. Itu semua menu yang tersedia! 😊 Mau pesan yang mana?');
-            $this->sendReply($account, $contact->wa_id, 'Sudah tidak ada menu lagi. Itu semua menu yang tersedia! 😊 Mau pesan yang mana?');
+            $conversation->addMessage('ai', $msg);
+            $this->sendReply($account, $contact->wa_id, $msg);
 
             return;
         }
 
         $conversation->setCurrentMenuPage($nextPage);
-
         $conversation->addMessage('human', 'menu lainnya');
-
-        $systemPrompt = $aiAgent->buildSystemPrompt($account->user_id);
-        $messages = $conversation->getRecentMessages(2);
-        $messages[] = ['role' => 'user', 'content' => "Berikut adalah menu halaman {$nextPage} yang perlu ditampilkan ke user dalam format yang ramah:\n\n{$result}"];
-
-        $response = $this->callLLM($systemPrompt, $messages, null, $aiAgent);
-        $assistantMessage = $response['content'] ?? '';
-
-        if (empty(trim($assistantMessage))) {
-            $assistantMessage = $this->formatMenuFallback($result, $nextPage);
-        }
-
-        $conversation->addMessage('ai', $assistantMessage);
-        $this->sendReply($account, $contact->wa_id, $assistantMessage);
+        $conversation->addMessage('ai', $result);
+        $this->sendReply($account, $contact->wa_id, $result);
     }
 
     protected function formatMenuFallback(string $rawResult, int $page): string
@@ -1652,10 +1647,10 @@ class AiAgentService
 
         if ($products->isEmpty()) {
             if ($page > 1) {
-                return "EMPTY\npage:{$page}\naction:katakan tidak ada produk lagi di halaman ini";
+                return "EMPTY\nTidak ada menu lagi di halaman ini.";
             }
 
-            return "EMPTY\naction:katakan belum ada menu tersedia";
+            return "EMPTY\nMaaf, belum ada menu tersedia saat ini.";
         }
 
         // Group products by category
@@ -1663,49 +1658,30 @@ class AiAgentService
             return $product->category?->name ?? 'Lainnya';
         });
 
-        // Use TOON format if enabled (saves ~67% tokens with sbsaga/toon)
-        if ($useToon) {
-            $categorizedArray = [];
-            foreach ($groupedProducts as $categoryName => $categoryProducts) {
-                $categorizedArray[$categoryName] = $categoryProducts->map(fn ($p) => [
-                    'id' => $p->id,
-                    'name' => $p->name,
-                    'price' => $p->price,
-                    'stock' => $p->stock_quantity,
-                ])->toArray();
-            }
-
-            $paginationInfo = "page:{$page}/{$totalPages}|total:{$totalProducts}";
-            if ($page < $totalPages) {
-                $paginationInfo .= '|next:get_all_products(page='.($page + 1).')';
-            }
-
-            return "DATA_MENU\n".Toon::convert(['menu' => $categorizedArray])."\n{$paginationInfo}\nINSTRUKSI: Tampilkan menu per kategori ke user (nama - harga). JANGAN tampilkan ID/TOON ke user. Untuk order, panggil add_to_cart dengan items=[{product_name:'nama',quantity:X}].";
-        }
-
-        // ULTRA-COMPACT format to minimize tokens
+        // Format directly for user display (consistent with test endpoint)
         $lines = [];
-        $lines[] = "MENU p{$page}/{$totalPages}({$totalProducts})";
+        $lines[] = "📋 **DAFTAR MENU** (Halaman {$page}/{$totalPages})";
+        $lines[] = str_repeat('─', 30);
 
         foreach ($groupedProducts as $categoryName => $categoryProducts) {
-            $items = [];
+            $lines[] = "\n🏷️ **{$categoryName}**";
             foreach ($categoryProducts as $product) {
                 $price = number_format($product->price, 0, ',', '.');
-                // Simplified format - just name and price, no ID needed
-                $items[] = "{$product->name} Rp{$price}";
+                $stock = ($product->stock_quantity !== null && $product->stock_quantity <= 0) ? ' _(Habis)_' : '';
+                $lines[] = "  • {$product->name} - Rp {$price}{$stock}";
             }
-            $lines[] = "{$categoryName}:".implode('|', $items);
         }
 
-        // Clear instruction for LLM - use product_name not product_id
-        $paginationInfo = "Halaman {$page} dari {$totalPages}";
+        $lines[] = "\n".str_repeat('─', 30);
+
         if ($page < $totalPages) {
-            $paginationInfo .= ". Ada menu lainnya! Jika user bertanya 'ada yang lain', panggil get_all_products(page=".($page + 1).')';
+            $remaining = $totalProducts - ($page * $perPage);
+            $lines[] = "📄 Masih ada {$remaining} menu lagi. Ketik \"menu lainnya\" untuk lihat selanjutnya.";
         } else {
-            $paginationInfo .= '. Ini halaman terakhir.';
+            $lines[] = "✅ Total: {$totalProducts} menu tersedia.";
         }
-        $lines[] = $paginationInfo;
-        $lines[] = 'ACT:show menu to user,order→add_to_cart(items=[{product_name:"nama",quantity:X}])';
+
+        $lines[] = "\n💬 Mau pesan apa? Contoh: \"pesan nasi goreng 2 porsi\"";
 
         return implode("\n", $lines);
     }
