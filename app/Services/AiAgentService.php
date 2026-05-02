@@ -2193,7 +2193,7 @@ class AiAgentService
 
         try {
             return DB::transaction(function () use ($conversation, $aiAgent, $userId, $cart) {
-                $contact = $conversation->whatsappContact;
+                $contact = $conversation->whatsappContact()->withoutGlobalScopes()->first();
 
                 $deliveryType = $conversation->getDeliveryType();
                 $deliveryAddress = $conversation->getDeliveryAddress();
