@@ -53,6 +53,12 @@ enum UserIntent: string
             return self::ORDER;
         }
 
+        // Delivery address message — "alamat" here is part of order flow, not business info
+        if (preg_match('/(delivery|pickup|antar|ambil sendiri)/i', $message) &&
+            preg_match('/(alamat|address)/i', $message)) {
+            return self::ORDER;
+        }
+
         // Business Info
         if (preg_match('/(jam|buka|tutup|alamat|lokasi|dimana|kontak|telepon)/i', $message)) {
             return self::BUSINESS_INFO;

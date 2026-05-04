@@ -616,11 +616,13 @@ class AiAgentService
      */
     protected function intentNeedsTools(UserIntent $intent): bool
     {
-        // These intents don't need product/order tools
+        // These intents don't need product/order tools.
+        // BUSINESS_INFO is intentionally excluded from this list: "alamat" in a delivery
+        // address message gets misclassified as BUSINESS_INFO, and without tools the LLM
+        // can never call set_delivery_type, causing confirm_order to loop forever.
         $noToolIntents = [
             UserIntent::GREETING,
             UserIntent::OFF_TOPIC,
-            UserIntent::BUSINESS_INFO,
         ];
 
         return ! in_array($intent, $noToolIntents);
