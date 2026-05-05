@@ -366,11 +366,15 @@
                                     <button
                                         type="button"
                                         @click="hasSubMerchant && (config.qris_enabled = !config.qris_enabled)"
-                                        :class="config.qris_enabled && hasSubMerchant ? 'bg-blue-600 ring-2 ring-blue-200' : 'bg-gray-300'"
+                                        :class="{
+                                            'bg-blue-600 ring-2 ring-blue-200': config.qris_enabled && hasSubMerchant,
+                                            'bg-gray-300': !(config.qris_enabled && hasSubMerchant),
+                                            'cursor-not-allowed': !hasSubMerchant,
+                                            'cursor-pointer': hasSubMerchant
+                                        }"
                                         :disabled="!hasSubMerchant"
                                         :title="!hasSubMerchant ? 'Buat Sub Merchant terlebih dahulu untuk mengaktifkan QRIS' : ''"
                                         class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex-shrink-0"
-                                        :class="!hasSubMerchant ? 'cursor-not-allowed' : 'cursor-pointer'"
                                     >
                                         <span
                                             :class="config.qris_enabled && hasSubMerchant ? 'translate-x-6' : 'translate-x-1'"
