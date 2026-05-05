@@ -633,6 +633,7 @@ function aiAgentApp() {
         loading: true,
         saving: false,
         hasWhatsAppAccount: false,
+        hasSubMerchant: false,
         togglingActive: false,
         togglingOrder: false,
         lastSaved: null,
@@ -718,6 +719,7 @@ function aiAgentApp() {
                 }
 
                 this.hasWhatsAppAccount = true;
+                this.hasSubMerchant = data.has_sub_merchant || false;
 
                 if (data.success && data.data) {
                     this.config = {

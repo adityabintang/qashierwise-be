@@ -11,6 +11,7 @@ use App\Models\Payment;
 use App\Models\Product;
 use App\Models\QrisTransaction;
 use App\Models\Store;
+use App\Models\SubMerchant;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
 use App\Services\AiAgentService;
@@ -56,11 +57,14 @@ class AiAgentController extends Controller
 
             $aiAgent = AiAgent::where('whatsapp_account_id', $whatsappAccount->id)->first();
 
+            $hasSubMerchant = SubMerchant::where('user_id', $userId)->exists();
+
             if (! $aiAgent) {
                 return response()->json([
                     'success' => true,
                     'message' => 'AI Agent not configured yet',
                     'data' => null,
+                    'has_sub_merchant' => $hasSubMerchant,
                 ], 200);
             }
 
@@ -83,6 +87,7 @@ class AiAgentController extends Controller
                     'created_at' => $aiAgent->created_at,
                     'updated_at' => $aiAgent->updated_at,
                 ],
+                'has_sub_merchant' => $hasSubMerchant,
             ], 200);
 
         } catch (\Exception $e) {
@@ -121,6 +126,17 @@ class AiAgentController extends Controller
                     return response()->json([
                         'success' => false,
                         'message' => 'Invalid store. Store not found or does not belong to you.',
+                    ], 422);
+                }
+            }
+
+            // Validate sub-merchant exists before enabling QRIS
+            if ($request->boolean('qris_enabled', false)) {
+                $hasSubMerchant = SubMerchant::where('user_id', $userId)->exists();
+                if (! $hasSubMerchant) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'QRIS Payment tidak bisa diaktifkan. Silakan buat Sub Merchant terlebih dahulu di halaman Sub Merchant.',
                     ], 422);
                 }
             }
