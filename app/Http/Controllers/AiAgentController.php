@@ -17,6 +17,7 @@ use App\Models\WhatsAppContact;
 use App\Services\AiAgentService;
 use App\Services\OrderService;
 use App\Services\QrisService;
+use App\Services\SubMerchantService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -31,11 +32,14 @@ class AiAgentController extends Controller
 
     protected OrderService $orderService;
 
-    public function __construct(AiAgentService $aiAgentService, QrisService $qrisService, OrderService $orderService)
+    protected SubMerchantService $subMerchantService;
+
+    public function __construct(AiAgentService $aiAgentService, QrisService $qrisService, OrderService $orderService, SubMerchantService $subMerchantService)
     {
         $this->aiAgentService = $aiAgentService;
         $this->qrisService = $qrisService;
         $this->orderService = $orderService;
+        $this->subMerchantService = $subMerchantService;
     }
 
     /**
@@ -45,6 +49,10 @@ class AiAgentController extends Controller
     {
         try {
             $userId = auth()->user()->getEffectiveUserId();
+
+            // Verify XenPlatform account is still valid each time user opens AI agent page.
+            // Cleans up stale sub-merchant data so the QRIS toggle reflects the real state.
+            $this->subMerchantService->verifyAndCleanupInvalidAccount(auth()->user());
 
             $whatsappAccount = WhatsAppAccount::where('user_id', $userId)->first();
 

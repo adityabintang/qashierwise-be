@@ -11,7 +11,6 @@ use App\Notifications\SendOtpNotification;
 use App\Notifications\SendPasswordResetLinkNotification;
 use App\Services\OtpService;
 use App\Services\PasswordResetService;
-use App\Services\SubMerchantService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -24,13 +23,10 @@ class AuthController extends Controller
 
     protected PasswordResetService $passwordResetService;
 
-    protected SubMerchantService $subMerchantService;
-
-    public function __construct(OtpService $otpService, PasswordResetService $passwordResetService, SubMerchantService $subMerchantService)
+    public function __construct(OtpService $otpService, PasswordResetService $passwordResetService)
     {
         $this->otpService = $otpService;
         $this->passwordResetService = $passwordResetService;
-        $this->subMerchantService = $subMerchantService;
     }
 
     /**
@@ -177,12 +173,6 @@ class AuthController extends Controller
         $expirationMinutes = (int) config('sanctum.expiration', 43200);
         $expiresAt = now()->addMinutes($expirationMinutes);
         $token = $user->createToken('auth_token', ['*'], $expiresAt)->plainTextToken;
-
-        // Verify sub-merchant XenPlatform account is still valid.
-        // If the account no longer exists in Xendit, clean up the local data
-        // so the user can re-register cleanly at /dashboard/sub-merchant/.
-        // Errors here never block login.
-        $this->subMerchantService->verifyAndCleanupInvalidAccount($user);
 
         return ApiResponse::success([
             'user' => [
