@@ -337,30 +337,50 @@
                                 </p>
                             </div>
                             <div class="p-4 sm:p-6 space-y-5">
+                                <!-- No Sub-Merchant Warning -->
+                                <div x-show="!hasSubMerchant" x-transition class="bg-red-50 border border-red-200 rounded-xl p-4">
+                                    <p class="text-sm text-red-800 font-medium">
+                                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                                        Sub Merchant belum dibuat
+                                    </p>
+                                    <p class="text-sm text-red-700 mt-1">
+                                        QRIS Payment memerlukan Sub Merchant aktif. Silakan buat Sub Merchant terlebih dahulu agar dapat menggunakan fitur ini.
+                                    </p>
+                                    <a href="{{ config('app.url') }}/dashboard/sub-merchant/"
+                                        class="inline-flex items-center gap-2 mt-3 text-sm font-medium text-red-700 underline hover:no-underline">
+                                        <i class="fas fa-external-link-alt"></i>
+                                        Buat Sub Merchant sekarang
+                                    </a>
+                                </div>
+
                                 <!-- QRIS Toggle -->
-                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl" :class="config.qris_enabled ? 'bg-blue-100 border border-blue-400 shadow-sm shadow-blue-100' : 'bg-gray-50 border border-gray-200'">
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl"
+                                    :class="!hasSubMerchant ? 'bg-gray-50 border border-gray-200 opacity-60' : (config.qris_enabled ? 'bg-blue-100 border border-blue-400 shadow-sm shadow-blue-100' : 'bg-gray-50 border border-gray-200')">
                                     <div class="flex-1">
-                                        <p class="font-medium" :class="config.qris_enabled ? 'text-blue-950' : 'text-gray-600'">Enable QRIS Payment</p>
-                                        <p class="text-sm" :class="config.qris_enabled ? 'text-blue-800' : 'text-gray-500'">
-                                            <span x-show="config.qris_enabled">QRIS akan otomatis di-generate saat pelanggan konfirmasi pembelian</span>
-                                            <span x-show="!config.qris_enabled">Pembayaran manual - pelanggan akan diarahkan ke kasir</span>
+                                        <p class="font-medium" :class="config.qris_enabled && hasSubMerchant ? 'text-blue-950' : 'text-gray-600'">Enable QRIS Payment</p>
+                                        <p class="text-sm" :class="config.qris_enabled && hasSubMerchant ? 'text-blue-800' : 'text-gray-500'">
+                                            <span x-show="config.qris_enabled && hasSubMerchant">QRIS akan otomatis di-generate saat pelanggan konfirmasi pembelian</span>
+                                            <span x-show="!config.qris_enabled || !hasSubMerchant">Pembayaran manual - pelanggan akan diarahkan ke kasir</span>
                                         </p>
                                     </div>
                                     <button
                                         type="button"
-                                        @click="config.qris_enabled = !config.qris_enabled"
-                                        :class="config.qris_enabled ? 'bg-blue-600 ring-2 ring-blue-200' : 'bg-gray-300'"
-                                        class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex-shrink-0 cursor-pointer"
+                                        @click="hasSubMerchant && (config.qris_enabled = !config.qris_enabled)"
+                                        :class="config.qris_enabled && hasSubMerchant ? 'bg-blue-600 ring-2 ring-blue-200' : 'bg-gray-300'"
+                                        :disabled="!hasSubMerchant"
+                                        :title="!hasSubMerchant ? 'Buat Sub Merchant terlebih dahulu untuk mengaktifkan QRIS' : ''"
+                                        class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex-shrink-0"
+                                        :class="!hasSubMerchant ? 'cursor-not-allowed' : 'cursor-pointer'"
                                     >
                                         <span
-                                            :class="config.qris_enabled ? 'translate-x-6' : 'translate-x-1'"
+                                            :class="config.qris_enabled && hasSubMerchant ? 'translate-x-6' : 'translate-x-1'"
                                             class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md"
                                         ></span>
                                     </button>
                                 </div>
 
                                 <!-- QRIS Enabled Info -->
-                                <div x-show="config.qris_enabled" x-transition class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                                <div x-show="config.qris_enabled && hasSubMerchant" x-transition class="bg-blue-50 border border-blue-200 rounded-xl p-4">
                                     <p class="text-sm text-blue-800 font-medium">
                                         <i class="fas fa-check-circle mr-2"></i>
                                         QRIS Payment aktif! Saat pelanggan konfirmasi pembelian:
@@ -377,8 +397,8 @@
                                     </p>
                                 </div>
 
-                                <!-- QRIS Disabled Info -->
-                                <div x-show="!config.qris_enabled" x-transition class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                                <!-- QRIS Disabled Info (only show when sub-merchant exists but QRIS off) -->
+                                <div x-show="hasSubMerchant && !config.qris_enabled" x-transition class="bg-amber-50 border border-amber-200 rounded-xl p-4">
                                     <p class="text-sm text-amber-800 font-medium">
                                         <i class="fas fa-info-circle mr-2"></i>
                                         Mode Manual - Saat pelanggan konfirmasi pembelian:
