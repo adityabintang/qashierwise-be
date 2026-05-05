@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\AiAgent;
 use App\Models\MerchantBalance;
 use App\Models\SubMerchant;
 use App\Models\User;
+use App\Models\WhatsAppAccount;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
@@ -207,5 +209,83 @@ class SubMerchantService
     public function canBecomeSubMerchant(User $user): bool
     {
         return $user->subMerchant === null;
+    }
+
+    /**
+     * Verify that the user's sub-merchant actually exists in XenPlatform.
+     * If the account is invalid (missing, or not found in Xendit), delete all
+     * sub-merchant data so the user can re-register cleanly.
+     *
+     * Returns true if cleanup was performed, false otherwise.
+     * Never throws — all errors are logged silently to avoid blocking login.
+     */
+    public function verifyAndCleanupInvalidAccount(User $user): bool
+    {
+        try {
+            $subMerchant = $this->findByUserId($user->id);
+
+            if ($subMerchant === null) {
+                return false;
+            }
+
+            $needsCleanup = false;
+
+            if ($subMerchant->xendit_account_id === null || $subMerchant->xendit_account_status !== 'active') {
+                // Local state is already invalid — no Xendit call needed
+                Log::warning('SubMerchant has invalid local XenPlatform state, cleaning up', [
+                    'user_id' => $user->id,
+                    'sub_merchant_id' => $subMerchant->id,
+                    'xendit_account_id' => $subMerchant->xendit_account_id,
+                    'xendit_account_status' => $subMerchant->xendit_account_status,
+                ]);
+                $needsCleanup = true;
+            } else {
+                // Has a xendit_account_id marked active — verify it actually exists in Xendit
+                $exists = $this->xenPlatformService->verifySubAccount($subMerchant->xendit_account_id);
+
+                if ($exists === false) {
+                    Log::warning('SubMerchant xendit account not found in XenPlatform, cleaning up', [
+                        'user_id' => $user->id,
+                        'sub_merchant_id' => $subMerchant->id,
+                        'xendit_account_id' => $subMerchant->xendit_account_id,
+                    ]);
+                    $needsCleanup = true;
+                } elseif ($exists === null) {
+                    // Network error or unexpected response — skip cleanup, try next login
+                    return false;
+                }
+                // $exists === true → all good
+            }
+
+            if (! $needsCleanup) {
+                return false;
+            }
+
+            DB::transaction(function () use ($user, $subMerchant) {
+                // Disable QRIS on AI agent so user knows they need to re-register
+                $whatsappAccount = WhatsAppAccount::where('user_id', $user->id)->first();
+                if ($whatsappAccount) {
+                    AiAgent::where('whatsapp_account_id', $whatsappAccount->id)
+                        ->update(['qris_enabled' => false]);
+                }
+
+                // Delete sub-merchant — cascades to merchant_balances, qris_transactions, withdrawal_requests
+                $subMerchant->delete();
+            });
+
+            Log::info('SubMerchant invalid XenPlatform account cleaned up', [
+                'user_id' => $user->id,
+                'sub_merchant_id' => $subMerchant->id,
+            ]);
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error('SubMerchant verification/cleanup failed unexpectedly', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 }
