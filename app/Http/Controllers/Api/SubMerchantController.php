@@ -27,6 +27,11 @@ class SubMerchantController extends Controller
     public function status(Request $request): JsonResponse
     {
         $user = $request->user();
+
+        // Verify XenPlatform account is still valid each time user opens sub-merchant page.
+        // Cleans up stale data so user can re-register if account no longer exists in Xendit.
+        $this->subMerchantService->verifyAndCleanupInvalidAccount($user);
+
         $subMerchant = $this->subMerchantService->findByUserId($user->id);
 
         if ($subMerchant === null) {
