@@ -375,6 +375,16 @@ class WhatsAppWebhookController extends Controller
             ->first();
 
         if ($aiAgent && $type === 'text') {
+            // Skip duplicate webhook deliveries — same wamid already processed
+            if (! $whatsappMessage->wasRecentlyCreated) {
+                Log::info('Duplicate webhook delivery, skipping AI dispatch', [
+                    'message_id' => $messageId,
+                    'contact_id' => $contact->id,
+                ]);
+
+                return $messageData;
+            }
+
             $contact->refresh();
             if (! $contact->ai_active) {
                 Log::info('AI disabled for this contact, skipping', [
