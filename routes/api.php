@@ -245,6 +245,7 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::delete('/orders/{order}/items/{item}', [OrderController::class, 'removeItem'])->middleware('pos.permission:manage_orders');
         Route::post('/orders/{order}/discount', [OrderController::class, 'applyDiscount'])->middleware('pos.permission:manage_orders');
         Route::post('/orders/{order}/cancel', [OrderController::class, 'cancel'])->middleware('pos.permission:manage_orders');
+        Route::post('/orders/{order}/resend-qris', [OrderController::class, 'resendQrisLink'])->middleware('pos.permission:manage_orders');
         Route::get('/orders', [OrderController::class, 'index'])->middleware('pos.permission:view_orders|manage_orders');
         Route::post('/orders', [OrderController::class, 'store'])->middleware('pos.permission:manage_orders');
         Route::get('/orders/{order}', [OrderController::class, 'show'])->middleware('pos.permission:view_orders|manage_orders');

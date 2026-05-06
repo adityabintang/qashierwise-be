@@ -316,6 +316,45 @@
                                 <input type="number" x-model.number="createForm.ongkir" min="0" step="500" placeholder="0" class="input w-full min-h-[44px]">
                             </div>
                         </div>
+                        <!-- Customer Info -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">Nama Customer</label>
+                                <input type="text" x-model="createForm.customer_name" placeholder="Nama pelanggan..." class="input w-full min-h-[44px]">
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium mb-1.5 block">No. WhatsApp</label>
+                                <input type="text" x-model="createForm.customer_phone" placeholder="628xxx..." class="input w-full min-h-[44px]">
+                            </div>
+                        </div>
+                        <!-- Payment Method -->
+                        <div>
+                            <label class="text-sm font-medium mb-1.5 block">Metode Pembayaran</label>
+                            <div class="flex gap-2">
+                                <button type="button" @click="createForm.payment_method = 'cash'" class="flex-1 h-10 rounded-lg text-sm font-medium transition-all" :class="createForm.payment_method === 'cash' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">
+                                    <i class="fas fa-money-bill-wave mr-1"></i> Cash
+                                </button>
+                                <div class="flex-1 relative" :title="subMerchantActive === false ? 'QRIS tidak tersedia — daftarkan Sub-Merchant QRIS terlebih dahulu di menu Pengaturan QRIS' : ''">
+                                    <button type="button"
+                                        @click="subMerchantActive ? (createForm.payment_method = 'qris') : null"
+                                        :disabled="!subMerchantActive"
+                                        class="w-full h-10 rounded-lg text-sm font-medium transition-all"
+                                        :class="!subMerchantActive ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60' : (createForm.payment_method === 'qris' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')">
+                                        <i class="fas fa-qrcode mr-1"></i> QRIS
+                                        <template x-if="!subMerchantActive">
+                                            <i class="fas fa-lock ml-1 text-xs"></i>
+                                        </template>
+                                    </button>
+                                </div>
+                            </div>
+                            <p x-show="!subMerchantActive" class="text-xs text-amber-600 mt-1.5 flex items-start gap-1">
+                                <i class="fas fa-exclamation-triangle mt-0.5 flex-shrink-0"></i>
+                                <span>QRIS belum aktif. Daftarkan akun Sub-Merchant QRIS di <strong>menu Pengaturan QRIS</strong> untuk menggunakan fitur ini.</span>
+                            </p>
+                            <p x-show="subMerchantActive && createForm.payment_method === 'qris' && createForm.customer_phone" class="text-xs text-blue-600 mt-1">
+                                <i class="fas fa-info-circle mr-1"></i> Link pembayaran akan dikirim ke WhatsApp customer
+                            </p>
+                        </div>
                         <div>
                             <label class="text-sm font-medium mb-1.5 block">Catatan (Optional)</label>
                             <input type="text" x-model="createForm.catatan" placeholder="Catatan pesanan..." class="input w-full min-h-[44px]">
@@ -452,6 +491,13 @@
                         <h5 class="font-medium mb-2">Catatan</h5>
                         <p class="text-sm text-[hsl(var(--muted-foreground))] bg-amber-50 p-3 rounded-lg" x-text="selectedOrder?.catatan"></p>
                     </div>
+                    <div x-show="selectedOrder?.customer_name || selectedOrder?.customer_phone" class="border-t border-[hsl(var(--border))] pt-4">
+                        <h5 class="font-medium mb-3">Customer</h5>
+                        <div class="grid grid-cols-2 gap-2 text-sm">
+                            <div x-show="selectedOrder?.customer_name"><span class="text-[hsl(var(--muted-foreground))]">Nama:</span><p class="font-medium" x-text="selectedOrder?.customer_name"></p></div>
+                            <div x-show="selectedOrder?.customer_phone"><span class="text-[hsl(var(--muted-foreground))]">WhatsApp:</span><p class="font-medium" x-text="selectedOrder?.customer_phone"></p></div>
+                        </div>
+                    </div>
                     <div class="border-t border-[hsl(var(--border))] pt-4">
                         <h5 class="font-medium mb-3">Payment Method</h5>
                         <template x-if="selectedOrder?.payments && selectedOrder.payments.length > 0">
@@ -468,6 +514,50 @@
                             <p class="text-sm text-[hsl(var(--muted-foreground))]">No payment recorded</p>
                         </template>
                     </div>
+                    <!-- QRIS Section -->
+                    <template x-if="selectedOrder?.qris_transaction">
+                        <div class="border-t border-[hsl(var(--border))] pt-4">
+                            <h5 class="font-medium mb-3 flex items-center gap-2">
+                                <i class="fas fa-qrcode text-blue-600"></i> QRIS Payment
+                                <span class="text-xs px-2 py-0.5 rounded-full font-normal"
+                                    :class="{
+                                        'bg-amber-100 text-amber-700': selectedOrder.qris_transaction.status === 'pending',
+                                        'bg-emerald-100 text-emerald-700': selectedOrder.qris_transaction.status === 'settlement',
+                                        'bg-red-100 text-red-700': ['cancel','expire'].includes(selectedOrder.qris_transaction.status)
+                                    }"
+                                    x-text="selectedOrder.qris_transaction.status">
+                                </span>
+                            </h5>
+                            <div class="flex flex-col items-center gap-3">
+                                <template x-if="selectedOrder.qris_transaction.qr_code_url">
+                                    <img :src="selectedOrder.qris_transaction.qr_code_url" alt="QRIS Code" class="w-48 h-48 border border-gray-200 rounded-lg p-2">
+                                </template>
+                                <div class="w-full space-y-2">
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-[hsl(var(--muted-foreground))]">Jumlah</span>
+                                        <span class="font-medium" x-text="formatCurrency(selectedOrder.qris_transaction.amount)"></span>
+                                    </div>
+                                    <div x-show="selectedOrder.qris_transaction.expires_at" class="flex justify-between text-sm">
+                                        <span class="text-[hsl(var(--muted-foreground))]">Berlaku hingga</span>
+                                        <span x-text="formatDate(selectedOrder.qris_transaction.expires_at)"></span>
+                                    </div>
+                                    <div class="pt-2">
+                                        <a :href="selectedOrder.qris_transaction.shareable_link" target="_blank"
+                                            class="btn btn-outline btn-sm w-full flex items-center justify-center gap-2">
+                                            <i class="fas fa-external-link-alt"></i>
+                                            <span>Buka Link Pembayaran</span>
+                                        </a>
+                                        <button x-show="selectedOrder?.customer_phone"
+                                            @click="resendQrisLink(selectedOrder)"
+                                            class="btn btn-ghost btn-sm w-full mt-1 flex items-center justify-center gap-2 text-green-600">
+                                            <i class="fab fa-whatsapp"></i>
+                                            <span>Kirim Ulang ke WhatsApp</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
                 </div>
             </div>
         </div>
@@ -484,17 +574,31 @@ function ordersApp() {
         viewMode: 'all',
         showCreateModal: false, showViewModal: false,
         selectedOrder: null,
-        createForm: { store_id: '', table_id: '', delivery_type: 'pickup', alamat: '', ongkir: 0, catatan: '' },
+        createForm: { store_id: '', table_id: '', delivery_type: 'pickup', alamat: '', ongkir: 0, catatan: '', customer_name: '', customer_phone: '', payment_method: 'cash' },
         pagination: { currentPage: 1, lastPage: 1, from: 0, to: 0, total: 0 },
         sidebarOpen: window.innerWidth >= 1024, isMobile: window.innerWidth < 768, user: null, notifications: [],
         searchTimeout: null,
         // Permissions
         userPermissions: [], isAdmin: true,
+        // Sub-merchant QRIS availability
+        subMerchantActive: null,
 
         async init() {
             this.initDashboard();
             await this.fetchUserPermissions();
-            await Promise.all([this.fetchOrders(), this.fetchStores(), this.fetchProducts()]);
+            await Promise.all([this.fetchOrders(), this.fetchStores(), this.fetchProducts(), this.fetchSubMerchantStatus()]);
+        },
+
+        async fetchSubMerchantStatus() {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${window.location.origin}/api/sub-merchant/status`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
+                const data = await res.json();
+                if (data.success) {
+                    const sm = data.data;
+                    this.subMerchantActive = sm.is_sub_merchant && sm.sub_merchant?.is_active && sm.sub_merchant?.can_accept_payments;
+                }
+            } catch (e) { this.subMerchantActive = false; }
         },
 
         debounceSearch() {
@@ -616,7 +720,7 @@ function ordersApp() {
         decreaseQty(i) { if (this.orderItems[i].quantity > 1) this.orderItems[i].quantity--; else this.removeItem(i); },
         removeItem(i) { this.orderItems.splice(i, 1); },
 
-        async openCreateModal() { this.createForm = { store_id: '', table_id: '', delivery_type: 'pickup', alamat: '', ongkir: 0, catatan: '' }; this.orderItems = []; this.products = []; this.productSearch = ''; await this.fetchProducts(); this.showCreateModal = true; },
+        async openCreateModal() { this.createForm = { store_id: '', table_id: '', delivery_type: 'pickup', alamat: '', ongkir: 0, catatan: '', customer_name: '', customer_phone: '', payment_method: 'cash' }; this.orderItems = []; this.products = []; this.productSearch = ''; await this.fetchProducts(); this.showCreateModal = true; },
         closeCreateModal() { this.showCreateModal = false; },
 
         async createOrder() {
@@ -629,9 +733,19 @@ function ordersApp() {
             this.creating = true;
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${this.API_BASE_URL}/orders`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ store_id: this.createForm.store_id, table_id: this.createForm.table_id || null, delivery_type: this.createForm.delivery_type, alamat: this.createForm.delivery_type === 'delivery' ? this.createForm.alamat : null, ongkir: this.createForm.delivery_type === 'delivery' ? (parseFloat(this.createForm.ongkir) || 0) : 0, catatan: this.createForm.catatan || null, items: this.orderItems.map(i => ({ product_id: i.product_id, quantity: i.quantity })) }) });
+                const res = await fetch(`${this.API_BASE_URL}/orders`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ store_id: this.createForm.store_id, table_id: this.createForm.table_id || null, delivery_type: this.createForm.delivery_type, alamat: this.createForm.delivery_type === 'delivery' ? this.createForm.alamat : null, ongkir: this.createForm.delivery_type === 'delivery' ? (parseFloat(this.createForm.ongkir) || 0) : 0, catatan: this.createForm.catatan || null, customer_name: this.createForm.customer_name || null, customer_phone: this.createForm.customer_phone || null, payment_method: this.createForm.payment_method || 'cash', items: this.orderItems.map(i => ({ product_id: i.product_id, quantity: i.quantity })) }) });
                 const data = await res.json();
-                if (data.success) { this.closeCreateModal(); await this.fetchOrders(); } else { alert(data.message || 'Failed'); }
+                if (data.success) {
+                    this.closeCreateModal();
+                    await this.fetchOrders();
+                    if (data.qris_warning) { alert('⚠️ ' + data.qris_warning); }
+                    if (data.qris_transaction) {
+                        const order = data.data;
+                        order.qris_transaction = data.qris_transaction;
+                        this.selectedOrder = order;
+                        this.showViewModal = true;
+                    }
+                } else { alert(data.message || 'Failed'); }
             } catch (e) { console.error('Error:', e); alert('Failed'); } finally { this.creating = false; }
         },
 
@@ -649,6 +763,18 @@ function ordersApp() {
             } catch (e) { console.error('Error:', e); alert('Failed to load order'); }
         },
         closeViewModal() { this.showViewModal = false; this.selectedOrder = null; },
+
+        async resendQrisLink(order) {
+            if (!order?.customer_phone || !order?.qris_transaction?.shareable_link) return;
+            try {
+                const token = localStorage.getItem('token');
+                await fetch(`${this.API_BASE_URL}/orders/${order.id}/resend-qris`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
+                alert('Link QRIS berhasil dikirim ulang ke WhatsApp customer');
+            } catch (e) { console.error('Error:', e); alert('Gagal mengirim ulang link'); }
+        },
 
         async completeOrder(order) {
             if (!confirm('Complete this order?')) return;

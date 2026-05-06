@@ -8,14 +8,22 @@ use App\Models\OrderItem;
 use App\Models\PosUser;
 use App\Models\Product;
 use App\Services\OrderService;
+use App\Services\QrisService;
+use App\Services\SubMerchantService;
+use App\Services\WhatsAppAccountService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Netflie\WhatsAppCloudApi\WhatsAppCloudApi;
 use Spatie\Permission\Models\Role;
 
 class OrderController extends Controller
 {
     public function __construct(
-        protected OrderService $orderService
+        protected OrderService $orderService,
+        protected QrisService $qrisService,
+        protected SubMerchantService $subMerchantService,
+        protected WhatsAppAccountService $whatsAppAccountService,
     ) {}
 
     /**
@@ -72,6 +80,9 @@ class OrderController extends Controller
             'alamat' => 'nullable|string',
             'ongkir' => 'nullable|numeric|min:0',
             'catatan' => 'nullable|string',
+            'customer_name' => 'nullable|string|max:100',
+            'customer_phone' => 'nullable|string|max:20',
+            'payment_method' => 'nullable|in:cash,qris',
             'items' => 'nullable|array',
             'items.*.product_id' => 'required_with:items|exists:products,id',
             'items.*.quantity' => 'required_with:items|integer|min:1',
@@ -134,16 +145,104 @@ class OrderController extends Controller
                 $order->refresh();
             }
 
+            $qrisTransaction = null;
+
+            // Generate QRIS if payment_method is qris
+            $qrisWarning = null;
+            if (($validated['payment_method'] ?? 'cash') === 'qris') {
+                $user = $request->user();
+                $subMerchant = $this->subMerchantService->findByUserId($user->getEffectiveUserId());
+
+                if (! $subMerchant) {
+                    $qrisWarning = 'Sub-merchant belum terdaftar. Daftarkan akun QRIS terlebih dahulu di menu Pengaturan QRIS.';
+                    Log::warning('QRIS requested but no SubMerchant found', ['user_id' => $user->getEffectiveUserId(), 'order_id' => $order->id]);
+                } else {
+                    try {
+                        $qrisTransaction = $this->qrisService->generateQris(
+                            $subMerchant,
+                            (float) $order->total,
+                            [
+                                'description' => 'POS Order #'.$order->order_number,
+                                'customer_name' => $validated['customer_name'] ?? null,
+                            ]
+                        );
+
+                        // Link QRIS transaction to this order
+                        $qrisTransaction->update(['linked_order_id' => $order->id]);
+
+                        Log::info('QRIS generated for POS order', ['order_id' => $order->id, 'qris_order_id' => $qrisTransaction->order_id]);
+
+                        // Send WhatsApp message with payment link if customer_phone is set
+                        if (! empty($validated['customer_phone'])) {
+                            $this->sendQrisPaymentLink(
+                                $user->getEffectiveUserId(),
+                                $validated['customer_phone'],
+                                $order->order_number,
+                                $qrisTransaction->getShareableLink()
+                            );
+                        }
+                    } catch (\Exception $e) {
+                        $qrisWarning = 'Gagal membuat QRIS: '.$e->getMessage();
+                        Log::warning('Failed to generate QRIS for POS order', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+                    }
+                }
+            }
+
+            $responseData = $order->load(['store', 'table', 'posUser.user', 'items.product']);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Order created successfully',
-                'data' => $order->load(['store', 'table', 'posUser.user', 'items.product']),
+                'data' => $responseData,
+                'qris_transaction' => $qrisTransaction ? [
+                    'order_id' => $qrisTransaction->order_id,
+                    'qr_code_url' => $qrisTransaction->qr_code_url,
+                    'shareable_link' => $qrisTransaction->getShareableLink(),
+                    'amount' => (float) $qrisTransaction->amount,
+                    'status' => $qrisTransaction->status,
+                    'expires_at' => $qrisTransaction->expires_at?->toIso8601String(),
+                ] : null,
+                'qris_warning' => $qrisWarning,
             ], 201);
         } catch (\InvalidArgumentException $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
             ], 400);
+        }
+    }
+
+    private function sendQrisPaymentLink(int $userId, string $customerPhone, string $orderNumber, string $paymentLink): void
+    {
+        try {
+            $account = $this->whatsAppAccountService->getActiveAccount($userId);
+            if (! $account) {
+                return;
+            }
+
+            $phone = preg_replace('/[^0-9]/', '', $customerPhone);
+
+            $whatsapp = new WhatsAppCloudApi([
+                'from_phone_number_id' => $account->phone_number_id,
+                'access_token' => $account->access_token,
+            ]);
+
+            $message = "🛍️ *Order #{$orderNumber}*\n\n";
+            $message .= "Silakan selesaikan pembayaran QRIS Anda melalui link berikut:\n";
+            $message .= $paymentLink."\n\n";
+            $message .= "Link berlaku selama 30 menit. Terima kasih! 🙏";
+
+            $whatsapp->sendTextMessage($phone, $message);
+
+            Log::info('QRIS payment link sent via WhatsApp', [
+                'order_number' => $orderNumber,
+                'customer_phone' => $phone,
+            ]);
+        } catch (\Exception $e) {
+            Log::warning('Failed to send QRIS payment link via WhatsApp', [
+                'order_number' => $orderNumber,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
@@ -163,8 +262,39 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $order->load(['store', 'table', 'posUser.user', 'items.product', 'payments']),
+            'data' => $order->load(['store', 'table', 'posUser.user', 'items.product', 'payments', 'qrisTransaction']),
         ]);
+    }
+
+    /**
+     * Resend QRIS payment link via WhatsApp.
+     */
+    public function resendQrisLink(Order $order, Request $request): JsonResponse
+    {
+        $effectiveUserId = $request->user()->getEffectiveUserId();
+
+        if ($order->store->user_id !== $effectiveUserId) {
+            return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
+        }
+
+        $qrisTransaction = $order->qrisTransaction;
+
+        if (! $qrisTransaction) {
+            return response()->json(['success' => false, 'message' => 'No QRIS transaction found for this order'], 404);
+        }
+
+        if (empty($order->customer_phone)) {
+            return response()->json(['success' => false, 'message' => 'No customer phone on this order'], 400);
+        }
+
+        $this->sendQrisPaymentLink(
+            $effectiveUserId,
+            $order->customer_phone,
+            $order->order_number,
+            $qrisTransaction->getShareableLink()
+        );
+
+        return response()->json(['success' => true, 'message' => 'Payment link resent via WhatsApp']);
     }
 
     /**

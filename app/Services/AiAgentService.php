@@ -2644,6 +2644,67 @@ class AiAgentService
     }
 
     /**
+     * Send payment confirmation for POS manual orders (no AI conversation).
+     * Sends directly to customer_phone stored on the linked order.
+     */
+    private function sendPosOrderPaymentConfirmation(QrisTransaction $qrisTransaction): void
+    {
+        try {
+            $order = $qrisTransaction->linkedOrder;
+
+            if (! $order || empty($order->customer_phone)) {
+                Log::info('POS order has no customer_phone, skipping payment confirmation', [
+                    'qris_transaction_id' => $qrisTransaction->id,
+                    'linked_order_id' => $qrisTransaction->linked_order_id,
+                ]);
+
+                return;
+            }
+
+            // Get WhatsApp account for the store owner
+            $storeUserId = $order->store->user_id;
+            $account = $this->whatsappAccountService->getActiveAccount($storeUserId);
+
+            if (! $account) {
+                Log::warning('No active WhatsApp account for POS payment confirmation', [
+                    'store_user_id' => $storeUserId,
+                    'order_id' => $order->id,
+                ]);
+
+                return;
+            }
+
+            $phone = preg_replace('/[^0-9]/', '', $order->customer_phone);
+            $formattedAmount = 'Rp '.number_format($qrisTransaction->amount, 0, ',', '.');
+
+            $message = "✅ *Pembayaran Berhasil!*\n\n";
+            $message .= "No. Pesanan: #{$order->order_number}\n";
+            $message .= "Jumlah: {$formattedAmount}\n";
+
+            if ($order->delivery_type === Order::DELIVERY_TYPE_DELIVERY && $order->alamat) {
+                $message .= "\n🚚 Pesanan Anda sedang disiapkan dan akan segera diantar ke:\n";
+                $message .= "📍 {$order->alamat}\n";
+                $message .= "\nMohon siapkan diri untuk menerima pesanan. Terima kasih! 🙏";
+            } else {
+                $message .= "\nPesanan Anda sedang diproses. Terima kasih! 🙏";
+            }
+
+            $this->sendReply($account, $phone, $message);
+
+            Log::info('POS order payment confirmation sent via WhatsApp', [
+                'order_id' => $order->id,
+                'customer_phone' => $phone,
+                'qris_transaction_id' => $qrisTransaction->id,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to send POS order payment confirmation', [
+                'error' => $e->getMessage(),
+                'qris_transaction_id' => $qrisTransaction->id,
+            ]);
+        }
+    }
+
+    /**
      * Send payment confirmation to customer via WhatsApp.
      * Called when QRIS payment is completed via webhook.
      */
@@ -2655,10 +2716,12 @@ class AiAgentService
                 ->first();
 
             if (! $conversation) {
-                Log::info('No conversation found for QRIS transaction, skipping notification', [
+                Log::info('No AI conversation for QRIS transaction, falling back to POS order confirmation', [
                     'qris_transaction_id' => $qrisTransaction->id,
-                    'order_id' => $qrisTransaction->order_id,
+                    'linked_order_id' => $qrisTransaction->linked_order_id,
                 ]);
+                // Fallback: POS manual order — send directly to customer_phone on the linked order
+                $this->sendPosOrderPaymentConfirmation($qrisTransaction);
 
                 return;
             }
