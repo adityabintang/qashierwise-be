@@ -104,6 +104,47 @@ class XenPlatformService
     }
 
     /**
+     * Verify that a XenPlatform sub-account exists.
+     *
+     * @return true  account exists
+     * @return false account not found (404)
+     * @return null  could not determine (network error / unexpected response)
+     */
+    public function verifySubAccount(string $xenditAccountId): ?bool
+    {
+        $this->ensureApiKey();
+
+        try {
+            $response = Http::withBasicAuth($this->apiKey, '')
+                ->withHeaders(['Content-Type' => 'application/json'])
+                ->timeout(5)
+                ->get("{$this->baseUrl}/v2/accounts/{$xenditAccountId}");
+
+            if ($response->status() === 404) {
+                return false;
+            }
+
+            if ($response->successful()) {
+                return true;
+            }
+
+            Log::warning('XenPlatform: Unexpected response verifying sub-account', [
+                'xendit_account_id' => $xenditAccountId,
+                'status_code' => $response->status(),
+            ]);
+
+            return null;
+        } catch (\Exception $e) {
+            Log::warning('XenPlatform: Failed to verify sub-account existence', [
+                'xendit_account_id' => $xenditAccountId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
      * Get balance for a sub-account.
      *
      * @return array{balance: float}

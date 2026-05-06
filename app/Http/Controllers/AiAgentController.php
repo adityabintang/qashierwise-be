@@ -11,11 +11,13 @@ use App\Models\Payment;
 use App\Models\Product;
 use App\Models\QrisTransaction;
 use App\Models\Store;
+use App\Models\SubMerchant;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
 use App\Services\AiAgentService;
 use App\Services\OrderService;
 use App\Services\QrisService;
+use App\Services\SubMerchantService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,11 +32,14 @@ class AiAgentController extends Controller
 
     protected OrderService $orderService;
 
-    public function __construct(AiAgentService $aiAgentService, QrisService $qrisService, OrderService $orderService)
+    protected SubMerchantService $subMerchantService;
+
+    public function __construct(AiAgentService $aiAgentService, QrisService $qrisService, OrderService $orderService, SubMerchantService $subMerchantService)
     {
         $this->aiAgentService = $aiAgentService;
         $this->qrisService = $qrisService;
         $this->orderService = $orderService;
+        $this->subMerchantService = $subMerchantService;
     }
 
     /**
@@ -44,6 +49,10 @@ class AiAgentController extends Controller
     {
         try {
             $userId = auth()->user()->getEffectiveUserId();
+
+            // Verify XenPlatform account is still valid each time user opens AI agent page.
+            // Cleans up stale sub-merchant data so the QRIS toggle reflects the real state.
+            $this->subMerchantService->verifyAndCleanupInvalidAccount(auth()->user());
 
             $whatsappAccount = WhatsAppAccount::where('user_id', $userId)->first();
 
@@ -56,11 +65,14 @@ class AiAgentController extends Controller
 
             $aiAgent = AiAgent::where('whatsapp_account_id', $whatsappAccount->id)->first();
 
+            $hasSubMerchant = SubMerchant::where('user_id', $userId)->exists();
+
             if (! $aiAgent) {
                 return response()->json([
                     'success' => true,
                     'message' => 'AI Agent not configured yet',
                     'data' => null,
+                    'has_sub_merchant' => $hasSubMerchant,
                 ], 200);
             }
 
@@ -83,6 +95,7 @@ class AiAgentController extends Controller
                     'created_at' => $aiAgent->created_at,
                     'updated_at' => $aiAgent->updated_at,
                 ],
+                'has_sub_merchant' => $hasSubMerchant,
             ], 200);
 
         } catch (\Exception $e) {
@@ -121,6 +134,17 @@ class AiAgentController extends Controller
                     return response()->json([
                         'success' => false,
                         'message' => 'Invalid store. Store not found or does not belong to you.',
+                    ], 422);
+                }
+            }
+
+            // Validate sub-merchant exists before enabling QRIS
+            if ($request->boolean('qris_enabled', false)) {
+                $hasSubMerchant = SubMerchant::where('user_id', $userId)->exists();
+                if (! $hasSubMerchant) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'QRIS Payment tidak bisa diaktifkan. Silakan buat Sub Merchant terlebih dahulu di halaman Sub Merchant.',
                     ], 422);
                 }
             }
