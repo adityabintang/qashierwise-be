@@ -17,9 +17,19 @@ class BlogPostsChartWidget extends ChartWidget
 
     protected function getData(): array
     {
+        // Detect database driver and use appropriate date format function
+        $driver = DB::connection()->getDriverName();
+        
+        if ($driver === 'sqlite') {
+            $dateFormat = DB::raw('strftime("%Y-%m", created_at) as month');
+        } else {
+            // PostgreSQL, MySQL, etc.
+            $dateFormat = DB::raw("to_char(created_at, 'YYYY-MM') as month");
+        }
+
         $data = BlogPost::query()
             ->select(
-                DB::raw('strftime("%Y-%m", created_at) as month'),
+                $dateFormat,
                 DB::raw('count(*) as count')
             )
             ->where('created_at', '>=', now()->subMonths(6))

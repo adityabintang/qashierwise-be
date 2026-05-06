@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BlogCategory;
 use App\Models\BlogPost;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Cursor;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class BlogController extends Controller
@@ -16,6 +18,8 @@ class BlogController extends Controller
 
         $search = $request->query('search', '');
         $sort = $request->query('sort', 'latest');
+        $selectedCategory = $request->query('category', '');
+        $searchOperator = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
 
         $query = BlogPost::query()
             ->published()
@@ -23,10 +27,16 @@ class BlogController extends Controller
 
         // Apply search filter
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                    ->orWhere('excerpt', 'like', "%{$search}%")
-                    ->orWhere('content', 'like', "%{$search}%");
+            $query->where(function ($q) use ($search, $searchOperator) {
+                $q->where('title', $searchOperator, "%{$search}%")
+                    ->orWhere('excerpt', $searchOperator, "%{$search}%")
+                    ->orWhere('content', $searchOperator, "%{$search}%");
+            });
+        }
+
+        if (is_string($selectedCategory) && $selectedCategory !== '') {
+            $query->whereHas('category', function ($q) use ($selectedCategory) {
+                $q->where('slug', $selectedCategory);
             });
         }
 
@@ -45,6 +55,13 @@ class BlogController extends Controller
         }
 
         $initialPosts = $query->cursorPaginate(10);
+        $categories = BlogCategory::query()
+            ->where('is_active', true)
+            ->whereHas('posts', function ($q) {
+                $q->published();
+            })
+            ->orderBy('name')
+            ->get(['id', 'name', 'slug']);
 
         $featuredPost = $initialPosts->getCollection()->first();
         $gridPosts = $initialPosts->getCollection()->slice(1)->values();
@@ -55,6 +72,8 @@ class BlogController extends Controller
             'nextCursor' => $initialPosts->nextCursor()?->encode(),
             'search' => $search,
             'sort' => $sort,
+            'categories' => $categories,
+            'selectedCategory' => is_string($selectedCategory) ? $selectedCategory : '',
         ]);
     }
 
@@ -65,6 +84,8 @@ class BlogController extends Controller
         $encodedCursor = $request->query('cursor');
         $search = $request->query('search', '');
         $sort = $request->query('sort', 'latest');
+        $selectedCategory = $request->query('category', '');
+        $searchOperator = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
 
         $cursor = is_string($encodedCursor) && $encodedCursor !== ''
             ? Cursor::fromEncoded($encodedCursor)
@@ -76,10 +97,16 @@ class BlogController extends Controller
 
         // Apply search filter
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                    ->orWhere('excerpt', 'like', "%{$search}%")
-                    ->orWhere('content', 'like', "%{$search}%");
+            $query->where(function ($q) use ($search, $searchOperator) {
+                $q->where('title', $searchOperator, "%{$search}%")
+                    ->orWhere('excerpt', $searchOperator, "%{$search}%")
+                    ->orWhere('content', $searchOperator, "%{$search}%");
+            });
+        }
+
+        if (is_string($selectedCategory) && $selectedCategory !== '') {
+            $query->whereHas('category', function ($q) use ($selectedCategory) {
+                $q->where('slug', $selectedCategory);
             });
         }
 

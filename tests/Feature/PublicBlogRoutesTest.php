@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\BlogCategory;
 use App\Models\BlogPost;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -153,5 +154,120 @@ class PublicBlogRoutesTest extends TestCase
 
         $this->assertStringContainsString('Read more', $response->json('html'));
         $this->assertStringNotContainsString('Draft Should Not Appear', $response->json('html'));
+    }
+
+    public function test_blog_index_can_filter_posts_by_category_slug(): void
+    {
+        $paymentCategory = BlogCategory::factory()->create([
+            'name' => 'Payments',
+            'slug' => 'payments',
+        ]);
+
+        $opsCategory = BlogCategory::factory()->create([
+            'name' => 'Operations',
+            'slug' => 'operations',
+        ]);
+
+        BlogPost::factory()->published()->create([
+            'title' => 'Panduan Pembayaran QRIS',
+            'slug' => 'panduan-pembayaran-qris',
+            'blog_category_id' => $paymentCategory->id,
+        ]);
+
+        BlogPost::factory()->published()->create([
+            'title' => 'Panduan Operasional Toko',
+            'slug' => 'panduan-operasional-toko',
+            'blog_category_id' => $opsCategory->id,
+        ]);
+
+        $response = $this->get(route('blog.index', ['category' => $paymentCategory->slug]));
+
+        $response->assertOk();
+        $response->assertSee('Panduan Pembayaran QRIS');
+        $response->assertDontSee('Panduan Operasional Toko');
+    }
+
+    public function test_blog_index_search_is_case_insensitive_for_title(): void
+    {
+        $technologyCategory = BlogCategory::factory()->create([
+            'name' => 'Technology',
+            'slug' => 'technology',
+        ]);
+
+        BlogPost::factory()->published()->create([
+            'title' => 'Analisis Data untuk Keputusan Bisnis yang Lebih Baik',
+            'slug' => 'analisis-data-untuk-keputusan-bisnis-yang-lebih-baik',
+            'blog_category_id' => $technologyCategory->id,
+        ]);
+
+        $response = $this->get(route('blog.index', [
+            'search' => 'anali',
+            'sort' => 'latest',
+            'category' => $technologyCategory->slug,
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Analisis Data untuk Keputusan Bisnis yang Lebih Baik');
+    }
+
+    public function test_blog_load_more_can_filter_posts_by_category_slug(): void
+    {
+        $paymentCategory = BlogCategory::factory()->create([
+            'name' => 'Payments',
+            'slug' => 'payments',
+        ]);
+
+        $opsCategory = BlogCategory::factory()->create([
+            'name' => 'Operations',
+            'slug' => 'operations',
+        ]);
+
+        BlogPost::factory()->published()->count(12)->create([
+            'blog_category_id' => $paymentCategory->id,
+        ]);
+
+        BlogPost::factory()->published()->create([
+            'title' => 'Artikel Kategori Lain',
+            'slug' => 'artikel-kategori-lain',
+            'blog_category_id' => $opsCategory->id,
+        ]);
+
+        $initialResponse = $this->get(route('blog.index', ['category' => $paymentCategory->slug]));
+        $initialResponse->assertOk();
+
+        preg_match('/data-next-cursor="([^"]+)"/', $initialResponse->getContent(), $matches);
+        $this->assertNotEmpty($matches[1] ?? null);
+
+        $response = $this->getJson(route('blog.load-more', [
+            'cursor' => $matches[1],
+            'category' => $paymentCategory->slug,
+        ]));
+
+        $response->assertOk();
+        $this->assertStringNotContainsString('Artikel Kategori Lain', $response->json('html'));
+    }
+
+    public function test_blog_index_keeps_hero_visible_when_search_has_no_results(): void
+    {
+        $technologyCategory = BlogCategory::factory()->create([
+            'name' => 'Technology',
+            'slug' => 'technology',
+        ]);
+
+        BlogPost::factory()->published()->create([
+            'title' => 'Analisis Sistem Kasir Modern',
+            'slug' => 'analisis-sistem-kasir-modern',
+            'blog_category_id' => $technologyCategory->id,
+        ]);
+
+        $response = $this->get(route('blog.index', [
+            'search' => 'anali123',
+            'sort' => 'latest',
+            'category' => 'technology',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('fly-hero-section is-empty', false);
+        $response->assertSee(__('blog.no_posts'));
     }
 }

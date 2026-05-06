@@ -62,11 +62,21 @@
                     </div>
                     
                     <div class="fly-sort-group">
-                        <label for="sort" class="fly-sort-label">{{ __('blog.sort_label') }}</label>
                         <select name="sort" id="sort" class="fly-sort-select">
                             <option value="latest" {{ ($sort ?? 'latest') === 'latest' ? 'selected' : '' }}>{{ __('blog.sort_latest') }}</option>
                             <option value="oldest" {{ ($sort ?? 'latest') === 'oldest' ? 'selected' : '' }}>{{ __('blog.sort_oldest') }}</option>
                             <option value="title" {{ ($sort ?? 'latest') === 'title' ? 'selected' : '' }}>{{ __('blog.sort_title') }}</option>
+                        </select>
+                    </div>
+
+                    <div class="fly-sort-group">
+                        <select name="category" id="category" class="fly-sort-select">
+                            <option value="">{{ __('blog.category_all') }}</option>
+                            @foreach(($categories ?? collect()) as $category)
+                                <option value="{{ $category->slug }}" {{ ($selectedCategory ?? '') === $category->slug ? 'selected' : '' }}>
+                                    {{ $category->name }}
+                                </option>
+                            @endforeach
                         </select>
                     </div>
                 </form>
@@ -88,7 +98,7 @@
     </header>
 
     <main>
-        <section class="fly-hero-section">
+        <section class="fly-hero-section {{ $featuredPost ? '' : 'is-empty' }}">
             <img
                 src="/blog-cover.webp"
                 alt="blog-cover"
@@ -126,7 +136,7 @@
             </div>
         </section>
 
-        <section class="fly-cards-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section class="fly-cards-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" id="blog-cards-section">
             @if (! $featuredPost)
                 <div class="fly-empty-state">
                     <h2>{{ __('blog.no_posts') }}</h2>
@@ -145,21 +155,87 @@
         </section>
     </main>
 
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid md:grid-cols-4 gap-8 mb-12">
+                <!-- Company Info -->
+                <div>
+                    <div class="flex items-center space-x-2 mb-4">
+                        <img src="{{ asset('images/logo-48.png') }}" class="h-7 rounded-xl" alt="Logo" width="28" height="28" loading="lazy" style="width: 28px; height: 28px;">
+                        <span class="text-xl font-bold text-primary">QashierWise</span>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-4">
+                        {{ __('landing.footer.company_description') }}
+                    </p>
+                    <div class="text-sm text-gray-600">
+                        <p class="font-semibold text-gray-900 mb-1">{{ __('landing.footer.address_title') }}</p>
+                        <p>{!! __('landing.footer.address') !!}</p>
+                    </div>
+                </div>
+
+                <!-- Navigation -->
+                <div>
+                    <h3 class="text-gray-900 font-semibold mb-4 text-base">{{ __('landing.footer.navigation_title') }}</h3>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="/#fitur" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.features') }}</a></li>
+                        <li><a href="/#pricing" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.pricing') }}</a></li>
+                        <li><a href="/#about" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.about') }}</a></li>
+                        <li><a href="/#faq" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.faq') }}</a></li>
+                    </ul>
+                </div>
+
+                <!-- Legal -->
+                <div>
+                    <h3 class="text-gray-900 font-semibold mb-4 text-base">{{ __('landing.footer.legal_title') }}</h3>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="/privacy-policy" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.privacy_policy') }}</a></li>
+                        <li><a href="/terms-of-service" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.terms_of_service') }}</a></li>
+                        <li><a href="/refund-policy" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.refund_policy') }}</a></li>
+                    </ul>
+                </div>
+
+                 <!-- Product -->
+                 <div>
+                     <h3 class="text-gray-900 font-semibold mb-4 text-base">{{ __('landing.footer.product_title') }}</h3>
+                     <ul class="space-y-2 text-sm">
+                         <li><a href="#" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.console') }}</a></li>
+                         <li><a href="#" class="text-gray-600 hover:text-primary transition">{{ __('landing.footer.chatbot') }}</a></li>
+                     </ul>
+                 </div>
+
+                 <!-- Social Media -->
+                 <div>
+                     <h3 class="text-gray-900 font-semibold mb-4 text-base">{{ __('landing.footer.follow_us') }}</h3>
+                     <p class="text-sm text-gray-600 mb-4">{{ __('landing.footer.follow_us_desc') }}</p>
+                     <x-social-links :size="'md'" :showLabels="false" />
+                 </div>
+             </div>
+
+            <div class="border-t border-gray-200 pt-8 text-center text-sm text-gray-600">
+                <p>{!! __('landing.footer.copyright') !!}</p>
+            </div>
+        </div>
+    </footer>
+
     <x-timezone-detector-script />
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const searchInput = document.getElementById('searchInput');
             const sortSelect = document.getElementById('sort');
+            const categorySelect = document.getElementById('category');
             const clearButton = document.getElementById('clearSearch');
             const searchLoading = document.getElementById('searchLoading');
             const blogGrid = document.getElementById('blog-grid');
             const heroSection = document.querySelector('.fly-hero-section');
+            const cardsSection = document.getElementById('blog-cards-section');
             const loadTrigger = document.getElementById('blog-load-more');
             
             let searchTimeout = null;
             let currentSearch = searchInput?.value || '';
             let currentSort = sortSelect?.value || 'latest';
+            let currentCategory = categorySelect?.value || '';
 
             // Real-time search
             if (searchInput) {
@@ -185,6 +261,13 @@
                 });
             }
 
+            if (categorySelect) {
+                categorySelect.addEventListener('change', (e) => {
+                    currentCategory = e.target.value;
+                    performSearch();
+                });
+            }
+
             // Clear search
             if (clearButton) {
                 clearButton.addEventListener('click', () => {
@@ -198,6 +281,7 @@
                 const params = new URLSearchParams();
                 if (currentSearch) params.set('search', currentSearch);
                 if (currentSort) params.set('sort', currentSort);
+                if (currentCategory) params.set('category', currentCategory);
                 
                 const url = `{{ route('blog.index') }}${params.toString() ? '?' + params.toString() : ''}`;
                 
@@ -219,7 +303,27 @@
                     // Update hero section
                     const newHero = doc.querySelector('.fly-hero-section');
                     if (heroSection && newHero) {
+                        heroSection.className = newHero.className;
                         heroSection.innerHTML = newHero.innerHTML;
+                    }
+
+                    // Handle empty state when no matching results
+                    const newEmptyState = doc.querySelector('.fly-empty-state');
+                    const existingEmptyState = cardsSection?.querySelector('.fly-empty-state');
+                    if (cardsSection && newEmptyState) {
+                        if (blogGrid) {
+                            blogGrid.innerHTML = '';
+                        }
+
+                        if (loadTrigger) {
+                            loadTrigger.classList.add('hidden');
+                        }
+
+                        if (!existingEmptyState) {
+                            cardsSection.insertAdjacentHTML('afterbegin', newEmptyState.outerHTML);
+                        }
+                    } else if (existingEmptyState) {
+                        existingEmptyState.remove();
                     }
                     
                     // Update grid
@@ -281,7 +385,8 @@
                 try {
                     const searchParam = currentSearch || '';
                     const sortParam = currentSort || 'latest';
-                    const url = `{{ route('blog.load-more') }}?cursor=${encodeURIComponent(cursor)}&search=${encodeURIComponent(searchParam)}&sort=${encodeURIComponent(sortParam)}`;
+                    const categoryParam = currentCategory || '';
+                    const url = `{{ route('blog.load-more') }}?cursor=${encodeURIComponent(cursor)}&search=${encodeURIComponent(searchParam)}&sort=${encodeURIComponent(sortParam)}&category=${encodeURIComponent(categoryParam)}`;
                     
                     const response = await fetch(url, {
                         headers: {
