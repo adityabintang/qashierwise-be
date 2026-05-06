@@ -11,6 +11,7 @@ use App\Models\Product;
 use App\Models\QrisTransaction;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Netflie\WhatsAppCloudApi\WhatsAppCloudApi;
@@ -615,11 +616,13 @@ class AiAgentService
      */
     protected function intentNeedsTools(UserIntent $intent): bool
     {
-        // These intents don't need product/order tools
+        // These intents don't need product/order tools.
+        // BUSINESS_INFO is intentionally excluded from this list: "alamat" in a delivery
+        // address message gets misclassified as BUSINESS_INFO, and without tools the LLM
+        // can never call set_delivery_type, causing confirm_order to loop forever.
         $noToolIntents = [
             UserIntent::GREETING,
             UserIntent::OFF_TOPIC,
-            UserIntent::BUSINESS_INFO,
         ];
 
         return ! in_array($intent, $noToolIntents);
@@ -807,11 +810,12 @@ class AiAgentService
             $result = $this->executeToolCall($functionName, $arguments, $account->user_id, $conversation, $aiAgent);
 
             // Track what type of calls we have
-            // get_all_products is also a "search" type call that needs LLM to format for user
-            if (in_array($functionName, ['search_products', 'search_multiple_products', 'get_all_products'])) {
+            // search_products/search_multiple_products are internal - need LLM to format for user
+            // get_all_products returns user-friendly text directly
+            if (in_array($functionName, ['search_products', 'search_multiple_products'])) {
                 $hasSearchCall = true;
             }
-            if (in_array($functionName, ['add_to_cart', 'confirm_order', 'get_cart_summary', 'generate_qris', 'check_payment_status', 'remove_from_cart', 'clear_cart', 'set_delivery_type', 'set_order_notes'])) {
+            if (in_array($functionName, ['add_to_cart', 'confirm_order', 'get_cart_summary', 'generate_qris', 'check_payment_status', 'remove_from_cart', 'clear_cart', 'set_delivery_type', 'set_order_notes', 'get_all_products'])) {
                 $hasFinalAction = true;
             }
 
@@ -933,9 +937,15 @@ class AiAgentService
         // For final actions or if follow-up failed, send results to user
         $userFacingResults = [];
         foreach ($toolResults as $tr) {
-            // Don't show raw search/menu results to user - they're internal and need LLM formatting
-            if (! in_array($tr['function_name'], ['search_products', 'search_multiple_products', 'get_all_products'])) {
-                $userFacingResults[] = $tr['result'];
+            // Don't show raw search results to user - they're internal and need LLM formatting
+            // get_all_products now returns user-friendly text directly
+            if (! in_array($tr['function_name'], ['search_products', 'search_multiple_products'])) {
+                $result = $tr['result'];
+                // Strip EMPTY sentinel prefix from getAllProducts empty-page responses
+                if (str_starts_with($result, 'EMPTY\n')) {
+                    $result = substr($result, 6);
+                }
+                $userFacingResults[] = $result;
             }
         }
 
@@ -1573,33 +1583,21 @@ class AiAgentService
         $nextPage = $currentPage + 1;
         $useToon = $aiAgent->use_toon_format ?? false;
 
-        $result = $this->getAllProducts($account->user_id, $useToon, $nextPage);
+        $result = $this->getAllProducts($account->user_id, false, $nextPage);
 
         if (str_starts_with($result, 'EMPTY')) {
+            $msg = 'Sudah tidak ada menu lagi. Itu semua menu yang tersedia! 😊 Mau pesan yang mana?';
             $conversation->addMessage('human', 'menu lainnya');
-            $conversation->addMessage('ai', 'Sudah tidak ada menu lagi. Itu semua menu yang tersedia! 😊 Mau pesan yang mana?');
-            $this->sendReply($account, $contact->wa_id, 'Sudah tidak ada menu lagi. Itu semua menu yang tersedia! 😊 Mau pesan yang mana?');
+            $conversation->addMessage('ai', $msg);
+            $this->sendReply($account, $contact->wa_id, $msg);
 
             return;
         }
 
         $conversation->setCurrentMenuPage($nextPage);
-
         $conversation->addMessage('human', 'menu lainnya');
-
-        $systemPrompt = $aiAgent->buildSystemPrompt($account->user_id);
-        $messages = $conversation->getRecentMessages(2);
-        $messages[] = ['role' => 'user', 'content' => "Berikut adalah menu halaman {$nextPage} yang perlu ditampilkan ke user dalam format yang ramah:\n\n{$result}"];
-
-        $response = $this->callLLM($systemPrompt, $messages, null, $aiAgent);
-        $assistantMessage = $response['content'] ?? '';
-
-        if (empty(trim($assistantMessage))) {
-            $assistantMessage = $this->formatMenuFallback($result, $nextPage);
-        }
-
-        $conversation->addMessage('ai', $assistantMessage);
-        $this->sendReply($account, $contact->wa_id, $assistantMessage);
+        $conversation->addMessage('ai', $result);
+        $this->sendReply($account, $contact->wa_id, $result);
     }
 
     protected function formatMenuFallback(string $rawResult, int $page): string
@@ -1652,10 +1650,10 @@ class AiAgentService
 
         if ($products->isEmpty()) {
             if ($page > 1) {
-                return "EMPTY\npage:{$page}\naction:katakan tidak ada produk lagi di halaman ini";
+                return "EMPTY\nTidak ada menu lagi di halaman ini.";
             }
 
-            return "EMPTY\naction:katakan belum ada menu tersedia";
+            return "EMPTY\nMaaf, belum ada menu tersedia saat ini.";
         }
 
         // Group products by category
@@ -1663,49 +1661,30 @@ class AiAgentService
             return $product->category?->name ?? 'Lainnya';
         });
 
-        // Use TOON format if enabled (saves ~67% tokens with sbsaga/toon)
-        if ($useToon) {
-            $categorizedArray = [];
-            foreach ($groupedProducts as $categoryName => $categoryProducts) {
-                $categorizedArray[$categoryName] = $categoryProducts->map(fn ($p) => [
-                    'id' => $p->id,
-                    'name' => $p->name,
-                    'price' => $p->price,
-                    'stock' => $p->stock_quantity,
-                ])->toArray();
-            }
-
-            $paginationInfo = "page:{$page}/{$totalPages}|total:{$totalProducts}";
-            if ($page < $totalPages) {
-                $paginationInfo .= '|next:get_all_products(page='.($page + 1).')';
-            }
-
-            return "DATA_MENU\n".Toon::convert(['menu' => $categorizedArray])."\n{$paginationInfo}\nINSTRUKSI: Tampilkan menu per kategori ke user (nama - harga). JANGAN tampilkan ID/TOON ke user. Untuk order, panggil add_to_cart dengan items=[{product_name:'nama',quantity:X}].";
-        }
-
-        // ULTRA-COMPACT format to minimize tokens
+        // Format directly for user display (consistent with test endpoint)
         $lines = [];
-        $lines[] = "MENU p{$page}/{$totalPages}({$totalProducts})";
+        $lines[] = "📋 **DAFTAR MENU** (Halaman {$page}/{$totalPages})";
+        $lines[] = str_repeat('─', 30);
 
         foreach ($groupedProducts as $categoryName => $categoryProducts) {
-            $items = [];
+            $lines[] = "\n🏷️ **{$categoryName}**";
             foreach ($categoryProducts as $product) {
                 $price = number_format($product->price, 0, ',', '.');
-                // Simplified format - just name and price, no ID needed
-                $items[] = "{$product->name} Rp{$price}";
+                $stock = ($product->stock_quantity !== null && $product->stock_quantity <= 0) ? ' _(Habis)_' : '';
+                $lines[] = "  • {$product->name} - Rp {$price}{$stock}";
             }
-            $lines[] = "{$categoryName}:".implode('|', $items);
         }
 
-        // Clear instruction for LLM - use product_name not product_id
-        $paginationInfo = "Halaman {$page} dari {$totalPages}";
+        $lines[] = "\n".str_repeat('─', 30);
+
         if ($page < $totalPages) {
-            $paginationInfo .= ". Ada menu lainnya! Jika user bertanya 'ada yang lain', panggil get_all_products(page=".($page + 1).')';
+            $remaining = $totalProducts - ($page * $perPage);
+            $lines[] = "📄 Masih ada {$remaining} menu lagi. Ketik \"menu lainnya\" untuk lihat selanjutnya.";
         } else {
-            $paginationInfo .= '. Ini halaman terakhir.';
+            $lines[] = "✅ Total: {$totalProducts} menu tersedia.";
         }
-        $lines[] = $paginationInfo;
-        $lines[] = 'ACT:show menu to user,order→add_to_cart(items=[{product_name:"nama",quantity:X}])';
+
+        $lines[] = "\n💬 Mau pesan apa? Contoh: \"pesan nasi goreng 2 porsi\"";
 
         return implode("\n", $lines);
     }
@@ -2193,67 +2172,149 @@ class AiAgentService
     }
 
     /**
-     * Prepare order confirmation.
+     * Confirm and immediately create the order (mirrors AiAgentController::confirmOrder).
      */
     protected function prepareOrderConfirmation(AiAgentConversation $conversation, int $userId, ?AiAgent $aiAgent = null): string
     {
         $cart = $conversation->getCart();
 
         if (empty($cart)) {
-            return 'Keranjang belanja Anda masih kosong. Silakan tambahkan produk terlebih dahulu.';
+            return '🛒 Keranjang belanja Anda masih kosong. Silakan tambahkan produk terlebih dahulu.';
         }
 
-        if ($aiAgent && $aiAgent->isDeliveryEnabled()) {
+        if (! $aiAgent || ! $aiAgent->default_store_id) {
+            return 'Maaf, toko default belum dikonfigurasi.';
+        }
+
+        if ($aiAgent->isDeliveryEnabled()) {
             $deliveryType = $conversation->getDeliveryType();
             if (! $deliveryType) {
-                return "Sebelum konfirmasi, mau Pickup atau Delivery?\n".
-                       "Ketik 'pickup' atau 'delivery'.";
+                return "Sebelum checkout, pilih metode pengiriman:\n• Ketik 'pickup' untuk ambil di tempat\n• Ketik 'delivery' untuk diantar";
             }
         }
 
-        $conversation->setPendingOrder($cart);
+        try {
+            return DB::transaction(function () use ($conversation, $aiAgent, $userId, $cart) {
+                $contact = $conversation->whatsappContact()->withoutGlobalScopes()->first();
 
-        $response = "📝 Konfirmasi Pesanan:\n\n";
-        $total = 0;
+                $deliveryType = $conversation->getDeliveryType();
+                $deliveryAddress = $conversation->getDeliveryAddress();
+                $deliveryNotes = $conversation->getDeliveryNotes();
+                $ongkir = $conversation->getOngkir();
 
-        foreach ($cart as $item) {
-            $subtotal = $item['price'] * $item['quantity'];
-            $total += $subtotal;
+                Log::info('Creating order via WhatsApp AI confirm_order tool', [
+                    'user_id' => $userId,
+                    'store_id' => $aiAgent->default_store_id,
+                    'cart_items' => count($cart),
+                    'qris_enabled' => $aiAgent->isQrisEnabled(),
+                    'delivery_type' => $deliveryType,
+                    'ongkir' => $ongkir,
+                ]);
 
-            $response .= "• {$item['product_name']} x{$item['quantity']}\n";
-            $response .= '  Rp '.number_format($subtotal, 0, ',', '.')."\n";
+                $order = $this->orderService->create([
+                    'store_id' => $aiAgent->default_store_id,
+                    'table_id' => null,
+                    'pos_user_id' => null,
+                    'source' => Order::SOURCE_WHATSAPP_AI,
+                    'customer_name' => $contact->name ?? 'WhatsApp Customer',
+                    'customer_phone' => $contact->wa_id,
+                    'delivery_type' => $deliveryType ?? Order::DELIVERY_TYPE_PICKUP,
+                    'alamat' => $deliveryAddress,
+                    'ongkir' => $ongkir,
+                    'catatan' => $deliveryNotes,
+                ]);
+
+                foreach ($cart as $item) {
+                    $product = Product::find($item['product_id']);
+                    if ($product) {
+                        $this->orderService->addItem($order, $product, $item['quantity']);
+                    }
+                }
+
+                $order->refresh();
+
+                $conversation->setCurrentOrder($order->id);
+                $conversation->clearCart();
+                $conversation->clearPendingOrder();
+                $conversation->clearDeliveryContext();
+
+                Log::info('Order created via WhatsApp AI', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'total' => $order->total,
+                ]);
+
+                // Auto-generate QRIS if enabled
+                if ($aiAgent->isQrisEnabled()) {
+                    $subMerchant = $aiAgent->getSubMerchant();
+
+                    if ($subMerchant) {
+                        try {
+                            $qrisTransaction = $this->qrisService->generateQris($subMerchant, (float) $order->total, [
+                                'description' => "Pesanan #{$order->order_number}",
+                            ]);
+
+                            $qrisTransaction->linked_order_id = $order->id;
+                            $qrisTransaction->save();
+
+                            Payment::create([
+                                'order_id' => $order->id,
+                                'qris_transaction_id' => $qrisTransaction->id,
+                                'method' => Payment::METHOD_QRIS,
+                                'amount' => $order->total,
+                                'status' => Payment::STATUS_PENDING,
+                            ]);
+
+                            $conversation->setCurrentQrisTransaction($qrisTransaction->id);
+
+                            $expiryTime = $qrisTransaction->expires_at->format('H:i');
+                            $formattedTotal = 'Rp '.number_format($order->total, 0, ',', '.');
+                            $shareableLink = $qrisTransaction->getShareableLink();
+
+                            $response = "✅ Pesanan Berhasil Dibuat!\n\n";
+                            $response .= "📋 No. Pesanan: {$order->order_number}\n";
+                            $response .= "💰 Total: {$formattedTotal}\n\n";
+                            $response .= "💳 Silakan bayar melalui link berikut:\n";
+                            $response .= "{$shareableLink}\n\n";
+                            $response .= "⏰ Berlaku hingga: {$expiryTime}\n\n";
+                            $response .= "Cara pembayaran:\n";
+                            $response .= "1. Klik link di atas\n";
+                            $response .= "2. Scan QR Code yang muncul\n";
+                            $response .= "3. Buka aplikasi e-wallet/mobile banking\n";
+                            $response .= "4. Konfirmasi pembayaran\n\n";
+                            $response .= "Ketik 'cek status' setelah membayar. 🙏";
+
+                            return $response;
+
+                        } catch (\Exception $e) {
+                            Log::error('QRIS generation failed during WhatsApp order confirmation', [
+                                'error' => $e->getMessage(),
+                                'order_id' => $order->id,
+                            ]);
+                            // Fall through to send order without QRIS
+                        }
+                    }
+                }
+
+                $formattedTotal = 'Rp '.number_format($order->total, 0, ',', '.');
+
+                return "✅ Pesanan Berhasil Dibuat!\n\n".
+                       "📋 No. Pesanan: {$order->order_number}\n".
+                       "💰 Total: {$formattedTotal}\n\n".
+                       "Pesanan Anda sedang diproses.\n".
+                       "Silakan tunjukkan pesan ini ke kasir untuk melakukan pembayaran.\n\n".
+                       'Terima kasih! 🙏';
+            });
+
+        } catch (\Exception $e) {
+            Log::error('Order creation failed via WhatsApp AI confirm_order', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return 'Maaf, terjadi kesalahan saat membuat pesanan. Silakan coba lagi.';
         }
-
-        $ongkir = 0;
-        $deliveryType = $conversation->getDeliveryType();
-        $deliveryAddress = $conversation->getDeliveryAddress();
-        $deliveryNotes = $conversation->getDeliveryNotes();
-
-        if ($deliveryType === 'delivery') {
-            $ongkir = $aiAgent ? (float) $aiAgent->default_ongkir : 0;
-        }
-
-        $tax = round($total * 0.11, 2);
-        $grandTotal = round($total + $tax + $ongkir, 2);
-
-        $response .= "\nSubtotal: Rp ".number_format($total, 0, ',', '.')."\n";
-        $response .= 'Pajak (11%): Rp '.number_format($tax, 0, ',', '.')."\n";
-        if ($ongkir > 0) {
-            $response .= 'Ongkir: Rp '.number_format($ongkir, 0, ',', '.')."\n";
-        }
-        $response .= 'Total: Rp '.number_format($grandTotal, 0, ',', '.')."\n";
-
-        if ($deliveryType === 'delivery' && $deliveryAddress) {
-            $response .= "\n📍 Alamat: {$deliveryAddress}\n";
-        }
-        if ($deliveryNotes) {
-            $response .= "📝 Catatan: {$deliveryNotes}\n";
-        }
-
-        $response .= "\nApakah Anda yakin ingin melanjutkan pesanan ini?\n";
-        $response .= "Balas 'Ya' untuk konfirmasi atau 'Tidak' untuk membatalkan.";
-
-        return $response;
     }
 
     /**
