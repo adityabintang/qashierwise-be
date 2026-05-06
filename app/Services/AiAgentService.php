@@ -2716,6 +2716,10 @@ class AiAgentService
                 ->first();
 
             if (! $conversation) {
+                Log::info('No AI conversation for QRIS transaction, falling back to POS order confirmation', [
+                    'qris_transaction_id' => $qrisTransaction->id,
+                    'linked_order_id' => $qrisTransaction->linked_order_id,
+                ]);
                 // Fallback: POS manual order — send directly to customer_phone on the linked order
                 $this->sendPosOrderPaymentConfirmation($qrisTransaction);
 
