@@ -104,40 +104,62 @@
                         :class="isMobileMessages ? 'w-full' : ''"
                     >
                         <!-- Chat Header -->
-                        <div class="h-14 md:h-16 px-3 md:px-4 border-b border-[hsl(var(--border))] flex items-center justify-between bg-[hsl(var(--muted)/0.3)]">
-                            <div class="flex items-center gap-2 md:gap-3">
-                                <!-- Back Button (Mobile Only) - Requirements 4.2, 4.3 -->
-                                <button
-                                    x-show="isMobileMessages"
-                                    @click="backToContacts()"
-                                    class="btn btn-ghost btn-icon min-h-[44px] min-w-[44px]"
-                                    title="Back to contacts"
-                                >
-                                    <i class="fas fa-arrow-left"></i>
-                                </button>
-                                <!-- Avatar with name -->
-                                <img
-                                    x-show="selectedContact?.name && selectedContact.name.trim()"
-                                    :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(selectedContact?.name || 'U')}&backgroundColor=a855f7`"
-                                    :alt="selectedContact?.name"
-                                    class="avatar h-9 w-9 md:h-10 md:w-10"
-                                >
-                                <!-- Avatar without name -->
-                                <div
-                                    x-show="!selectedContact?.name || !selectedContact.name.trim()"
-                                    class="avatar h-9 w-9 md:h-10 md:w-10 flex items-center justify-center text-white font-bold"
-                                    style="background: linear-gradient(135deg, #a855f7, #9333ea); font-size: 0.75rem;"
-                                >
-                                    <span x-text="getCountryCode(selectedContact?.phone_number) || '?'"></span>
+                        <div class="px-3 md:px-4 border-b border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)]">
+                            <div class="h-14 md:h-16 flex items-center justify-between">
+                                <div class="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+                                    <!-- Back Button (Mobile Only) - Requirements 4.2, 4.3 -->
+                                    <button
+                                        x-show="isMobileMessages"
+                                        @click="backToContacts()"
+                                        class="btn btn-ghost btn-icon min-h-[44px] min-w-[44px]"
+                                        title="Back to contacts"
+                                    >
+                                        <i class="fas fa-arrow-left"></i>
+                                    </button>
+                                    <!-- Avatar with name -->
+                                    <img
+                                        x-show="selectedContact?.name && selectedContact.name.trim()"
+                                        :src="`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(selectedContact?.name || 'U')}&backgroundColor=a855f7`"
+                                        :alt="selectedContact?.name"
+                                        class="avatar h-9 w-9 md:h-10 md:w-10"
+                                    >
+                                    <!-- Avatar without name -->
+                                    <div
+                                        x-show="!selectedContact?.name || !selectedContact.name.trim()"
+                                        class="avatar h-9 w-9 md:h-10 md:w-10 flex items-center justify-center text-white font-bold"
+                                        style="background: linear-gradient(135deg, #a855f7, #9333ea); font-size: 0.75rem;"
+                                    >
+                                        <span x-text="getCountryCode(selectedContact?.phone_number) || '?'"></span>
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="font-medium text-xs md:text-sm" x-text="selectedContact?.name || 'Unknown'">Unknown</p>
+                                        <p class="text-[10px] md:text-xs text-[hsl(var(--muted-foreground))]" x-text="selectedContact?.phone_number">-</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p class="font-medium text-xs md:text-sm" x-text="selectedContact?.name || 'Unknown'">Unknown</p>
-                                    <p class="text-[10px] md:text-xs text-[hsl(var(--muted-foreground))]" x-text="selectedContact?.phone_number">-</p>
+                                <div class="flex items-center gap-1">
+                                    <!-- AI Toggle -->
+                                    <div
+                                        x-show="selectedContact"
+                                        class="flex items-center gap-1.5 px-2"
+                                        :title="selectedContact?.ai_active !== false ? 'AI Aktif - Klik untuk nonaktifkan' : 'AI Nonaktif - Klik untuk aktifkan'"
+                                    >
+                                        <span class="text-xs hidden md:inline" :class="selectedContact?.ai_active !== false ? 'text-purple-600' : 'text-gray-400'">AI</span>
+                                        <button
+                                            @click="toggleContactAi(selectedContact)"
+                                            class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none"
+                                            :class="selectedContact?.ai_active !== false ? 'bg-purple-600' : 'bg-gray-300'"
+                                        >
+                                            <span
+                                                class="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform"
+                                                :class="selectedContact?.ai_active !== false ? 'translate-x-4' : 'translate-x-1'"
+                                            ></span>
+                                        </button>
+                                    </div>
+                                    <button @click="refreshMessages" class="btn btn-ghost btn-icon min-h-[44px] min-w-[44px]">
+                                        <i class="fas fa-sync-alt" :class="{'animate-spin': loadingMessages}"></i>
+                                    </button>
                                 </div>
                             </div>
-                            <button @click="refreshMessages" class="btn btn-ghost btn-icon min-h-[44px] min-w-[44px]">
-                                <i class="fas fa-sync-alt" :class="{'animate-spin': loadingMessages}"></i>
-                            </button>
                         </div>
                         <!-- Messages -->
                         <div class="flex-1 overflow-y-auto scroll-area p-4 space-y-3 bg-[hsl(var(--muted)/0.2)]" x-ref="messagesContainer">
@@ -975,6 +997,22 @@ function messagesManager() {
             finally { this.loadingMessages = false; }
         },
         async refreshMessages() { await this.fetchMessages(); },
+
+        async toggleContactAi(contact) {
+            if (!contact) return;
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/contacts/${contact.id}/toggle-ai`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    contact.ai_active = data.data.ai_active;
+                    this.contacts = [...this.contacts];
+                }
+            } catch (e) { console.error('Toggle AI error:', e); }
+        },
 
         // Mark all messages from contact as read
         async markContactAsRead(contactId) {
