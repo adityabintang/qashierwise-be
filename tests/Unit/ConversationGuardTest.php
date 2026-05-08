@@ -5,7 +5,9 @@ namespace Tests\Unit;
 use App\Enums\UserIntent;
 use App\Models\AiAgent;
 use App\Models\AiAgentConversation;
+use App\Models\QrisTransaction;
 use App\Models\Store;
+use App\Models\SubMerchant;
 use App\Models\User;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
@@ -88,6 +90,89 @@ class ConversationGuardTest extends TestCase
 
         $this->assertNotNull($reply);
         $this->assertStringContainsString('pesan', strtolower($reply));
+    }
+
+    public function test_guard_reminds_pending_payment_with_link(): void
+    {
+        [$aiAgent, $conversation] = $this->makeConversation(withCart: false);
+        $subMerchant = SubMerchant::factory()->create(['user_id' => $aiAgent->getUser()->id]);
+
+        $transaction = QrisTransaction::create([
+            'sub_merchant_id' => $subMerchant->id,
+            'order_id' => QrisTransaction::generateOrderId(),
+            'amount' => 63280,
+            'platform_fee' => 1582,
+            'net_amount' => 61698,
+            'status' => QrisTransaction::STATUS_PENDING,
+            'expires_at' => now()->addMinutes(23),
+        ]);
+
+        $conversation->setCurrentQrisTransaction($transaction->id);
+
+        $reply = $this->guard->resolve($conversation, $aiAgent, 'sky is blue', UserIntent::UNKNOWN);
+
+        $this->assertNotNull($reply);
+        $this->assertStringContainsString('/pay/qris/', $reply);
+        $this->assertStringContainsString('menit', $reply);
+    }
+
+    public function test_guard_reminds_pending_payment_for_off_topic_message(): void
+    {
+        [$aiAgent, $conversation] = $this->makeConversation(withCart: false);
+        $subMerchant = SubMerchant::factory()->create(['user_id' => $aiAgent->getUser()->id]);
+
+        $transaction = QrisTransaction::create([
+            'sub_merchant_id' => $subMerchant->id,
+            'order_id' => QrisTransaction::generateOrderId(),
+            'amount' => 63280,
+            'platform_fee' => 1582,
+            'net_amount' => 61698,
+            'status' => QrisTransaction::STATUS_PENDING,
+            'expires_at' => now()->addMinutes(23),
+        ]);
+
+        $conversation->setCurrentQrisTransaction($transaction->id);
+
+        $reply = $this->guard->resolve(
+            $conversation,
+            $aiAgent,
+            'napoleon bonaparte adalah seorang biksu',
+            UserIntent::OFF_TOPIC
+        );
+
+        $this->assertNotNull($reply);
+        $this->assertStringContainsString('Maaf, saya', $reply);
+        $this->assertStringContainsString('/pay/qris/', $reply);
+        $this->assertStringContainsString('pembayaran', strtolower($reply));
+    }
+
+    public function test_guard_uses_disclaimer_for_unknown_off_topic_like_message(): void
+    {
+        [$aiAgent, $conversation] = $this->makeConversation(withCart: false);
+        $subMerchant = SubMerchant::factory()->create(['user_id' => $aiAgent->getUser()->id]);
+
+        $transaction = QrisTransaction::create([
+            'sub_merchant_id' => $subMerchant->id,
+            'order_id' => QrisTransaction::generateOrderId(),
+            'amount' => 63280,
+            'platform_fee' => 1582,
+            'net_amount' => 61698,
+            'status' => QrisTransaction::STATUS_PENDING,
+            'expires_at' => now()->addMinutes(23),
+        ]);
+
+        $conversation->setCurrentQrisTransaction($transaction->id);
+
+        $reply = $this->guard->resolve(
+            $conversation,
+            $aiAgent,
+            'okeh, tapi napolon bonaparte adalah seorang biksu',
+            UserIntent::UNKNOWN
+        );
+
+        $this->assertNotNull($reply);
+        $this->assertStringContainsString('Maaf, saya', $reply);
+        $this->assertStringContainsString('/pay/qris/', $reply);
     }
 
     private function makeConversation(bool $withCart = true): array

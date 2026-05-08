@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\UserIntent;
 use App\Models\AiAgent;
 use App\Models\AiAgentConversation;
+use App\Models\QrisTransaction;
 
 class ConversationGuard
 {
@@ -26,6 +27,11 @@ class ConversationGuard
             return $orderContextReply;
         }
 
+        $paymentReply = $this->resolveFromPendingPayment($conversation, $aiAgent, $messageText, $intent);
+        if ($paymentReply !== null) {
+            return $paymentReply;
+        }
+
         return $this->resolveFromSummary($conversation, $aiAgent);
     }
 
@@ -37,6 +43,10 @@ class ConversationGuard
     ): bool {
         if (! $aiAgent->isOrderEnabled()) {
             return false;
+        }
+
+        if ($this->getActiveQrisTransaction($conversation)) {
+            return true;
         }
 
         if ($intent === UserIntent::UNKNOWN) {
@@ -168,7 +178,7 @@ class ConversationGuard
     private function isShortConfirmation(string $messageText): bool
     {
         $confirmations = [
-            'ok', 'oke', 'iya', 'ya', 'y', 'sip', 'betul', 'benar', 'lanjut', 'sudah',
+            'ok', 'oke', 'iya', 'ya', 'y', 'sip', 'sipsip', 'sip sip', 'betul', 'benar', 'lanjut', 'sudah',
         ];
 
         return in_array($messageText, $confirmations, true);
@@ -276,5 +286,140 @@ class ConversationGuard
             "🚚 Ongkir: {$formattedOngkir}\n\n".
             "Ada catatan khusus untuk pesanan? (contoh: tidak pedas, tanpa bawang)\n".
             "Ketik 'tidak ada' jika tidak ada catatan.";
+    }
+
+    private function resolveFromPendingPayment(
+        AiAgentConversation $conversation,
+        AiAgent $aiAgent,
+        string $messageText,
+        UserIntent $intent
+    ): ?string {
+        $normalized = $this->normalizeMessage($messageText);
+
+        if ($this->looksLikePaymentAction($normalized)) {
+            return null;
+        }
+
+        $transaction = $this->getActiveQrisTransaction($conversation);
+        if (! $transaction) {
+            return null;
+        }
+
+        if (! $transaction->canBeUsed()) {
+            return "⏰ Kode pembayaran sudah kadaluarsa.\n\n".
+                "Ketik 'bayar' untuk mendapatkan link pembayaran baru.";
+        }
+
+        $remainingMinutes = max(1, (int) ceil($transaction->getRemainingTimeInSeconds() / 60));
+        $shareableLink = $transaction->getShareableLink();
+        $formattedAmount = 'Rp '.number_format($transaction->amount, 0, ',', '.');
+
+        $prefix = $this->buildPaymentPrefix($aiAgent, $messageText, $intent);
+
+        return "{$prefix}Tapi Anda masih ada pembayaran menanti nih.\n\n".
+            "Jumlah: {$formattedAmount}\n".
+            "Sisa waktu: {$remainingMinutes} menit\n\n".
+            "Silakan selesaikan pembayaran pada link berikut:\n".
+            "{$shareableLink}\n\n".
+            "Jika sudah bayar, ketik 'cek status' ya.";
+    }
+
+    private function getActiveQrisTransaction(AiAgentConversation $conversation): ?QrisTransaction
+    {
+        $transaction = $conversation->getCurrentQrisTransaction();
+
+        if (! $transaction) {
+            $lastId = $conversation->order_context['last_qris_transaction_id'] ?? null;
+            if ($lastId) {
+                $transaction = QrisTransaction::find($lastId);
+            }
+        }
+
+        if (! $transaction) {
+            return null;
+        }
+
+        $transaction->refresh();
+
+        if ($transaction->status !== QrisTransaction::STATUS_PENDING) {
+            return null;
+        }
+
+        return $transaction;
+    }
+
+    private function looksLikePaymentAction(string $messageText): bool
+    {
+        return (bool) preg_match('/\b(cek status|status|bayar|payment|qris|bukti)\b/i', $messageText);
+    }
+
+    private function buildPaymentPrefix(
+        AiAgent $aiAgent,
+        string $messageText,
+        UserIntent $intent
+    ): string {
+        $normalized = $this->normalizeMessage($messageText);
+
+        if ($intent === UserIntent::OFF_TOPIC || $this->looksOffTopic($normalized)) {
+            $botName = $aiAgent->bot_name;
+
+            return "Maaf, saya {$botName} hanya membantu pemesanan makanan, melihat menu, atau reservasi. ";
+        }
+
+        if (! $this->isOrderContextMessage($normalized) && ! $this->isShortConfirmation($normalized)) {
+            $botName = $aiAgent->bot_name;
+
+            return "Maaf, saya {$botName} hanya membantu pemesanan makanan, melihat menu, atau reservasi. ";
+        }
+
+        $cleanMessage = trim(preg_replace('/\s+/', ' ', $messageText));
+        if ($cleanMessage === '') {
+            return 'Oke. ';
+        }
+
+        if (! $this->shouldEchoMessage($cleanMessage)) {
+            return 'Oke. ';
+        }
+
+        if (mb_strlen($cleanMessage) > 60) {
+            return 'Oke. ';
+        }
+
+        return "Oke, {$cleanMessage}. ";
+    }
+
+    private function shouldEchoMessage(string $messageText): bool
+    {
+        if (str_contains($messageText, '?')) {
+            return false;
+        }
+
+        if (preg_match('/\b(apakah|kenapa|gimana|bagaimana|kapan|dimana|berapa)\b/i', $messageText)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function isOrderContextMessage(string $messageText): bool
+    {
+        return (bool) preg_match('/\b(menu|pesan|order|keranjang|checkout|konfirmasi|bayar|pembayaran|payment|qris|status)\b/i', $messageText);
+    }
+
+    private function looksOffTopic(string $messageText): bool
+    {
+        $offTopicKeywords = [
+            'siapa presiden', 'ibu kota', 'chatgpt', 'claude', 'openai',
+            'berita', 'politik', 'sejarah', 'matematika', 'hitungan',
+            'cerita', 'puisi', 'coding', 'program', 'napoleon', 'biksu',
+        ];
+
+        foreach ($offTopicKeywords as $keyword) {
+            if (str_contains($messageText, $keyword)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
