@@ -29,18 +29,22 @@ class AiAgentService
 
     protected IntentTracker $intentTracker;
 
+    protected ConversationGuard $conversationGuard;
+
     public function __construct(
         WhatsAppAccountService $whatsappAccountService,
         OrderService $orderService,
         QrisService $qrisService,
         ConversationSummarizer $conversationSummarizer,
-        IntentTracker $intentTracker
+        IntentTracker $intentTracker,
+        ConversationGuard $conversationGuard
     ) {
         $this->whatsappAccountService = $whatsappAccountService;
         $this->orderService = $orderService;
         $this->qrisService = $qrisService;
         $this->conversationSummarizer = $conversationSummarizer;
         $this->intentTracker = $intentTracker;
+        $this->conversationGuard = $conversationGuard;
     }
 
     /**
@@ -115,6 +119,20 @@ class AiAgentService
                 $assistantMessage = $this->getOrderDisabledMessage($aiAgent);
                 $conversation->addMessage('ai', $assistantMessage);
                 $this->sendReply($account, $contact->wa_id, $assistantMessage);
+
+                return;
+            }
+
+            $userIntent = UserIntent::detect($messageText);
+            $guardedReply = $this->conversationGuard->resolve($conversation, $aiAgent, $messageText, $userIntent);
+            if ($guardedReply !== null) {
+                Log::info('Conversation guard handled response without LLM', [
+                    'conversation_id' => $conversation->id,
+                    'intent' => $userIntent->value,
+                ]);
+
+                $conversation->addMessage('ai', $guardedReply);
+                $this->sendReply($account, $contact->wa_id, $guardedReply);
 
                 return;
             }
@@ -196,9 +214,6 @@ class AiAgentService
                     // Continue without summary - system will use full message history
                 }
             }
-
-            // Detect user intent for optimization
-            $userIntent = UserIntent::detect($messageText);
 
             // Build system prompt with intent-based optimization
             $systemPrompt = $aiAgent->buildSystemPrompt($account->user_id, $messageText);
@@ -2446,13 +2461,13 @@ class AiAgentService
                     $deliveryType = $conversation->order_context['delivery_type'] ?? null;
                     if ($deliveryType === Order::DELIVERY_TYPE_DELIVERY) {
                         $address = $conversation->order_context['delivery_address'] ?? null;
-                        $response .= "🚚 Pesanan Anda sedang disiapkan dan akan segera diantar";
+                        $response .= '🚚 Pesanan Anda sedang disiapkan dan akan segera diantar';
                         if ($address) {
                             $response .= " ke:\n📍 {$address}";
                         }
                         $response .= "\n\nMohon siapkan diri untuk menerima pesanan. Terima kasih! 🙏";
                     } else {
-                        $response .= "Pesanan Anda sedang diproses. Terima kasih atas pembayaran Anda! 🙏";
+                        $response .= 'Pesanan Anda sedang diproses. Terima kasih atas pembayaran Anda! 🙏';
                     }
 
                     // Clear payment context so it's not double-counted
