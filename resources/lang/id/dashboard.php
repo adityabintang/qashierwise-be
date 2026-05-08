@@ -19,6 +19,7 @@ return [
     'profile_title' => 'Profil Bisnis - QashierWise',
     'whatsapp_account_title' => 'Akun WhatsApp - QashierWise',
     'ai_agent_title' => 'Agen AI - QashierWise',
+    'customer_tags_title' => 'Tag Pelanggan - QashierWise',
     'reservations_title' => 'Reservasi - QashierWise',
 
     // Main Navigation Menu Items
@@ -29,6 +30,8 @@ return [
     'menu_business_profile' => 'Profil Bisnis',
     'menu_whatsapp_account' => 'Akun WhatsApp',
     'menu_ai_agent' => 'Agen AI',
+    'menu_customer_tags' => 'Tag Pelanggan',
+    'customer_tags_description' => 'Kelola tag untuk kontak WhatsApp Anda',
 
     // POS Section Headers
     'section_point_of_sale' => 'Point of Sale',
@@ -210,8 +213,10 @@ return [
 
     // Confirmation Messages
     'confirm_delete' => 'Apakah Anda yakin ingin menghapus ini?',
+    'confirm_delete_message' => 'Apakah Anda yakin ingin menghapus ini? Tindakan ini tidak dapat dibatalkan.',
     'confirm_action' => 'Apakah Anda yakin ingin melanjutkan?',
     'action_cannot_undone' => 'Tindakan ini tidak dapat dibatalkan',
+    'deleting' => 'Menghapus',
 
     // Loading States
     'loading_data' => 'Memuat data...',

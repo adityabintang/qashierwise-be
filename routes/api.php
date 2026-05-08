@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\SubMerchantController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\WhatsAppController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
+use App\Http\Controllers\Api\ContactTagController;
 use App\Http\Controllers\Api\WithdrawalController;
 use App\Http\Controllers\Api\XenditWebhookController;
 use App\Http\Controllers\MonitoringDashboardController;
@@ -187,6 +188,14 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::get('/contacts/{id}/messages', [WhatsAppController::class, 'getContactMessages']);
         Route::post('/contacts/{id}/mark-read', [WhatsAppController::class, 'markContactMessagesAsRead']);
         Route::put('/contacts/{id}/toggle-ai', [WhatsAppController::class, 'toggleContactAi']);
+
+        // Contact Tags
+        Route::get('/tags', [ContactTagController::class, 'index']);
+        Route::post('/tags', [ContactTagController::class, 'store']);
+        Route::put('/tags/{id}', [ContactTagController::class, 'update']);
+        Route::delete('/tags/{id}', [ContactTagController::class, 'destroy']);
+        Route::post('/contacts/{id}/tags', [ContactTagController::class, 'assignTags']);
+        Route::delete('/contacts/{id}/tags/{tagId}', [ContactTagController::class, 'removeTag']);
     });
 
     // AI Agent routes

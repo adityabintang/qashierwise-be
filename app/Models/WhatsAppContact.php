@@ -82,6 +82,19 @@ class WhatsAppContact extends Model
     }
 
     /**
+     * The tags assigned to this contact.
+     */
+    public function tags()
+    {
+        return $this->belongsToMany(
+            ContactTag::class,
+            'contact_tag_pivot',
+            'whatsapp_contact_id',
+            'contact_tag_id'
+        )->withTimestamps();
+    }
+
+    /**
      * Get phone number (formatted wa_id)
      */
     public function getPhoneNumberAttribute()

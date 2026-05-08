@@ -1585,8 +1585,18 @@ class WhatsAppController extends Controller
 
             $perPage = $request->get('per_page', 15);
 
-            $contacts = WhatsAppContact::withCount('messages')
-                ->orderBy('last_message_at', 'desc')
+            // RLS in model automatically filters by user_id
+            $query = WhatsAppContact::with('tags')
+                ->withCount('messages');
+
+            // Filter by tag if tag_id parameter is provided
+            if ($request->has('tag_id') && $request->tag_id) {
+                $query->whereHas('tags', function ($q) use ($request) {
+                    $q->where('contact_tags.id', $request->tag_id);
+                });
+            }
+
+            $contacts = $query->orderBy('last_message_at', 'desc')
                 ->paginate($perPage);
 
             return response()->json([
