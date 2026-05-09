@@ -133,12 +133,12 @@
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-[hsl(var(--border))]">
-                                    <template x-for="(product, index) in topProducts" :key="product.id">
+                                    <template x-for="(product, index) in topProducts" :key="product.product_id">
                                         <tr class="hover:bg-[hsl(var(--muted)/0.3)]">
                                             <td class="p-4 text-sm" x-text="index + 1"></td>
-                                            <td class="p-4 font-medium" x-text="product.name"></td>
-                                            <td class="p-4 text-right" x-text="product.quantity_sold"></td>
-                                            <td class="p-4 text-right font-medium text-[hsl(var(--primary))]" x-text="formatCurrency(product.revenue)"></td>
+                                            <td class="p-4 font-medium" x-text="product.product_name"></td>
+                                            <td class="p-4 text-right" x-text="product.total_quantity"></td>
+                                            <td class="p-4 text-right font-medium text-[hsl(var(--primary))]" x-text="formatCurrency(product.total_revenue)"></td>
                                         </tr>
                                     </template>
                                 </tbody>
@@ -166,8 +166,8 @@
                                     <template x-for="day in dailyBreakdown" :key="day.date">
                                         <tr class="hover:bg-[hsl(var(--muted)/0.3)]">
                                             <td class="p-4" x-text="formatDateShort(day.date)"></td>
-                                            <td class="p-4 text-right" x-text="day.orders"></td>
-                                            <td class="p-4 text-right font-medium text-[hsl(var(--primary))]" x-text="formatCurrency(day.sales)"></td>
+                                            <td class="p-4 text-right" x-text="day.total_orders"></td>
+                                            <td class="p-4 text-right font-medium text-[hsl(var(--primary))]" x-text="formatCurrency(day.total_sales)"></td>
                                         </tr>
                                     </template>
                                 </tbody>
@@ -256,17 +256,17 @@ function reportsApp() {
                 if (this.reportType === 'daily') {
                     url += `daily?date=${this.selectedDate}&${params}`;
                 } else if (this.reportType === 'range') {
-                    url += `range?start=${this.startDate}&end=${this.endDate}&${params}`;
+                    url += `range?start_date=${this.startDate}&end_date=${this.endDate}&${params}`;
                 } else {
-                    url += `top-products?start=${this.startDate}&end=${this.endDate}&${params}`;
+                    url += `top-products?start_date=${this.startDate}&end_date=${this.endDate}&${params}`;
                 }
 
                 const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
                 const data = await res.json();
                 if (data.success) {
-                    this.summary = data.data.summary || { total_sales: data.data.total_sales || 0, total_orders: data.data.total_orders || 0, average_order: data.data.average_order || 0, items_sold: data.data.items_sold || 0 };
+                    this.summary = { total_sales: data.data.total_sales || 0, total_orders: data.data.total_orders || 0, average_order: data.data.average_order_value || 0, items_sold: data.data.total_items || 0 };
                     this.topProducts = data.data.products || [];
-                    this.dailyBreakdown = data.data.daily || [];
+                    this.dailyBreakdown = data.data.daily_breakdown || [];
                     this.$nextTick(() => this.renderChart(data.data));
                 }
             } catch (e) { console.error('Error:', e); } finally { this.loading = false; }
@@ -281,11 +281,11 @@ function reportsApp() {
 
             if (this.reportType === 'products') {
                 const products = (data.products || []).slice(0, 10);
-                options.series = [{ name: 'Revenue', data: products.map(p => p.revenue || 0) }];
-                options.xaxis = { categories: products.map(p => p.name || 'Unknown') };
+                options.series = [{ name: 'Revenue', data: products.map(p => p.total_revenue || 0) }];
+                options.xaxis = { categories: products.map(p => p.product_name || 'Unknown') };
             } else if (this.reportType === 'range') {
-                const daily = data.daily || [];
-                options.series = [{ name: 'Sales', data: daily.map(d => d.sales || 0) }];
+                const daily = data.daily_breakdown || [];
+                options.series = [{ name: 'Sales', data: daily.map(d => d.total_sales || 0) }];
                 options.xaxis = { categories: daily.map(d => this.formatDateShort(d.date)) };
             } else {
                 options.series = [{ name: 'Sales', data: [data.total_sales || 0] }];
