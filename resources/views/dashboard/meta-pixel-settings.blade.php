@@ -466,6 +466,13 @@
 <script>
 function metaPixelApp() {
     return {
+        // ── Shared sidebar/layout state (required by dashboard-sidebar & dashboard-header) ──
+        sidebarOpen: window.innerWidth >= 1024,
+        isMobile: window.innerWidth < 768,
+        user: null,
+        notifications: [],
+
+        // ── Page state ──
         loading: true,
         saving: false,
         showToken: false,
@@ -489,14 +496,59 @@ function metaPixelApp() {
         eventsPage: 1,
 
         async init() {
+            // Sidebar init
+            this.isMobile = window.innerWidth < 768;
+            if (this.isMobile) {
+                this.sidebarOpen = false;
+            } else {
+                const saved = localStorage.getItem('sidebarOpen');
+                if (saved !== null) this.sidebarOpen = JSON.parse(saved);
+            }
+            this.$watch('sidebarOpen', v => {
+                if (!this.isMobile) localStorage.setItem('sidebarOpen', JSON.stringify(v));
+            });
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    const wasMobile = this.isMobile;
+                    this.isMobile = window.innerWidth < 768;
+                    if (wasMobile && !this.isMobile) {
+                        const saved = localStorage.getItem('sidebarOpen');
+                        this.sidebarOpen = saved !== null ? JSON.parse(saved) : true;
+                    } else if (!wasMobile && this.isMobile) {
+                        this.sidebarOpen = false;
+                    }
+                }, 150);
+            });
+
+            // Load user & notifications from localStorage
+            try { this.user = JSON.parse(localStorage.getItem('user')) || { name: 'User', email: '' }; }
+            catch { this.user = { name: 'User', email: '' }; }
+            try { this.notifications = JSON.parse(localStorage.getItem('notifications')) || []; }
+            catch { this.notifications = []; }
+
             await this.loadSettings();
+        },
+
+        logout() {
+            const token = localStorage.getItem('token');
+            const cleanup = () => {
+                ['token', 'user', 'sidebarOpen', 'notifications'].forEach(k => localStorage.removeItem(k));
+                window.location.href = '/login';
+            };
+            if (token) {
+                fetch('/api/logout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } }).finally(cleanup);
+            } else {
+                cleanup();
+            }
         },
 
         async loadSettings() {
             this.loading = true;
             try {
                 const res = await fetch('/api/meta-pixel/settings', {
-                    headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` }
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
                 });
                 if (!res.ok) throw new Error('Gagal memuat pengaturan');
                 const json = await res.json();
@@ -544,7 +596,7 @@ function metaPixelApp() {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+                        Authorization: `Bearer ${localStorage.getItem('token')}`,
                     },
                     body: JSON.stringify(body),
                 });
@@ -574,7 +626,7 @@ function metaPixelApp() {
             try {
                 const res = await fetch('/api/meta-pixel/settings', {
                     method: 'DELETE',
-                    headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
                 });
                 if (!res.ok) throw new Error('Gagal menghapus');
                 this.settings = null;
@@ -596,7 +648,7 @@ function metaPixelApp() {
                 if (this.eventsFilter) params.set('status', this.eventsFilter);
 
                 const res = await fetch(`/api/meta-pixel/events?${params}`, {
-                    headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
                 });
                 const json = await res.json();
                 this.events    = json.data ?? [];
