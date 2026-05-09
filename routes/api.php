@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\WhatsAppController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
 use App\Http\Controllers\Api\ContactTagController;
+use App\Http\Controllers\Api\MetaPixelController;
 use App\Http\Controllers\Api\WithdrawalController;
 use App\Http\Controllers\Api\XenditWebhookController;
 use App\Http\Controllers\MonitoringDashboardController;
@@ -362,6 +363,14 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
             Route::get('/earnings', [BalanceController::class, 'earnings']);
             Route::get('/daily-earnings', [BalanceController::class, 'dailyEarnings']);
             Route::post('/calculate-fee', [BalanceController::class, 'calculateFee']);
+        });
+
+        // Meta Conversions API (CAPI) settings
+        Route::prefix('meta-pixel')->group(function () {
+            Route::get('/settings', [MetaPixelController::class, 'show']);
+            Route::post('/settings', [MetaPixelController::class, 'upsert']);
+            Route::delete('/settings', [MetaPixelController::class, 'destroy']);
+            Route::get('/events', [MetaPixelController::class, 'events']);
         });
     });
 });

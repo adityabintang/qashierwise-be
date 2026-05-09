@@ -6,6 +6,7 @@ use App\Events\MessageStatusUpdated;
 use App\Events\NewWhatsAppMessage;
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessAiAgentMessage;
+use App\Jobs\SendCapiEventJob;
 use App\Models\AiAgent;
 use App\Models\Reservation;
 use App\Models\WhatsAppAccount;
@@ -196,6 +197,49 @@ class WhatsAppWebhookController extends Controller
             ]
         );
 
+        $isNewContact = $contact->wasRecentlyCreated;
+
+        // Extract CTWA referral data if present (Click-to-WhatsApp Ads)
+        $referral = $message['referral'] ?? null;
+        $ctwaClid = $referral['ctwa_clid'] ?? null;
+        $referralSourceType = $referral['source_type'] ?? null;
+
+        if ($ctwaClid && (! $contact->ctwa_clid || $contact->attribution_expires_at?->isPast())) {
+            $contact->update([
+                'ctwa_clid' => $ctwaClid,
+                'first_source_type' => $referralSourceType === 'ad' ? 'ad' : 'organic',
+                'ctwa_headline' => $referral['headline'] ?? null,
+                'attribution_expires_at' => now()->addDays(
+                    config('services.meta_capi.attribution_window_days', 7)
+                ),
+            ]);
+
+            Log::info('CTWA attribution stored for contact', [
+                'contact_id' => $contact->id,
+                'ctwa_clid' => $ctwaClid,
+                'source_type' => $referralSourceType,
+            ]);
+        }
+
+        // Dispatch Lead CAPI event for new contacts arriving via CTWA ad
+        if ($isNewContact && $ctwaClid) {
+            SendCapiEventJob::dispatch(
+                $userId,
+                'Lead',
+                ['phone' => $from, 'fbc' => $ctwaClid],
+                ['lead_event_source' => 'ctwa'],
+                'lead_contact_'.$contact->id,
+                'other',
+                'whatsapp',
+                $contact->id
+            );
+
+            Log::info('CAPI Lead event dispatched for new CTWA contact', [
+                'contact_id' => $contact->id,
+                'ctwa_clid' => $ctwaClid,
+            ]);
+        }
+
         // Extract message content based on type
         $content = null;
         $metadata = [];
@@ -333,6 +377,11 @@ class WhatsAppWebhookController extends Controller
                 $content = "Unsupported message type: $type";
                 $metadata = $message;
                 break;
+        }
+
+        // Append CTWA referral data to metadata for full traceability
+        if ($referral) {
+            $metadata['referral'] = $referral;
         }
 
         // Save message to database (use updateOrCreate to prevent duplicate errors)

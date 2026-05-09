@@ -52,11 +52,16 @@ class WhatsAppContact extends Model
         'last_message_text',
         'unread_count',
         'ai_active',
+        'ctwa_clid',
+        'first_source_type',
+        'ctwa_headline',
+        'attribution_expires_at',
     ];
 
     protected $casts = [
         'last_message_at' => 'datetime',
         'ai_active' => 'boolean',
+        'attribution_expires_at' => 'datetime',
     ];
 
     protected $appends = ['phone_number'];

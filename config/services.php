@@ -71,4 +71,10 @@ return [
         'redirect_uri' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'meta_capi' => [
+        'graph_api_url' => 'https://graph.facebook.com',
+        'api_version' => env('META_CAPI_API_VERSION', 'v22.0'),
+        'attribution_window_days' => 7,
+    ],
+
 ];
