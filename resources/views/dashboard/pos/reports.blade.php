@@ -247,6 +247,7 @@ function reportsApp() {
                 this.loading = false; return;
             }
             this.loading = true;
+            let reportData = null;
             try {
                 const token = localStorage.getItem('token');
                 let url = `${this.API_BASE_URL}/reports/`;
@@ -267,13 +268,15 @@ function reportsApp() {
                     this.summary = { total_sales: data.data.total_sales || 0, total_orders: data.data.total_orders || 0, average_order: data.data.average_order_value || 0, items_sold: data.data.total_items || 0 };
                     this.topProducts = data.data.products || [];
                     this.dailyBreakdown = data.data.daily_breakdown || [];
-                    this.$nextTick(() => this.renderChart(data.data));
+                    reportData = data.data;
                 }
             } catch (e) { console.error('Error:', e); } finally { this.loading = false; }
+            if (reportData) { this.$nextTick(() => this.renderChart(reportData)); }
         },
 
         renderChart(data) {
-            if (this.chart) { this.chart.destroy(); }
+            if (!window.ApexCharts) { console.error('ApexCharts not loaded'); return; }
+            if (this.chart) { this.chart.destroy(); this.chart = null; }
             const el = document.querySelector('#reportChart');
             if (!el) return;
 
@@ -292,7 +295,7 @@ function reportsApp() {
                 options.xaxis = { categories: [this.selectedDate] };
             }
 
-            this.chart = new ApexCharts(el, options);
+            this.chart = new window.ApexCharts(el, options);
             this.chart.render();
         },
 
