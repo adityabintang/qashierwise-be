@@ -287,7 +287,7 @@ function reportsApp() {
                     reportData = data.data;
                 }
             } catch (e) { console.error('Error:', e); } finally { this.loading = false; }
-            if (reportData) { this.$nextTick(() => this.renderChart(reportData)); }
+            if (reportData) { this.$nextTick(() => requestAnimationFrame(() => this.renderChart(reportData))); }
         },
 
         renderChart(data) {
@@ -312,7 +312,7 @@ function reportsApp() {
             }
 
             this.chart = new window.ApexCharts(el, options);
-            this.chart.render();
+            this.chart.render().then(() => window.dispatchEvent(new Event('resize')));
         },
 
         formatCurrency(a) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(a || 0); },
