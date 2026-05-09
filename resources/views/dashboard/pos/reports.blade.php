@@ -3,6 +3,9 @@
 
 @push('head-scripts')
     @vite('resources/js/apexcharts.js')
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 @endpush
 
 @section('title', __('pos.reports.title') . ' - QashierWise POS')
@@ -52,6 +55,19 @@
                                 </div>
                             </div>
                         </template>
+                    </div>
+                    <!-- Export Buttons -->
+                    <div class="flex justify-end gap-2 pt-3 mt-3 border-t border-[hsl(var(--border))]">
+                        <button @click="exportExcel()" :disabled="loading"
+                            class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium border border-[hsl(var(--border))] rounded-lg hover:bg-[hsl(var(--muted)/0.5)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            <i class="fas fa-file-excel text-green-600"></i>
+                            <span>Excel</span>
+                        </button>
+                        <button @click="exportPDF()" :disabled="loading"
+                            class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium border border-[hsl(var(--border))] rounded-lg hover:bg-[hsl(var(--muted)/0.5)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            <i class="fas fa-file-pdf text-red-600"></i>
+                            <span>PDF</span>
+                        </button>
                     </div>
                 </div>
 
@@ -133,12 +149,12 @@
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-[hsl(var(--border))]">
-                                    <template x-for="(product, index) in topProducts" :key="product.id">
+                                    <template x-for="(product, index) in topProducts" :key="product.product_id">
                                         <tr class="hover:bg-[hsl(var(--muted)/0.3)]">
                                             <td class="p-4 text-sm" x-text="index + 1"></td>
-                                            <td class="p-4 font-medium" x-text="product.name"></td>
-                                            <td class="p-4 text-right" x-text="product.quantity_sold"></td>
-                                            <td class="p-4 text-right font-medium text-[hsl(var(--primary))]" x-text="formatCurrency(product.revenue)"></td>
+                                            <td class="p-4 font-medium" x-text="product.product_name"></td>
+                                            <td class="p-4 text-right" x-text="product.total_quantity"></td>
+                                            <td class="p-4 text-right font-medium text-[hsl(var(--primary))]" x-text="formatCurrency(product.total_revenue)"></td>
                                         </tr>
                                     </template>
                                 </tbody>
@@ -166,8 +182,8 @@
                                     <template x-for="day in dailyBreakdown" :key="day.date">
                                         <tr class="hover:bg-[hsl(var(--muted)/0.3)]">
                                             <td class="p-4" x-text="formatDateShort(day.date)"></td>
-                                            <td class="p-4 text-right" x-text="day.orders"></td>
-                                            <td class="p-4 text-right font-medium text-[hsl(var(--primary))]" x-text="formatCurrency(day.sales)"></td>
+                                            <td class="p-4 text-right" x-text="day.total_orders"></td>
+                                            <td class="p-4 text-right font-medium text-[hsl(var(--primary))]" x-text="formatCurrency(day.total_sales)"></td>
                                         </tr>
                                     </template>
                                 </tbody>
@@ -247,6 +263,7 @@ function reportsApp() {
                 this.loading = false; return;
             }
             this.loading = true;
+            let reportData = null;
             try {
                 const token = localStorage.getItem('token');
                 let url = `${this.API_BASE_URL}/reports/`;
@@ -256,24 +273,26 @@ function reportsApp() {
                 if (this.reportType === 'daily') {
                     url += `daily?date=${this.selectedDate}&${params}`;
                 } else if (this.reportType === 'range') {
-                    url += `range?start=${this.startDate}&end=${this.endDate}&${params}`;
+                    url += `range?start_date=${this.startDate}&end_date=${this.endDate}&${params}`;
                 } else {
-                    url += `top-products?start=${this.startDate}&end=${this.endDate}&${params}`;
+                    url += `top-products?start_date=${this.startDate}&end_date=${this.endDate}&${params}`;
                 }
 
                 const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
                 const data = await res.json();
                 if (data.success) {
-                    this.summary = data.data.summary || { total_sales: data.data.total_sales || 0, total_orders: data.data.total_orders || 0, average_order: data.data.average_order || 0, items_sold: data.data.items_sold || 0 };
+                    this.summary = { total_sales: data.data.total_sales || 0, total_orders: data.data.total_orders || 0, average_order: data.data.average_order_value || 0, items_sold: data.data.total_items || 0 };
                     this.topProducts = data.data.products || [];
-                    this.dailyBreakdown = data.data.daily || [];
-                    this.$nextTick(() => this.renderChart(data.data));
+                    this.dailyBreakdown = data.data.daily_breakdown || [];
+                    reportData = data.data;
                 }
             } catch (e) { console.error('Error:', e); } finally { this.loading = false; }
+            if (reportData) { this.$nextTick(() => requestAnimationFrame(() => this.renderChart(reportData))); }
         },
 
         renderChart(data) {
-            if (this.chart) { this.chart.destroy(); }
+            if (!window.ApexCharts) { console.error('ApexCharts not loaded'); return; }
+            if (this.chart) { this.chart.destroy(); this.chart = null; }
             const el = document.querySelector('#reportChart');
             if (!el) return;
 
@@ -281,23 +300,141 @@ function reportsApp() {
 
             if (this.reportType === 'products') {
                 const products = (data.products || []).slice(0, 10);
-                options.series = [{ name: 'Revenue', data: products.map(p => p.revenue || 0) }];
-                options.xaxis = { categories: products.map(p => p.name || 'Unknown') };
+                options.series = [{ name: 'Revenue', data: products.map(p => p.total_revenue || 0) }];
+                options.xaxis = { categories: products.map(p => p.product_name || 'Unknown') };
             } else if (this.reportType === 'range') {
-                const daily = data.daily || [];
-                options.series = [{ name: 'Sales', data: daily.map(d => d.sales || 0) }];
+                const daily = data.daily_breakdown || [];
+                options.series = [{ name: 'Sales', data: daily.map(d => d.total_sales || 0) }];
                 options.xaxis = { categories: daily.map(d => this.formatDateShort(d.date)) };
             } else {
                 options.series = [{ name: 'Sales', data: [data.total_sales || 0] }];
                 options.xaxis = { categories: [this.selectedDate] };
             }
 
-            this.chart = new ApexCharts(el, options);
-            this.chart.render();
+            this.chart = new window.ApexCharts(el, options);
+            this.chart.render().then(() => window.dispatchEvent(new Event('resize')));
         },
 
         formatCurrency(a) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(a || 0); },
         formatDateShort(d) { return d ? new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : '-'; },
+
+        exportPDF() {
+            if (!window.jspdf) { alert('PDF library belum siap, coba refresh halaman.'); return; }
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const purple = [88, 28, 220];
+            const filename = `laporan-${this.reportType}-${new Date().toISOString().split('T')[0]}.pdf`;
+
+            const typeLabel = { daily: 'Penjualan Harian', range: 'Rentang Tanggal', products: 'Produk Terlaris' };
+            let periodLabel = '';
+            if (this.reportType === 'daily') periodLabel = `Tanggal: ${this.selectedDate}`;
+            else periodLabel = `Periode: ${this.startDate} s/d ${this.endDate}`;
+
+            doc.setFontSize(20); doc.setTextColor(...purple);
+            doc.text('Laporan Penjualan', 14, 20);
+            doc.setFontSize(11); doc.setTextColor(80, 80, 80);
+            doc.text(`Tipe: ${typeLabel[this.reportType]}`, 14, 29);
+            doc.text(periodLabel, 14, 36);
+            doc.text(`Dicetak: ${new Date().toLocaleString('id-ID')}`, 14, 43);
+
+            doc.autoTable({
+                startY: 50,
+                head: [['Metrik', 'Nilai']],
+                body: [
+                    ['Total Penjualan', this.formatCurrency(this.summary.total_sales)],
+                    ['Total Pesanan', String(this.summary.total_orders)],
+                    ['Rata-rata Pesanan', this.formatCurrency(this.summary.average_order)],
+                    ['Item Terjual', String(this.summary.items_sold)],
+                ],
+                theme: 'grid',
+                headStyles: { fillColor: purple, textColor: 255, fontStyle: 'bold' },
+                columnStyles: { 1: { halign: 'right' } },
+            });
+
+            let finalY = doc.lastAutoTable.finalY + 10;
+
+            if (this.reportType === 'products' && this.topProducts.length > 0) {
+                doc.setFontSize(13); doc.setTextColor(...purple);
+                doc.text('Performa Produk', 14, finalY);
+                doc.autoTable({
+                    startY: finalY + 4,
+                    head: [['#', 'Produk', 'Qty Terjual', 'Pendapatan']],
+                    body: this.topProducts.map((p, i) => [i + 1, p.product_name, p.total_quantity, this.formatCurrency(p.total_revenue)]),
+                    theme: 'striped',
+                    headStyles: { fillColor: purple, textColor: 255, fontStyle: 'bold' },
+                    columnStyles: { 0: { halign: 'center', cellWidth: 12 }, 2: { halign: 'right' }, 3: { halign: 'right' } },
+                });
+            } else if (this.reportType === 'range' && this.dailyBreakdown.length > 0) {
+                doc.setFontSize(13); doc.setTextColor(...purple);
+                doc.text('Rincian Harian', 14, finalY);
+                doc.autoTable({
+                    startY: finalY + 4,
+                    head: [['Tanggal', 'Pesanan', 'Penjualan']],
+                    body: this.dailyBreakdown.map(d => [this.formatDateShort(d.date), d.total_orders, this.formatCurrency(d.total_sales)]),
+                    theme: 'striped',
+                    headStyles: { fillColor: purple, textColor: 255, fontStyle: 'bold' },
+                    columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+                });
+            }
+
+            doc.save(filename);
+        },
+
+        exportExcel() {
+            if (!window.XLSX) { alert('Excel library belum siap, coba refresh halaman.'); return; }
+            const wb = XLSX.utils.book_new();
+            const filename = `laporan-${this.reportType}-${new Date().toISOString().split('T')[0]}.xlsx`;
+            const typeLabel = { daily: 'Penjualan Harian', range: 'Rentang Tanggal', products: 'Produk Terlaris' };
+
+            const summaryRows = [
+                ['Laporan Penjualan - QashierWise'],
+                ['Tipe Laporan', typeLabel[this.reportType]],
+                this.reportType === 'daily'
+                    ? ['Tanggal', this.selectedDate]
+                    : ['Periode', `${this.startDate} s/d ${this.endDate}`],
+                ['Dicetak', new Date().toLocaleString('id-ID')],
+                [],
+                ['RINGKASAN'],
+                ['Total Penjualan', this.summary.total_sales],
+                ['Total Pesanan', this.summary.total_orders],
+                ['Rata-rata Pesanan', this.summary.average_order],
+                ['Item Terjual', this.summary.items_sold],
+            ];
+            const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+            wsSummary['!cols'] = [{ wch: 22 }, { wch: 20 }];
+            XLSX.utils.book_append_sheet(wb, wsSummary, 'Ringkasan');
+
+            if (this.reportType === 'products' && this.topProducts.length > 0) {
+                const rows = [
+                    ['#', 'Produk', 'Qty Terjual', 'Pendapatan (IDR)'],
+                    ...this.topProducts.map((p, i) => [i + 1, p.product_name, p.total_quantity, p.total_revenue]),
+                ];
+                const ws = XLSX.utils.aoa_to_sheet(rows);
+                ws['!cols'] = [{ wch: 5 }, { wch: 35 }, { wch: 14 }, { wch: 20 }];
+                XLSX.utils.book_append_sheet(wb, ws, 'Produk Terlaris');
+            } else if (this.reportType === 'range' && this.dailyBreakdown.length > 0) {
+                const rows = [
+                    ['Tanggal', 'Total Pesanan', 'Total Penjualan (IDR)'],
+                    ...this.dailyBreakdown.map(d => [d.date, d.total_orders, d.total_sales]),
+                ];
+                const ws = XLSX.utils.aoa_to_sheet(rows);
+                ws['!cols'] = [{ wch: 14 }, { wch: 16 }, { wch: 22 }];
+                XLSX.utils.book_append_sheet(wb, ws, 'Rincian Harian');
+            } else if (this.reportType === 'daily') {
+                const rows = [
+                    ['Metrik', 'Nilai'],
+                    ['Total Penjualan', this.summary.total_sales],
+                    ['Total Pesanan', this.summary.total_orders],
+                    ['Rata-rata Pesanan', this.summary.average_order],
+                    ['Item Terjual', this.summary.items_sold],
+                ];
+                const ws = XLSX.utils.aoa_to_sheet(rows);
+                ws['!cols'] = [{ wch: 22 }, { wch: 20 }];
+                XLSX.utils.book_append_sheet(wb, ws, 'Penjualan Harian');
+            }
+
+            XLSX.writeFile(wb, filename);
+        },
 
         logout() { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/login'; },
         addNotification() {}, clearNotifications() {}, removeNotification() {}, formatNotificationTime() { return ''; }
