@@ -72,6 +72,17 @@
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_customer_tags') }}</span>
         </a>
 
+        <!-- Marketing Section -->
+        <div x-show="sidebarOpen || isMobile" x-transition class="pt-4">
+            <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
+                Marketing
+            </div>
+        </div>
+        <a href="/dashboard/meta-pixel-settings" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'meta-pixel' ? 'active' : '' }}">
+            <i class="fab fa-meta w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Meta Pixel & CAPI</span>
+        </a>
+
         <!-- Reservation Section -->
         <div x-show="sidebarOpen || isMobile" x-transition class="pt-4">
             <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">

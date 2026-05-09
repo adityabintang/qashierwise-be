@@ -114,6 +114,10 @@ Route::middleware(['web', 'check.web.auth', 'block.author.login'])->group(functi
         return view('dashboard.customer-tags');
     })->name('dashboard.customer-tags');
 
+    Route::get('/dashboard/meta-pixel-settings', function () {
+        return view('dashboard.meta-pixel-settings');
+    })->name('dashboard.meta-pixel-settings');
+
     // Reservation routes
     Route::get('/dashboard/reservations', function () {
         return view('dashboard.reservations.index');
