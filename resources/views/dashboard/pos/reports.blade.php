@@ -3,6 +3,9 @@
 
 @push('head-scripts')
     @vite('resources/js/apexcharts.js')
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 @endpush
 
 @section('title', __('pos.reports.title') . ' - QashierWise POS')
@@ -52,6 +55,19 @@
                                 </div>
                             </div>
                         </template>
+                    </div>
+                    <!-- Export Buttons -->
+                    <div class="flex justify-end gap-2 pt-3 mt-3 border-t border-[hsl(var(--border))]">
+                        <button @click="exportExcel()" :disabled="loading"
+                            class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium border border-[hsl(var(--border))] rounded-lg hover:bg-[hsl(var(--muted)/0.5)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            <i class="fas fa-file-excel text-green-600"></i>
+                            <span>Excel</span>
+                        </button>
+                        <button @click="exportPDF()" :disabled="loading"
+                            class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium border border-[hsl(var(--border))] rounded-lg hover:bg-[hsl(var(--muted)/0.5)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            <i class="fas fa-file-pdf text-red-600"></i>
+                            <span>PDF</span>
+                        </button>
                     </div>
                 </div>
 
@@ -301,6 +317,124 @@ function reportsApp() {
 
         formatCurrency(a) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(a || 0); },
         formatDateShort(d) { return d ? new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : '-'; },
+
+        exportPDF() {
+            if (!window.jspdf) { alert('PDF library belum siap, coba refresh halaman.'); return; }
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const purple = [88, 28, 220];
+            const filename = `laporan-${this.reportType}-${new Date().toISOString().split('T')[0]}.pdf`;
+
+            const typeLabel = { daily: 'Penjualan Harian', range: 'Rentang Tanggal', products: 'Produk Terlaris' };
+            let periodLabel = '';
+            if (this.reportType === 'daily') periodLabel = `Tanggal: ${this.selectedDate}`;
+            else periodLabel = `Periode: ${this.startDate} s/d ${this.endDate}`;
+
+            doc.setFontSize(20); doc.setTextColor(...purple);
+            doc.text('Laporan Penjualan', 14, 20);
+            doc.setFontSize(11); doc.setTextColor(80, 80, 80);
+            doc.text(`Tipe: ${typeLabel[this.reportType]}`, 14, 29);
+            doc.text(periodLabel, 14, 36);
+            doc.text(`Dicetak: ${new Date().toLocaleString('id-ID')}`, 14, 43);
+
+            doc.autoTable({
+                startY: 50,
+                head: [['Metrik', 'Nilai']],
+                body: [
+                    ['Total Penjualan', this.formatCurrency(this.summary.total_sales)],
+                    ['Total Pesanan', String(this.summary.total_orders)],
+                    ['Rata-rata Pesanan', this.formatCurrency(this.summary.average_order)],
+                    ['Item Terjual', String(this.summary.items_sold)],
+                ],
+                theme: 'grid',
+                headStyles: { fillColor: purple, textColor: 255, fontStyle: 'bold' },
+                columnStyles: { 1: { halign: 'right' } },
+            });
+
+            let finalY = doc.lastAutoTable.finalY + 10;
+
+            if (this.reportType === 'products' && this.topProducts.length > 0) {
+                doc.setFontSize(13); doc.setTextColor(...purple);
+                doc.text('Performa Produk', 14, finalY);
+                doc.autoTable({
+                    startY: finalY + 4,
+                    head: [['#', 'Produk', 'Qty Terjual', 'Pendapatan']],
+                    body: this.topProducts.map((p, i) => [i + 1, p.product_name, p.total_quantity, this.formatCurrency(p.total_revenue)]),
+                    theme: 'striped',
+                    headStyles: { fillColor: purple, textColor: 255, fontStyle: 'bold' },
+                    columnStyles: { 0: { halign: 'center', cellWidth: 12 }, 2: { halign: 'right' }, 3: { halign: 'right' } },
+                });
+            } else if (this.reportType === 'range' && this.dailyBreakdown.length > 0) {
+                doc.setFontSize(13); doc.setTextColor(...purple);
+                doc.text('Rincian Harian', 14, finalY);
+                doc.autoTable({
+                    startY: finalY + 4,
+                    head: [['Tanggal', 'Pesanan', 'Penjualan']],
+                    body: this.dailyBreakdown.map(d => [this.formatDateShort(d.date), d.total_orders, this.formatCurrency(d.total_sales)]),
+                    theme: 'striped',
+                    headStyles: { fillColor: purple, textColor: 255, fontStyle: 'bold' },
+                    columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+                });
+            }
+
+            doc.save(filename);
+        },
+
+        exportExcel() {
+            if (!window.XLSX) { alert('Excel library belum siap, coba refresh halaman.'); return; }
+            const wb = XLSX.utils.book_new();
+            const filename = `laporan-${this.reportType}-${new Date().toISOString().split('T')[0]}.xlsx`;
+            const typeLabel = { daily: 'Penjualan Harian', range: 'Rentang Tanggal', products: 'Produk Terlaris' };
+
+            const summaryRows = [
+                ['Laporan Penjualan - QashierWise'],
+                ['Tipe Laporan', typeLabel[this.reportType]],
+                this.reportType === 'daily'
+                    ? ['Tanggal', this.selectedDate]
+                    : ['Periode', `${this.startDate} s/d ${this.endDate}`],
+                ['Dicetak', new Date().toLocaleString('id-ID')],
+                [],
+                ['RINGKASAN'],
+                ['Total Penjualan', this.summary.total_sales],
+                ['Total Pesanan', this.summary.total_orders],
+                ['Rata-rata Pesanan', this.summary.average_order],
+                ['Item Terjual', this.summary.items_sold],
+            ];
+            const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+            wsSummary['!cols'] = [{ wch: 22 }, { wch: 20 }];
+            XLSX.utils.book_append_sheet(wb, wsSummary, 'Ringkasan');
+
+            if (this.reportType === 'products' && this.topProducts.length > 0) {
+                const rows = [
+                    ['#', 'Produk', 'Qty Terjual', 'Pendapatan (IDR)'],
+                    ...this.topProducts.map((p, i) => [i + 1, p.product_name, p.total_quantity, p.total_revenue]),
+                ];
+                const ws = XLSX.utils.aoa_to_sheet(rows);
+                ws['!cols'] = [{ wch: 5 }, { wch: 35 }, { wch: 14 }, { wch: 20 }];
+                XLSX.utils.book_append_sheet(wb, ws, 'Produk Terlaris');
+            } else if (this.reportType === 'range' && this.dailyBreakdown.length > 0) {
+                const rows = [
+                    ['Tanggal', 'Total Pesanan', 'Total Penjualan (IDR)'],
+                    ...this.dailyBreakdown.map(d => [d.date, d.total_orders, d.total_sales]),
+                ];
+                const ws = XLSX.utils.aoa_to_sheet(rows);
+                ws['!cols'] = [{ wch: 14 }, { wch: 16 }, { wch: 22 }];
+                XLSX.utils.book_append_sheet(wb, ws, 'Rincian Harian');
+            } else if (this.reportType === 'daily') {
+                const rows = [
+                    ['Metrik', 'Nilai'],
+                    ['Total Penjualan', this.summary.total_sales],
+                    ['Total Pesanan', this.summary.total_orders],
+                    ['Rata-rata Pesanan', this.summary.average_order],
+                    ['Item Terjual', this.summary.items_sold],
+                ];
+                const ws = XLSX.utils.aoa_to_sheet(rows);
+                ws['!cols'] = [{ wch: 22 }, { wch: 20 }];
+                XLSX.utils.book_append_sheet(wb, ws, 'Penjualan Harian');
+            }
+
+            XLSX.writeFile(wb, filename);
+        },
 
         logout() { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/login'; },
         addNotification() {}, clearNotifications() {}, removeNotification() {}, formatNotificationTime() { return ''; }
