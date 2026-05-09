@@ -224,19 +224,51 @@ class WhatsAppWebhookController extends Controller
         // Dispatch Lead CAPI event for new contacts arriving via CTWA ad
         if ($isNewContact && $ctwaClid) {
             SendCapiEventJob::dispatch(
-                $userId,
-                'Lead',
-                ['phone' => $from, 'fbc' => $ctwaClid],
-                ['lead_event_source' => 'ctwa'],
-                'lead_contact_'.$contact->id,
-                'other',
-                'whatsapp',
-                $contact->id
+                userId: $userId,
+                eventName: 'Lead',
+                userData: [
+                    'phone' => $from,
+                    'fbc' => $ctwaClid,
+                    'first_name' => explode(' ', trim($contactName), 2)[0] ?? null,
+                    'last_name' => explode(' ', trim($contactName), 2)[1] ?? null,
+                    'external_id' => $from,
+                ],
+                customData: [
+                    'lead_event_source' => 'ctwa',
+                    'content_name' => $referral['headline'] ?? 'WhatsApp Ad',
+                ],
+                eventId: 'lead_contact_'.$contact->id,
+                actionSource: 'chat',
+                messagingChannel: 'whatsapp',
+                contactId: $contact->id
             );
 
             Log::info('CAPI Lead event dispatched for new CTWA contact', [
                 'contact_id' => $contact->id,
                 'ctwa_clid' => $ctwaClid,
+            ]);
+        }
+
+        // Dispatch Contact CAPI event for new organic (non-CTWA) contacts
+        if ($isNewContact && ! $ctwaClid) {
+            SendCapiEventJob::dispatch(
+                userId: $userId,
+                eventName: 'Contact',
+                userData: [
+                    'phone' => $from,
+                    'first_name' => explode(' ', trim($contactName), 2)[0] ?? null,
+                    'last_name' => explode(' ', trim($contactName), 2)[1] ?? null,
+                    'external_id' => $from,
+                ],
+                customData: [],
+                eventId: 'contact_new_'.$contact->id,
+                actionSource: 'chat',
+                messagingChannel: 'whatsapp',
+                contactId: $contact->id
+            );
+
+            Log::info('CAPI Contact event dispatched for new organic contact', [
+                'contact_id' => $contact->id,
             ]);
         }
 

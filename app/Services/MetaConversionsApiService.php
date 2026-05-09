@@ -13,11 +13,29 @@ use Illuminate\Support\Str;
 class MetaConversionsApiService
 {
     /**
+     * Meta error codes and their human-readable diagnostics.
+     * Reference: https://developers.facebook.com/docs/marketing-api/conversions-api
+     */
+    private const ERROR_CODES = [
+        190 => 'Invalid OAuth access token — regenerate system user token with ads_management permission',
+        100 => 'Invalid parameter — check required fields: event_name, event_time, action_source, user_data',
+        2804001 => 'Missing user_data — include at least one customer information parameter (ph, em, etc.)',
+        2804002 => 'Invalid action_source — valid: website, app, phone_call, chat, email, in_store, other',
+        2804003 => 'Timestamp too old — event_time must be within 7 days of current time',
+        2804004 => 'Invalid event_time — must be Unix seconds (not milliseconds)',
+        368 => 'Temporarily blocked — rate limiting in effect; apply exponential backoff',
+        803 => 'Permission denied — system user requires ads_management permission',
+    ];
+
+    /**
      * Send a CAPI event to Meta Graph API.
      *
-     * @param  array  $userData  Raw user data: ['phone' => '628xx', 'fbc' => 'ctwa_clid', 'email' => '...']
-     * @param  array  $customData  Event-specific data: ['value' => 100000, 'currency' => 'IDR']
-     * @param  string|null  $eventId  Deduplication ID (idempotency key)
+     * action_source 'chat' is correct for WhatsApp Business messages per Meta spec.
+     * Valid values: website, app, phone_call, chat, email, in_store, other
+     *
+     * @param  array  $userData  Raw PII: ['phone' => '628xx', 'fbc' => 'ctwa_clid', 'name' => '...', 'email' => '...']
+     * @param  array  $customData  Event-specific payload: ['value' => 100000, 'currency' => 'IDR']
+     * @param  string|null  $eventId  Deduplication key — must match browser Pixel eventID when running both
      * @return array ['success' => bool, 'response' => array, 'capi_event_id' => int|null]
      */
     public function sendEvent(
@@ -26,7 +44,7 @@ class MetaConversionsApiService
         array $userData,
         array $customData = [],
         ?string $eventId = null,
-        string $actionSource = 'other',
+        string $actionSource = 'chat',
         string $messagingChannel = 'whatsapp',
         ?int $contactId = null
     ): array {
@@ -67,7 +85,6 @@ class MetaConversionsApiService
             $body['test_event_code'] = $settings->test_event_code;
         }
 
-        // Log the pending event before sending
         $capiEvent = CapiEvent::create([
             'user_id' => $userId,
             'event_name' => $eventName,
@@ -102,21 +119,17 @@ class MetaConversionsApiService
                     'event_name' => $eventName,
                     'event_id' => $eventId,
                     'events_received' => $responseData['events_received'] ?? null,
+                    'fbtrace_id' => $responseData['fbtrace_id'] ?? null,
                 ]);
 
                 return ['success' => true, 'response' => $responseData, 'capi_event_id' => $capiEvent->id];
             }
 
+            $this->logMetaError($userId, $eventName, $response->status(), $responseData);
+
             $capiEvent->update([
                 'status' => 'failed',
                 'meta_response' => $responseData,
-            ]);
-
-            Log::warning('CAPI: Event failed', [
-                'user_id' => $userId,
-                'event_name' => $eventName,
-                'status' => $response->status(),
-                'response' => $responseData,
             ]);
 
             return ['success' => false, 'response' => $responseData, 'capi_event_id' => $capiEvent->id];
@@ -138,21 +151,20 @@ class MetaConversionsApiService
     }
 
     /**
-     * Fire a Lead event when a new CTWA contact sends their first message.
+     * Lead event — fired when a new contact arrives via a CTWA ad click.
+     * The ctwa_clid is used as fbc for attribution.
+     *
+     * EMQ note: we pass name for fn/ln + wa_id as external_id to improve match quality.
      */
     public function sendLeadEvent(WhatsAppContact $contact): void
     {
-        $ctwaClid = $contact->ctwa_clid;
-
         $this->sendEvent(
             userId: $contact->user_id,
             eventName: 'Lead',
-            userData: [
-                'phone' => $contact->wa_id,
-                'fbc' => $ctwaClid,
-            ],
+            userData: $this->contactToUserData($contact),
             customData: [
-                'lead_event_source' => $ctwaClid ? 'ctwa' : 'organic',
+                'lead_event_source' => 'ctwa',
+                'content_name' => $contact->ctwa_headline ?? 'WhatsApp Ad',
             ],
             eventId: 'lead_contact_'.$contact->id,
             contactId: $contact->id
@@ -160,38 +172,86 @@ class MetaConversionsApiService
     }
 
     /**
-     * Fire a Purchase event when an order is paid.
-     * Looks up the contact to include CTWA attribution if within the window.
+     * Contact event — fired when a new organic (non-ad) contact messages for the first time.
+     * action_source 'chat' per Meta spec for WhatsApp.
+     */
+    public function sendContactEvent(WhatsAppContact $contact): void
+    {
+        $this->sendEvent(
+            userId: $contact->user_id,
+            eventName: 'Contact',
+            userData: $this->contactToUserData($contact),
+            customData: [],
+            eventId: 'contact_new_'.$contact->id,
+            contactId: $contact->id
+        );
+    }
+
+    /**
+     * Purchase event — fired when an order is confirmed paid.
+     * Includes ctwa_clid attribution if the contact is still within the 7-day window.
      */
     public function sendPurchaseEvent(Order $order, WhatsAppContact $contact): void
     {
-        $ctwaClid = null;
+        $userData = $this->contactToUserData($contact);
 
-        // Only use ctwa_clid if within the attribution window
+        // Only attach ctwa_clid attribution if within the window
         if (
             $contact->ctwa_clid &&
             $contact->attribution_expires_at &&
             $contact->attribution_expires_at->isFuture()
         ) {
-            $ctwaClid = $contact->ctwa_clid;
+            $userData['fbc'] = $contact->ctwa_clid;
+        } else {
+            unset($userData['fbc']);
         }
 
         $this->sendEvent(
             userId: $order->user_id ?? $contact->user_id,
             eventName: 'Purchase',
-            userData: [
-                'phone' => $contact->wa_id,
-                'fbc' => $ctwaClid,
-            ],
+            userData: $userData,
             customData: [
                 'value' => (float) $order->total,
                 'currency' => 'IDR',
-                'order_id' => $order->id,
+                'order_id' => (string) $order->id,
                 'content_name' => 'Order #'.$order->id,
+                'content_type' => 'product',
+                'num_items' => $order->items?->count() ?? 1,
             ],
             eventId: 'purchase_order_'.$order->id,
             contactId: $contact->id
         );
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Build a raw user_data array from a WhatsAppContact.
+     * Includes wa_id as external_id and attempts to parse fn/ln from name.
+     */
+    private function contactToUserData(WhatsAppContact $contact): array
+    {
+        $userData = [
+            'phone' => $contact->wa_id,
+            'external_id' => $contact->wa_id, // wa_id is stable cross-session
+        ];
+
+        if ($contact->ctwa_clid) {
+            $userData['fbc'] = $contact->ctwa_clid;
+        }
+
+        // Parse name into first/last for EMQ improvement
+        if ($contact->name && $contact->name !== $contact->wa_id) {
+            $parts = explode(' ', trim($contact->name), 2);
+            $userData['first_name'] = $parts[0];
+            if (isset($parts[1])) {
+                $userData['last_name'] = $parts[1];
+            }
+        }
+
+        return $userData;
     }
 
     private function getPixelSettings(int $userId): ?MetaPixelSetting
@@ -200,7 +260,8 @@ class MetaConversionsApiService
     }
 
     /**
-     * Hash a string value using SHA256 (required by Meta for PII fields).
+     * SHA256 hash with normalize-before-hash (required by Meta for all PII fields).
+     * fbc and fbp are NOT hashed — they are sent as raw cookie strings.
      */
     private function hashData(string $value): string
     {
@@ -208,35 +269,26 @@ class MetaConversionsApiService
     }
 
     /**
-     * Build the fbc cookie value from a ctwa_clid.
-     * Format: fb.{version}.{creation_time}.{ctwa_clid}
-     */
-    private function buildFbc(string $ctwaClid): string
-    {
-        return 'fb.1.'.time().'.'.$ctwaClid;
-    }
-
-    /**
      * Build and hash the user_data object for the CAPI payload.
-     * All PII must be SHA256-hashed before sending to Meta.
+     *
+     * Rules:
+     * - ph: digits only with country code, then SHA256
+     * - em: lowercase trim, then SHA256
+     * - fn/ln: lowercase trim, then SHA256
+     * - external_id: hash recommended
+     * - fbc/fbp: send raw — NOT hashed
      */
     private function buildUserData(array $raw, int $eventTime): array
     {
         $userData = [];
 
         if (! empty($raw['phone'])) {
-            // Normalize to E.164 format (digits only with country code)
             $phone = preg_replace('/[^0-9]/', '', $raw['phone']);
             $userData['ph'] = [$this->hashData($phone)];
         }
 
         if (! empty($raw['email'])) {
             $userData['em'] = [$this->hashData($raw['email'])];
-        }
-
-        if (! empty($raw['fbc'])) {
-            // Build fbc from ctwa_clid: fb.1.{event_time}.{ctwa_clid}
-            $userData['fbc'] = 'fb.1.'.$eventTime.'.'.$raw['fbc'];
         }
 
         if (! empty($raw['first_name'])) {
@@ -247,6 +299,41 @@ class MetaConversionsApiService
             $userData['ln'] = [$this->hashData($raw['last_name'])];
         }
 
+        if (! empty($raw['external_id'])) {
+            // Hash recommended for external_id (Meta spec allows unhashed but recommends hashing)
+            $userData['external_id'] = [$this->hashData((string) $raw['external_id'])];
+        }
+
+        if (! empty($raw['fbc'])) {
+            // fbc is sent RAW (not hashed) — format: fb.1.{event_time}.{ctwa_clid}
+            $userData['fbc'] = 'fb.1.'.$eventTime.'.'.$raw['fbc'];
+        }
+
+        if (! empty($raw['fbp'])) {
+            // fbp is sent RAW (not hashed) — set by Meta Pixel browser-side
+            $userData['fbp'] = $raw['fbp'];
+        }
+
         return $userData;
+    }
+
+    /**
+     * Log Meta API error with human-readable diagnosis from known error codes.
+     */
+    private function logMetaError(int $userId, string $eventName, int $httpStatus, array $responseData): void
+    {
+        $errorCode = $responseData['error']['code'] ?? null;
+        $errorMessage = $responseData['error']['message'] ?? 'Unknown error';
+        $diagnosis = $errorCode ? (self::ERROR_CODES[$errorCode] ?? null) : null;
+
+        Log::warning('CAPI: Event failed', array_filter([
+            'user_id' => $userId,
+            'event_name' => $eventName,
+            'http_status' => $httpStatus,
+            'meta_error_code' => $errorCode,
+            'meta_error_message' => $errorMessage,
+            'diagnosis' => $diagnosis,
+            'fbtrace_id' => $responseData['error']['fbtrace_id'] ?? null,
+        ]));
     }
 }
