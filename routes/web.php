@@ -106,6 +106,10 @@ Route::middleware(['web', 'check.web.auth', 'block.author.login'])->group(functi
         return view('dashboard.whatsapp-account');
     })->name('dashboard.whatsapp-account');
 
+    Route::get('/dashboard/meta-catalog', function () {
+        return view('dashboard.meta-catalog');
+    })->name('dashboard.meta-catalog');
+
     Route::get('/dashboard/ai-agent', function () {
         return view('dashboard.ai-agent');
     })->name('dashboard.ai-agent');
