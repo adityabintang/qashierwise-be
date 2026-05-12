@@ -44,6 +44,7 @@ return [
     'menu_orders' => 'Pesanan',
     'menu_payment' => 'Pembayaran',
     'menu_products' => 'Produk',
+    'menu_meta_catalog' => 'Meta Katalog',
     'menu_categories' => 'Kategori',
     'menu_stores' => 'Toko',
     'menu_tables' => 'Meja',
