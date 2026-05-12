@@ -1800,7 +1800,7 @@ class WhatsAppController extends Controller
                     'body_examples' => $template->body_examples,
                     'variable_type' => $template->variable_type ?? 'numeric',
                     'footer' => $template->footer,
-                    'buttons' => $template->buttons ? json_decode($template->buttons, true) : [],
+                    'buttons' => $template->buttons ?? [],
                     'quality_score' => $template->quality_score,
                 ];
             });
