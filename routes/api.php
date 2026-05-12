@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\SubMerchantController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\WhatsAppController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
+use App\Http\Controllers\Api\CatalogController;
 use App\Http\Controllers\Api\ContactTagController;
 use App\Http\Controllers\Api\WithdrawalController;
 use App\Http\Controllers\Api\XenditWebhookController;
@@ -196,6 +197,10 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::delete('/tags/{id}', [ContactTagController::class, 'destroy']);
         Route::post('/contacts/{id}/tags', [ContactTagController::class, 'assignTags']);
         Route::delete('/contacts/{id}/tags/{tagId}', [ContactTagController::class, 'removeTag']);
+
+        // Meta Product Catalog
+        Route::get('/catalog/catalogs', [CatalogController::class, 'getCatalogs']);
+        Route::get('/catalog/{catalogId}/products', [CatalogController::class, 'getCatalogProducts']);
     });
 
     // AI Agent routes
