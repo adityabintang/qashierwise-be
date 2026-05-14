@@ -5,6 +5,9 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BalanceController;
 use App\Http\Controllers\Api\BankAccountController;
 use App\Http\Controllers\Api\BroadcastAuthController;
+use App\Http\Controllers\Api\CatalogController;
+use App\Http\Controllers\Api\CatalogEmbeddedSignupController;
+use App\Http\Controllers\Api\ContactTagController;
 use App\Http\Controllers\Api\EmbeddedSignupController;
 use App\Http\Controllers\Api\Internal\ReservationReminderController;
 use App\Http\Controllers\Api\MidtransWebhookController;
@@ -27,8 +30,6 @@ use App\Http\Controllers\Api\SubMerchantController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\WhatsAppController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
-use App\Http\Controllers\Api\CatalogController;
-use App\Http\Controllers\Api\ContactTagController;
 use App\Http\Controllers\Api\WithdrawalController;
 use App\Http\Controllers\Api\XenditWebhookController;
 use App\Http\Controllers\MonitoringDashboardController;
@@ -132,6 +133,10 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::post('/embedded-signup/callback', [EmbeddedSignupController::class, 'handleCallback']);
         Route::get('/embedded-signup/config', [EmbeddedSignupController::class, 'getConfig']);
 
+        // Catalog Embedded Signup routes
+        Route::post('/catalog/embedded-signup/callback', [CatalogEmbeddedSignupController::class, 'handleCallback']);
+        Route::get('/catalog/embedded-signup/config', [CatalogEmbeddedSignupController::class, 'getConfig']);
+
         // Account management routes
         Route::delete('/account', [EmbeddedSignupController::class, 'disconnect']);
         Route::get('/account', [EmbeddedSignupController::class, 'getAccountStatus']);
@@ -201,6 +206,9 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         // Meta Product Catalog
         Route::get('/catalog/catalogs', [CatalogController::class, 'getCatalogs']);
         Route::get('/catalog/{catalogId}/products', [CatalogController::class, 'getCatalogProducts']);
+        Route::post('/catalog/{catalogId}/products', [CatalogController::class, 'createProduct']);
+        Route::put('/catalog/products/{productId}', [CatalogController::class, 'updateProduct']);
+        Route::delete('/catalog/products/{productId}', [CatalogController::class, 'deleteProduct']);
     });
 
     // AI Agent routes

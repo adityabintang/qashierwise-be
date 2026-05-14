@@ -30,6 +30,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Catalog Embedded Signup Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Separate Embedded Signup config for Meta Catalog permissions.
+    |
+    */
+    'catalog_embedded_signup' => [
+        'app_id' => env('WHATSAPP_APP_ID'),
+        'app_secret' => env('WHATSAPP_APP_SECRET'),
+        'config_id' => env('CATALOG_CONFIG_ID'),
+        'es_version' => 'v4',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Legacy Single-Account Configuration (Deprecated)
     |--------------------------------------------------------------------------
     |

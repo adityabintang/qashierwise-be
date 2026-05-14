@@ -1,6 +1,10 @@
 <?php
 
 use App\Http\Controllers\BlogController;
+use App\Http\Controllers\MonitoringDashboardController;
+use App\Http\Controllers\QrisPaymentPageController;
+use App\Http\Controllers\ReservationFormController;
+use App\Http\Controllers\SubscriptionController;
 use Illuminate\Support\Facades\Route;
 
 // Language switching route
@@ -63,20 +67,20 @@ Route::get('/refund-policy', function () {
 })->name('refund-policy');
 
 // Public QRIS Payment Page
-Route::get('/pay/qris/{orderId}', [App\Http\Controllers\QrisPaymentPageController::class, 'show'])
+Route::get('/pay/qris/{orderId}', [QrisPaymentPageController::class, 'show'])
     ->name('qris.payment.page');
 
 // Public Reservation Form Routes
 Route::prefix('reservations')->name('reservation.')->group(function () {
-    Route::get('/form', [App\Http\Controllers\ReservationFormController::class, 'show'])
+    Route::get('/form', [ReservationFormController::class, 'show'])
         ->name('form');
-    Route::post('/form/submit', [App\Http\Controllers\ReservationFormController::class, 'submit'])
+    Route::post('/form/submit', [ReservationFormController::class, 'submit'])
         ->name('submit');
-    Route::get('/form/status/{orderId}', [App\Http\Controllers\ReservationFormController::class, 'status'])
+    Route::get('/form/status/{orderId}', [ReservationFormController::class, 'status'])
         ->name('status');
-    Route::get('/tables', [App\Http\Controllers\ReservationFormController::class, 'getAvailableTables'])
+    Route::get('/tables', [ReservationFormController::class, 'getAvailableTables'])
         ->name('tables');
-    Route::get('/products', [App\Http\Controllers\ReservationFormController::class, 'getAvailableProducts'])
+    Route::get('/products', [ReservationFormController::class, 'getAvailableProducts'])
         ->name('products');
 });
 
@@ -110,6 +114,10 @@ Route::middleware(['web', 'check.web.auth', 'block.author.login'])->group(functi
         return view('dashboard.meta-catalog');
     })->name('dashboard.meta-catalog');
 
+    Route::get('/dashboard/meta-catalog/{catalogId}', function ($catalogId) {
+        return view('dashboard.meta-catalog', ['initialCatalogId' => $catalogId]);
+    })->name('dashboard.meta-catalog.catalog');
+
     Route::get('/dashboard/ai-agent', function () {
         return view('dashboard.ai-agent');
     })->name('dashboard.ai-agent');
@@ -133,37 +141,37 @@ Route::middleware(['web', 'check.web.auth', 'block.author.login'])->group(functi
 
     // Subscription routes
     Route::prefix('subscription')->name('subscription.')->group(function () {
-        Route::get('/pricing', [App\Http\Controllers\SubscriptionController::class, 'index'])
+        Route::get('/pricing', [SubscriptionController::class, 'index'])
             ->name('pricing');
-        Route::post('/checkout', [App\Http\Controllers\SubscriptionController::class, 'createCheckout'])
+        Route::post('/checkout', [SubscriptionController::class, 'createCheckout'])
             ->name('checkout');
         // Card tokenization for Midtrans Subscription API
-        Route::get('/tokenization', [App\Http\Controllers\SubscriptionController::class, 'tokenization'])
+        Route::get('/tokenization', [SubscriptionController::class, 'tokenization'])
             ->name('tokenization');
-        Route::post('/create-subscription', [App\Http\Controllers\SubscriptionController::class, 'createSubscription'])
+        Route::post('/create-subscription', [SubscriptionController::class, 'createSubscription'])
             ->name('create-subscription');
         // Legacy payment route (kept for compatibility)
-        Route::get('/payment', [App\Http\Controllers\SubscriptionController::class, 'payment'])
+        Route::get('/payment', [SubscriptionController::class, 'payment'])
             ->name('payment');
-        Route::get('/success', [App\Http\Controllers\SubscriptionController::class, 'success'])
+        Route::get('/success', [SubscriptionController::class, 'success'])
             ->name('success');
-        Route::get('/cancel', [App\Http\Controllers\SubscriptionController::class, 'cancel'])
+        Route::get('/cancel', [SubscriptionController::class, 'cancel'])
             ->name('cancel');
-        Route::get('/error', [App\Http\Controllers\SubscriptionController::class, 'error'])
+        Route::get('/error', [SubscriptionController::class, 'error'])
             ->name('error');
-        Route::get('/manage', [App\Http\Controllers\SubscriptionController::class, 'manage'])
+        Route::get('/manage', [SubscriptionController::class, 'manage'])
             ->name('manage');
-        Route::post('/cancel', [App\Http\Controllers\SubscriptionController::class, 'cancelSubscription'])
+        Route::post('/cancel', [SubscriptionController::class, 'cancelSubscription'])
             ->name('cancel.post');
     });
 
     // Monitoring Dashboard routes (admin only)
     Route::prefix('monitoring')->name('monitoring.')->middleware('can:view-monitoring')->group(function () {
-        Route::get('/dashboard', [App\Http\Controllers\MonitoringDashboardController::class, 'index'])
+        Route::get('/dashboard', [MonitoringDashboardController::class, 'index'])
             ->name('dashboard');
-        Route::get('/metrics', [App\Http\Controllers\MonitoringDashboardController::class, 'metrics'])
+        Route::get('/metrics', [MonitoringDashboardController::class, 'metrics'])
             ->name('metrics');
-        Route::get('/health', [App\Http\Controllers\MonitoringDashboardController::class, 'health'])
+        Route::get('/health', [MonitoringDashboardController::class, 'health'])
             ->name('health');
     });
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\CatalogNotConnectedException;
 use App\Exceptions\WhatsAppNotConnectedException;
 use App\Http\Controllers\Controller;
 use App\Services\CatalogService;
@@ -20,12 +21,12 @@ class CatalogController extends Controller
      * GET /api/whatsapp/catalog/catalogs
      * List all Meta product catalogs for the authenticated user's business.
      */
-    public function getCatalogs(): JsonResponse
+    public function getCatalogs(Request $request): JsonResponse
     {
         try {
-            $account = $this->getAccount();
+            $account = $this->getCatalogAccount();
 
-            $result = $this->catalogService->getCatalogs($account);
+            $result = $this->catalogService->getCatalogs($account, $request->query('business_id'));
 
             if (! $result['success']) {
                 return response()->json([
@@ -49,6 +50,12 @@ class CatalogController extends Controller
                 'error_code' => $e->getErrorCode(),
                 'message' => $e->getMessage(),
             ], $e->getCode());
+        } catch (CatalogNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         }
     }
 
@@ -64,7 +71,7 @@ class CatalogController extends Controller
         ]);
 
         try {
-            $account = $this->getAccount();
+            $account = $this->getCatalogAccount();
 
             $result = $this->catalogService->getCatalogProducts(
                 $account,
@@ -96,6 +103,159 @@ class CatalogController extends Controller
                 'error_code' => $e->getErrorCode(),
                 'message' => $e->getMessage(),
             ], $e->getCode());
+        } catch (CatalogNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
+        }
+    }
+
+    /**
+     * POST /api/whatsapp/catalog/{catalogId}/products
+     * Create a new product in a catalog.
+     */
+    public function createProduct(Request $request, string $catalogId): JsonResponse
+    {
+        $request->validate([
+            'retailer_id' => 'required|string',
+            'name' => 'required|string|max:255',
+            'price' => 'required|integer|min:0',
+            'currency' => 'required|string|size:3',
+            'image_url' => 'required|url',
+            'url' => 'required|url',
+            'availability' => 'sometimes|string|in:in stock,out of stock,preorder,available for order,discontinued,pending',
+            'description' => 'sometimes|string|max:5000',
+            'brand' => 'sometimes|string',
+            'condition' => 'sometimes|string|in:new,refurbished,used',
+            'category' => 'sometimes|string',
+        ]);
+
+        try {
+            $account = $this->getCatalogAccount();
+
+            $data = array_filter($request->only([
+                'retailer_id', 'name', 'price', 'currency', 'image_url', 'url',
+                'availability', 'description', 'brand', 'condition', 'category',
+            ]), fn ($v) => $v !== null);
+
+            $data['availability'] = $data['availability'] ?? 'in stock';
+
+            $result = $this->catalogService->createProduct($account, $catalogId, $data);
+
+            if (! $result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => $result['error_code'],
+                    'message' => $result['error'],
+                ], 422);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => ['id' => $result['id']],
+            ], 201);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
+        } catch (CatalogNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
+        }
+    }
+
+    /**
+     * PUT /api/whatsapp/catalog/products/{productId}
+     * Update an existing product item.
+     */
+    public function updateProduct(Request $request, string $productId): JsonResponse
+    {
+        $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'price' => 'sometimes|integer|min:0',
+            'currency' => 'sometimes|string|size:3',
+            'image_url' => 'sometimes|url',
+            'url' => 'sometimes|url',
+            'availability' => 'sometimes|string|in:in stock,out of stock,preorder,available for order,discontinued,pending',
+            'description' => 'sometimes|string|max:5000',
+            'brand' => 'sometimes|string',
+            'condition' => 'sometimes|string|in:new,refurbished,used',
+            'category' => 'sometimes|string',
+        ]);
+
+        try {
+            $account = $this->getCatalogAccount();
+
+            $data = array_filter($request->only([
+                'name', 'price', 'currency', 'image_url', 'url',
+                'availability', 'description', 'brand', 'condition', 'category',
+            ]), fn ($v) => $v !== null);
+
+            $result = $this->catalogService->updateProduct($account, $productId, $data);
+
+            if (! $result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => $result['error_code'],
+                    'message' => $result['error'],
+                ], 422);
+            }
+
+            return response()->json(['success' => true]);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
+        } catch (CatalogNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
+        }
+    }
+
+    /**
+     * DELETE /api/whatsapp/catalog/products/{productId}
+     * Delete a product item.
+     */
+    public function deleteProduct(string $productId): JsonResponse
+    {
+        try {
+            $account = $this->getCatalogAccount();
+
+            $result = $this->catalogService->deleteProduct($account, $productId);
+
+            if (! $result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => $result['error_code'],
+                    'message' => $result['error'],
+                ], 422);
+            }
+
+            return response()->json(['success' => true]);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
+        } catch (CatalogNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
         }
     }
 
@@ -111,6 +271,17 @@ class CatalogController extends Controller
 
         if (! $account) {
             throw new WhatsAppNotConnectedException('No connected WhatsApp account found.');
+        }
+
+        return $account;
+    }
+
+    protected function getCatalogAccount()
+    {
+        $account = $this->getAccount();
+
+        if (empty($account->catalog_access_token)) {
+            throw new CatalogNotConnectedException('Please connect your Meta catalog to access this feature.');
         }
 
         return $account;
