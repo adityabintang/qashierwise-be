@@ -11,173 +11,221 @@
         @include('components.dashboard-header', ['title' => 'Meta Catalog', 'description' => 'Produk dari katalog Meta Business Anda'])
 
         <main class="flex-1 p-4 md:p-6">
-            <div class="max-w-7xl mx-auto space-y-6">
+            <div class="max-w-7xl mx-auto space-y-5">
 
-                <!-- Header -->
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                        <h2 class="text-lg font-semibold" x-text="selectedCatalog ? selectedCatalog.name : 'Katalog Produk Meta'"></h2>
-                        <p class="text-sm text-[hsl(var(--muted-foreground))] hidden sm:block"
-                           x-text="selectedCatalog ? 'ID: ' + selectedCatalog.id : 'Kelola dan lihat produk dari Facebook Business Catalog'"></p>
-                    </div>
-                    <div class="flex gap-2">
+                <!-- ── Page Header ── -->
+                <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <template x-if="!selectedCatalog">
+                            <div>
+                                <h2 class="text-lg font-semibold flex items-center gap-2 flex-wrap">
+                                    Katalog Meta Anda
+                                    <span x-show="!loading && catalogs.length > 0"
+                                          class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))]"
+                                          x-text="catalogs.length + ' katalog'"></span>
+                                </h2>
+                                <p x-show="businessId" class="text-xs text-[hsl(var(--muted-foreground))] mt-0.5 font-mono">
+                                    Business ID: <span x-text="businessId"></span>
+                                </p>
+                            </div>
+                        </template>
                         <template x-if="selectedCatalog">
-                            <button @click="openCreateModal()" class="btn btn-primary btn-md">
-                                <i class="fas fa-plus mr-2"></i>Tambah Produk
+                            <div>
+                                <div class="flex items-center gap-1.5 text-xs text-[hsl(var(--muted-foreground))] mb-1">
+                                    <button @click="backToCatalogs()" class="hover:text-[hsl(var(--foreground))] transition-colors">Katalog</button>
+                                    <i class="fas fa-chevron-right text-[9px] opacity-50"></i>
+                                    <span class="text-[hsl(var(--foreground))] font-medium truncate max-w-[200px]" x-text="selectedCatalog.name"></span>
+                                </div>
+                                <h2 class="text-lg font-semibold truncate" x-text="selectedCatalog.name"></h2>
+                                <p class="text-xs text-[hsl(var(--muted-foreground))] font-mono mt-0.5">ID: <span x-text="selectedCatalog.id"></span></p>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <template x-if="selectedCatalog">
+                            <button @click="backToCatalogs()" class="btn btn-outline btn-sm">
+                                <i class="fas fa-arrow-left mr-1.5"></i>Kembali
                             </button>
                         </template>
-                        <button @click="selectedCatalog ? backToCatalogs() : fetchCatalogs()" class="btn btn-outline btn-md">
-                            <template x-if="selectedCatalog">
-                                <span><i class="fas fa-arrow-left mr-2"></i>Kembali</span>
-                            </template>
-                            <template x-if="!selectedCatalog">
-                                <span><i class="fas fa-sync-alt mr-2" :class="loading ? 'animate-spin' : ''"></i>Muat Ulang</span>
-                            </template>
-                        </button>
+                        <template x-if="!selectedCatalog">
+                            <button @click="fetchCatalogs()" :disabled="loading" class="btn btn-outline btn-sm">
+                                <i class="fas fa-sync-alt mr-1.5" :class="loading ? 'animate-spin' : ''"></i>Muat Ulang
+                            </button>
+                        </template>
+                        <template x-if="selectedCatalog">
+                            <button @click="openCreateModal()" class="btn btn-primary btn-sm">
+                                <i class="fas fa-plus mr-1.5"></i>Tambah Produk
+                            </button>
+                        </template>
                     </div>
                 </div>
 
-                <!-- Permission Warning Banner -->
-                <template x-if="error && error.code === 'PERMISSION_DENIED'">
-                    <div class="card p-5 border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/20">
-                        <div class="flex gap-3">
-                            <i class="fas fa-exclamation-triangle text-yellow-500 text-xl mt-0.5 flex-shrink-0"></i>
-                            <div class="space-y-2">
-                                <h3 class="font-semibold text-yellow-800 dark:text-yellow-300">Izin Catalog Diperlukan</h3>
-                                <p class="text-sm text-yellow-700 dark:text-yellow-400" x-text="error.message"></p>
-                                <button @click="launchCatalogSignup()" class="btn btn-sm mt-2" style="background-color: #f59e0b; color: white;">
-                                    <span><i class="fab fa-facebook mr-1"></i>Hubungkan Katalog</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </template>
-
-                <!-- Catalog Not Connected Warning -->
-                <template x-if="error && error.code === 'CATALOG_NOT_CONNECTED'">
-                    <div class="card p-5 border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/20">
-                        <div class="flex gap-3">
-                            <i class="fas fa-store text-yellow-600 text-xl mt-0.5 flex-shrink-0"></i>
-                            <div class="space-y-2">
-                                <h3 class="font-semibold text-yellow-800 dark:text-yellow-300">Katalog Belum Terhubung</h3>
-                                <p class="text-sm text-yellow-700 dark:text-yellow-400" x-text="error.message"></p>
-                                <button @click="launchCatalogSignup()" class="btn btn-sm mt-2" style="background-color: #f59e0b; color: white;">
-                                    <span><i class="fab fa-facebook mr-1"></i>Hubungkan Katalog</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </template>
-
-                <!-- Not Connected Warning -->
+                <!-- ── Error: WhatsApp belum terhubung ── -->
                 <template x-if="error && error.code === 'WHATSAPP_NOT_CONNECTED'">
-                    <div class="card p-5 border border-red-300 bg-red-50 dark:bg-red-950/20">
+                    <div class="rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900/50 p-4">
                         <div class="flex gap-3">
-                            <i class="fab fa-whatsapp text-red-500 text-xl mt-0.5 flex-shrink-0"></i>
-                            <div class="space-y-2">
-                                <h3 class="font-semibold text-red-800 dark:text-red-300">Akun WhatsApp Belum Terhubung</h3>
-                                <p class="text-sm text-red-700 dark:text-red-400">Hubungkan akun WhatsApp Business Anda terlebih dahulu untuk mengakses katalog produk Meta.</p>
-                                <a href="/dashboard/whatsapp-account" class="btn btn-sm btn-primary mt-2">
-                                    <i class="fab fa-whatsapp mr-1"></i>Hubungkan Sekarang
+                            <div class="h-9 w-9 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center flex-shrink-0">
+                                <i class="fab fa-whatsapp text-red-500"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="font-semibold text-red-800 dark:text-red-300 text-sm">Akun WhatsApp Belum Terhubung</p>
+                                <p class="text-sm text-red-700 dark:text-red-400 mt-0.5">Hubungkan akun WhatsApp Business Anda terlebih dahulu untuk mengakses katalog produk Meta.</p>
+                                <a href="/dashboard/whatsapp-account"
+                                   class="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-lg text-sm font-medium btn btn-primary btn-sm">
+                                    <i class="fab fa-whatsapp"></i>Hubungkan WhatsApp
                                 </a>
                             </div>
                         </div>
                     </div>
                 </template>
 
-                <!-- Generic Error -->
-                <template x-if="error && error.code !== 'PERMISSION_DENIED' && error.code !== 'WHATSAPP_NOT_CONNECTED' && error.code !== 'CATALOG_NOT_CONNECTED'">
-                    <div class="card p-4 border border-red-300 bg-red-50 dark:bg-red-950/20">
-                        <div class="flex gap-3 items-start">
-                            <i class="fas fa-circle-exclamation text-red-500 mt-0.5 flex-shrink-0"></i>
-                            <p class="text-sm font-medium text-red-800 dark:text-red-300" x-text="error.message"></p>
+                <!-- ── Error: Katalog belum terhubung / izin diperlukan ── -->
+                <template x-if="error && (error.code === 'CATALOG_NOT_CONNECTED' || error.code === 'PERMISSION_DENIED')">
+                    <div class="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/50 p-4">
+                        <div class="flex gap-3">
+                            <div class="h-9 w-9 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0">
+                                <i class="fas fa-store text-amber-600"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="font-semibold text-amber-800 dark:text-amber-300 text-sm"
+                                   x-text="error.code === 'PERMISSION_DENIED' ? 'Izin Katalog Diperlukan' : 'Katalog Belum Terhubung'"></p>
+                                <p class="text-sm text-amber-700 dark:text-amber-400 mt-0.5" x-text="error.message"></p>
+                                <button @click="launchCatalogSignup()"
+                                        class="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-lg text-sm font-medium bg-[#1877f2] hover:bg-[#166fe5] text-white transition-colors">
+                                    <i class="fab fa-facebook"></i>Hubungkan Katalog Meta
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </template>
 
-                <!-- Toast notification -->
-                <template x-if="toast">
-                    <div class="fixed top-5 right-5 z-50 card px-5 py-3 shadow-lg flex items-center gap-3 border"
-                         :class="toast.type === 'success' ? 'border-green-300 bg-green-50 dark:bg-green-950/40' : 'border-red-300 bg-red-50 dark:bg-red-950/40'">
-                        <i :class="toast.type === 'success' ? 'fas fa-check-circle text-green-500' : 'fas fa-times-circle text-red-500'"></i>
-                        <span class="text-sm font-medium" x-text="toast.message"></span>
+                <!-- ── Generic Error ── -->
+                <template x-if="error && error.code !== 'PERMISSION_DENIED' && error.code !== 'WHATSAPP_NOT_CONNECTED' && error.code !== 'CATALOG_NOT_CONNECTED'">
+                    <div class="rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/20 p-4 flex gap-3 items-start">
+                        <i class="fas fa-circle-exclamation text-red-500 mt-0.5 flex-shrink-0"></i>
+                        <p class="text-sm text-red-800 dark:text-red-300" x-text="error.message"></p>
                     </div>
                 </template>
 
-                <!-- CATALOG LIST VIEW -->
+                <!-- ── Toast ── -->
+                <div class="fixed bottom-5 right-5 z-50 pointer-events-none">
+                    <div x-show="toast"
+                         x-transition:enter="transition ease-out duration-250"
+                         x-transition:enter-start="opacity-0 translate-y-3"
+                         x-transition:enter-end="opacity-100 translate-y-0"
+                         x-transition:leave="transition ease-in duration-150"
+                         x-transition:leave-start="opacity-100 translate-y-0"
+                         x-transition:leave-end="opacity-0 translate-y-3"
+                         class="pointer-events-auto rounded-xl shadow-lg border px-4 py-3 flex items-center gap-3 min-w-[260px] max-w-sm bg-[hsl(var(--card))]"
+                         :class="toast?.type === 'success' ? 'border-green-200 dark:border-green-900' : 'border-red-200 dark:border-red-900'">
+                        <div class="flex-shrink-0">
+                            <template x-if="toast?.type === 'success'">
+                                <div class="h-7 w-7 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
+                                    <i class="fas fa-check text-green-600 text-xs"></i>
+                                </div>
+                            </template>
+                            <template x-if="toast?.type !== 'success'">
+                                <div class="h-7 w-7 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
+                                    <i class="fas fa-times text-red-500 text-xs"></i>
+                                </div>
+                            </template>
+                        </div>
+                        <span class="text-sm font-medium flex-1" x-text="toast?.message"></span>
+                        <button @click="toast = null" class="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors flex-shrink-0 ml-1">
+                            <i class="fas fa-times text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ════════ CATALOG LIST VIEW ════════ -->
                 <template x-if="!selectedCatalog">
                     <div>
+                        <!-- Skeleton loading -->
                         <template x-if="loading">
                             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <template x-for="i in 3" :key="'skel-'+i">
-                                    <div class="card p-5 space-y-3">
-                                        <div class="skeleton h-5 w-2/3"></div>
-                                        <div class="skeleton h-4 w-1/3"></div>
-                                        <div class="skeleton h-9 w-full mt-2"></div>
+                                    <div class="card p-5 space-y-4">
+                                        <div class="flex items-center gap-3">
+                                            <div class="skeleton h-10 w-10 rounded-xl flex-shrink-0"></div>
+                                            <div class="space-y-2 flex-1">
+                                                <div class="skeleton h-4 w-3/4"></div>
+                                                <div class="skeleton h-3 w-1/2"></div>
+                                            </div>
+                                        </div>
+                                        <div class="skeleton h-3 w-1/4 rounded-full"></div>
+                                        <div class="skeleton h-9 w-full rounded-lg"></div>
                                     </div>
                                 </template>
                             </div>
                         </template>
 
+                        <!-- Empty state -->
                         <template x-if="!loading && !error && catalogs.length === 0">
-                            <div class="card p-10 text-center">
-                                <i class="fas fa-store text-4xl text-[hsl(var(--muted-foreground))] mb-4"></i>
-                                <h3 class="font-semibold text-lg mb-1">Tidak ada katalog ditemukan</h3>
-                                <p class="text-sm text-[hsl(var(--muted-foreground))]">Pastikan akun Meta Business Anda memiliki katalog produk yang aktif.</p>
+                            <div class="card p-12 text-center">
+                                <div class="h-14 w-14 rounded-2xl bg-[hsl(var(--muted))] flex items-center justify-center mx-auto mb-4">
+                                    <i class="fas fa-store text-2xl text-[hsl(var(--muted-foreground))]"></i>
+                                </div>
+                                <h3 class="font-semibold text-base mb-1">Tidak Ada Katalog</h3>
+                                <p class="text-sm text-[hsl(var(--muted-foreground))] max-w-xs mx-auto">Pastikan akun Meta Business Anda memiliki katalog produk yang aktif dan sudah terhubung.</p>
                             </div>
                         </template>
 
+                        <!-- Catalog grid -->
                         <template x-if="!loading && catalogs.length > 0">
-                            <div>
-                                <p class="text-sm text-[hsl(var(--muted-foreground))] mb-4">
-                                    <span x-text="catalogs.length"></span> katalog ditemukan
-                                    <span x-show="businessId" class="ml-2 font-mono text-xs opacity-60">Business ID: <span x-text="businessId"></span></span>
-                                </p>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    <template x-for="catalog in catalogs" :key="catalog.id">
-                                        <div class="card p-5 hover:shadow-md transition-shadow flex flex-col gap-3">
-                                            <div class="flex items-start gap-3">
-                                                <div class="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
-                                                    <i class="fab fa-facebook text-blue-600 text-lg"></i>
-                                                </div>
-                                                <div class="flex-1 min-w-0">
-                                                    <h3 class="font-semibold truncate" x-text="catalog.name"></h3>
-                                                    <p class="text-xs text-[hsl(var(--muted-foreground))] font-mono" x-text="'ID: ' + catalog.id"></p>
-                                                </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <template x-for="catalog in catalogs" :key="catalog.id">
+                                    <div class="card p-5 hover:shadow-md hover:border-[hsl(var(--primary)/0.25)] transition-all flex flex-col gap-4 cursor-pointer group"
+                                         @click="selectCatalog(catalog)">
+                                        <div class="flex items-start gap-3">
+                                            <div class="h-10 w-10 rounded-xl bg-[#1877f2]/10 flex items-center justify-center flex-shrink-0">
+                                                <i class="fab fa-facebook text-[#1877f2] text-lg"></i>
                                             </div>
-                                            <div class="flex items-center gap-2 flex-wrap">
-                                                <span class="badge badge-secondary text-xs">
-                                                    <i class="fas fa-box mr-1"></i>
-                                                    <span x-text="(catalog.product_count ?? '–') + ' produk'"></span>
-                                                </span>
-                                                <template x-if="catalog.vertical">
-                                                    <span class="badge badge-outline text-xs capitalize" x-text="catalog.vertical.toLowerCase().replace('_', ' ')"></span>
-                                                </template>
+                                            <div class="flex-1 min-w-0">
+                                                <h3 class="font-semibold text-sm leading-tight truncate group-hover:text-[hsl(var(--primary))] transition-colors"
+                                                    x-text="catalog.name"></h3>
+                                                <p class="text-xs text-[hsl(var(--muted-foreground))] font-mono mt-0.5 truncate"
+                                                   x-text="'ID: ' + catalog.id"></p>
                                             </div>
-                                            <button @click="selectCatalog(catalog)" class="btn btn-primary btn-sm w-full mt-auto">
-                                                <i class="fas fa-eye mr-1"></i>Lihat Produk
-                                            </button>
                                         </div>
-                                    </template>
-                                </div>
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
+                                                <i class="fas fa-box text-[10px]"></i>
+                                                <span x-text="(catalog.product_count ?? '–') + ' produk'"></span>
+                                            </span>
+                                            <template x-if="catalog.vertical">
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] capitalize"
+                                                      x-text="catalog.vertical.toLowerCase().replace(/_/g, ' ')"></span>
+                                            </template>
+                                        </div>
+                                        <button class="btn btn-primary btn-sm w-full mt-auto" @click.stop="selectCatalog(catalog)">
+                                            <i class="fas fa-eye mr-1.5"></i>Lihat Produk
+                                        </button>
+                                    </div>
+                                </template>
                             </div>
                         </template>
                     </div>
                 </template>
 
-                <!-- PRODUCT LIST VIEW -->
+                <!-- ════════ PRODUCT LIST VIEW ════════ -->
                 <template x-if="selectedCatalog">
                     <div class="space-y-4">
-                        <!-- Search -->
-                        <div class="card p-3">
-                            <div class="relative">
+                        <!-- Search bar + count -->
+                        <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                            <div class="relative flex-1 w-full">
                                 <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none"></i>
-                                <input type="text" x-model="productSearch" placeholder="Cari produk berdasarkan nama atau SKU..."
-                                    class="input w-full min-h-[44px]" style="padding-left: 2.5rem;">
+                                <input type="text" x-model="productSearch"
+                                       placeholder="Cari produk berdasarkan nama atau SKU..."
+                                       class="input w-full pl-9 min-h-[40px]">
                             </div>
+                            <span x-show="!loadingProducts && products.length > 0"
+                                  class="text-xs text-[hsl(var(--muted-foreground))] whitespace-nowrap flex-shrink-0 tabular-nums">
+                                <span x-text="filteredProducts.length"></span> / <span x-text="products.length"></span> produk
+                            </span>
                         </div>
 
-                        <!-- Loading products -->
+                        <!-- Loading skeleton -->
                         <template x-if="loadingProducts">
                             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                 <template x-for="i in 8" :key="'pskel-'+i">
@@ -191,62 +239,77 @@
                             </div>
                         </template>
 
-                        <!-- Empty products -->
+                        <!-- Empty state -->
                         <template x-if="!loadingProducts && filteredProducts.length === 0">
-                            <div class="card p-10 text-center">
-                                <i class="fas fa-box-open text-4xl text-[hsl(var(--muted-foreground))] mb-4"></i>
-                                <h3 class="font-semibold text-lg mb-1">Tidak ada produk</h3>
-                                <p class="text-sm text-[hsl(var(--muted-foreground))]"
-                                   x-text="productSearch ? 'Tidak ada hasil untuk \'' + productSearch + '\'' : 'Katalog ini belum memiliki produk. Klik Tambah Produk untuk memulai.'"></p>
+                            <div class="card p-12 text-center">
+                                <div class="h-14 w-14 rounded-2xl bg-[hsl(var(--muted))] flex items-center justify-center mx-auto mb-4">
+                                    <i class="fas fa-box-open text-2xl text-[hsl(var(--muted-foreground))]"></i>
+                                </div>
+                                <h3 class="font-semibold text-base mb-1"
+                                    x-text="productSearch ? 'Tidak Ada Hasil' : 'Katalog Kosong'"></h3>
+                                <p class="text-sm text-[hsl(var(--muted-foreground))] max-w-xs mx-auto"
+                                   x-text="productSearch
+                                       ? 'Tidak ada produk yang cocok dengan \'' + productSearch + '\''
+                                       : 'Katalog ini belum memiliki produk. Klik Tambah Produk untuk memulai.'"></p>
                             </div>
                         </template>
 
-                        <!-- Products Grid -->
+                        <!-- Products grid -->
                         <template x-if="!loadingProducts && filteredProducts.length > 0">
                             <div>
-                                <p class="text-sm text-[hsl(var(--muted-foreground))] mb-4">
-                                    Menampilkan <span x-text="filteredProducts.length"></span> dari <span x-text="products.length"></span> produk
-                                </p>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                     <template x-for="product in filteredProducts" :key="product.id">
                                         <div class="card overflow-hidden hover:shadow-md transition-shadow flex flex-col">
+                                            <!-- Gambar -->
                                             <div class="h-44 bg-[hsl(var(--muted))] flex items-center justify-center overflow-hidden relative group">
                                                 <template x-if="product.image_url">
-                                                    <img :src="product.image_url" :alt="product.name" class="w-full h-full object-cover" loading="lazy">
+                                                    <img :src="product.image_url" :alt="product.name"
+                                                         class="w-full h-full object-cover" loading="lazy">
                                                 </template>
                                                 <template x-if="!product.image_url">
-                                                    <i class="fas fa-image text-3xl text-[hsl(var(--muted-foreground))]"></i>
+                                                    <i class="fas fa-image text-3xl text-[hsl(var(--muted-foreground)/0.4)]"></i>
                                                 </template>
-                                                <!-- Action overlay -->
+                                                <!-- Hover actions (desktop) -->
                                                 <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                                                     <button @click.stop="openEditModal(product)"
-                                                        class="btn btn-sm bg-white text-gray-800 hover:bg-gray-100">
+                                                        class="btn btn-sm bg-white text-gray-800 hover:bg-gray-100 shadow-sm">
                                                         <i class="fas fa-pencil mr-1"></i>Edit
                                                     </button>
                                                     <button @click.stop="confirmDelete(product)"
-                                                        class="btn btn-sm bg-red-500 text-white hover:bg-red-600">
+                                                        class="btn btn-sm bg-red-500 text-white hover:bg-red-600 shadow-sm">
                                                         <i class="fas fa-trash mr-1"></i>Hapus
                                                     </button>
                                                 </div>
                                             </div>
 
-                                            <div class="p-4 flex flex-col gap-2 flex-1">
-                                                <h3 class="font-semibold text-sm leading-tight line-clamp-2" x-text="product.name"></h3>
+                                            <!-- Info -->
+                                            <div class="p-4 flex flex-col gap-1.5 flex-1">
+                                                <h3 class="font-semibold text-sm leading-snug line-clamp-2" x-text="product.name"></h3>
                                                 <template x-if="product.description">
                                                     <p class="text-xs text-[hsl(var(--muted-foreground))] line-clamp-2" x-text="product.description"></p>
                                                 </template>
-                                                <div class="flex items-center justify-between mt-auto pt-2">
-                                                    <span class="font-bold text-[hsl(var(--primary))]" x-text="formatPrice(product.price, product.currency)"></span>
-                                                    <span class="badge text-xs"
-                                                        :class="product.availability === 'in stock' ? 'badge-success' : 'badge-secondary'"
-                                                        x-text="product.availability === 'in stock' ? 'Tersedia' : (product.availability ?? '–')">
-                                                    </span>
-                                                </div>
                                                 <template x-if="product.retailer_id">
                                                     <p class="text-xs text-[hsl(var(--muted-foreground))] font-mono truncate" x-text="'SKU: ' + product.retailer_id"></p>
                                                 </template>
-                                                <!-- Edit/Delete buttons (mobile fallback) -->
-                                                <div class="flex gap-2 mt-1 sm:hidden">
+                                                <!-- Harga + availability -->
+                                                <div class="flex items-center justify-between mt-auto pt-2 border-t border-[hsl(var(--border))]">
+                                                    <span class="font-bold text-[hsl(var(--primary))] text-sm"
+                                                          x-text="formatPrice(product.price, product.currency)"></span>
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                                                          :class="{
+                                                              'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400': product.availability === 'in stock',
+                                                              'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400': product.availability === 'out of stock',
+                                                              'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400': product.availability === 'preorder',
+                                                              'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]': !['in stock','out of stock','preorder'].includes(product.availability ?? '')
+                                                          }"
+                                                          x-text="product.availability === 'in stock' ? 'Tersedia' :
+                                                                   product.availability === 'out of stock' ? 'Habis' :
+                                                                   product.availability === 'preorder' ? 'Pre-order' :
+                                                                   (product.availability ?? '–')">
+                                                    </span>
+                                                </div>
+                                                <!-- Mobile actions -->
+                                                <div class="flex gap-2 mt-2 sm:hidden">
                                                     <button @click="openEditModal(product)" class="btn btn-outline btn-sm flex-1">
                                                         <i class="fas fa-pencil mr-1"></i>Edit
                                                     </button>
@@ -259,6 +322,7 @@
                                     </template>
                                 </div>
 
+                                <!-- Load more -->
                                 <template x-if="pagingCursor">
                                     <div class="text-center mt-6">
                                         <button @click="loadMoreProducts()" :disabled="loadingMore" class="btn btn-outline btn-md">
@@ -280,42 +344,49 @@
         </main>
     </div>
 
-    <!-- ===== CREATE MODAL ===== -->
+    <!-- ════════ CREATE MODAL ════════ -->
     <template x-if="showCreateModal">
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="absolute inset-0 bg-black/60" @click="showCreateModal = false"></div>
+            <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showCreateModal = false"></div>
             <div class="relative bg-[hsl(var(--card))] rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-                <div class="flex items-center justify-between p-5 border-b border-[hsl(var(--border))]">
-                    <h3 class="font-semibold text-lg">Tambah Produk Baru</h3>
-                    <button @click="showCreateModal = false" class="btn btn-ghost btn-sm p-1">
-                        <i class="fas fa-times text-lg"></i>
+                <div class="sticky top-0 bg-[hsl(var(--card))] flex items-center justify-between px-5 py-4 border-b border-[hsl(var(--border))] z-10">
+                    <div class="flex items-center gap-2">
+                        <div class="h-7 w-7 rounded-lg bg-[hsl(var(--primary)/0.1)] flex items-center justify-center">
+                            <i class="fas fa-plus text-[hsl(var(--primary))] text-xs"></i>
+                        </div>
+                        <h3 class="font-semibold">Tambah Produk Baru</h3>
+                    </div>
+                    <button @click="showCreateModal = false" class="btn btn-ghost btn-sm p-1.5 rounded-lg">
+                        <i class="fas fa-times"></i>
                     </button>
                 </div>
-                <form @submit.prevent="createProduct()" class="p-5 space-y-4">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="col-span-2">
-                            <label class="label text-sm font-medium mb-1 block">Nama Produk <span class="text-red-500">*</span></label>
-                            <input type="text" x-model="createForm.name" class="input w-full" placeholder="Nama produk" required>
-                        </div>
+                <form @submit.prevent="createProduct()" class="p-5 space-y-3">
+                    <div>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Nama Produk <span class="text-red-500">*</span></label>
+                        <input type="text" x-model="createForm.name" class="input w-full" placeholder="Nama produk" required>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="label text-sm font-medium mb-1 block">SKU / Retailer ID <span class="text-red-500">*</span></label>
+                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">SKU / Retailer ID <span class="text-red-500">*</span></label>
                             <input type="text" x-model="createForm.retailer_id" class="input w-full" placeholder="SKU-001" required>
                         </div>
                         <div>
-                            <label class="label text-sm font-medium mb-1 block">Ketersediaan</label>
+                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Ketersediaan</label>
                             <select x-model="createForm.availability" class="input w-full">
                                 <option value="in stock">Tersedia</option>
                                 <option value="out of stock">Habis</option>
                                 <option value="preorder">Pre-order</option>
                             </select>
                         </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="label text-sm font-medium mb-1 block">Harga <span class="text-red-500">*</span></label>
+                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Harga <span class="text-red-500">*</span></label>
                             <input type="number" x-model="createForm.price_display" class="input w-full" placeholder="30000" min="0" required>
-                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Masukkan dalam Rupiah (misal: 30000)</p>
+                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Dalam Rupiah</p>
                         </div>
                         <div>
-                            <label class="label text-sm font-medium mb-1 block">Mata Uang</label>
+                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Mata Uang</label>
                             <select x-model="createForm.currency" class="input w-full">
                                 <option value="IDR">IDR</option>
                                 <option value="USD">USD</option>
@@ -323,24 +394,26 @@
                                 <option value="MYR">MYR</option>
                             </select>
                         </div>
-                        <div class="col-span-2">
-                            <label class="label text-sm font-medium mb-1 block">URL Gambar <span class="text-red-500">*</span></label>
-                            <input type="url" x-model="createForm.image_url" class="input w-full" placeholder="https://..." required>
-                        </div>
-                        <div class="col-span-2">
-                            <label class="label text-sm font-medium mb-1 block">URL Produk <span class="text-red-500">*</span></label>
-                            <input type="url" x-model="createForm.url" class="input w-full" placeholder="https://..." required>
-                        </div>
-                        <div class="col-span-2">
-                            <label class="label text-sm font-medium mb-1 block">Deskripsi</label>
-                            <textarea x-model="createForm.description" class="input w-full resize-none" rows="3" placeholder="Deskripsi produk..."></textarea>
-                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">URL Gambar <span class="text-red-500">*</span></label>
+                        <input type="url" x-model="createForm.image_url" class="input w-full" placeholder="https://..." required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">URL Produk <span class="text-red-500">*</span></label>
+                        <input type="url" x-model="createForm.url" class="input w-full" placeholder="https://..." required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Deskripsi</label>
+                        <textarea x-model="createForm.description" class="input w-full resize-none" rows="3" placeholder="Deskripsi produk..."></textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="label text-sm font-medium mb-1 block">Brand</label>
+                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Brand</label>
                             <input type="text" x-model="createForm.brand" class="input w-full" placeholder="Nama brand">
                         </div>
                         <div>
-                            <label class="label text-sm font-medium mb-1 block">Kondisi</label>
+                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Kondisi</label>
                             <select x-model="createForm.condition" class="input w-full">
                                 <option value="new">Baru</option>
                                 <option value="refurbished">Refurbished</option>
@@ -349,7 +422,10 @@
                         </div>
                     </div>
                     <template x-if="createError">
-                        <p class="text-sm text-red-500" x-text="createError"></p>
+                        <div class="flex gap-2 items-start rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 p-3">
+                            <i class="fas fa-circle-exclamation text-red-500 text-sm mt-0.5 flex-shrink-0"></i>
+                            <p class="text-sm text-red-700 dark:text-red-400" x-text="createError"></p>
+                        </div>
                     </template>
                     <div class="flex gap-3 pt-2">
                         <button type="button" @click="showCreateModal = false" class="btn btn-outline flex-1">Batal</button>
@@ -363,25 +439,30 @@
         </div>
     </template>
 
-    <!-- ===== EDIT MODAL ===== -->
+    <!-- ════════ EDIT MODAL ════════ -->
     <template x-if="showEditModal">
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="absolute inset-0 bg-black/60" @click="showEditModal = false"></div>
+            <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showEditModal = false"></div>
             <div class="relative bg-[hsl(var(--card))] rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-                <div class="flex items-center justify-between p-5 border-b border-[hsl(var(--border))]">
-                    <h3 class="font-semibold text-lg">Edit Produk</h3>
-                    <button @click="showEditModal = false" class="btn btn-ghost btn-sm p-1">
-                        <i class="fas fa-times text-lg"></i>
+                <div class="sticky top-0 bg-[hsl(var(--card))] flex items-center justify-between px-5 py-4 border-b border-[hsl(var(--border))] z-10">
+                    <div class="flex items-center gap-2">
+                        <div class="h-7 w-7 rounded-lg bg-[hsl(var(--primary)/0.1)] flex items-center justify-center">
+                            <i class="fas fa-pencil text-[hsl(var(--primary))] text-xs"></i>
+                        </div>
+                        <h3 class="font-semibold">Edit Produk</h3>
+                    </div>
+                    <button @click="showEditModal = false" class="btn btn-ghost btn-sm p-1.5 rounded-lg">
+                        <i class="fas fa-times"></i>
                     </button>
                 </div>
-                <form @submit.prevent="updateProduct()" class="p-5 space-y-4">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="col-span-2">
-                            <label class="label text-sm font-medium mb-1 block">Nama Produk</label>
-                            <input type="text" x-model="editForm.name" class="input w-full" placeholder="Nama produk">
-                        </div>
+                <form @submit.prevent="updateProduct()" class="p-5 space-y-3">
+                    <div>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Nama Produk</label>
+                        <input type="text" x-model="editForm.name" class="input w-full" placeholder="Nama produk">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="label text-sm font-medium mb-1 block">Ketersediaan</label>
+                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Ketersediaan</label>
                             <select x-model="editForm.availability" class="input w-full">
                                 <option value="in stock">Tersedia</option>
                                 <option value="out of stock">Habis</option>
@@ -389,20 +470,22 @@
                             </select>
                         </div>
                         <div>
-                            <label class="label text-sm font-medium mb-1 block">Kondisi</label>
+                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Kondisi</label>
                             <select x-model="editForm.condition" class="input w-full">
                                 <option value="new">Baru</option>
                                 <option value="refurbished">Refurbished</option>
                                 <option value="used">Bekas</option>
                             </select>
                         </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="label text-sm font-medium mb-1 block">Harga</label>
+                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Harga</label>
                             <input type="number" x-model="editForm.price_display" class="input w-full" placeholder="30000" min="0">
-                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Masukkan dalam Rupiah</p>
+                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Dalam Rupiah</p>
                         </div>
                         <div>
-                            <label class="label text-sm font-medium mb-1 block">Mata Uang</label>
+                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Mata Uang</label>
                             <select x-model="editForm.currency" class="input w-full">
                                 <option value="IDR">IDR</option>
                                 <option value="USD">USD</option>
@@ -410,25 +493,28 @@
                                 <option value="MYR">MYR</option>
                             </select>
                         </div>
-                        <div class="col-span-2">
-                            <label class="label text-sm font-medium mb-1 block">URL Gambar</label>
-                            <input type="url" x-model="editForm.image_url" class="input w-full" placeholder="https://...">
-                        </div>
-                        <div class="col-span-2">
-                            <label class="label text-sm font-medium mb-1 block">URL Produk</label>
-                            <input type="url" x-model="editForm.url" class="input w-full" placeholder="https://...">
-                        </div>
-                        <div class="col-span-2">
-                            <label class="label text-sm font-medium mb-1 block">Deskripsi</label>
-                            <textarea x-model="editForm.description" class="input w-full resize-none" rows="3"></textarea>
-                        </div>
-                        <div class="col-span-2">
-                            <label class="label text-sm font-medium mb-1 block">Brand</label>
-                            <input type="text" x-model="editForm.brand" class="input w-full">
-                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">URL Gambar</label>
+                        <input type="url" x-model="editForm.image_url" class="input w-full" placeholder="https://...">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">URL Produk</label>
+                        <input type="url" x-model="editForm.url" class="input w-full" placeholder="https://...">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Deskripsi</label>
+                        <textarea x-model="editForm.description" class="input w-full resize-none" rows="3"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Brand</label>
+                        <input type="text" x-model="editForm.brand" class="input w-full">
                     </div>
                     <template x-if="editError">
-                        <p class="text-sm text-red-500" x-text="editError"></p>
+                        <div class="flex gap-2 items-start rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 p-3">
+                            <i class="fas fa-circle-exclamation text-red-500 text-sm mt-0.5 flex-shrink-0"></i>
+                            <p class="text-sm text-red-700 dark:text-red-400" x-text="editError"></p>
+                        </div>
                     </template>
                     <div class="flex gap-3 pt-2">
                         <button type="button" @click="showEditModal = false" class="btn btn-outline flex-1">Batal</button>
@@ -442,21 +528,23 @@
         </div>
     </template>
 
-    <!-- ===== DELETE CONFIRM ===== -->
+    <!-- ════════ DELETE CONFIRM ════════ -->
     <template x-if="showDeleteConfirm">
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="absolute inset-0 bg-black/60" @click="showDeleteConfirm = false"></div>
+            <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showDeleteConfirm = false"></div>
             <div class="relative bg-[hsl(var(--card))] rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4">
-                <div class="flex items-center gap-3">
+                <div class="flex items-start gap-4">
                     <div class="h-10 w-10 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center flex-shrink-0">
                         <i class="fas fa-trash text-red-500"></i>
                     </div>
                     <div>
                         <h3 class="font-semibold">Hapus Produk</h3>
-                        <p class="text-sm text-[hsl(var(--muted-foreground))]">Tindakan ini tidak dapat dibatalkan.</p>
+                        <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">
+                            Yakin ingin menghapus <strong x-text="deleteTarget?.name"></strong>?
+                            Tindakan ini tidak dapat dibatalkan.
+                        </p>
                     </div>
                 </div>
-                <p class="text-sm">Yakin ingin menghapus produk <strong x-text="deleteTarget?.name"></strong>?</p>
                 <div class="flex gap-3">
                     <button @click="showDeleteConfirm = false" class="btn btn-outline flex-1">Batal</button>
                     <button @click="deleteProduct()" :disabled="deleting" class="btn flex-1 bg-red-500 text-white hover:bg-red-600 border-0">
