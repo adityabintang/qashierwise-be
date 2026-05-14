@@ -229,7 +229,7 @@
                                 <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none"></i>
                                 <input type="text" x-model="productSearch"
                                        placeholder="Cari produk berdasarkan nama atau SKU..."
-                                       class="input w-full pl-9 min-h-[40px]">
+                                       class="input w-full !pl-9 min-h-[40px]">
                             </div>
                             <span x-show="!loadingProducts && products.length > 0"
                                   class="text-xs text-[hsl(var(--muted-foreground))] whitespace-nowrap flex-shrink-0 tabular-nums">
@@ -307,17 +307,26 @@
                                                 <div class="flex items-center justify-between mt-auto pt-2 border-t border-[hsl(var(--border))]">
                                                     <span class="font-bold text-[hsl(var(--primary))] text-sm"
                                                           x-text="formatPrice(product.price, product.currency)"></span>
-                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                                                          :class="{
-                                                              'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400': product.availability === 'in stock',
-                                                              'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400': product.availability === 'out of stock',
-                                                              'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400': product.availability === 'preorder',
-                                                              'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]': !['in stock','out of stock','preorder'].includes(product.availability ?? '')
-                                                          }"
-                                                          x-text="product.availability === 'in stock' ? 'Tersedia' :
-                                                                   product.availability === 'out of stock' ? 'Habis' :
-                                                                   product.availability === 'preorder' ? 'Pre-order' :
-                                                                   (product.availability ?? '–')">
+                                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                                                          :style="product.availability === 'in stock'
+                                                              ? 'background:rgba(34,197,94,0.15);color:rgb(22,163,74)'
+                                                              : product.availability === 'out of stock'
+                                                              ? 'background:rgba(239,68,68,0.15);color:rgb(220,38,38)'
+                                                              : product.availability === 'preorder'
+                                                              ? 'background:rgba(59,130,246,0.15);color:rgb(37,99,235)'
+                                                              : 'background:rgba(100,116,139,0.15);color:rgb(100,116,139)'">
+                                                        <span class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                                                              :style="product.availability === 'in stock'
+                                                                  ? 'background:rgb(22,163,74)'
+                                                                  : product.availability === 'out of stock'
+                                                                  ? 'background:rgb(220,38,38)'
+                                                                  : product.availability === 'preorder'
+                                                                  ? 'background:rgb(37,99,235)'
+                                                                  : 'background:rgb(100,116,139)'"></span>
+                                                        <span x-text="product.availability === 'in stock' ? 'Tersedia' :
+                                                                      product.availability === 'out of stock' ? 'Habis' :
+                                                                      product.availability === 'preorder' ? 'Pre-order' :
+                                                                      (product.availability ?? '–')"></span>
                                                     </span>
                                                 </div>
                                                 <!-- Mobile actions -->
