@@ -44,6 +44,7 @@ return [
     'menu_orders' => 'Orders',
     'menu_payment' => 'Payment',
     'menu_products' => 'Products',
+    'menu_meta_catalog' => 'Meta Catalog',
     'menu_categories' => 'Categories',
     'menu_stores' => 'Stores',
     'menu_tables' => 'Tables',

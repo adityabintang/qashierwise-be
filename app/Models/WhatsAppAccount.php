@@ -35,6 +35,9 @@ class WhatsAppAccount extends Model
         'waba_id',
         'access_token',
         'token_expires_at',
+        'catalog_access_token',
+        'catalog_token_expires_at',
+        'catalog_business_id',
         'is_active',
         'coexistence_enabled',
         'connection_method',
@@ -58,6 +61,8 @@ class WhatsAppAccount extends Model
         'websites' => 'array',
         'token_expires_at' => 'datetime',
         'access_token' => 'encrypted',
+        'catalog_access_token' => 'encrypted',
+        'catalog_token_expires_at' => 'datetime',
     ];
 
     public function user()
