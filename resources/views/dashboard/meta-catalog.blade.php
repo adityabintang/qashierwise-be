@@ -49,8 +49,8 @@
                             </button>
                         </template>
                         <template x-if="!selectedCatalog">
-                            <button @click="fetchCatalogs()" :disabled="loading" class="btn btn-outline btn-sm">
-                                <i class="fas fa-sync-alt mr-1.5" :class="loading ? 'animate-spin' : ''"></i>Muat Ulang
+                            <button @click="launchCatalogSignup()" :disabled="connectingCatalog" class="btn btn-outline btn-sm">
+                                <i class="fas fa-sync-alt mr-1.5" :class="connectingCatalog ? 'animate-spin' : ''"></i>Muat Ulang
                             </button>
                         </template>
                         <template x-if="!selectedCatalog && businessId">
