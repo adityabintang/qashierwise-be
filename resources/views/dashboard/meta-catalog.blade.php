@@ -443,7 +443,10 @@
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Deskripsi</label>
-                        <textarea x-model="createForm.description" class="input w-full resize-none" rows="3" placeholder="Deskripsi produk..."></textarea>
+                        <textarea x-model="createForm.description"
+                            x-init="$el.style.height='auto';$el.style.height=$el.scrollHeight+'px'"
+                            x-on:input="$el.style.height='auto';$el.style.height=$el.scrollHeight+'px'"
+                            class="input w-full resize-none overflow-hidden" rows="3" placeholder="Deskripsi produk..."></textarea>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
@@ -570,7 +573,10 @@
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Deskripsi</label>
-                        <textarea x-model="editForm.description" class="input w-full resize-none" rows="3"></textarea>
+                        <textarea x-model="editForm.description"
+                            x-init="$el.style.height='auto';$el.style.height=$el.scrollHeight+'px'"
+                            x-on:input="$el.style.height='auto';$el.style.height=$el.scrollHeight+'px'"
+                            class="input w-full resize-none overflow-hidden" rows="3"></textarea>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Brand</label>
