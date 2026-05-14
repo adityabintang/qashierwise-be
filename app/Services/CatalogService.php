@@ -144,6 +144,55 @@ class CatalogService
     }
 
     /**
+     * Create a new product catalog under the business linked to this account.
+     *
+     * @return array{success: bool, id?: string, name?: string, error?: string, error_code?: string}
+     */
+    public function createCatalog(WhatsAppAccount $account, string $name, ?string $vertical = null): array
+    {
+        $accessToken = $this->getCatalogAccessToken($account);
+        $businessId = $this->getBusinessId($account);
+
+        if (! $businessId) {
+            return [
+                'success' => false,
+                'error_code' => 'BUSINESS_ID_NOT_FOUND',
+                'error' => 'Unable to resolve Meta Business ID.',
+            ];
+        }
+
+        $payload = ['name' => $name];
+        if ($vertical) {
+            $payload['vertical'] = $vertical;
+        }
+
+        $response = Http::withToken($accessToken)
+            ->post("{$this->baseUrl()}/{$businessId}/owned_product_catalogs", $payload);
+
+        if ($response->successful()) {
+            $id = $response->json('id');
+            Log::info('CatalogService: catalog created', ['business_id' => $businessId, 'catalog_id' => $id, 'name' => $name]);
+
+            return ['success' => true, 'id' => $id, 'name' => $name];
+        }
+
+        $error = $response->json('error', []);
+        $errorMessage = $error['message'] ?? 'Failed to create catalog';
+
+        Log::error('CatalogService: failed to create catalog', [
+            'business_id' => $businessId,
+            'status' => $response->status(),
+            'error_code' => $error['code'] ?? null,
+            'error_subcode' => $error['error_subcode'] ?? null,
+            'error_type' => $error['type'] ?? null,
+            'error' => $errorMessage,
+            'fbtrace_id' => $error['fbtrace_id'] ?? null,
+        ]);
+
+        return ['success' => false, 'error_code' => 'API_ERROR', 'error' => $errorMessage];
+    }
+
+    /**
      * List all product catalogs owned by the business linked to this WhatsApp account.
      *
      * @return array{success: bool, catalogs?: array, error?: string, error_code?: string}

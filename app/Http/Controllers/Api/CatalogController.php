@@ -20,6 +20,53 @@ class CatalogController extends Controller
     ) {}
 
     /**
+     * POST /api/whatsapp/catalog/catalogs
+     * Create a new Meta product catalog.
+     */
+    public function createCatalog(Request $request): JsonResponse
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'vertical' => 'sometimes|string|in:commerce,destinations,flights,home_listings,hotels,vehicles',
+        ]);
+
+        try {
+            $account = $this->getCatalogAccount();
+
+            $result = $this->catalogService->createCatalog(
+                $account,
+                $request->input('name'),
+                $request->input('vertical'),
+            );
+
+            if (! $result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => $result['error_code'],
+                    'message' => $result['error'],
+                ], 422);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => ['id' => $result['id'], 'name' => $result['name']],
+            ], 201);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
+        } catch (CatalogNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
+        }
+    }
+
+    /**
      * GET /api/whatsapp/catalog/catalogs
      * List all Meta product catalogs for the authenticated user's business.
      */
@@ -218,6 +265,33 @@ class CatalogController extends Controller
                 'message' => $e->getMessage(),
             ], $e->getCode());
         } catch (CatalogNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
+        }
+    }
+
+    /**
+     * DELETE /api/whatsapp/catalog/disconnect
+     * Clear catalog credentials from the account (disconnect Meta catalog).
+     */
+    public function disconnect(): JsonResponse
+    {
+        try {
+            $account = $this->getAccount();
+
+            $account->update([
+                'catalog_access_token'   => null,
+                'catalog_token_expires_at' => null,
+                'catalog_business_id'    => null,
+            ]);
+
+            Log::info('CatalogController: catalog disconnected', ['account_id' => $account->id]);
+
+            return response()->json(['success' => true, 'message' => 'Katalog berhasil diputuskan.']);
+        } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
                 'success' => false,
                 'error_code' => $e->getErrorCode(),

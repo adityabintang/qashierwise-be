@@ -53,6 +53,18 @@
                                 <i class="fas fa-sync-alt mr-1.5" :class="loading ? 'animate-spin' : ''"></i>Muat Ulang
                             </button>
                         </template>
+                        <template x-if="!selectedCatalog && businessId">
+                            <a :href="`https://web.facebook.com/products/catalogs/new/?business_id=${businessId}&nav_source=commerce_manager_launchpad`"
+                               target="_blank" rel="noopener"
+                               class="btn btn-primary btn-sm">
+                                <i class="fas fa-plus mr-1.5"></i>Buat Katalog
+                            </a>
+                        </template>
+                        <template x-if="!selectedCatalog">
+                            <button @click="showDisconnectConfirm = true" class="btn btn-outline btn-sm text-red-500 border-red-200 hover:bg-red-50 dark:hover:bg-red-950/20">
+                                <i class="fas fa-unlink mr-1.5"></i>Disconnect
+                            </button>
+                        </template>
                         <template x-if="selectedCatalog">
                             <button @click="openCreateModal()" class="btn btn-primary btn-sm">
                                 <i class="fas fa-plus mr-1.5"></i>Tambah Produk
@@ -365,19 +377,13 @@
                         <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Nama Produk <span class="text-red-500">*</span></label>
                         <input type="text" x-model="createForm.name" class="input w-full" placeholder="Nama produk" required>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">SKU / Retailer ID <span class="text-red-500">*</span></label>
-                            <input type="text" x-model="createForm.retailer_id" class="input w-full" placeholder="SKU-001" required>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Ketersediaan</label>
-                            <select x-model="createForm.availability" class="input w-full">
-                                <option value="in stock">Tersedia</option>
-                                <option value="out of stock">Habis</option>
-                                <option value="preorder">Pre-order</option>
-                            </select>
-                        </div>
+                    <div>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Ketersediaan</label>
+                        <select x-model="createForm.availability" class="input w-full">
+                            <option value="in stock">Tersedia</option>
+                            <option value="out of stock">Habis</option>
+                            <option value="preorder">Pre-order</option>
+                        </select>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
@@ -413,7 +419,7 @@
                         <template x-if="uploadingCreateImage">
                             <div class="mb-2 rounded-lg border border-[hsl(var(--border))] h-36 bg-[hsl(var(--muted))] flex flex-col items-center justify-center gap-2">
                                 <i class="fas fa-spinner animate-spin text-[hsl(var(--primary))]"></i>
-                                <span class="text-xs text-[hsl(var(--muted-foreground))]">Mengupload ke Meta...</span>
+                                <span class="text-xs text-[hsl(var(--muted-foreground))]">Mengupload gambar...</span>
                             </div>
                         </template>
 
@@ -430,14 +436,10 @@
                             </label>
                         </template>
 
-                        <!-- URL input (fallback / auto-filled) -->
-                        <input type="url" x-model="createForm.image_url" class="input w-full text-xs"
-                               placeholder="atau tempel URL gambar langsung..."
-                               :disabled="uploadingCreateImage" required>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">URL Produk <span class="text-red-500">*</span></label>
-                        <input type="url" x-model="createForm.url" class="input w-full" placeholder="https://..." required>
+                        <!-- Validasi: gambar wajib -->
+                        <template x-if="!createForm.image_url && !uploadingCreateImage && createImageTouched">
+                            <p class="text-xs text-red-500 mt-1"><i class="fas fa-circle-exclamation mr-1"></i>Gambar produk wajib diupload.</p>
+                        </template>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Deskripsi</label>
@@ -548,7 +550,7 @@
                         <template x-if="uploadingEditImage">
                             <div class="mb-2 rounded-lg border border-[hsl(var(--border))] h-36 bg-[hsl(var(--muted))] flex flex-col items-center justify-center gap-2">
                                 <i class="fas fa-spinner animate-spin text-[hsl(var(--primary))]"></i>
-                                <span class="text-xs text-[hsl(var(--muted-foreground))]">Mengupload ke Meta...</span>
+                                <span class="text-xs text-[hsl(var(--muted-foreground))]">Mengupload gambar...</span>
                             </div>
                         </template>
 
@@ -565,14 +567,6 @@
                             </label>
                         </template>
 
-                        <!-- URL input (fallback / auto-filled) -->
-                        <input type="url" x-model="editForm.image_url" class="input w-full text-xs"
-                               placeholder="atau tempel URL gambar langsung..."
-                               :disabled="uploadingEditImage">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">URL Produk</label>
-                        <input type="url" x-model="editForm.url" class="input w-full" placeholder="https://...">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Deskripsi</label>
@@ -624,6 +618,81 @@
                         <template x-if="!deleting"><span><i class="fas fa-trash mr-2"></i>Ya, Hapus</span></template>
                     </button>
                 </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- ════════ DISCONNECT CONFIRM ════════ -->
+    <template x-if="showDisconnectConfirm">
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showDisconnectConfirm = false"></div>
+            <div class="relative bg-[hsl(var(--card))] rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+                <div class="flex items-start gap-4">
+                    <div class="h-10 w-10 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-unlink text-red-500"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold">Putuskan Koneksi Katalog</h3>
+                        <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">Token katalog Meta akan dihapus dari akun ini. Kamu perlu menghubungkan ulang untuk mengakses katalog kembali.</p>
+                    </div>
+                </div>
+                <div class="flex gap-3">
+                    <button @click="showDisconnectConfirm = false" class="btn btn-outline flex-1">Batal</button>
+                    <button @click="disconnectCatalog()" :disabled="disconnecting" class="btn flex-1 bg-red-500 text-white hover:bg-red-600 border-0">
+                        <template x-if="disconnecting"><span><i class="fas fa-spinner animate-spin mr-2"></i>Memutuskan...</span></template>
+                        <template x-if="!disconnecting"><span><i class="fas fa-unlink mr-2"></i>Ya, Putuskan</span></template>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- ════════ CREATE CATALOG MODAL ════════ -->
+    <template x-if="showCreateCatalogModal">
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showCreateCatalogModal = false"></div>
+            <div class="relative bg-[hsl(var(--card))] rounded-xl shadow-2xl w-full max-w-md">
+                <div class="flex items-center justify-between px-5 py-4 border-b border-[hsl(var(--border))]">
+                    <div class="flex items-center gap-2">
+                        <div class="h-7 w-7 rounded-lg bg-[#1877f2]/10 flex items-center justify-center">
+                            <i class="fab fa-facebook text-[#1877f2] text-xs"></i>
+                        </div>
+                        <h3 class="font-semibold">Buat Katalog Baru</h3>
+                    </div>
+                    <button @click="showCreateCatalogModal = false" class="btn btn-ghost btn-sm p-1.5 rounded-lg">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form @submit.prevent="submitCreateCatalog()" class="p-5 space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Nama Katalog <span class="text-red-500">*</span></label>
+                        <input type="text" x-model="createCatalogForm.name" class="input w-full" placeholder="Contoh: Katalog Produk Utama" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Jenis Katalog</label>
+                        <select x-model="createCatalogForm.vertical" class="input w-full">
+                            <option value="commerce">E-Commerce (Produk Umum)</option>
+                            <option value="destinations">Destinasi</option>
+                            <option value="flights">Penerbangan</option>
+                            <option value="home_listings">Properti</option>
+                            <option value="hotels">Hotel</option>
+                            <option value="vehicles">Kendaraan</option>
+                        </select>
+                    </div>
+                    <template x-if="createCatalogError">
+                        <div class="flex gap-2 items-start rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 p-3">
+                            <i class="fas fa-circle-exclamation text-red-500 text-sm mt-0.5 flex-shrink-0"></i>
+                            <p class="text-sm text-red-700 dark:text-red-400" x-text="createCatalogError"></p>
+                        </div>
+                    </template>
+                    <div class="flex gap-3 pt-1">
+                        <button type="button" @click="showCreateCatalogModal = false" class="btn btn-outline flex-1">Batal</button>
+                        <button type="submit" :disabled="creatingCatalog" class="btn btn-primary flex-1">
+                            <template x-if="creatingCatalog"><span><i class="fas fa-spinner animate-spin mr-2"></i>Membuat...</span></template>
+                            <template x-if="!creatingCatalog"><span><i class="fas fa-plus mr-2"></i>Buat Katalog</span></template>
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </template>
@@ -702,6 +771,17 @@ function metaCatalogApp() {
         // Image upload
         uploadingCreateImage: false,
         uploadingEditImage: false,
+        createImageTouched: false,
+
+        // Create catalog
+        showCreateCatalogModal: false,
+        creatingCatalog: false,
+        createCatalogForm: { name: '', vertical: 'commerce' },
+        createCatalogError: null,
+
+        // Disconnect catalog
+        showDisconnectConfirm: false,
+        disconnecting: false,
 
         sidebarOpen: window.innerWidth >= 1024,
         isMobile: window.innerWidth < 768,
@@ -1032,12 +1112,27 @@ function metaCatalogApp() {
 
         // ─── CREATE ───────────────────────────────────────────
         openCreateModal() {
-            this.createForm = { name: '', retailer_id: '', price_display: '', currency: 'IDR', image_url: '', url: '', availability: 'in stock', description: '', brand: '', condition: 'new' };
+            const ts = Date.now().toString(36).toUpperCase();
+            const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+            const catalogUrl = `https://qashierwise.com/dashboard/meta-catalog/${this.selectedCatalog?.id || ''}`;
+            const defaultBrand = this.user?.name || '';
+            const defaultDesc = 'Produk makanan & minuman pilihan, disiapkan dengan bahan segar berkualitas untuk pengalaman kuliner terbaik Anda.';
+            this.createForm = {
+                name: '', retailer_id: `SKU-${ts}-${rand}`, price_display: '', currency: 'IDR',
+                image_url: '', url: catalogUrl, availability: 'in stock',
+                description: defaultDesc, brand: defaultBrand, condition: 'new',
+            };
             this.createError = null;
+            this.createImageTouched = false;
             this.showCreateModal = true;
         },
 
         async createProduct() {
+            this.createImageTouched = true;
+            if (!this.createForm.image_url) {
+                this.createError = 'Gambar produk wajib diupload terlebih dahulu.';
+                return;
+            }
             this.creating = true;
             this.createError = null;
             try {
@@ -1090,8 +1185,8 @@ function metaCatalogApp() {
                 currency: product.currency || 'IDR',
                 image_url: product.image_url || '',
                 url: product.url || '',
-                description: product.description || '',
-                brand: product.brand || '',
+                description: product.description || 'Produk makanan & minuman pilihan, disiapkan dengan bahan segar berkualitas untuk pengalaman kuliner terbaik Anda.',
+                brand: product.brand || this.user?.name || '',
             };
             this.editError = null;
             this.showEditModal = true;
@@ -1166,6 +1261,63 @@ function metaCatalogApp() {
                 this.showDeleteConfirm = false;
             } finally {
                 this.deleting = false;
+            }
+        },
+
+        // ─── DISCONNECT CATALOG ───────────────────────────────
+        async disconnectCatalog() {
+            this.disconnecting = true;
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/catalog/disconnect`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.showDisconnectConfirm = false;
+                    this.showToast('Katalog berhasil diputuskan.', 'success');
+                    this.catalogs = [];
+                    this.error = { code: 'CATALOG_NOT_CONNECTED', message: 'Katalog telah diputuskan. Hubungkan kembali untuk mengakses katalog.' };
+                } else {
+                    this.showToast(data.message || 'Gagal memutuskan katalog.', 'error');
+                    this.showDisconnectConfirm = false;
+                }
+            } catch (e) {
+                this.showToast('Gagal terhubung ke server.', 'error');
+                this.showDisconnectConfirm = false;
+            } finally {
+                this.disconnecting = false;
+            }
+        },
+
+        // ─── CREATE CATALOG ───────────────────────────────────
+        async submitCreateCatalog() {
+            if (!this.createCatalogForm.name.trim()) {
+                this.createCatalogError = 'Nama katalog wajib diisi.';
+                return;
+            }
+            this.creatingCatalog = true;
+            this.createCatalogError = null;
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/catalog/catalogs`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.createCatalogForm),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.showCreateCatalogModal = false;
+                    this.showToast('Katalog berhasil dibuat.', 'success');
+                    await this.fetchCatalogs();
+                } else {
+                    this.createCatalogError = data.message || 'Gagal membuat katalog.';
+                }
+            } catch (e) {
+                this.createCatalogError = 'Gagal terhubung ke server.';
+            } finally {
+                this.creatingCatalog = false;
             }
         },
 
