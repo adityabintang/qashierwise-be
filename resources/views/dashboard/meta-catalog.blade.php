@@ -396,8 +396,44 @@
                         </div>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">URL Gambar <span class="text-red-500">*</span></label>
-                        <input type="url" x-model="createForm.image_url" class="input w-full" placeholder="https://..." required>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Gambar Produk <span class="text-red-500">*</span></label>
+
+                        <!-- Preview setelah upload/URL diisi -->
+                        <template x-if="createForm.image_url && !uploadingCreateImage">
+                            <div class="relative mb-2 rounded-lg overflow-hidden border border-[hsl(var(--border))] h-36 bg-[hsl(var(--muted))]">
+                                <img :src="createForm.image_url" class="w-full h-full object-cover" x-on:error="$el.style.display='none'">
+                                <button type="button" @click="createForm.image_url = ''"
+                                    class="absolute top-2 right-2 h-6 w-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors">
+                                    <i class="fas fa-times text-[10px]"></i>
+                                </button>
+                            </div>
+                        </template>
+
+                        <!-- State: mengupload -->
+                        <template x-if="uploadingCreateImage">
+                            <div class="mb-2 rounded-lg border border-[hsl(var(--border))] h-36 bg-[hsl(var(--muted))] flex flex-col items-center justify-center gap-2">
+                                <i class="fas fa-spinner animate-spin text-[hsl(var(--primary))]"></i>
+                                <span class="text-xs text-[hsl(var(--muted-foreground))]">Mengupload ke Meta...</span>
+                            </div>
+                        </template>
+
+                        <!-- Dropzone (saat belum ada gambar) -->
+                        <template x-if="!createForm.image_url && !uploadingCreateImage">
+                            <label class="mb-2 flex flex-col items-center justify-center h-36 rounded-lg border-2 border-dashed border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.4)] cursor-pointer hover:border-[hsl(var(--primary)/0.4)] hover:bg-[hsl(var(--primary)/0.03)] transition-colors"
+                                   x-on:dragover.prevent
+                                   x-on:drop.prevent="if($event.dataTransfer.files[0]) uploadImageFile($event.dataTransfer.files[0], 'create')">
+                                <i class="fas fa-cloud-upload-alt text-2xl text-[hsl(var(--muted-foreground))] mb-2"></i>
+                                <span class="text-xs font-medium text-[hsl(var(--muted-foreground))]">Klik atau seret gambar ke sini</span>
+                                <span class="text-[10px] text-[hsl(var(--muted-foreground)/0.6)] mt-0.5">JPG, PNG, GIF, WebP — maks. 5MB</span>
+                                <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden"
+                                       x-on:change="if($event.target.files[0]) uploadImageFile($event.target.files[0], 'create')">
+                            </label>
+                        </template>
+
+                        <!-- URL input (fallback / auto-filled) -->
+                        <input type="url" x-model="createForm.image_url" class="input w-full text-xs"
+                               placeholder="atau tempel URL gambar langsung..."
+                               :disabled="uploadingCreateImage" required>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">URL Produk <span class="text-red-500">*</span></label>
@@ -495,8 +531,44 @@
                         </div>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">URL Gambar</label>
-                        <input type="url" x-model="editForm.image_url" class="input w-full" placeholder="https://...">
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Gambar Produk</label>
+
+                        <!-- Preview -->
+                        <template x-if="editForm.image_url && !uploadingEditImage">
+                            <div class="relative mb-2 rounded-lg overflow-hidden border border-[hsl(var(--border))] h-36 bg-[hsl(var(--muted))]">
+                                <img :src="editForm.image_url" class="w-full h-full object-cover" x-on:error="$el.style.display='none'">
+                                <button type="button" @click="editForm.image_url = ''"
+                                    class="absolute top-2 right-2 h-6 w-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors">
+                                    <i class="fas fa-times text-[10px]"></i>
+                                </button>
+                            </div>
+                        </template>
+
+                        <!-- State: mengupload -->
+                        <template x-if="uploadingEditImage">
+                            <div class="mb-2 rounded-lg border border-[hsl(var(--border))] h-36 bg-[hsl(var(--muted))] flex flex-col items-center justify-center gap-2">
+                                <i class="fas fa-spinner animate-spin text-[hsl(var(--primary))]"></i>
+                                <span class="text-xs text-[hsl(var(--muted-foreground))]">Mengupload ke Meta...</span>
+                            </div>
+                        </template>
+
+                        <!-- Dropzone (saat belum ada gambar) -->
+                        <template x-if="!editForm.image_url && !uploadingEditImage">
+                            <label class="mb-2 flex flex-col items-center justify-center h-36 rounded-lg border-2 border-dashed border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.4)] cursor-pointer hover:border-[hsl(var(--primary)/0.4)] hover:bg-[hsl(var(--primary)/0.03)] transition-colors"
+                                   x-on:dragover.prevent
+                                   x-on:drop.prevent="if($event.dataTransfer.files[0]) uploadImageFile($event.dataTransfer.files[0], 'edit')">
+                                <i class="fas fa-cloud-upload-alt text-2xl text-[hsl(var(--muted-foreground))] mb-2"></i>
+                                <span class="text-xs font-medium text-[hsl(var(--muted-foreground))]">Klik atau seret gambar ke sini</span>
+                                <span class="text-[10px] text-[hsl(var(--muted-foreground)/0.6)] mt-0.5">JPG, PNG, GIF, WebP — maks. 5MB</span>
+                                <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden"
+                                       x-on:change="if($event.target.files[0]) uploadImageFile($event.target.files[0], 'edit')">
+                            </label>
+                        </template>
+
+                        <!-- URL input (fallback / auto-filled) -->
+                        <input type="url" x-model="editForm.image_url" class="input w-full text-xs"
+                               placeholder="atau tempel URL gambar langsung..."
+                               :disabled="uploadingEditImage">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">URL Produk</label>
@@ -626,6 +698,10 @@ function metaCatalogApp() {
         showDeleteConfirm: false,
         deleting: false,
         deleteTarget: null,
+
+        // Image upload
+        uploadingCreateImage: false,
+        uploadingEditImage: false,
 
         sidebarOpen: window.innerWidth >= 1024,
         isMobile: window.innerWidth < 768,
@@ -1090,6 +1166,45 @@ function metaCatalogApp() {
                 this.showDeleteConfirm = false;
             } finally {
                 this.deleting = false;
+            }
+        },
+
+        // ─── IMAGE UPLOAD ─────────────────────────────────────
+        async uploadImageFile(file, formKey) {
+            if (!file || !this.selectedCatalog) return;
+
+            const uploadingKey = formKey === 'create' ? 'uploadingCreateImage' : 'uploadingEditImage';
+            this[uploadingKey] = true;
+
+            try {
+                const token = localStorage.getItem('token');
+                const formData = new FormData();
+                formData.append('image', file);
+
+                const res = await fetch(`${this.API_BASE_URL}/catalog/${this.selectedCatalog.id}/upload-image`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json',
+                    },
+                    body: formData,
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    if (formKey === 'create') {
+                        this.createForm.image_url = data.data.image_url;
+                    } else {
+                        this.editForm.image_url = data.data.image_url;
+                    }
+                    this.showToast('Gambar berhasil diupload.', 'success');
+                } else {
+                    this.showToast(data.message || 'Gagal mengupload gambar.', 'error');
+                }
+            } catch (e) {
+                this.showToast('Gagal mengupload gambar.', 'error');
+            } finally {
+                this[uploadingKey] = false;
             }
         },
 

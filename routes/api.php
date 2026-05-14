@@ -207,6 +207,7 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::get('/catalog/catalogs', [CatalogController::class, 'getCatalogs']);
         Route::get('/catalog/{catalogId}/products', [CatalogController::class, 'getCatalogProducts']);
         Route::post('/catalog/{catalogId}/products', [CatalogController::class, 'createProduct']);
+        Route::post('/catalog/{catalogId}/upload-image', [CatalogController::class, 'uploadImage']);
         Route::put('/catalog/products/{productId}', [CatalogController::class, 'updateProduct']);
         Route::delete('/catalog/products/{productId}', [CatalogController::class, 'deleteProduct']);
     });

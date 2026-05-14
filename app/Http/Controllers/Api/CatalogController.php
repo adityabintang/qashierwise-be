@@ -9,6 +9,8 @@ use App\Services\CatalogService;
 use App\Services\WhatsAppAccountService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class CatalogController extends Controller
 {
@@ -221,6 +223,59 @@ class CatalogController extends Controller
                 'error_code' => $e->getErrorCode(),
                 'message' => $e->getMessage(),
             ], $e->getCode());
+        }
+    }
+
+    /**
+     * POST /api/whatsapp/catalog/{catalogId}/upload-image
+     * Store a product image in public storage and return a publicly accessible URL
+     * to use as the image_url when creating/updating catalog products.
+     */
+    public function uploadImage(Request $request, string $catalogId): JsonResponse
+    {
+        $request->validate([
+            'image' => 'required|file|image|max:5120|mimes:jpeg,jpg,png,gif,webp',
+        ]);
+
+        try {
+            $this->getCatalogAccount();
+
+            $path = $request->file('image')->store('catalog-images', 'r2');
+            $url = Storage::disk('r2')->url($path);
+
+            Log::info('CatalogController: image uploaded', [
+                'catalog_id' => $catalogId,
+                'path' => $path,
+                'url' => $url,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'data' => ['image_url' => $url],
+            ]);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
+        } catch (CatalogNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
+        } catch (\Throwable $e) {
+            Log::error('CatalogController: image upload failed', [
+                'catalog_id' => $catalogId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error_code' => 'UPLOAD_FAILED',
+                'message' => 'Gagal mengupload gambar: ' . $e->getMessage(),
+            ], 500);
         }
     }
 
