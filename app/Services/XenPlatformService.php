@@ -53,7 +53,8 @@ class XenPlatformService
 
         try {
             $payload = [
-                'type' => 'OWNED',
+                'type' => 'MANAGED',
+                'country' => 'ID',
                 'public_profile' => [
                     'business_name' => $businessName,
                 ],
@@ -75,6 +76,7 @@ class XenPlatformService
                     'sub_merchant_id' => $merchant->id,
                     'status_code' => $response->status(),
                     'error' => $errorMessage,
+                    'response_body' => $response->body(),
                 ]);
 
                 throw new RuntimeException("XenPlatform API error: {$errorMessage}");
