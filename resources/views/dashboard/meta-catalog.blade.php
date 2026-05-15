@@ -3,6 +3,23 @@
 
 @section('title', 'Meta Catalog - QashierWise')
 
+@push('scripts')
+<script>
+    window.fbAsyncInit = function() {
+        if (window.__fbSdkReady) return;
+        window.__fbSdkReady = true;
+        window.dispatchEvent(new Event('fb-sdk-ready'));
+    };
+    (function(d, s, id) {
+        if (d.getElementById(id)) { window.fbAsyncInit(); return; }
+        var js = d.createElement(s); js.id = id;
+        js.src = 'https://connect.facebook.net/en_US/sdk.js';
+        js.async = true; js.defer = true;
+        d.head.appendChild(js);
+    }(document, 'script', 'facebook-jssdk'));
+</script>
+@endpush
+
 @section('content')
 <div x-data="metaCatalogApp()" x-init="init()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'meta-catalog'])
@@ -49,8 +66,13 @@
                             </button>
                         </template>
                         <template x-if="!selectedCatalog">
-                            <button @click="launchCatalogSignup()" :disabled="connectingCatalog" class="btn btn-outline btn-sm">
-                                <i class="fas fa-sync-alt mr-1.5" :class="connectingCatalog ? 'animate-spin' : ''"></i>Muat Ulang
+                            <button @click="launchSignup()" :disabled="signingUp || loading" class="btn btn-outline btn-sm">
+                                <template x-if="signingUp">
+                                    <span><i class="fas fa-spinner animate-spin mr-1.5"></i>Menghubungkan...</span>
+                                </template>
+                                <template x-if="!signingUp">
+                                    <span><i class="fas fa-sync-alt mr-1.5"></i>Muat Ulang</span>
+                                </template>
                             </button>
                         </template>
                         <template x-if="!selectedCatalog && businessId">
@@ -59,11 +81,6 @@
                                class="btn btn-primary btn-sm">
                                 <i class="fas fa-plus mr-1.5"></i>Buat Katalog
                             </a>
-                        </template>
-                        <template x-if="!selectedCatalog">
-                            <button @click="showDisconnectConfirm = true" class="btn btn-outline btn-sm text-red-500 border-red-200 hover:bg-red-50 dark:hover:bg-red-950/20">
-                                <i class="fas fa-unlink mr-1.5"></i>Disconnect
-                            </button>
                         </template>
                         <template x-if="selectedCatalog">
                             <button @click="openCreateModal()" class="btn btn-primary btn-sm">
@@ -92,28 +109,8 @@
                     </div>
                 </template>
 
-                <!-- ── Error: Katalog belum terhubung / izin diperlukan ── -->
-                <template x-if="error && (error.code === 'CATALOG_NOT_CONNECTED' || error.code === 'PERMISSION_DENIED')">
-                    <div class="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/50 p-4">
-                        <div class="flex gap-3">
-                            <div class="h-9 w-9 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0">
-                                <i class="fas fa-store text-amber-600"></i>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <p class="font-semibold text-amber-800 dark:text-amber-300 text-sm"
-                                   x-text="error.code === 'PERMISSION_DENIED' ? 'Izin Katalog Diperlukan' : 'Katalog Belum Terhubung'"></p>
-                                <p class="text-sm text-amber-700 dark:text-amber-400 mt-0.5" x-text="error.message"></p>
-                                <button @click="launchCatalogSignup()"
-                                        class="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-lg text-sm font-medium bg-[#1877f2] hover:bg-[#166fe5] text-white transition-colors">
-                                    <i class="fab fa-facebook"></i>Hubungkan Katalog Meta
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </template>
-
                 <!-- ── Generic Error ── -->
-                <template x-if="error && error.code !== 'PERMISSION_DENIED' && error.code !== 'WHATSAPP_NOT_CONNECTED' && error.code !== 'CATALOG_NOT_CONNECTED'">
+                <template x-if="error && error.code !== 'WHATSAPP_NOT_CONNECTED'">
                     <div class="rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/20 p-4 flex gap-3 items-start">
                         <i class="fas fa-circle-exclamation text-red-500 mt-0.5 flex-shrink-0"></i>
                         <p class="text-sm text-red-800 dark:text-red-300" x-text="error.message"></p>
@@ -179,7 +176,7 @@
                                     <i class="fas fa-store text-2xl text-[hsl(var(--muted-foreground))]"></i>
                                 </div>
                                 <h3 class="font-semibold text-base mb-1">Tidak Ada Katalog</h3>
-                                <p class="text-sm text-[hsl(var(--muted-foreground))] max-w-xs mx-auto">Pastikan akun Meta Business Anda memiliki katalog produk yang aktif dan sudah terhubung.</p>
+                                <p class="text-sm text-[hsl(var(--muted-foreground))] max-w-xs mx-auto">Pastikan akun Meta Business Anda memiliki katalog produk yang aktif.</p>
                             </div>
                         </template>
 
@@ -637,31 +634,6 @@
         </div>
     </template>
 
-    <!-- ════════ DISCONNECT CONFIRM ════════ -->
-    <template x-if="showDisconnectConfirm">
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showDisconnectConfirm = false"></div>
-            <div class="relative bg-[hsl(var(--card))] rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4">
-                <div class="flex items-start gap-4">
-                    <div class="h-10 w-10 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center flex-shrink-0">
-                        <i class="fas fa-unlink text-red-500"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-semibold">Putuskan Koneksi Katalog</h3>
-                        <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">Token katalog Meta akan dihapus dari akun ini. Kamu perlu menghubungkan ulang untuk mengakses katalog kembali.</p>
-                    </div>
-                </div>
-                <div class="flex gap-3">
-                    <button @click="showDisconnectConfirm = false" class="btn btn-outline flex-1">Batal</button>
-                    <button @click="disconnectCatalog()" :disabled="disconnecting" class="btn flex-1 bg-red-500 text-white hover:bg-red-600 border-0">
-                        <template x-if="disconnecting"><span><i class="fas fa-spinner animate-spin mr-2"></i>Memutuskan...</span></template>
-                        <template x-if="!disconnecting"><span><i class="fas fa-unlink mr-2"></i>Ya, Putuskan</span></template>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </template>
-
     <!-- ════════ CREATE CATALOG MODAL ════════ -->
     <template x-if="showCreateCatalogModal">
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -714,37 +686,6 @@
 
 </div>
 
-<!-- Facebook SDK -->
-<script>
-    window.fbAsyncInit = function() {
-        FB.init({
-            appId: window.catalogConfig?.app_id || '',
-            autoLogAppEvents: true,
-            xfbml: true,
-            version: 'v24.0',
-        });
-        window.dispatchEvent(new CustomEvent('fb-catalog-sdk-ready'));
-    };
-
-    function loadFacebookSDK() {
-        var d = document, s = 'script', id = 'facebook-jssdk';
-        var js, fjs = d.getElementsByTagName(s)[0];
-        if (d.getElementById(id)) return;
-        js = d.createElement(s);
-        js.id = id;
-        js.async = true;
-        js.defer = true;
-        js.src = "https://connect.facebook.net/en_US/sdk.js";
-        fjs.parentNode.insertBefore(js, fjs);
-    }
-
-    if (document.readyState === 'complete') {
-        setTimeout(loadFacebookSDK, 100);
-    } else {
-        window.addEventListener('load', function() { setTimeout(loadFacebookSDK, 100); });
-    }
-</script>
-
 <script>
 function metaCatalogApp() {
     return {
@@ -762,23 +703,21 @@ function metaCatalogApp() {
         productSearch: '',
         error: null,
         toast: null,
-        catalogConfig: null,
-        connectingCatalog: false,
 
-        // Create
+        // Create product
         showCreateModal: false,
         creating: false,
         createError: null,
         createForm: {},
 
-        // Edit
+        // Edit product
         showEditModal: false,
         editing: false,
         editError: null,
         editForm: {},
         editingProductId: null,
 
-        // Delete
+        // Delete product
         showDeleteConfirm: false,
         deleting: false,
         deleteTarget: null,
@@ -793,10 +732,6 @@ function metaCatalogApp() {
         creatingCatalog: false,
         createCatalogForm: { name: '', vertical: 'commerce' },
         createCatalogError: null,
-
-        // Disconnect catalog
-        showDisconnectConfirm: false,
-        disconnecting: false,
 
         sidebarOpen: window.innerWidth >= 1024,
         isMobile: window.innerWidth < 768,
@@ -813,31 +748,15 @@ function metaCatalogApp() {
             );
         },
 
-        sdkLoaded: false,
-
         async init() {
             this.initDashboard();
-            this.setupCatalogMessageListener();
+            await this.fetchCatalogs();
 
-            window.addEventListener('fb-catalog-sdk-ready', () => {
-                this.sdkLoaded = true;
-            });
-            if (typeof FB !== 'undefined') {
-                this.sdkLoaded = true;
-            }
-            setTimeout(() => { this.sdkLoaded = true; }, 5000);
-
-            await Promise.all([
-                this.loadCatalogConfig(),
-                this.fetchCatalogs(),
-            ]);
-            // Auto-open catalog from URL if present
             if (this.initialCatalogId && this.catalogs.length > 0) {
                 const found = this.catalogs.find(c => c.id === String(this.initialCatalogId));
                 if (found) {
                     await this.selectCatalog(found, false);
                 } else {
-                    // Catalog ID from URL not in list — open directly
                     this.selectedCatalog = { id: String(this.initialCatalogId), name: 'Katalog ' + this.initialCatalogId };
                     await this.fetchProducts();
                 }
@@ -865,7 +784,6 @@ function metaCatalogApp() {
                     this.sidebarOpen = false;
                 }
             });
-            // Handle browser back/forward button
             window.addEventListener('popstate', () => {
                 const path = window.location.pathname;
                 const match = path.match(/\/dashboard\/meta-catalog\/(.+)/);
@@ -906,158 +824,6 @@ function metaCatalogApp() {
                 this.error = { code: 'NETWORK_ERROR', message: 'Gagal terhubung ke server.' };
             } finally {
                 this.loading = false;
-            }
-        },
-
-        async loadCatalogConfig() {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-            try {
-                const token = localStorage.getItem('token');
-                if (!token) return;
-
-                const res = await fetch(`${this.API_BASE_URL}/catalog/embedded-signup/config`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json',
-                    },
-                    signal: controller.signal,
-                });
-
-                clearTimeout(timeoutId);
-
-                if (!res.ok) return;
-
-                const data = await res.json();
-                if (data.success) {
-                    this.catalogConfig = data.data;
-                    window.catalogConfig = data.data;
-
-                    if (typeof FB !== 'undefined' && this.catalogConfig?.app_id) {
-                        FB.init({
-                            appId: this.catalogConfig.app_id,
-                            autoLogAppEvents: true,
-                            xfbml: true,
-                            version: 'v24.0',
-                        });
-                        this.sdkLoaded = true;
-                    }
-                }
-            } catch (e) {
-                if (e.name !== 'AbortError') {
-                    console.error('Error loading catalog config:', e);
-                }
-            } finally {
-                clearTimeout(timeoutId);
-            }
-        },
-
-        setupCatalogMessageListener() {
-            window.addEventListener('message', (event) => {
-                if (event.origin !== 'https://www.facebook.com' &&
-                    event.origin !== 'https://web.facebook.com') {
-                    return;
-                }
-                try {
-                    const data = JSON.parse(event.data);
-                    if (data.type === 'WA_EMBEDDED_SIGNUP' && data.event === 'FINISH') {
-                        console.log('Catalog signup completed via message event:', data.data);
-                    } else if (data.type === 'WA_EMBEDDED_SIGNUP' && data.event === 'CANCEL') {
-                        this.showToast('Koneksi dibatalkan.', 'error');
-                    } else if (data.type === 'WA_EMBEDDED_SIGNUP' && data.event === 'ERROR') {
-                        this.showToast('Terjadi kesalahan saat menghubungkan katalog.', 'error');
-                    }
-                } catch (e) {}
-            });
-        },
-
-        launchCatalogSignup() {
-            if (!this.catalogConfig?.config_id || !this.catalogConfig?.app_id) {
-                this.showToast('Konfigurasi katalog belum tersedia. Silakan muat ulang halaman.', 'error');
-                return;
-            }
-
-            if (typeof FB !== 'undefined') {
-                const self = this;
-
-                FB.login((response) => {
-                    if (response.authResponse) {
-                        const code = response.authResponse.code;
-                        const sessionInfo = response.authResponse.extras?.session_info || null;
-                        self.sendCatalogCodeToBackend(code, sessionInfo);
-                    } else {
-                        self.showToast('Koneksi dibatalkan atau tidak diizinkan.', 'error');
-                    }
-                }, {
-                    config_id: this.catalogConfig.config_id,
-                    response_type: 'code',
-                    override_default_response_type: true,
-                    extras: {
-                        setup: {},
-                        sessionInfoVersion: '3',
-                    },
-                });
-            } else {
-                this.launchCatalogSignupRedirect();
-            }
-        },
-
-        launchCatalogSignupRedirect() {
-            const appId = this.catalogConfig.app_id;
-            const configId = this.catalogConfig.config_id;
-            const extras = encodeURIComponent(JSON.stringify({
-                sessionInfoVersion: '3',
-                version: 'v3',
-            }));
-
-            const url = `https://business.facebook.com/messaging/whatsapp/onboard/?app_id=${appId}&config_id=${configId}&extras=${extras}`;
-            const width = 600;
-            const height = 700;
-            const left = (window.innerWidth - width) / 2;
-            const top = (window.innerHeight - height) / 2;
-
-            const popup = window.open(
-                url,
-                'catalog_signup',
-                `width=${width},height=${height},left=${left},top=${top},scrollbars=yes`
-            );
-
-            if (!popup) {
-                this.showToast('Popup diblokir. Izinkan popup untuk situs ini.', 'error');
-            }
-        },
-
-        async sendCatalogCodeToBackend(code, sessionInfo = null) {
-            try {
-                const token = localStorage.getItem('token');
-                const body = { code };
-                if (sessionInfo?.business_id) {
-                    body.business_id = sessionInfo.business_id;
-                }
-
-                const res = await fetch(`${this.API_BASE_URL}/catalog/embedded-signup/callback`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json',
-                    },
-                    body: JSON.stringify(body),
-                });
-
-                const data = await res.json();
-                if (data.success) {
-                    this.showToast('Katalog berhasil terhubung.', 'success');
-                    await this.fetchCatalogs();
-                } else {
-                    this.showToast(data.message || 'Gagal menghubungkan katalog.', 'error');
-                }
-            } catch (e) {
-                console.error('Error sending catalog code to backend:', e);
-                this.showToast('Gagal terhubung ke server.', 'error');
-            } finally {
-                this.connectingCatalog = false;
             }
         },
 
@@ -1125,7 +891,7 @@ function metaCatalogApp() {
             }
         },
 
-        // ─── CREATE ───────────────────────────────────────────
+        // ─── CREATE PRODUCT ───────────────────────────────────
         openCreateModal() {
             const ts = Date.now().toString(36).toUpperCase();
             const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
@@ -1152,9 +918,11 @@ function metaCatalogApp() {
             this.createError = null;
             try {
                 const token = localStorage.getItem('token');
+                const NO_SUBUNIT = ['IDR', 'JPY', 'KRW', 'VND'];
+                const multiplier = NO_SUBUNIT.includes(this.createForm.currency) ? 1 : 100;
                 const payload = {
                     ...this.createForm,
-                    price: Math.round(parseFloat(this.createForm.price_display || 0) * 100),
+                    price: Math.round(parseFloat(this.createForm.price_display || 0) * multiplier),
                 };
                 delete payload.price_display;
 
@@ -1181,17 +949,10 @@ function metaCatalogApp() {
             }
         },
 
-        // ─── EDIT ─────────────────────────────────────────────
+        // ─── EDIT PRODUCT ─────────────────────────────────────
         openEditModal(product) {
             this.editingProductId = product.id;
-            // Parse price: Meta returns formatted string like "Rp30.000", extract number
-            let priceNum = 0;
-            if (product.price) {
-                const raw = String(product.price).replace(/[^0-9.]/g, '');
-                priceNum = parseFloat(raw) || 0;
-                // If price > 1000 it's likely already in cents format (divide by 100)
-                if (priceNum > 1000) priceNum = priceNum / 100;
-            }
+            const priceNum = product.price ? this.parseMetaPrice(product.price) : 0;
             this.editForm = {
                 name: product.name || '',
                 availability: product.availability || 'in stock',
@@ -1214,10 +975,11 @@ function metaCatalogApp() {
                 const token = localStorage.getItem('token');
                 const payload = { ...this.editForm };
                 if (payload.price_display) {
-                    payload.price = Math.round(parseFloat(payload.price_display) * 100);
+                    const NO_SUBUNIT = ['IDR', 'JPY', 'KRW', 'VND'];
+                    const multiplier = NO_SUBUNIT.includes(payload.currency) ? 1 : 100;
+                    payload.price = Math.round(parseFloat(payload.price_display) * multiplier);
                 }
                 delete payload.price_display;
-                // Remove empty fields
                 Object.keys(payload).forEach(k => { if (payload[k] === '') delete payload[k]; });
 
                 const response = await fetch(
@@ -1243,7 +1005,7 @@ function metaCatalogApp() {
             }
         },
 
-        // ─── DELETE ───────────────────────────────────────────
+        // ─── DELETE PRODUCT ───────────────────────────────────
         confirmDelete(product) {
             this.deleteTarget = product;
             this.showDeleteConfirm = true;
@@ -1276,33 +1038,6 @@ function metaCatalogApp() {
                 this.showDeleteConfirm = false;
             } finally {
                 this.deleting = false;
-            }
-        },
-
-        // ─── DISCONNECT CATALOG ───────────────────────────────
-        async disconnectCatalog() {
-            this.disconnecting = true;
-            try {
-                const token = localStorage.getItem('token');
-                const res = await fetch(`${this.API_BASE_URL}/catalog/disconnect`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
-                });
-                const data = await res.json();
-                if (data.success) {
-                    this.showDisconnectConfirm = false;
-                    this.showToast('Katalog berhasil diputuskan.', 'success');
-                    this.catalogs = [];
-                    this.error = { code: 'CATALOG_NOT_CONNECTED', message: 'Katalog telah diputuskan. Hubungkan kembali untuk mengakses katalog.' };
-                } else {
-                    this.showToast(data.message || 'Gagal memutuskan katalog.', 'error');
-                    this.showDisconnectConfirm = false;
-                }
-            } catch (e) {
-                this.showToast('Gagal terhubung ke server.', 'error');
-                this.showDisconnectConfirm = false;
-            } finally {
-                this.disconnecting = false;
             }
         },
 
@@ -1381,12 +1116,38 @@ function metaCatalogApp() {
             setTimeout(() => { this.toast = null; }, 3000);
         },
 
+        parseMetaPrice(price) {
+            if (price === null || price === undefined || price === '') return 0;
+            if (typeof price === 'number') return Math.round(price);
+            const str = String(price).trim();
+            const dotCount = (str.match(/\./g) || []).length;
+            const commaCount = (str.match(/,/g) || []).length;
+            if (dotCount > 1) {
+                return parseInt(str.replace(/[^0-9]/g, ''), 10) || 0;
+            }
+            if (commaCount >= 1) {
+                const lastComma = str.lastIndexOf(',');
+                const lastDot = str.lastIndexOf('.');
+                if (lastComma > lastDot) {
+                    return Math.round(parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0);
+                }
+                return Math.round(parseFloat(str.replace(/,/g, '')) || 0);
+            }
+            if (dotCount === 1) {
+                const afterDot = str.slice(str.lastIndexOf('.') + 1).replace(/[^0-9]/g, '');
+                if (afterDot.length === 3) {
+                    return parseInt(str.replace(/[^0-9]/g, ''), 10) || 0;
+                }
+                return Math.round(parseFloat(str.replace(/[^0-9.]/g, '')) || 0);
+            }
+            return parseInt(str.replace(/[^0-9]/g, ''), 10) || 0;
+        },
+
         formatPrice(price, currency) {
             if (!price) return '–';
             try {
-                const raw = String(price).replace(/[^0-9.]/g, '');
-                const num = parseFloat(raw);
-                if (isNaN(num)) return price;
+                const num = this.parseMetaPrice(price);
+                if (!num) return '–';
                 return new Intl.NumberFormat('id-ID', {
                     style: 'currency',
                     currency: currency || 'IDR',

@@ -6,7 +6,6 @@ use App\Http\Controllers\Api\BalanceController;
 use App\Http\Controllers\Api\BankAccountController;
 use App\Http\Controllers\Api\BroadcastAuthController;
 use App\Http\Controllers\Api\CatalogController;
-use App\Http\Controllers\Api\CatalogEmbeddedSignupController;
 use App\Http\Controllers\Api\ContactTagController;
 use App\Http\Controllers\Api\EmbeddedSignupController;
 use App\Http\Controllers\Api\Internal\ReservationReminderController;
@@ -134,10 +133,6 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::post('/embedded-signup/callback', [EmbeddedSignupController::class, 'handleCallback']);
         Route::get('/embedded-signup/config', [EmbeddedSignupController::class, 'getConfig']);
 
-        // Catalog Embedded Signup routes
-        Route::post('/catalog/embedded-signup/callback', [CatalogEmbeddedSignupController::class, 'handleCallback']);
-        Route::get('/catalog/embedded-signup/config', [CatalogEmbeddedSignupController::class, 'getConfig']);
-
         // Account management routes
         Route::delete('/account', [EmbeddedSignupController::class, 'disconnect']);
         Route::get('/account', [EmbeddedSignupController::class, 'getAccountStatus']);
@@ -207,7 +202,6 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         // Meta Product Catalog
         Route::get('/catalog/catalogs', [CatalogController::class, 'getCatalogs']);
         Route::post('/catalog/catalogs', [CatalogController::class, 'createCatalog']);
-        Route::delete('/catalog/disconnect', [CatalogController::class, 'disconnect']);
         Route::get('/catalog/{catalogId}/products', [CatalogController::class, 'getCatalogProducts']);
         Route::post('/catalog/{catalogId}/products', [CatalogController::class, 'createProduct']);
         Route::post('/catalog/{catalogId}/upload-image', [CatalogController::class, 'uploadImage']);
