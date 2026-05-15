@@ -248,9 +248,10 @@ class EmbeddedSignupService
             'connection_method' => 'embedded_signup',
         ];
 
-        if (! empty($credentials['catalog_business_id'])) {
-            $data['catalog_business_id'] = $credentials['catalog_business_id'];
-        }
+        // Always overwrite catalog_business_id on fresh signup. If the new signup is for a
+        // different FB account, the previously-cached business_id would no longer be accessible
+        // by the new token. Null lets CatalogService::getBusinessId() re-discover it.
+        $data['catalog_business_id'] = $credentials['catalog_business_id'] ?? null;
 
         // Add token expiration if provided
         if (isset($credentials['token_expires_at'])) {
