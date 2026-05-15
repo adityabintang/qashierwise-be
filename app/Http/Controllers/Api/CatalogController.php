@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Exceptions\CatalogNotConnectedException;
 use App\Exceptions\WhatsAppNotConnectedException;
 use App\Http\Controllers\Controller;
 use App\Services\CatalogService;
@@ -31,7 +30,7 @@ class CatalogController extends Controller
         ]);
 
         try {
-            $account = $this->getCatalogAccount();
+            $account = $this->getAccount();
 
             $result = $this->catalogService->createCatalog(
                 $account,
@@ -57,12 +56,6 @@ class CatalogController extends Controller
                 'error_code' => $e->getErrorCode(),
                 'message' => $e->getMessage(),
             ], $e->getCode());
-        } catch (CatalogNotConnectedException $e) {
-            return response()->json([
-                'success' => false,
-                'error_code' => $e->getErrorCode(),
-                'message' => $e->getMessage(),
-            ], $e->getCode());
         }
     }
 
@@ -73,7 +66,7 @@ class CatalogController extends Controller
     public function getCatalogs(Request $request): JsonResponse
     {
         try {
-            $account = $this->getCatalogAccount();
+            $account = $this->getAccount();
 
             $result = $this->catalogService->getCatalogs($account, $request->query('business_id'));
 
@@ -99,12 +92,6 @@ class CatalogController extends Controller
                 'error_code' => $e->getErrorCode(),
                 'message' => $e->getMessage(),
             ], $e->getCode());
-        } catch (CatalogNotConnectedException $e) {
-            return response()->json([
-                'success' => false,
-                'error_code' => $e->getErrorCode(),
-                'message' => $e->getMessage(),
-            ], $e->getCode());
         }
     }
 
@@ -120,7 +107,7 @@ class CatalogController extends Controller
         ]);
 
         try {
-            $account = $this->getCatalogAccount();
+            $account = $this->getAccount();
 
             $result = $this->catalogService->getCatalogProducts(
                 $account,
@@ -152,12 +139,6 @@ class CatalogController extends Controller
                 'error_code' => $e->getErrorCode(),
                 'message' => $e->getMessage(),
             ], $e->getCode());
-        } catch (CatalogNotConnectedException $e) {
-            return response()->json([
-                'success' => false,
-                'error_code' => $e->getErrorCode(),
-                'message' => $e->getMessage(),
-            ], $e->getCode());
         }
     }
 
@@ -182,7 +163,7 @@ class CatalogController extends Controller
         ]);
 
         try {
-            $account = $this->getCatalogAccount();
+            $account = $this->getAccount();
 
             $data = array_filter($request->only([
                 'retailer_id', 'name', 'price', 'currency', 'image_url', 'url',
@@ -211,12 +192,6 @@ class CatalogController extends Controller
                 'error_code' => $e->getErrorCode(),
                 'message' => $e->getMessage(),
             ], $e->getCode());
-        } catch (CatalogNotConnectedException $e) {
-            return response()->json([
-                'success' => false,
-                'error_code' => $e->getErrorCode(),
-                'message' => $e->getMessage(),
-            ], $e->getCode());
         }
     }
 
@@ -240,7 +215,7 @@ class CatalogController extends Controller
         ]);
 
         try {
-            $account = $this->getCatalogAccount();
+            $account = $this->getAccount();
 
             $data = array_filter($request->only([
                 'name', 'price', 'currency', 'image_url', 'url',
@@ -264,33 +239,29 @@ class CatalogController extends Controller
                 'error_code' => $e->getErrorCode(),
                 'message' => $e->getMessage(),
             ], $e->getCode());
-        } catch (CatalogNotConnectedException $e) {
-            return response()->json([
-                'success' => false,
-                'error_code' => $e->getErrorCode(),
-                'message' => $e->getMessage(),
-            ], $e->getCode());
         }
     }
 
     /**
-     * DELETE /api/whatsapp/catalog/disconnect
-     * Clear catalog credentials from the account (disconnect Meta catalog).
+     * DELETE /api/whatsapp/catalog/products/{productId}
+     * Delete a product item.
      */
-    public function disconnect(): JsonResponse
+    public function deleteProduct(string $productId): JsonResponse
     {
         try {
             $account = $this->getAccount();
 
-            $account->update([
-                'catalog_access_token'   => null,
-                'catalog_token_expires_at' => null,
-                'catalog_business_id'    => null,
-            ]);
+            $result = $this->catalogService->deleteProduct($account, $productId);
 
-            Log::info('CatalogController: catalog disconnected', ['account_id' => $account->id]);
+            if (! $result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => $result['error_code'],
+                    'message' => $result['error'],
+                ], 422);
+            }
 
-            return response()->json(['success' => true, 'message' => 'Katalog berhasil diputuskan.']);
+            return response()->json(['success' => true]);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
                 'success' => false,
@@ -302,8 +273,7 @@ class CatalogController extends Controller
 
     /**
      * POST /api/whatsapp/catalog/{catalogId}/upload-image
-     * Store a product image in public storage and return a publicly accessible URL
-     * to use as the image_url when creating/updating catalog products.
+     * Store a product image in public storage and return a publicly accessible URL.
      */
     public function uploadImage(Request $request, string $catalogId): JsonResponse
     {
@@ -312,7 +282,7 @@ class CatalogController extends Controller
         ]);
 
         try {
-            $this->getCatalogAccount();
+            $this->getAccount();
 
             $path = $request->file('image')->store('catalog-images', 'r2');
             $url = Storage::disk('r2')->url($path);
@@ -333,12 +303,6 @@ class CatalogController extends Controller
                 'error_code' => $e->getErrorCode(),
                 'message' => $e->getMessage(),
             ], $e->getCode());
-        } catch (CatalogNotConnectedException $e) {
-            return response()->json([
-                'success' => false,
-                'error_code' => $e->getErrorCode(),
-                'message' => $e->getMessage(),
-            ], $e->getCode());
         } catch (\Throwable $e) {
             Log::error('CatalogController: image upload failed', [
                 'catalog_id' => $catalogId,
@@ -350,41 +314,6 @@ class CatalogController extends Controller
                 'error_code' => 'UPLOAD_FAILED',
                 'message' => 'Gagal mengupload gambar: ' . $e->getMessage(),
             ], 500);
-        }
-    }
-
-    /**
-     * DELETE /api/whatsapp/catalog/products/{productId}
-     * Delete a product item.
-     */
-    public function deleteProduct(string $productId): JsonResponse
-    {
-        try {
-            $account = $this->getCatalogAccount();
-
-            $result = $this->catalogService->deleteProduct($account, $productId);
-
-            if (! $result['success']) {
-                return response()->json([
-                    'success' => false,
-                    'error_code' => $result['error_code'],
-                    'message' => $result['error'],
-                ], 422);
-            }
-
-            return response()->json(['success' => true]);
-        } catch (WhatsAppNotConnectedException $e) {
-            return response()->json([
-                'success' => false,
-                'error_code' => $e->getErrorCode(),
-                'message' => $e->getMessage(),
-            ], $e->getCode());
-        } catch (CatalogNotConnectedException $e) {
-            return response()->json([
-                'success' => false,
-                'error_code' => $e->getErrorCode(),
-                'message' => $e->getMessage(),
-            ], $e->getCode());
         }
     }
 
@@ -400,17 +329,6 @@ class CatalogController extends Controller
 
         if (! $account) {
             throw new WhatsAppNotConnectedException('No connected WhatsApp account found.');
-        }
-
-        return $account;
-    }
-
-    protected function getCatalogAccount()
-    {
-        $account = $this->getAccount();
-
-        if (empty($account->catalog_access_token)) {
-            throw new CatalogNotConnectedException('Please connect your Meta catalog to access this feature.');
         }
 
         return $account;

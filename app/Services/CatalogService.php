@@ -20,18 +20,13 @@ class CatalogService
         return "https://graph.facebook.com/{$this->apiVersion}";
     }
 
-    protected function getCatalogAccessToken(WhatsAppAccount $account): string
-    {
-        return $account->catalog_access_token ?? $account->access_token;
-    }
-
     /**
      * Resolve the Meta Business Portfolio ID from a WABA.
      * Returns null when the token lacks business_management scope.
      */
     public function getBusinessId(WhatsAppAccount $account): ?string
     {
-        $accessToken = $this->getCatalogAccessToken($account);
+        $accessToken = $account->access_token;
         $wabaId = $account->waba_id ?? $account->business_account_id;
 
         if (! empty($account->catalog_business_id)) {
@@ -47,6 +42,7 @@ class CatalogService
         if ($response->successful()) {
             $businessId = $response->json('owner_business_info.id');
             if ($businessId) {
+                $account->update(['catalog_business_id' => $businessId]);
                 return $businessId;
             }
         }
@@ -71,6 +67,7 @@ class CatalogService
                 Log::info('CatalogService: resolved business_id via /me/businesses', [
                     'business_id' => $businessId,
                 ]);
+                $account->update(['catalog_business_id' => $businessId]);
 
                 return $businessId;
             }
@@ -91,6 +88,7 @@ class CatalogService
                         'business_id' => $businessId,
                         'business_name' => $bu['business']['name'] ?? null,
                     ]);
+                    $account->update(['catalog_business_id' => $businessId]);
 
                     return $businessId;
                 }
@@ -110,6 +108,7 @@ class CatalogService
                 Log::info('CatalogService: resolved business_id via businesses field', [
                     'business_id' => $businessId,
                 ]);
+                $account->update(['catalog_business_id' => $businessId]);
 
                 return $businessId;
             }
@@ -128,16 +127,40 @@ class CatalogService
                     'business_id' => $businessId,
                     'business_name' => $systemUserBizResponse->json('business.name'),
                 ]);
+                $account->update(['catalog_business_id' => $businessId]);
+
+                return $businessId;
+            }
+        }
+
+        // Method 6: owned_product_catalogs directly on WABA (last resort)
+        // Some setups expose the business through the WABA's product catalog link
+        $wabaResponse = Http::withToken($accessToken)
+            ->get("{$this->baseUrl()}/{$wabaId}", [
+                'fields' => 'id,name,business',
+            ]);
+
+        if ($wabaResponse->successful()) {
+            $businessId = $wabaResponse->json('business.id');
+            if ($businessId) {
+                Log::info('CatalogService: resolved business_id via WABA business field', [
+                    'business_id' => $businessId,
+                    'business_name' => $wabaResponse->json('business.name'),
+                ]);
+                $account->update(['catalog_business_id' => $businessId]);
 
                 return $businessId;
             }
         }
 
         Log::warning('CatalogService: all business_id discovery methods failed', [
-            'me_businesses_body' => $meResponse->json(),
-            'business_users_body' => $bizUsersResponse->json(),
-            'businesses_field_body' => $bizFieldResponse->json(),
-            'system_user_business_body' => $systemUserBizResponse->json(),
+            'waba_id' => $wabaId,
+            'method1_status' => $response->status(),
+            'method1_error' => $response->json('error.message'),
+            'method2_status' => $meResponse->status(),
+            'method2_error' => $meResponse->json('error.message'),
+            'method5_response' => $systemUserBizResponse->json(),
+            'method6_response' => $wabaResponse->json(),
         ]);
 
         return null;
@@ -150,7 +173,6 @@ class CatalogService
      */
     public function createCatalog(WhatsAppAccount $account, string $name, ?string $vertical = null): array
     {
-        $accessToken = $this->getCatalogAccessToken($account);
         $businessId = $this->getBusinessId($account);
 
         if (! $businessId) {
@@ -166,7 +188,7 @@ class CatalogService
             $payload['vertical'] = $vertical;
         }
 
-        $response = Http::withToken($accessToken)
+        $response = Http::withToken($account->access_token)
             ->post("{$this->baseUrl()}/{$businessId}/owned_product_catalogs", $payload);
 
         if ($response->successful()) {
@@ -193,31 +215,58 @@ class CatalogService
     }
 
     /**
-     * List all product catalogs owned by the business linked to this WhatsApp account.
+     * List all product catalogs accessible by this account.
+     *
+     * Merges owned, client (shared-in), and shared (shared-out) catalogs so that
+     * catalogs the user did not explicitly select during Embedded Signup but exist
+     * under the business are still visible.
      *
      * @return array{success: bool, catalogs?: array, error?: string, error_code?: string}
      */
     public function getCatalogs(WhatsAppAccount $account, ?string $overrideBusinessId = null): array
     {
-        $accessToken = $this->getCatalogAccessToken($account);
         $businessId = $overrideBusinessId ?: $this->getBusinessId($account);
 
         if (! $businessId) {
             return [
                 'success' => false,
                 'error_code' => 'BUSINESS_ID_NOT_FOUND',
-                'error' => 'Unable to resolve Meta Business ID. Ensure your catalog is connected using the Catalog OAuth configuration which includes catalog_management permission.',
+                'error' => 'Unable to resolve Meta Business ID. Pastikan akun WhatsApp Business Anda sudah terhubung dengan benar.',
             ];
         }
 
-        $response = Http::withToken($accessToken)
-            ->get("{$this->baseUrl()}/{$businessId}/owned_product_catalogs", [
-                'fields' => 'id,name,product_count,vertical',
-            ]);
+        $fields = 'id,name,product_count,vertical';
+        $edges = ['owned_product_catalogs', 'client_product_catalogs', 'shared_product_catalogs'];
 
-        if ($response->successful()) {
-            $catalogs = $response->json('data', []);
+        $seen = [];
+        $catalogs = [];
+        $lastError = null;
 
+        foreach ($edges as $edge) {
+            $response = Http::withToken($account->access_token)
+                ->get("{$this->baseUrl()}/{$businessId}/{$edge}", [
+                    'fields' => $fields,
+                    'limit' => 100,
+                ]);
+
+            if ($response->successful()) {
+                foreach ($response->json('data', []) as $catalog) {
+                    if (! isset($seen[$catalog['id']])) {
+                        $seen[$catalog['id']] = true;
+                        $catalogs[] = $catalog;
+                    }
+                }
+            } else {
+                $error = $response->json('error', []);
+                $lastError = $error['message'] ?? null;
+                Log::debug("CatalogService: {$edge} not accessible", [
+                    'business_id' => $businessId,
+                    'error' => $lastError,
+                ]);
+            }
+        }
+
+        if (! empty($catalogs)) {
             Log::info('CatalogService: fetched catalogs', [
                 'business_id' => $businessId,
                 'count' => count($catalogs),
@@ -230,27 +279,24 @@ class CatalogService
             ];
         }
 
-        $error = $response->json('error', []);
-        $errorMessage = $error['message'] ?? 'Failed to fetch catalogs';
-
-        // Detect missing catalog_management permission
-        if (($error['code'] ?? 0) === 200 || str_contains($errorMessage, 'catalog')) {
+        // All edges failed — surface the error
+        if ($lastError && (str_contains($lastError, 'permission') || str_contains($lastError, 'catalog'))) {
             return [
                 'success' => false,
                 'error_code' => 'PERMISSION_DENIED',
-                'error' => 'The connected WhatsApp account does not have catalog_management permission. Please reconnect using the Catalog OAuth configuration.',
+                'error' => 'Akun WhatsApp tidak memiliki izin catalog_management. Pastikan konfigurasi Embedded Signup Anda sudah menyertakan izin ini.',
             ];
         }
 
-        Log::error('CatalogService: failed to fetch catalogs', [
+        Log::error('CatalogService: failed to fetch catalogs from all edges', [
             'business_id' => $businessId,
-            'error' => $errorMessage,
+            'last_error' => $lastError,
         ]);
 
         return [
             'success' => false,
             'error_code' => 'API_ERROR',
-            'error' => $errorMessage,
+            'error' => $lastError ?? 'Failed to fetch catalogs',
         ];
     }
 
@@ -261,7 +307,6 @@ class CatalogService
      */
     public function getCatalogProducts(WhatsAppAccount $account, string $catalogId, int $limit = 30, ?string $after = null): array
     {
-        $accessToken = $this->getCatalogAccessToken($account);
         $params = [
             'fields' => 'id,retailer_id,name,description,price,currency,image_url,availability,category,brand,condition,url',
             'limit' => $limit,
@@ -271,7 +316,7 @@ class CatalogService
             $params['after'] = $after;
         }
 
-        $response = Http::withToken($accessToken)
+        $response = Http::withToken($account->access_token)
             ->get("{$this->baseUrl()}/{$catalogId}/products", $params);
 
         if ($response->successful()) {
@@ -313,7 +358,7 @@ class CatalogService
      */
     public function createProduct(WhatsAppAccount $account, string $catalogId, array $data): array
     {
-        $response = Http::withToken($this->getCatalogAccessToken($account))
+        $response = Http::withToken($account->access_token)
             ->post("{$this->baseUrl()}/{$catalogId}/products", $data);
 
         if ($response->successful()) {
@@ -346,13 +391,12 @@ class CatalogService
     /**
      * Update a product item.
      *
-     * Update is done on the product item node directly, not on the /products edge.
-     *
      * @return array{success: bool, error?: string, error_code?: string}
      */
     public function updateProduct(WhatsAppAccount $account, string $productId, array $data): array
     {
-        $response = Http::withToken($this->getCatalogAccessToken($account))
+        $response = Http::withToken($account->access_token)
+            ->asForm()
             ->post("{$this->baseUrl()}/{$productId}", $data);
 
         if ($response->successful()) {
@@ -365,8 +409,12 @@ class CatalogService
         $errorMessage = $error['message'] ?? 'Failed to update product';
 
         Log::error('CatalogService: failed to update product', [
-            'product_id' => $productId,
-            'error' => $errorMessage,
+            'product_id'    => $productId,
+            'error_code'    => $error['code'] ?? null,
+            'error_type'    => $error['type'] ?? null,
+            'error_subcode' => $error['error_subcode'] ?? null,
+            'error'         => $errorMessage,
+            'data_sent'     => $data,
         ]);
 
         return [
@@ -383,7 +431,7 @@ class CatalogService
      */
     public function deleteProduct(WhatsAppAccount $account, string $productId): array
     {
-        $response = Http::withToken($this->getCatalogAccessToken($account))
+        $response = Http::withToken($account->access_token)
             ->delete("{$this->baseUrl()}/{$productId}");
 
         if ($response->successful()) {

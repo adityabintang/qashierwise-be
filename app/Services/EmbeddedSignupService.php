@@ -245,6 +245,10 @@ class EmbeddedSignupService
             'connection_method' => 'embedded_signup',
         ];
 
+        if (! empty($credentials['catalog_business_id'])) {
+            $data['catalog_business_id'] = $credentials['catalog_business_id'];
+        }
+
         // Add token expiration if provided
         if (isset($credentials['token_expires_at'])) {
             $data['token_expires_at'] = $credentials['token_expires_at'];
@@ -501,6 +505,11 @@ class EmbeddedSignupService
             'quality_rating' => $phoneNumber['quality_rating'] ?? null,
             'coexistence_enabled' => true,
         ];
+
+        // Persist business_id from session info so catalog features work without separate OAuth
+        if (! empty($sessionInfo['business_id'])) {
+            $credentials['catalog_business_id'] = $sessionInfo['business_id'];
+        }
 
         $account = $this->storeCredentials($userId, $credentials);
 
