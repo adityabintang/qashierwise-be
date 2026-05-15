@@ -65,7 +65,7 @@
                                 <i class="fas fa-arrow-left mr-1.5"></i>Kembali
                             </button>
                         </template>
-                        <template x-if="!selectedCatalog && !(error && error.code === 'WHATSAPP_NOT_CONNECTED')">
+                        <template x-if="!selectedCatalog && !(error && (error.code === 'WHATSAPP_NOT_CONNECTED' || error.code === 'PERMISSION_PENDING_REVIEW'))">
                             <button @click="launchSignup()" :disabled="signingUp || loading" class="btn btn-outline btn-sm">
                                 <template x-if="signingUp">
                                     <span><i class="fas fa-spinner animate-spin mr-1.5"></i>Menghubungkan...</span>
@@ -75,7 +75,7 @@
                                 </template>
                             </button>
                         </template>
-                        <template x-if="!selectedCatalog && businessId && !(error && error.code === 'WHATSAPP_NOT_CONNECTED')">
+                        <template x-if="!selectedCatalog && businessId && !(error && (error.code === 'WHATSAPP_NOT_CONNECTED' || error.code === 'PERMISSION_PENDING_REVIEW'))">
                             <a :href="`https://web.facebook.com/products/catalogs/new/?business_id=${businessId}&nav_source=commerce_manager_launchpad`"
                                target="_blank" rel="noopener"
                                class="btn btn-primary btn-sm">
@@ -91,7 +91,7 @@
                 </div>
 
                 <!-- ── Generic Error ── -->
-                <template x-if="error && error.code !== 'WHATSAPP_NOT_CONNECTED'">
+                <template x-if="error && error.code !== 'WHATSAPP_NOT_CONNECTED' && error.code !== 'PERMISSION_PENDING_REVIEW'">
                     <div class="rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/20 p-4 flex gap-3 items-start">
                         <i class="fas fa-circle-exclamation text-red-500 mt-0.5 flex-shrink-0"></i>
                         <p class="text-sm text-red-800 dark:text-red-300" x-text="error.message"></p>
@@ -193,8 +193,74 @@
                     </div>
                 </template>
 
+                <!-- ════════ PERMISSION PENDING REVIEW STATE ════════ -->
+                <template x-if="!selectedCatalog && error && error.code === 'PERMISSION_PENDING_REVIEW'">
+                    <div class="flex items-center justify-center py-16">
+                        <div class="card max-w-lg w-full p-8 text-center shadow-sm">
+                            <!-- Icon -->
+                            <div class="flex items-center justify-center mb-6">
+                                <div class="relative">
+                                    <div class="h-20 w-20 rounded-2xl flex items-center justify-center"
+                                         style="background:rgba(245,158,11,0.12)">
+                                        <i class="fas fa-hourglass-half text-4xl" style="color:#f59e0b"></i>
+                                    </div>
+                                    <div class="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-[hsl(var(--card))] flex items-center justify-center border-2 border-[hsl(var(--border))]">
+                                        <i class="fab fa-meta text-[11px]" style="color:#1877f2"></i>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Badge -->
+                            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold mb-4"
+                                 style="background:rgba(245,158,11,0.12); color:#b45309">
+                                <span class="w-1.5 h-1.5 rounded-full" style="background:#f59e0b"></span>
+                                Menunggu Persetujuan Meta
+                            </div>
+
+                            <!-- Title & desc -->
+                            <h2 class="text-xl font-bold mb-2">Fitur Katalog Sedang Ditinjau</h2>
+                            <p class="text-sm text-[hsl(var(--muted-foreground))] leading-relaxed mb-6">
+                                Akses ke fitur <strong>Meta Catalog Management</strong> masih dalam tahap <strong>Standard Access</strong> dan sedang menunggu peninjauan resmi dari Meta. Setelah disetujui, semua pengguna akan dapat mengelola katalog produk mereka di sini.
+                            </p>
+
+                            <!-- Status box -->
+                            <div class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.4)] p-4 text-left mb-6">
+                                <div class="flex items-start gap-3">
+                                    <i class="fas fa-info-circle text-base mt-0.5 flex-shrink-0" style="color:#1877f2"></i>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm font-semibold mb-1">Saat ini hanya tersedia untuk:</p>
+                                        <ul class="text-xs text-[hsl(var(--muted-foreground))] space-y-1">
+                                            <li class="flex items-center gap-2">
+                                                <i class="fas fa-check text-[10px]" style="color:#22c55e"></i>
+                                                Akun penguji (Tester) yang terdaftar di aplikasi developer
+                                            </li>
+                                            <li class="flex items-center gap-2">
+                                                <i class="fas fa-check text-[10px]" style="color:#22c55e"></i>
+                                                Akun developer / admin aplikasi
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Progress -->
+                            <div class="flex items-center justify-between text-xs text-[hsl(var(--muted-foreground))] mb-2">
+                                <span class="font-medium">Status Peninjauan</span>
+                                <span class="font-semibold" style="color:#b45309">Dalam Proses</span>
+                            </div>
+                            <div class="h-1.5 w-full rounded-full bg-[hsl(var(--muted))] overflow-hidden">
+                                <div class="h-full rounded-full animate-pulse" style="width:60%; background:linear-gradient(90deg,#f59e0b,#fbbf24)"></div>
+                            </div>
+
+                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-6">
+                                Mohon menunggu hingga proses peninjauan selesai. Anda akan otomatis mendapat akses penuh setelah disetujui Meta.
+                            </p>
+                        </div>
+                    </div>
+                </template>
+
                 <!-- ════════ CATALOG LIST VIEW ════════ -->
-                <template x-if="!selectedCatalog && !(error && error.code === 'WHATSAPP_NOT_CONNECTED')">
+                <template x-if="!selectedCatalog && !(error && (error.code === 'WHATSAPP_NOT_CONNECTED' || error.code === 'PERMISSION_PENDING_REVIEW'))">
                     <div>
                         <!-- Skeleton loading -->
                         <template x-if="loading">

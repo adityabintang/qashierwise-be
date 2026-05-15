@@ -284,8 +284,8 @@ class CatalogService
         if ($lastError && (str_contains($lastError, 'permission') || str_contains($lastError, 'catalog'))) {
             return [
                 'success' => false,
-                'error_code' => 'PERMISSION_DENIED',
-                'error' => 'Akun WhatsApp tidak memiliki izin catalog_management. Pastikan konfigurasi Embedded Signup Anda sudah menyertakan izin ini.',
+                'error_code' => 'PERMISSION_PENDING_REVIEW',
+                'error' => 'Fitur katalog Meta masih dalam proses peninjauan oleh Meta. Saat ini akses katalog hanya tersedia untuk akun penguji yang terdaftar di aplikasi developer kami.',
             ];
         }
 
