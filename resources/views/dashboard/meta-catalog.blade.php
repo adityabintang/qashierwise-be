@@ -65,7 +65,7 @@
                                 <i class="fas fa-arrow-left mr-1.5"></i>Kembali
                             </button>
                         </template>
-                        <template x-if="!selectedCatalog">
+                        <template x-if="!selectedCatalog && !(error && error.code === 'WHATSAPP_NOT_CONNECTED')">
                             <button @click="launchSignup()" :disabled="signingUp || loading" class="btn btn-outline btn-sm">
                                 <template x-if="signingUp">
                                     <span><i class="fas fa-spinner animate-spin mr-1.5"></i>Menghubungkan...</span>
@@ -75,7 +75,7 @@
                                 </template>
                             </button>
                         </template>
-                        <template x-if="!selectedCatalog && businessId">
+                        <template x-if="!selectedCatalog && businessId && !(error && error.code === 'WHATSAPP_NOT_CONNECTED')">
                             <a :href="`https://web.facebook.com/products/catalogs/new/?business_id=${businessId}&nav_source=commerce_manager_launchpad`"
                                target="_blank" rel="noopener"
                                class="btn btn-primary btn-sm">
@@ -89,25 +89,6 @@
                         </template>
                     </div>
                 </div>
-
-                <!-- ── Error: WhatsApp belum terhubung ── -->
-                <template x-if="error && error.code === 'WHATSAPP_NOT_CONNECTED'">
-                    <div class="rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900/50 p-4">
-                        <div class="flex gap-3">
-                            <div class="h-9 w-9 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center flex-shrink-0">
-                                <i class="fab fa-whatsapp text-red-500"></i>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <p class="font-semibold text-red-800 dark:text-red-300 text-sm">Akun WhatsApp Belum Terhubung</p>
-                                <p class="text-sm text-red-700 dark:text-red-400 mt-0.5">Hubungkan akun WhatsApp Business Anda terlebih dahulu untuk mengakses katalog produk Meta.</p>
-                                <a href="/dashboard/whatsapp-account"
-                                   class="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-lg text-sm font-medium btn btn-primary btn-sm">
-                                    <i class="fab fa-whatsapp"></i>Hubungkan WhatsApp
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </template>
 
                 <!-- ── Generic Error ── -->
                 <template x-if="error && error.code !== 'WHATSAPP_NOT_CONNECTED'">
@@ -147,8 +128,73 @@
                     </div>
                 </div>
 
+                <!-- ════════ WHATSAPP NOT CONNECTED STATE ════════ -->
+                <template x-if="!selectedCatalog && error && error.code === 'WHATSAPP_NOT_CONNECTED'">
+                    <div class="flex items-center justify-center py-16">
+                        <div class="card max-w-md w-full p-8 text-center shadow-sm">
+                            <!-- Icon -->
+                            <div class="flex items-center justify-center mb-6">
+                                <div class="relative">
+                                    <div class="h-20 w-20 rounded-2xl flex items-center justify-center"
+                                         style="background:rgba(37,211,102,0.12)">
+                                        <i class="fab fa-whatsapp text-4xl" style="color:#25d366"></i>
+                                    </div>
+                                    <div class="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-[hsl(var(--card))] flex items-center justify-center border-2 border-[hsl(var(--border))]">
+                                        <i class="fas fa-link-slash text-[10px] text-[hsl(var(--muted-foreground))]"></i>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Title & desc -->
+                            <h2 class="text-xl font-bold mb-2">WhatsApp Belum Terhubung</h2>
+                            <p class="text-sm text-[hsl(var(--muted-foreground))] leading-relaxed mb-8">
+                                Untuk mengakses dan mengelola katalog produk Meta, Anda perlu menghubungkan akun WhatsApp Business terlebih dahulu.
+                            </p>
+
+                            <!-- Steps -->
+                            <div class="flex items-start gap-3 text-left mb-8">
+                                <div class="flex flex-col items-center flex-shrink-0 mt-0.5">
+                                    <div class="h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style="background:#25d366">1</div>
+                                    <div class="w-px flex-1 mt-1" style="background:rgba(37,211,102,0.25); min-height:28px"></div>
+                                </div>
+                                <div class="pb-7">
+                                    <p class="text-sm font-medium">Hubungkan WhatsApp Business</p>
+                                    <p class="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">Masuk ke pengaturan akun dan ikuti proses Embedded Signup.</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3 text-left mb-8 -mt-8">
+                                <div class="flex flex-col items-center flex-shrink-0 mt-0.5">
+                                    <div class="h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style="background:#25d366">2</div>
+                                    <div class="w-px flex-1 mt-1" style="background:rgba(37,211,102,0.25); min-height:28px"></div>
+                                </div>
+                                <div class="pb-7">
+                                    <p class="text-sm font-medium">Pilih katalog saat signup</p>
+                                    <p class="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">Centang katalog yang ingin Anda kelola di popup Meta.</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3 text-left -mt-8">
+                                <div class="flex flex-col items-center flex-shrink-0 mt-0.5">
+                                    <div class="h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style="background:#25d366">3</div>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium">Kelola produk dari sini</p>
+                                    <p class="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">Tambah, edit, dan hapus produk langsung dari dashboard.</p>
+                                </div>
+                            </div>
+
+                            <!-- CTA -->
+                            <a href="/dashboard/whatsapp-account"
+                               class="mt-8 flex items-center justify-center gap-2 w-full py-3 px-6 rounded-xl font-semibold text-sm text-white transition-opacity hover:opacity-90"
+                               style="background:#25d366">
+                                <i class="fab fa-whatsapp text-base"></i>
+                                Hubungkan WhatsApp Sekarang
+                            </a>
+                        </div>
+                    </div>
+                </template>
+
                 <!-- ════════ CATALOG LIST VIEW ════════ -->
-                <template x-if="!selectedCatalog">
+                <template x-if="!selectedCatalog && !(error && error.code === 'WHATSAPP_NOT_CONNECTED')">
                     <div>
                         <!-- Skeleton loading -->
                         <template x-if="loading">
