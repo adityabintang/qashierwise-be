@@ -268,7 +268,7 @@ class EmbeddedSignupService
             Log::warning('EmbeddedSignupService: re-encrypting access_token after APP_KEY mismatch', [
                 'user_id' => $userId,
             ]);
-            DB::table('whats_app_accounts')
+            DB::table('whatsapp_accounts')
                 ->where('user_id', $userId)
                 ->update(['access_token' => null]);
 
