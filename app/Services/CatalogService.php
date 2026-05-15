@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\WhatsAppAccount;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -42,7 +43,7 @@ class CatalogService
         if ($response->successful()) {
             $businessId = $response->json('owner_business_info.id');
             if ($businessId) {
-                $account->update(['catalog_business_id' => $businessId]);
+                DB::table('whatsapp_accounts')->where('id', $account->id)->update(['catalog_business_id' => $businessId]);
                 return $businessId;
             }
         }
@@ -67,7 +68,7 @@ class CatalogService
                 Log::info('CatalogService: resolved business_id via /me/businesses', [
                     'business_id' => $businessId,
                 ]);
-                $account->update(['catalog_business_id' => $businessId]);
+                DB::table('whatsapp_accounts')->where('id', $account->id)->update(['catalog_business_id' => $businessId]);
 
                 return $businessId;
             }
@@ -88,7 +89,7 @@ class CatalogService
                         'business_id' => $businessId,
                         'business_name' => $bu['business']['name'] ?? null,
                     ]);
-                    $account->update(['catalog_business_id' => $businessId]);
+                    DB::table('whatsapp_accounts')->where('id', $account->id)->update(['catalog_business_id' => $businessId]);
 
                     return $businessId;
                 }
@@ -108,7 +109,7 @@ class CatalogService
                 Log::info('CatalogService: resolved business_id via businesses field', [
                     'business_id' => $businessId,
                 ]);
-                $account->update(['catalog_business_id' => $businessId]);
+                DB::table('whatsapp_accounts')->where('id', $account->id)->update(['catalog_business_id' => $businessId]);
 
                 return $businessId;
             }
@@ -127,7 +128,7 @@ class CatalogService
                     'business_id' => $businessId,
                     'business_name' => $systemUserBizResponse->json('business.name'),
                 ]);
-                $account->update(['catalog_business_id' => $businessId]);
+                DB::table('whatsapp_accounts')->where('id', $account->id)->update(['catalog_business_id' => $businessId]);
 
                 return $businessId;
             }
@@ -147,7 +148,7 @@ class CatalogService
                     'business_id' => $businessId,
                     'business_name' => $wabaResponse->json('business.name'),
                 ]);
-                $account->update(['catalog_business_id' => $businessId]);
+                DB::table('whatsapp_accounts')->where('id', $account->id)->update(['catalog_business_id' => $businessId]);
 
                 return $businessId;
             }

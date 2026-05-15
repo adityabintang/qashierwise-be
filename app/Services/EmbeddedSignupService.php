@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\WhatsAppAccount;
+use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -256,11 +258,23 @@ class EmbeddedSignupService
 
         // Use updateOrCreate to prevent duplicates (upsert)
         // Bypass RLS for the upsert operation
-        $account = WhatsAppAccount::withoutGlobalScope('userAccounts')
-            ->updateOrCreate(
-                ['user_id' => $userId],
-                $data
-            );
+        try {
+            $account = WhatsAppAccount::withoutGlobalScope('userAccounts')
+                ->updateOrCreate(['user_id' => $userId], $data);
+        } catch (DecryptException $e) {
+            // The stored access_token was encrypted with a different APP_KEY (e.g. key rotation or
+            // local-vs-production mismatch). Null it out via raw query to bypass Eloquent's cast
+            // comparison, then retry — the new token will be encrypted with the current key.
+            Log::warning('EmbeddedSignupService: re-encrypting access_token after APP_KEY mismatch', [
+                'user_id' => $userId,
+            ]);
+            DB::table('whats_app_accounts')
+                ->where('user_id', $userId)
+                ->update(['access_token' => null]);
+
+            $account = WhatsAppAccount::withoutGlobalScope('userAccounts')
+                ->updateOrCreate(['user_id' => $userId], $data);
+        }
 
         Log::info('Stored WhatsApp credentials for user', [
             'user_id' => $userId,
