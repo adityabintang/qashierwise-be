@@ -733,6 +733,11 @@ function metaCatalogApp() {
         createCatalogForm: { name: '', vertical: 'commerce' },
         createCatalogError: null,
 
+        // Embedded signup (Muat Ulang)
+        signingUp: false,
+        sdkLoaded: false,
+        signupConfig: null,
+
         sidebarOpen: window.innerWidth >= 1024,
         isMobile: window.innerWidth < 768,
         user: null,
@@ -750,6 +755,8 @@ function metaCatalogApp() {
 
         async init() {
             this.initDashboard();
+            this.loadSignupConfig();
+            this.setupSignupMessageListener();
             await this.fetchCatalogs();
 
             if (this.initialCatalogId && this.catalogs.length > 0) {
@@ -800,6 +807,85 @@ function metaCatalogApp() {
                 try { this.user = JSON.parse(storedUser); } catch(e) { this.user = { name: 'User', email: '' }; }
             } else {
                 this.user = { name: 'User', email: '' };
+            }
+        },
+
+        // ─── EMBEDDED SIGNUP (MUAT ULANG) ────────────────────
+        async loadSignupConfig() {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/embedded-signup/config`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.signupConfig = data.data;
+                    const initFB = () => {
+                        FB.init({ appId: data.data.app_id, version: data.data.api_version || 'v22.0', xfbml: false, cookie: true });
+                        this.sdkLoaded = true;
+                    };
+                    if (window.FB) {
+                        initFB();
+                    } else {
+                        window.addEventListener('fb-sdk-ready', initFB, { once: true });
+                    }
+                }
+            } catch(e) {}
+        },
+
+        setupSignupMessageListener() {
+            window.addEventListener('message', (event) => {
+                if (event.origin !== 'https://www.facebook.com' && event.origin !== 'https://web.facebook.com') return;
+                try {
+                    const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+                    if (data.type === 'WA_EMBEDDED_SIGNUP' && data.event === 'FINISH') {
+                        const { phone_number_id, waba_id, business_id } = data.data || {};
+                        this._pendingSessionInfo = { phone_number_id, waba_id, business_id };
+                    }
+                } catch(e) {}
+            });
+        },
+
+        launchSignup() {
+            if (!this.sdkLoaded || !this.signupConfig) {
+                this.showToast('Konfigurasi signup belum siap, coba lagi.', 'error');
+                return;
+            }
+            this._pendingSessionInfo = null;
+            FB.login((response) => {
+                if (response.authResponse?.code) {
+                    this.signingUp = true;
+                    this.sendCodeToBackend(response.authResponse.code, this._pendingSessionInfo || {});
+                } else if (response.status === 'not_authorized' || response.status === 'unknown') {
+                    // user cancelled — do nothing
+                }
+            }, {
+                config_id: this.signupConfig.config_id,
+                response_type: 'code',
+                override_default_response_type: true,
+                extras: { sessionInfoVersion: 3 },
+            });
+        },
+
+        async sendCodeToBackend(code, sessionInfo) {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/embedded-signup/callback`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code, session_info: sessionInfo }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.showToast('Akun berhasil diperbarui. Memuat katalog...', 'success');
+                    await this.fetchCatalogs();
+                } else {
+                    this.showToast(data.message || 'Gagal memperbarui akun.', 'error');
+                }
+            } catch(e) {
+                this.showToast('Gagal terhubung ke server.', 'error');
+            } finally {
+                this.signingUp = false;
             }
         },
 
