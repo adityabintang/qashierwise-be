@@ -71,20 +71,20 @@ class XenPlatformService
 
             // If the email is already registered (orphaned account from a failed prior registration),
             // retry without email. MANAGED sub-accounts don't require email — the platform controls them.
-            if (! $response->successful()
-                && $response->status() === 409
-                && $response->json('error_code') === 'BUSINESS_DUPLICATE_EMAIL_ERROR'
-                && isset($payload['email'])
-            ) {
-                Log::warning('XenPlatform: Email already registered, retrying account creation without email', [
-                    'sub_merchant_id' => $merchant->id,
-                ]);
-                unset($payload['email']);
-                $response = Http::withBasicAuth($this->apiKey, '')
-                    ->withHeaders(['Content-Type' => 'application/json'])
-                    ->timeout(30)
-                    ->post("{$this->baseUrl}/v2/accounts", $payload);
-            }
+            // if (! $response->successful()
+            //     && $response->status() === 409
+            //     && $response->json('error_code') === 'BUSINESS_DUPLICATE_EMAIL_ERROR'
+            //     && isset($payload['email'])
+            // ) {
+            //     Log::warning('XenPlatform: Email already registered, retrying account creation without email', [
+            //         'sub_merchant_id' => $merchant->id,
+            //     ]);
+            //     unset($payload['email']);
+            //     $response = Http::withBasicAuth($this->apiKey, '')
+            //         ->withHeaders(['Content-Type' => 'application/json'])
+            //         ->timeout(30)
+            //         ->post("{$this->baseUrl}/v2/accounts", $payload);
+            // }
 
             if (! $response->successful()) {
                 $errorMessage = $response->json('message') ?? $response->json('error_code') ?? 'Failed to create sub-account';
