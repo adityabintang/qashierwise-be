@@ -72,6 +72,11 @@
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_customer_tags') }}</span>
         </a>
 
+        <a href="/dashboard/developer/webhooks" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'developer-webhooks' ? 'active' : '' }}">
+            <i class="fas fa-code w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Developer</span>
+        </a>
+
         <!-- Reservation Section -->
         <div x-show="sidebarOpen || isMobile" x-transition class="pt-4">
             <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">

@@ -139,6 +139,11 @@ Route::middleware(['web', 'check.web.auth', 'block.author.login'])->group(functi
         return view('dashboard.reservations.config');
     })->name('dashboard.reservations.config');
 
+    // Developer Webhook UI
+    Route::get('/dashboard/developer/webhooks', function () {
+        return view('dashboard.developer-webhooks');
+    })->name('dashboard.developer-webhooks');
+
     // Subscription routes
     Route::prefix('subscription')->name('subscription.')->group(function () {
         Route::get('/pricing', [SubscriptionController::class, 'index'])

@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\SubMerchantController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\WhatsAppController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
+use App\Http\Controllers\Api\UserWebhookController;
 use App\Http\Controllers\Api\WithdrawalController;
 use App\Http\Controllers\Api\XenditWebhookController;
 use App\Http\Controllers\MonitoringDashboardController;
@@ -333,6 +334,19 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::get('/transactions/filter-by-date-range', [TransactionController::class, 'filterByDateRange'])->middleware('pos.permission:view_transactions|manage_transactions');
         Route::get('/transactions', [TransactionController::class, 'index'])->middleware('pos.permission:view_transactions|manage_transactions');
         Route::get('/transactions/{id}', [TransactionController::class, 'show'])->middleware('pos.permission:view_transactions|manage_transactions');
+    });
+
+    // Developer Webhook routes
+    Route::prefix('developer/webhooks')->group(function () {
+        Route::get('/', [UserWebhookController::class, 'index']);
+        Route::post('/', [UserWebhookController::class, 'store']);
+        Route::get('/{id}', [UserWebhookController::class, 'show']);
+        Route::put('/{id}', [UserWebhookController::class, 'update']);
+        Route::delete('/{id}', [UserWebhookController::class, 'destroy']);
+        Route::post('/{id}/toggle', [UserWebhookController::class, 'toggle']);
+        Route::post('/{id}/regenerate-secret', [UserWebhookController::class, 'regenerateSecret']);
+        Route::get('/{id}/deliveries', [UserWebhookController::class, 'deliveries']);
+        Route::post('/{id}/test', [UserWebhookController::class, 'test']);
     });
 
     // Sub-Merchant QRIS routes

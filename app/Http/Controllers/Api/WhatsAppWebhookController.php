@@ -13,6 +13,7 @@ use App\Models\WhatsAppContact;
 use App\Models\WhatsAppMessage;
 use App\Models\WhatsAppTemplate;
 use App\Services\MediaStorageService;
+use App\Services\WebhookForwardingService;
 use App\Services\WhatsAppAccountService;
 use App\Services\WhatsAppFlowService;
 use Illuminate\Http\Request;
@@ -367,6 +368,17 @@ class WhatsAppWebhookController extends Controller
         Log::info('Message saved and broadcasted', [
             'message_id' => $messageId,
             'contact_id' => $contact->id,
+        ]);
+
+        // Forward to user-registered developer webhooks
+        app(WebhookForwardingService::class)->dispatch($userId, 'whatsapp.message.received', [
+            'message_id' => $messageId,
+            'from' => $from,
+            'contact_name' => $contact->name,
+            'type' => $type,
+            'content' => $content,
+            'phone_number_id' => $whatsappAccount->phone_number_id,
+            'received_at' => now()->toIso8601String(),
         ]);
 
         // Check if AI Agent is active for this account
