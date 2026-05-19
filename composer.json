@@ -15,7 +15,7 @@
         "laravel/sanctum": "^4.2",
         "laravel/tinker": "^2.10.1",
         "league/flysystem-aws-s3-v3": "^3.30",
-        "netflie/whatsapp-cloud-api": "^2.2",
+        "netflie/whatsapp-cloud-api": "^4.0",
         "phpseclib/phpseclib": "~3.0",
         "polar-sh/sdk": "^0.7.0",
         "predis/predis": "^3.3",
