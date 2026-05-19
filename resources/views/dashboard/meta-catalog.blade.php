@@ -409,6 +409,58 @@
                             </span>
                         </div>
 
+                        <!-- Review status summary + Commerce Manager CTA -->
+                        <template x-if="!loadingProducts && products.length > 0">
+                            <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)] px-3 py-2 flex flex-col sm:flex-row sm:items-center gap-2 text-xs">
+                                <div class="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+                                    <span class="text-[hsl(var(--muted-foreground))] whitespace-nowrap">FB/IG Shops:</span>
+                                    <template x-if="reviewCounts.approved > 0">
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
+                                              style="background:rgba(34,197,94,0.12);color:rgb(22,163,74)">
+                                            <i class="fas fa-circle-check text-[9px]"></i>
+                                            <span x-text="reviewCounts.approved + ' approved'"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="reviewCounts.pending > 0">
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
+                                              style="background:rgba(245,158,11,0.12);color:rgb(180,83,9)">
+                                            <i class="fas fa-hourglass-half text-[9px]"></i>
+                                            <span x-text="reviewCounts.pending + ' pending'"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="reviewCounts.rejected > 0">
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
+                                              style="background:rgba(239,68,68,0.12);color:rgb(185,28,28)">
+                                            <i class="fas fa-circle-xmark text-[9px]"></i>
+                                            <span x-text="reviewCounts.rejected + ' ditolak'"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="reviewCounts.not_reviewed > 0">
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
+                                              style="background:rgba(100,116,139,0.10);color:rgb(71,85,105)">
+                                            <i class="fas fa-minus text-[9px]"></i>
+                                            <span x-text="reviewCounts.not_reviewed + ' belum direview'"></span>
+                                        </span>
+                                    </template>
+                                </div>
+                                <a :href="commerceManagerProductUrl()"
+                                   target="_blank" rel="noopener"
+                                   class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-[#1877f2]/10 text-[#1877f2] hover:bg-[#1877f2]/20 transition-colors whitespace-nowrap">
+                                    <i class="fab fa-meta text-[10px]"></i>
+                                    Status WhatsApp di Commerce Manager
+                                    <i class="fas fa-arrow-up-right-from-square text-[9px]"></i>
+                                </a>
+                            </div>
+                        </template>
+                        <template x-if="!loadingProducts && products.length > 0">
+                            <p class="text-[10px] text-[hsl(var(--muted-foreground))] -mt-1 leading-relaxed">
+                                <i class="fas fa-circle-info mr-1"></i>
+                                Badge di atas adalah status review untuk <strong>Facebook Shops / Instagram Shopping</strong> (dari Graph API).
+                                Status <strong>WhatsApp</strong> tidak tersedia via API — cek langsung di Commerce Manager → tab <em>Status and issues → WhatsApp</em>.
+                                Produk bisa <em>Belum Direview</em> di sini tetapi <em>sudah ditampilkan</em> di WhatsApp.
+                            </p>
+                        </template>
+
                         <!-- Loading skeleton -->
                         <template x-if="loadingProducts">
                             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -469,11 +521,27 @@
                                             <!-- Info -->
                                             <div class="p-4 flex flex-col gap-1.5 flex-1">
                                                 <h3 class="font-semibold text-sm leading-snug line-clamp-2" x-text="product.name"></h3>
-                                                <template x-if="product.category">
-                                                    <span class="inline-flex w-fit items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))]">
-                                                        <i class="fas fa-tag text-[8px]"></i>
-                                                        <span x-text="product.category"></span>
+                                                <div class="flex items-center gap-1.5 flex-wrap">
+                                                    <template x-if="product.category">
+                                                        <span class="inline-flex w-fit items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))]">
+                                                            <i class="fas fa-tag text-[8px]"></i>
+                                                            <span x-text="product.category"></span>
+                                                        </span>
+                                                    </template>
+                                                    <span class="inline-flex w-fit items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+                                                          :style="reviewBadgeStyle(product.review_status)"
+                                                          :title="reviewBadgeTooltip(product)">
+                                                        <i class="fas text-[8px]" :class="reviewBadgeIcon(product.review_status)"></i>
+                                                        <span x-text="reviewBadgeLabel(product.review_status)"></span>
                                                     </span>
+                                                </div>
+                                                <template x-if="(product.review_rejection_reasons || []).length > 0">
+                                                    <div class="rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 px-2 py-1">
+                                                        <p class="text-[10px] text-red-700 dark:text-red-300 leading-tight">
+                                                            <i class="fas fa-circle-exclamation mr-1"></i>
+                                                            <span x-text="(product.review_rejection_reasons || []).join(', ')"></span>
+                                                        </p>
+                                                    </div>
                                                 </template>
                                                 <template x-if="product.description">
                                                     <p class="text-xs text-[hsl(var(--muted-foreground))] line-clamp-2" x-text="product.description"></p>
@@ -988,6 +1056,14 @@ function metaCatalogApp() {
             );
         },
 
+        get reviewCounts() {
+            const c = { approved: 0, pending: 0, rejected: 0, outdated: 0, unknown: 0 };
+            for (const p of this.products) {
+                c[this._normalizeReview(p.review_status)] += 1;
+            }
+            return c;
+        },
+
         async init() {
             this.initDashboard();
             this.loadSignupConfig();
@@ -1455,13 +1531,90 @@ function metaCatalogApp() {
             setTimeout(() => { this.toast = null; }, 3000);
         },
 
-        // Currencies that have no minor unit (Meta still expects integer).
-        // For these, the user-facing "Rp 25.000" is sent to Meta as 25000.
-        // For others (USD, SGD...), "10.00" is sent as 1000 (cents).
+        // Currencies displayed WITHOUT decimal places (UI formatting only).
+        // Note: This list does NOT affect what we send to Meta — Meta always
+        // expects price in "cents" (multiplied by 100) regardless of currency,
+        // per https://developers.facebook.com/docs/marketing-api/reference/product-item/
         _noSubunit: ['IDR', 'JPY', 'KRW', 'VND', 'XOF', 'XAF', 'CLP', 'ISK'],
 
+        // Meta Marketing API stores price as int64 with 2 implicit decimal
+        // digits ALWAYS (e.g. send 599 to get $5.99, send 10000000 to get
+        // Rp 100.000). So toMinorUnit always × 100, regardless of currency.
         priceMultiplier(currency) {
-            return this._noSubunit.includes(String(currency || '').toUpperCase()) ? 1 : 100;
+            return 100;
+        },
+
+        // How many decimal places to SHOW the user in the UI.
+        // IDR/JPY/KRW/VND → 0 decimal; USD/EUR/etc. → 2 decimals.
+        displayFractionDigits(currency) {
+            return this._noSubunit.includes(String(currency || '').toUpperCase()) ? 0 : 2;
+        },
+
+        // ── Meta review_status badges ────────────────────────────────────────
+        // IMPORTANT: `review_status` di Graph API adalah review legacy untuk
+        // Facebook Shops / Instagram Shopping — BUKAN status WhatsApp.
+        // Status WhatsApp sesungguhnya hanya bisa dilihat di Commerce Manager
+        // (tab "Status and Issues" → "WhatsApp"). Meta tidak ekspos itu via API.
+        //
+        // Empty `review_status` ("") sangat umum untuk catalog yang hanya
+        // dipakai WhatsApp — bukan berarti produk ditolak.
+        _normalizeReview(s) {
+            const v = String(s ?? '').toLowerCase();
+            if (v === '')         return 'not_reviewed';   // empty = belum direview untuk FB/IG (normal)
+            if (v === 'pending')  return 'pending';
+            if (v === 'approved') return 'approved';
+            if (v === 'rejected') return 'rejected';
+            if (v === 'outdated') return 'outdated';
+            return 'unknown';
+        },
+        reviewBadgeLabel(status) {
+            return {
+                approved:     'Approved (FB/IG)',
+                pending:      'Pending (FB/IG)',
+                rejected:     'Ditolak (FB/IG)',
+                outdated:     'Perlu Update',
+                not_reviewed: 'Belum Direview',
+                unknown:      'Status ?',
+            }[this._normalizeReview(status)];
+        },
+        reviewBadgeIcon(status) {
+            return {
+                approved:     'fa-circle-check',
+                pending:      'fa-hourglass-half',
+                rejected:     'fa-circle-xmark',
+                outdated:     'fa-rotate',
+                not_reviewed: 'fa-minus',
+                unknown:      'fa-circle-question',
+            }[this._normalizeReview(status)];
+        },
+        reviewBadgeStyle(status) {
+            const map = {
+                approved:     'background:rgba(34,197,94,0.12);color:rgb(22,163,74)',
+                pending:      'background:rgba(245,158,11,0.12);color:rgb(180,83,9)',
+                rejected:     'background:rgba(239,68,68,0.12);color:rgb(185,28,28)',
+                outdated:     'background:rgba(168,85,247,0.12);color:rgb(126,34,206)',
+                not_reviewed: 'background:rgba(100,116,139,0.10);color:rgb(71,85,105)',
+                unknown:      'background:rgba(100,116,139,0.12);color:rgb(71,85,105)',
+            };
+            return map[this._normalizeReview(status)];
+        },
+        reviewBadgeTooltip(product) {
+            const norm = this._normalizeReview(product?.review_status);
+            const reasons = product?.review_rejection_reasons || [];
+            if (norm === 'approved')     return 'Produk disetujui untuk Facebook Shops / Instagram Shopping. Status WhatsApp cek di Commerce Manager.';
+            if (norm === 'pending')      return 'Sedang direview Meta untuk Facebook/Instagram (umumnya 30 menit – 24 jam).';
+            if (norm === 'rejected')     return reasons.length ? 'Ditolak: ' + reasons.join(', ') : 'Ditolak Meta untuk FB/IG. Cek alasan di Commerce Manager.';
+            if (norm === 'outdated')     return 'Produk perlu diperbarui — data sudah usang.';
+            if (norm === 'not_reviewed') return 'Produk belum direview untuk Facebook/Instagram Shops. Ini normal untuk katalog WhatsApp — status WhatsApp sebenarnya lihat di Commerce Manager → Status and Issues → WhatsApp.';
+            return 'Status review tidak dikenali.';
+        },
+
+        commerceManagerProductUrl(productId) {
+            const cid = this.selectedCatalog?.id;
+            const bid = this.businessId;
+            if (!cid) return '#';
+            const q = bid ? `?business_id=${bid}` : '';
+            return `https://business.facebook.com/commerce/catalogs/${cid}/products/${q}`;
         },
 
         // User-typed display value → integer in minor units (what Meta wants).
@@ -1478,21 +1631,27 @@ function metaCatalogApp() {
             return div === 1 ? m : (m / div);
         },
 
-        // Meta returns `price` as a string like "25000 IDR" or "10.00 USD" (or sometimes just a number).
-        // Parse to integer in minor units regardless of format.
+        // Meta returns `price` as a formatted string like "Rp 35.000", "Rp1",
+        // "10.00 USD", "$5.99", etc. Parse to integer in minor units (cents)
+        // regardless of locale/format/currency prefix or suffix.
         parseMetaPrice(price) {
             if (price == null || price === '') return 0;
             if (typeof price === 'number') return Math.max(0, Math.round(price));
 
             const str = String(price).trim();
-            // Try to detect currency suffix to choose multiplier
+            // Try to detect currency code suffix (USD/EUR/SGD/...).
             const ccyMatch = str.match(/([A-Z]{3})\s*$/);
             const currency = ccyMatch ? ccyMatch[1] : 'IDR';
             const mult = this.priceMultiplier(currency);
 
-            // Strip currency code & all non-numeric/dot/comma chars
-            let numStr = str.replace(/[A-Z]{3}\s*$/, '').trim();
-            // Indonesian / European decimals use comma. Heuristic: last comma is decimal if 1-2 digits follow.
+            // Extract only the digit/decimal/comma run — drops "Rp", "$", commas
+            // outside numbers, etc.
+            const runMatch = str.match(/[\d][\d.,\s]*/);
+            if (!runMatch) return 0;
+            let numStr = runMatch[0].trim();
+
+            // Indonesian/European decimal heuristic: last separator with 1-2
+            // trailing digits is the decimal point.
             const lastComma = numStr.lastIndexOf(',');
             const lastDot   = numStr.lastIndexOf('.');
             let decimalSep = null;
@@ -1503,15 +1662,14 @@ function metaCatalogApp() {
                 const thousandsSep = decimalSep === ',' ? '.' : ',';
                 numStr = numStr.split(thousandsSep).join('').replace(decimalSep, '.');
             } else {
-                // No decimal — strip all separators.
+                // No decimal point — strip all separators (e.g. "Rp 35.000" → "35000").
                 numStr = numStr.replace(/[.,\s]/g, '');
             }
 
             const n = parseFloat(numStr);
             if (!isFinite(n) || n <= 0) return 0;
 
-            // Meta's string format already includes the decimal (e.g. "10.00" USD).
-            // Multiply to land in minor units.
+            // Display major-unit × 100 = stored minor unit Meta expects.
             return Math.round(n * mult);
         },
 
@@ -1521,11 +1679,12 @@ function metaCatalogApp() {
                 const minor = this.parseMetaPrice(price);
                 if (!minor) return '–';
                 const display = this.fromMinorUnit(minor, currency);
+                const digits = this.displayFractionDigits(currency);
                 return new Intl.NumberFormat('id-ID', {
                     style: 'currency',
                     currency: currency || 'IDR',
-                    minimumFractionDigits: this.priceMultiplier(currency) === 1 ? 0 : 2,
-                    maximumFractionDigits: this.priceMultiplier(currency) === 1 ? 0 : 2,
+                    minimumFractionDigits: digits,
+                    maximumFractionDigits: digits,
                 }).format(display);
             } catch(e) {
                 return String(price);
@@ -1535,8 +1694,9 @@ function metaCatalogApp() {
         // Real-time price preview shown under the input.
         pricePreview(displayValue, currency) {
             const n = parseFloat(String(displayValue ?? '').replace(',', '.'));
+            const digits = this.displayFractionDigits(currency);
             if (!isFinite(n) || n <= 0) {
-                return this.priceMultiplier(currency) === 1
+                return digits === 0
                     ? 'Masukkan nominal langsung (mis. 25000 = Rp 25.000)'
                     : 'Masukkan nominal dengan desimal (mis. 10.00 = $10.00)';
             }
@@ -1544,8 +1704,8 @@ function metaCatalogApp() {
                 return new Intl.NumberFormat('id-ID', {
                     style: 'currency',
                     currency: currency || 'IDR',
-                    minimumFractionDigits: this.priceMultiplier(currency) === 1 ? 0 : 2,
-                    maximumFractionDigits: this.priceMultiplier(currency) === 1 ? 0 : 2,
+                    minimumFractionDigits: digits,
+                    maximumFractionDigits: digits,
                 }).format(n);
             } catch(e) {
                 return '';
@@ -1553,7 +1713,7 @@ function metaCatalogApp() {
         },
 
         pricePlaceholder(currency) {
-            return this.priceMultiplier(currency) === 1 ? '25000' : '10.00';
+            return this.displayFractionDigits(currency) === 0 ? '25000' : '10.00';
         },
 
         // SKU pattern: SKU-{base36 timestamp}-{4 random alnum}. Max 17 chars.
