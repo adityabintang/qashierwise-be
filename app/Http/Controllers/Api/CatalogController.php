@@ -81,9 +81,10 @@ class CatalogController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => [
-                    'catalogs' => $result['catalogs'],
-                    'business_id' => $result['business_id'],
-                    'total' => count($result['catalogs']),
+                    'catalogs'     => $result['catalogs'],
+                    'business_id'  => $result['business_id'],
+                    'total'        => count($result['catalogs']),
+                    'filtered_out' => $result['filtered_out'] ?? 0,
                 ],
             ]);
         } catch (WhatsAppNotConnectedException $e) {
