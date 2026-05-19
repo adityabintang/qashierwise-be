@@ -751,8 +751,10 @@ function aiAgentApp() {
                     }
                 });
                 const data = await response.json();
-                if (data.success && Array.isArray(data.catalogs)) {
-                    this.catalogs = data.catalogs;
+                // API returns { success, data: { catalogs: [...], business_id, total, filtered_out } }
+                const catalogs = data?.data?.catalogs;
+                if (data?.success && Array.isArray(catalogs)) {
+                    this.catalogs = catalogs;
                 }
             } catch (error) {
                 console.error('Failed to load catalogs:', error);
