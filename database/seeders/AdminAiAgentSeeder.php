@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\AiAgent;
 use App\Models\Store;
+use App\Models\SubMerchant;
 use App\Models\User;
 use App\Models\WhatsAppAccount;
 use Illuminate\Database\Seeder;
@@ -35,6 +36,12 @@ class AdminAiAgentSeeder extends Seeder
         if (! $store) {
             $this->command->warn('Store ADM-PUSAT tidak ditemukan. Jalankan AdminDemoDataSeeder terlebih dahulu untuk menghubungkan default store.');
         }
+
+        // Ensure a placeholder SubMerchant exists when QRIS will be enabled —
+        // AiAgentController rejects qris_enabled=true if user has no SubMerchant.
+        // Without this, saving the AI agent config from the dashboard would fail
+        // with "QRIS Payment tidak bisa diaktifkan...".
+        $subMerchant = $this->ensureSubMerchant($user);
 
         $systemPrompt = $this->buildSystemPrompt();
 
@@ -74,12 +81,36 @@ class AdminAiAgentSeeder extends Seeder
         $this->command->info('User             : ' . $user->email);
         $this->command->info('WhatsApp Account : ' . ($whatsappAccount->display_phone_number ?: $whatsappAccount->phone_number_id));
         $this->command->info('Default Store    : ' . ($store?->name ?? '(tidak terhubung)'));
+        $this->command->info('Sub Merchant     : ' . ($subMerchant?->business_name ?? '(tidak dibuat)') . ' [#' . ($subMerchant?->id ?? '-') . ']');
         $this->command->info('Bot Name         : ' . $agent->bot_name);
         $this->command->info('Status           : ' . ($agent->is_active ? 'Aktif' : 'Nonaktif'));
         $this->command->info('Order            : ' . ($agent->order_enabled ? 'Aktif' : 'Nonaktif'));
         $this->command->info('QRIS             : ' . ($agent->qris_enabled ? 'Aktif' : 'Nonaktif'));
         $this->command->info('Reservasi        : ' . ($agent->reservation_enabled ? 'Aktif' : 'Nonaktif'));
         $this->command->info('Delivery         : ' . ($agent->delivery_enabled ? 'Aktif' : 'Nonaktif'));
+    }
+
+    /**
+     * Create a placeholder SubMerchant for the demo user if none exists yet.
+     * The fields here are intentionally placeholder values — they're enough
+     * to pass the controller's existence check; real bank/Xendit details
+     * should be filled in by the user via the Sub Merchant dashboard.
+     */
+    private function ensureSubMerchant(User $user): SubMerchant
+    {
+        return SubMerchant::firstOrCreate(
+            ['user_id' => $user->id],
+            [
+                'business_name'         => 'Kafe Qashierwise',
+                'xendit_account_id'     => null,
+                'xendit_account_status' => 'pending',
+                'bank_code'             => null,
+                'bank_account_number'   => null,
+                'bank_account_name'     => null,
+                'is_active'             => true,
+                'verified_at'           => now(),
+            ]
+        );
     }
 
     private function resolveWhatsAppAccount(User $user): ?WhatsAppAccount
