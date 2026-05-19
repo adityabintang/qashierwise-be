@@ -241,7 +241,9 @@ class CatalogService
 
         $seen = [];
         $catalogs = [];
+        $filteredOut = 0;
         $lastError = null;
+        $anyEdgeOk = false;
 
         foreach ($edges as $edge) {
             $response = Http::withToken($account->access_token)
@@ -251,11 +253,24 @@ class CatalogService
                 ]);
 
             if ($response->successful()) {
+                $anyEdgeOk = true;
                 foreach ($response->json('data', []) as $catalog) {
-                    if (! isset($seen[$catalog['id']])) {
-                        $seen[$catalog['id']] = true;
-                        $catalogs[] = $catalog;
+                    if (isset($seen[$catalog['id']])) {
+                        continue;
                     }
+
+                    // Only include catalogs with vertical=commerce — WhatsApp Cart /
+                    // Multi-Product Messages and our POST /{catalog_id}/products
+                    // schema only work on commerce-vertical catalogs.
+                    $vertical = strtolower((string) ($catalog['vertical'] ?? ''));
+                    if ($vertical !== 'commerce') {
+                        $seen[$catalog['id']] = true;
+                        $filteredOut++;
+                        continue;
+                    }
+
+                    $seen[$catalog['id']] = true;
+                    $catalogs[] = $catalog;
                 }
             } else {
                 $error = $response->json('error', []);
@@ -267,16 +282,18 @@ class CatalogService
             }
         }
 
-        if (! empty($catalogs)) {
+        if ($anyEdgeOk) {
             Log::info('CatalogService: fetched catalogs', [
-                'business_id' => $businessId,
-                'count' => count($catalogs),
+                'business_id'  => $businessId,
+                'count'        => count($catalogs),
+                'filtered_out' => $filteredOut,
             ]);
 
             return [
-                'success' => true,
-                'catalogs' => $catalogs,
-                'business_id' => $businessId,
+                'success'      => true,
+                'catalogs'     => $catalogs,
+                'business_id'  => $businessId,
+                'filtered_out' => $filteredOut,
             ];
         }
 
@@ -360,6 +377,7 @@ class CatalogService
     public function createProduct(WhatsAppAccount $account, string $catalogId, array $data): array
     {
         $response = Http::withToken($account->access_token)
+            ->asForm()
             ->post("{$this->baseUrl()}/{$catalogId}/products", $data);
 
         if ($response->successful()) {
@@ -376,16 +394,26 @@ class CatalogService
 
         $error = $response->json('error', []);
         $errorMessage = $error['message'] ?? 'Failed to create product';
+        $errorUserMessage = $error['error_user_msg'] ?? null;
+        $errorUserTitle = $error['error_user_title'] ?? null;
 
         Log::error('CatalogService: failed to create product', [
-            'catalog_id' => $catalogId,
-            'error' => $errorMessage,
+            'catalog_id'    => $catalogId,
+            'status'        => $response->status(),
+            'error_code'    => $error['code'] ?? null,
+            'error_subcode' => $error['error_subcode'] ?? null,
+            'error_type'    => $error['type'] ?? null,
+            'error'         => $errorMessage,
+            'user_title'    => $errorUserTitle,
+            'user_msg'      => $errorUserMessage,
+            'fbtrace_id'    => $error['fbtrace_id'] ?? null,
+            'data_sent'     => $data,
         ]);
 
         return [
-            'success' => false,
+            'success'    => false,
             'error_code' => 'API_ERROR',
-            'error' => $errorMessage,
+            'error'      => $errorUserMessage ?: $errorMessage,
         ];
     }
 
