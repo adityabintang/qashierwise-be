@@ -31,6 +31,7 @@ class StoreAiAgentRequest extends FormRequest
             'business_info.description' => 'nullable|string',
             'business_info.phone' => 'nullable|string',
             'default_store_id' => 'nullable|exists:stores,id',
+            'catalog_id' => 'nullable|string|max:255',
             'order_enabled' => 'nullable|boolean',
             'qris_enabled' => 'nullable|boolean',
             'reservation_enabled' => 'nullable|boolean',
