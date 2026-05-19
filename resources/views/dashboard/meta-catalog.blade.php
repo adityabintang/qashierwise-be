@@ -287,8 +287,15 @@
                                 <div class="h-14 w-14 rounded-2xl bg-[hsl(var(--muted))] flex items-center justify-center mx-auto mb-4">
                                     <i class="fas fa-store text-2xl text-[hsl(var(--muted-foreground))]"></i>
                                 </div>
-                                <h3 class="font-semibold text-base mb-1">Tidak Ada Katalog</h3>
-                                <p class="text-sm text-[hsl(var(--muted-foreground))] max-w-xs mx-auto">Pastikan akun Meta Business Anda memiliki katalog produk yang aktif.</p>
+                                <h3 class="font-semibold text-base mb-1">Tidak Ada Katalog Commerce</h3>
+                                <template x-if="filteredOut === 0">
+                                    <p class="text-sm text-[hsl(var(--muted-foreground))] max-w-md mx-auto">Pastikan akun Meta Business Anda memiliki katalog produk yang aktif dengan tipe <strong>commerce</strong>.</p>
+                                </template>
+                                <template x-if="filteredOut > 0">
+                                    <p class="text-sm text-[hsl(var(--muted-foreground))] max-w-md mx-auto">
+                                        Ditemukan <strong x-text="filteredOut"></strong> katalog di Business Anda, tetapi tidak ada yang bertipe <strong>commerce</strong>. Buat katalog baru dengan tipe E-Commerce untuk mulai mengelola produk WhatsApp.
+                                    </p>
+                                </template>
                             </div>
                         </template>
 
@@ -324,6 +331,62 @@
                                         </button>
                                     </div>
                                 </template>
+                            </div>
+                        </template>
+
+                        <!-- ════════ COMMERCE FILTER INFO ════════ -->
+                        <template x-if="!loading && !error">
+                            <div class="card border-[hsl(var(--primary)/0.2)] bg-[hsl(var(--primary)/0.04)] p-5 mt-2">
+                                <div class="flex items-start gap-3">
+                                    <div class="h-9 w-9 rounded-lg bg-[hsl(var(--primary)/0.12)] flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <i class="fas fa-circle-info text-[hsl(var(--primary))]"></i>
+                                    </div>
+                                    <div class="flex-1 space-y-3">
+                                        <div>
+                                            <h4 class="font-semibold text-sm">Mengapa katalog saya tidak muncul di sini?</h4>
+                                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1 leading-relaxed">
+                                                Halaman ini <strong>hanya menampilkan katalog bertipe <span class="font-mono">commerce</span></strong>, karena hanya tipe inilah yang kompatibel dengan fitur produk WhatsApp Business (cart, multi-product message, dan order flow QashierWise).
+                                                <template x-if="filteredOut > 0">
+                                                    <span> Saat ini ada <strong x-text="filteredOut"></strong> katalog lain di Business Anda yang disembunyikan karena tipe-nya bukan <span class="font-mono">commerce</span>.</span>
+                                                </template>
+                                            </p>
+                                        </div>
+
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                                            <div class="rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/60 dark:bg-emerald-950/20 p-3">
+                                                <div class="flex items-center gap-1.5 font-semibold text-emerald-700 dark:text-emerald-400 mb-1.5">
+                                                    <i class="fas fa-circle-check"></i>
+                                                    <span>Pilih ini saat membuat katalog di Meta</span>
+                                                </div>
+                                                <ul class="space-y-1 text-[hsl(var(--foreground))]/85 list-disc list-inside leading-snug">
+                                                    <li><strong>Produk fisik → Produk online</strong> <span class="text-[hsl(var(--muted-foreground))]">(disarankan untuk F&B / retail)</span></li>
+                                                    <li><strong>Produk atau layanan lokal</strong> <span class="text-[hsl(var(--muted-foreground))]">(restoran, warung dengan delivery)</span></li>
+                                                    <li><strong>Layanan → Jasa profesional</strong></li>
+                                                    <li><strong>Produk atau konten digital → Aplikasi / Artikel</strong></li>
+                                                </ul>
+                                            </div>
+
+                                            <div class="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50/60 dark:bg-red-950/20 p-3">
+                                                <div class="flex items-center gap-1.5 font-semibold text-red-700 dark:text-red-400 mb-1.5">
+                                                    <i class="fas fa-circle-xmark"></i>
+                                                    <span>Hindari — tidak akan muncul di sini</span>
+                                                </div>
+                                                <ul class="space-y-1 text-[hsl(var(--foreground))]/85 list-disc list-inside leading-snug">
+                                                    <li><strong>Real estate</strong> <span class="text-[hsl(var(--muted-foreground))]">(home_listings)</span></li>
+                                                    <li><strong>Kendaraan / Kendaraan dan promo</strong> <span class="text-[hsl(var(--muted-foreground))]">(vehicles)</span></li>
+                                                    <li><strong>Hotel dan penyewaan</strong> <span class="text-[hsl(var(--muted-foreground))]">(hotels)</span></li>
+                                                    <li><strong>Penerbangan / Tujuan</strong> <span class="text-[hsl(var(--muted-foreground))]">(flights, destinations)</span></li>
+                                                    <li><strong>Media streaming</strong> <span class="text-[hsl(var(--muted-foreground))]">(media_title)</span></li>
+                                                </ul>
+                                            </div>
+                                        </div>
+
+                                        <p class="text-xs text-[hsl(var(--muted-foreground))] leading-relaxed">
+                                            <i class="fas fa-lightbulb text-amber-500 mr-1"></i>
+                                            <strong>Tip:</strong> Tipe katalog <span class="italic">tidak bisa diubah setelah dibuat</span>. Untuk menghindari kesalahan, disarankan membuat katalog langsung dari tombol <span class="font-semibold">"Buat Katalog Baru"</span> di halaman ini — tipe <span class="font-mono">commerce</span> akan otomatis diterapkan.
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </template>
                     </div>
@@ -406,12 +469,23 @@
                                             <!-- Info -->
                                             <div class="p-4 flex flex-col gap-1.5 flex-1">
                                                 <h3 class="font-semibold text-sm leading-snug line-clamp-2" x-text="product.name"></h3>
+                                                <template x-if="product.category">
+                                                    <span class="inline-flex w-fit items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))]">
+                                                        <i class="fas fa-tag text-[8px]"></i>
+                                                        <span x-text="product.category"></span>
+                                                    </span>
+                                                </template>
                                                 <template x-if="product.description">
                                                     <p class="text-xs text-[hsl(var(--muted-foreground))] line-clamp-2" x-text="product.description"></p>
                                                 </template>
-                                                <template x-if="product.retailer_id">
-                                                    <p class="text-xs text-[hsl(var(--muted-foreground))] font-mono truncate" x-text="'SKU: ' + product.retailer_id"></p>
-                                                </template>
+                                                <div class="flex items-center gap-3 text-xs text-[hsl(var(--muted-foreground))]">
+                                                    <template x-if="product.retailer_id">
+                                                        <span class="font-mono truncate" x-text="'SKU: ' + product.retailer_id"></span>
+                                                    </template>
+                                                    <template x-if="product.inventory != null">
+                                                        <span class="font-medium whitespace-nowrap" x-text="'Stok: ' + product.inventory"></span>
+                                                    </template>
+                                                </div>
                                                 <!-- Harga + availability -->
                                                 <div class="flex items-center justify-between mt-auto pt-2 border-t border-[hsl(var(--border))]">
                                                     <span class="font-bold text-[hsl(var(--primary))] text-sm"
@@ -493,31 +567,56 @@
                 <form @submit.prevent="createProduct()" class="p-5 space-y-3">
                     <div>
                         <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Nama Produk <span class="text-red-500">*</span></label>
-                        <input type="text" x-model="createForm.name" class="input w-full" placeholder="Nama produk" required>
+                        <input type="text" x-model="createForm.name" class="input w-full" placeholder="Contoh: Nasi Goreng Spesial" maxlength="150" required>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Ketersediaan</label>
-                        <select x-model="createForm.availability" class="input w-full">
-                            <option value="in stock">Tersedia</option>
-                            <option value="out of stock">Habis</option>
-                            <option value="preorder">Pre-order</option>
-                        </select>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">SKU / Kode Produk</label>
+                        <div class="flex gap-2">
+                            <input type="text" x-model="createForm.retailer_id" class="input flex-1 font-mono text-xs" readonly>
+                            <button type="button" @click="createForm.retailer_id = generateSku()" class="btn btn-outline btn-sm" title="Generate ulang">
+                                <i class="fas fa-rotate"></i>
+                            </button>
+                        </div>
+                        <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Otomatis dibuat — tidak bisa diubah setelah produk dibuat.</p>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
+                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Kategori Menu</label>
+                            <select x-model="createForm.category" class="input w-full">
+                                <template x-for="opt in fnbCategories" :key="opt">
+                                    <option :value="opt" x-text="opt"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Ketersediaan</label>
+                            <select x-model="createForm.availability" class="input w-full">
+                                <option value="in stock">Tersedia</option>
+                                <option value="out of stock">Habis</option>
+                                <option value="preorder">Pre-order</option>
+                                <option value="discontinued">Tidak Dijual Lagi</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="col-span-2">
                             <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Harga <span class="text-red-500">*</span></label>
-                            <input type="number" x-model="createForm.price_display" class="input w-full" placeholder="30000" min="0" required>
-                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Dalam Rupiah</p>
+                            <input type="number" x-model="createForm.price_display" class="input w-full" :placeholder="pricePlaceholder(createForm.currency)" min="1" step="any" required>
+                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1" x-text="pricePreview(createForm.price_display, createForm.currency)"></p>
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Mata Uang</label>
                             <select x-model="createForm.currency" class="input w-full">
-                                <option value="IDR">IDR</option>
-                                <option value="USD">USD</option>
-                                <option value="SGD">SGD</option>
-                                <option value="MYR">MYR</option>
+                                <template x-for="cur in currencies" :key="cur">
+                                    <option :value="cur" x-text="cur"></option>
+                                </template>
                             </select>
                         </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Stok (opsional)</label>
+                        <input type="number" x-model="createForm.inventory" class="input w-full" placeholder="Misal: 50" min="0">
+                        <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Kosongkan jika stok tak terbatas.</p>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Gambar Produk <span class="text-red-500">*</span></label>
@@ -560,25 +659,20 @@
                         </template>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Deskripsi</label>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Deskripsi <span class="text-red-500">*</span></label>
                         <textarea x-model="createForm.description"
                             x-init="$el.style.height='auto';$el.style.height=$el.scrollHeight+'px'"
                             x-on:input="$el.style.height='auto';$el.style.height=$el.scrollHeight+'px'"
-                            class="input w-full resize-none overflow-hidden" rows="3" placeholder="Deskripsi produk..."></textarea>
+                            class="input w-full resize-none overflow-hidden" rows="3"
+                            placeholder="Contoh: Nasi goreng ayam dengan bumbu rumahan, disajikan hangat dengan kerupuk dan telur."
+                            minlength="3" maxlength="5000" required></textarea>
+                        <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                            <span x-text="(createForm.description || '').length"></span> / 5000 karakter
+                        </p>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Brand</label>
-                            <input type="text" x-model="createForm.brand" class="input w-full" placeholder="Nama brand">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Kondisi</label>
-                            <select x-model="createForm.condition" class="input w-full">
-                                <option value="new">Baru</option>
-                                <option value="refurbished">Refurbished</option>
-                                <option value="used">Bekas</option>
-                            </select>
-                        </div>
+                    <div>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Brand / Nama Restoran</label>
+                        <input type="text" x-model="createForm.brand" class="input w-full" placeholder="Contoh: Warung Bu Tini" maxlength="100">
                     </div>
                     <template x-if="createError">
                         <div class="flex gap-2 items-start rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 p-3">
@@ -617,41 +711,50 @@
                 <form @submit.prevent="updateProduct()" class="p-5 space-y-3">
                     <div>
                         <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Nama Produk</label>
-                        <input type="text" x-model="editForm.name" class="input w-full" placeholder="Nama produk">
+                        <input type="text" x-model="editForm.name" class="input w-full" placeholder="Nama produk" maxlength="150">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">SKU / Kode Produk</label>
+                        <input type="text" :value="editForm.retailer_id || '–'" class="input w-full font-mono text-xs bg-[hsl(var(--muted)/0.5)]" readonly>
+                        <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">SKU tidak bisa diubah setelah produk dibuat.</p>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Kategori Menu</label>
+                            <select x-model="editForm.category" class="input w-full">
+                                <template x-for="opt in fnbCategories" :key="opt">
+                                    <option :value="opt" x-text="opt"></option>
+                                </template>
+                            </select>
+                        </div>
                         <div>
                             <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Ketersediaan</label>
                             <select x-model="editForm.availability" class="input w-full">
                                 <option value="in stock">Tersedia</option>
                                 <option value="out of stock">Habis</option>
                                 <option value="preorder">Pre-order</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Kondisi</label>
-                            <select x-model="editForm.condition" class="input w-full">
-                                <option value="new">Baru</option>
-                                <option value="refurbished">Refurbished</option>
-                                <option value="used">Bekas</option>
+                                <option value="discontinued">Tidak Dijual Lagi</option>
                             </select>
                         </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="col-span-2">
                             <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Harga</label>
-                            <input type="number" x-model="editForm.price_display" class="input w-full" placeholder="30000" min="0">
-                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Dalam Rupiah</p>
+                            <input type="number" x-model="editForm.price_display" class="input w-full" :placeholder="pricePlaceholder(editForm.currency)" min="1" step="any">
+                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1" x-text="pricePreview(editForm.price_display, editForm.currency)"></p>
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Mata Uang</label>
                             <select x-model="editForm.currency" class="input w-full">
-                                <option value="IDR">IDR</option>
-                                <option value="USD">USD</option>
-                                <option value="SGD">SGD</option>
-                                <option value="MYR">MYR</option>
+                                <template x-for="cur in currencies" :key="cur">
+                                    <option :value="cur" x-text="cur"></option>
+                                </template>
                             </select>
                         </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Stok</label>
+                        <input type="number" x-model="editForm.inventory" class="input w-full" placeholder="Kosongkan jika tak terbatas" min="0">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Gambar Produk</label>
@@ -694,11 +797,16 @@
                         <textarea x-model="editForm.description"
                             x-init="$el.style.height='auto';$el.style.height=$el.scrollHeight+'px'"
                             x-on:input="$el.style.height='auto';$el.style.height=$el.scrollHeight+'px'"
-                            class="input w-full resize-none overflow-hidden" rows="3"></textarea>
+                            class="input w-full resize-none overflow-hidden" rows="3"
+                            minlength="3" maxlength="5000"
+                            placeholder="Deskripsi produk..."></textarea>
+                        <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                            <span x-text="(editForm.description || '').length"></span> / 5000 karakter
+                        </p>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Brand</label>
-                        <input type="text" x-model="editForm.brand" class="input w-full">
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Brand / Nama Restoran</label>
+                        <input type="text" x-model="editForm.brand" class="input w-full" maxlength="100">
                     </div>
                     <template x-if="editError">
                         <div class="flex gap-2 items-start rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 p-3">
@@ -807,6 +915,7 @@ function metaCatalogApp() {
         loading: false,
         catalogs: [],
         businessId: null,
+        filteredOut: 0,
         selectedCatalog: null,
         products: [],
         loadingProducts: false,
@@ -854,6 +963,20 @@ function metaCatalogApp() {
         isMobile: window.innerWidth < 768,
         user: null,
         notifications: [],
+
+        // F&B preset categories — shown in create/edit modal "Kategori Menu" dropdown
+        fnbCategories: [
+            'Makanan Utama',
+            'Cemilan / Snack',
+            'Minuman',
+            'Dessert',
+            'Paket Hemat',
+            'Topping / Tambahan',
+            'Lainnya',
+        ],
+
+        // Currencies relevant to SEA F&B businesses
+        currencies: ['IDR', 'USD', 'SGD', 'MYR', 'THB', 'PHP', 'VND', 'JPY'],
 
         get filteredProducts() {
             if (!this.productSearch) return this.products;
@@ -1015,6 +1138,7 @@ function metaCatalogApp() {
                 if (data.success) {
                     this.catalogs = data.data.catalogs || [];
                     this.businessId = data.data.business_id || null;
+                    this.filteredOut = data.data.filtered_out || 0;
                 } else {
                     this.error = { code: data.error_code || 'UNKNOWN', message: data.message || 'Gagal memuat katalog.' };
                 }
@@ -1091,15 +1215,18 @@ function metaCatalogApp() {
 
         // ─── CREATE PRODUCT ───────────────────────────────────
         openCreateModal() {
-            const ts = Date.now().toString(36).toUpperCase();
-            const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
-            const catalogUrl = `https://qashierwise.com/dashboard/meta-catalog/${this.selectedCatalog?.id || ''}`;
-            const defaultBrand = this.user?.name || '';
-            const defaultDesc = 'Produk makanan & minuman pilihan, disiapkan dengan bahan segar berkualitas untuk pengalaman kuliner terbaik Anda.';
             this.createForm = {
-                name: '', retailer_id: `SKU-${ts}-${rand}`, price_display: '', currency: 'IDR',
-                image_url: '', url: catalogUrl, availability: 'in stock',
-                description: defaultDesc, brand: defaultBrand, condition: 'new',
+                name:          '',
+                retailer_id:   this.generateSku(),
+                price_display: '',
+                currency:      'IDR',
+                image_url:     '',
+                url:           this.defaultProductUrl(),
+                availability:  'in stock',
+                description:   '',
+                brand:         '',
+                category:      'Makanan Utama',
+                inventory:     '',
             };
             this.createError = null;
             this.createImageTouched = false;
@@ -1112,17 +1239,18 @@ function metaCatalogApp() {
                 this.createError = 'Gambar produk wajib diupload terlebih dahulu.';
                 return;
             }
+
+            const priceMinor = this.toMinorUnit(this.createForm.price_display, this.createForm.currency);
+            if (!priceMinor || priceMinor < 1) {
+                this.createError = 'Harga harus lebih besar dari 0.';
+                return;
+            }
+
             this.creating = true;
             this.createError = null;
             try {
                 const token = localStorage.getItem('token');
-                const NO_SUBUNIT = ['IDR', 'JPY', 'KRW', 'VND'];
-                const multiplier = NO_SUBUNIT.includes(this.createForm.currency) ? 1 : 100;
-                const payload = {
-                    ...this.createForm,
-                    price: Math.round(parseFloat(this.createForm.price_display || 0) * multiplier),
-                };
-                delete payload.price_display;
+                const payload = this.buildProductPayload(this.createForm, priceMinor);
 
                 const response = await fetch(
                     `${this.API_BASE_URL}/catalog/${this.selectedCatalog.id}/products`,
@@ -1150,35 +1278,48 @@ function metaCatalogApp() {
         // ─── EDIT PRODUCT ─────────────────────────────────────
         openEditModal(product) {
             this.editingProductId = product.id;
-            const priceNum = product.price ? this.parseMetaPrice(product.price) : 0;
+            const currency = product.currency || 'IDR';
+            const priceMinor = this.parseMetaPrice(product.price);
+            const priceDisplay = priceMinor > 0 ? String(this.fromMinorUnit(priceMinor, currency)) : '';
+
             this.editForm = {
-                name: product.name || '',
+                retailer_id:  product.retailer_id || '',
+                name:         product.name        || '',
                 availability: product.availability || 'in stock',
-                condition: product.condition || 'new',
-                price_display: priceNum > 0 ? String(Math.round(priceNum)) : '',
-                currency: product.currency || 'IDR',
-                image_url: product.image_url || '',
-                url: product.url || '',
-                description: product.description || 'Produk makanan & minuman pilihan, disiapkan dengan bahan segar berkualitas untuk pengalaman kuliner terbaik Anda.',
-                brand: product.brand || this.user?.name || '',
+                price_display: priceDisplay,
+                currency,
+                image_url:    product.image_url   || '',
+                url:          product.url         || this.defaultProductUrl(),
+                description:  product.description || '',
+                brand:        product.brand       || '',
+                category:     product.category    || 'Makanan Utama',
+                inventory:    product.inventory != null ? String(product.inventory) : '',
             };
             this.editError = null;
             this.showEditModal = true;
         },
 
         async updateProduct() {
+            if (!this.editForm.image_url) {
+                this.editError = 'Gambar produk tidak boleh kosong.';
+                return;
+            }
+
             this.editing = true;
             this.editError = null;
             try {
                 const token = localStorage.getItem('token');
-                const payload = { ...this.editForm };
-                if (payload.price_display) {
-                    const NO_SUBUNIT = ['IDR', 'JPY', 'KRW', 'VND'];
-                    const multiplier = NO_SUBUNIT.includes(payload.currency) ? 1 : 100;
-                    payload.price = Math.round(parseFloat(payload.price_display) * multiplier);
+                const priceMinor = this.editForm.price_display
+                    ? this.toMinorUnit(this.editForm.price_display, this.editForm.currency)
+                    : null;
+                if (this.editForm.price_display && (!priceMinor || priceMinor < 1)) {
+                    this.editError = 'Harga harus lebih besar dari 0.';
+                    this.editing = false;
+                    return;
                 }
-                delete payload.price_display;
-                Object.keys(payload).forEach(k => { if (payload[k] === '') delete payload[k]; });
+                const payload = this.buildProductPayload(this.editForm, priceMinor);
+                // retailer_id is immutable; controller treats it as prohibited on update.
+                delete payload.retailer_id;
 
                 const response = await fetch(
                     `${this.API_BASE_URL}/catalog/products/${this.editingProductId}`,
@@ -1314,47 +1455,131 @@ function metaCatalogApp() {
             setTimeout(() => { this.toast = null; }, 3000);
         },
 
+        // Currencies that have no minor unit (Meta still expects integer).
+        // For these, the user-facing "Rp 25.000" is sent to Meta as 25000.
+        // For others (USD, SGD...), "10.00" is sent as 1000 (cents).
+        _noSubunit: ['IDR', 'JPY', 'KRW', 'VND', 'XOF', 'XAF', 'CLP', 'ISK'],
+
+        priceMultiplier(currency) {
+            return this._noSubunit.includes(String(currency || '').toUpperCase()) ? 1 : 100;
+        },
+
+        // User-typed display value → integer in minor units (what Meta wants).
+        toMinorUnit(displayValue, currency) {
+            const n = parseFloat(String(displayValue ?? '').replace(',', '.'));
+            if (!isFinite(n) || n <= 0) return 0;
+            return Math.round(n * this.priceMultiplier(currency));
+        },
+
+        // Minor unit integer → display value (decimals only for non-zero-decimal currencies).
+        fromMinorUnit(minorValue, currency) {
+            const m = Number(minorValue) || 0;
+            const div = this.priceMultiplier(currency);
+            return div === 1 ? m : (m / div);
+        },
+
+        // Meta returns `price` as a string like "25000 IDR" or "10.00 USD" (or sometimes just a number).
+        // Parse to integer in minor units regardless of format.
         parseMetaPrice(price) {
-            if (price === null || price === undefined || price === '') return 0;
-            if (typeof price === 'number') return Math.round(price);
+            if (price == null || price === '') return 0;
+            if (typeof price === 'number') return Math.max(0, Math.round(price));
+
             const str = String(price).trim();
-            const dotCount = (str.match(/\./g) || []).length;
-            const commaCount = (str.match(/,/g) || []).length;
-            if (dotCount > 1) {
-                return parseInt(str.replace(/[^0-9]/g, ''), 10) || 0;
+            // Try to detect currency suffix to choose multiplier
+            const ccyMatch = str.match(/([A-Z]{3})\s*$/);
+            const currency = ccyMatch ? ccyMatch[1] : 'IDR';
+            const mult = this.priceMultiplier(currency);
+
+            // Strip currency code & all non-numeric/dot/comma chars
+            let numStr = str.replace(/[A-Z]{3}\s*$/, '').trim();
+            // Indonesian / European decimals use comma. Heuristic: last comma is decimal if 1-2 digits follow.
+            const lastComma = numStr.lastIndexOf(',');
+            const lastDot   = numStr.lastIndexOf('.');
+            let decimalSep = null;
+            if (lastComma > lastDot && /,\d{1,2}$/.test(numStr)) decimalSep = ',';
+            else if (lastDot > lastComma && /\.\d{1,2}$/.test(numStr)) decimalSep = '.';
+
+            if (decimalSep) {
+                const thousandsSep = decimalSep === ',' ? '.' : ',';
+                numStr = numStr.split(thousandsSep).join('').replace(decimalSep, '.');
+            } else {
+                // No decimal — strip all separators.
+                numStr = numStr.replace(/[.,\s]/g, '');
             }
-            if (commaCount >= 1) {
-                const lastComma = str.lastIndexOf(',');
-                const lastDot = str.lastIndexOf('.');
-                if (lastComma > lastDot) {
-                    return Math.round(parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0);
-                }
-                return Math.round(parseFloat(str.replace(/,/g, '')) || 0);
-            }
-            if (dotCount === 1) {
-                const afterDot = str.slice(str.lastIndexOf('.') + 1).replace(/[^0-9]/g, '');
-                if (afterDot.length === 3) {
-                    return parseInt(str.replace(/[^0-9]/g, ''), 10) || 0;
-                }
-                return Math.round(parseFloat(str.replace(/[^0-9.]/g, '')) || 0);
-            }
-            return parseInt(str.replace(/[^0-9]/g, ''), 10) || 0;
+
+            const n = parseFloat(numStr);
+            if (!isFinite(n) || n <= 0) return 0;
+
+            // Meta's string format already includes the decimal (e.g. "10.00" USD).
+            // Multiply to land in minor units.
+            return Math.round(n * mult);
         },
 
         formatPrice(price, currency) {
             if (!price) return '–';
             try {
-                const num = this.parseMetaPrice(price);
-                if (!num) return '–';
+                const minor = this.parseMetaPrice(price);
+                if (!minor) return '–';
+                const display = this.fromMinorUnit(minor, currency);
                 return new Intl.NumberFormat('id-ID', {
                     style: 'currency',
                     currency: currency || 'IDR',
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0,
-                }).format(num);
+                    minimumFractionDigits: this.priceMultiplier(currency) === 1 ? 0 : 2,
+                    maximumFractionDigits: this.priceMultiplier(currency) === 1 ? 0 : 2,
+                }).format(display);
             } catch(e) {
-                return price;
+                return String(price);
             }
+        },
+
+        // Real-time price preview shown under the input.
+        pricePreview(displayValue, currency) {
+            const n = parseFloat(String(displayValue ?? '').replace(',', '.'));
+            if (!isFinite(n) || n <= 0) {
+                return this.priceMultiplier(currency) === 1
+                    ? 'Masukkan nominal langsung (mis. 25000 = Rp 25.000)'
+                    : 'Masukkan nominal dengan desimal (mis. 10.00 = $10.00)';
+            }
+            try {
+                return new Intl.NumberFormat('id-ID', {
+                    style: 'currency',
+                    currency: currency || 'IDR',
+                    minimumFractionDigits: this.priceMultiplier(currency) === 1 ? 0 : 2,
+                    maximumFractionDigits: this.priceMultiplier(currency) === 1 ? 0 : 2,
+                }).format(n);
+            } catch(e) {
+                return '';
+            }
+        },
+
+        pricePlaceholder(currency) {
+            return this.priceMultiplier(currency) === 1 ? '25000' : '10.00';
+        },
+
+        // SKU pattern: SKU-{base36 timestamp}-{4 random alnum}. Max 17 chars.
+        generateSku() {
+            const ts = Date.now().toString(36).toUpperCase();
+            const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+            return `SKU-${ts}-${rand}`;
+        },
+
+        // Default landing URL for a product. Meta validates this is HTTPS and reachable.
+        // We point at our public homepage as a safe fallback when there's no public storefront yet.
+        defaultProductUrl() {
+            return `${window.location.origin}/`;
+        },
+
+        // Build the JSON payload sent to our API (which forwards form-encoded to Meta).
+        // Centralizes the price conversion & strips display-only fields.
+        buildProductPayload(form, priceMinor) {
+            const out = {};
+            const passthrough = ['retailer_id', 'name', 'description', 'currency', 'image_url', 'url',
+                                 'availability', 'category', 'brand', 'condition'];
+            passthrough.forEach(k => { if (form[k] != null && form[k] !== '') out[k] = form[k]; });
+            if (priceMinor && priceMinor > 0) out.price = priceMinor;
+            if (form.inventory !== '' && form.inventory != null) out.inventory = Number(form.inventory);
+            if (out.currency) out.currency = String(out.currency).toUpperCase();
+            return out;
         },
 
         logout() {
