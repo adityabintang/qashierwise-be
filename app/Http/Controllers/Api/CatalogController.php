@@ -144,43 +144,103 @@ class CatalogController extends Controller
     }
 
     /**
+     * Fields accepted by Meta's products endpoint. Single source of truth so
+     * create/update stay in sync.
+     */
+    protected const PRODUCT_FIELDS = [
+        'retailer_id', 'name', 'description',
+        'price', 'sale_price', 'currency',
+        'image_url', 'additional_image_link', 'url',
+        'availability', 'inventory',
+        'category', 'google_product_category',
+        'brand', 'condition',
+    ];
+
+    protected const AVAILABILITY_VALUES = 'in stock,out of stock,preorder,available for order,discontinued,pending';
+    protected const CONDITION_VALUES = 'new,refurbished,used';
+
+    /**
+     * Common validation rules for create/update. `$mode` is 'create' or 'update'
+     * — required-vs-optional rules switch accordingly.
+     */
+    protected function productRules(string $mode): array
+    {
+        $req = $mode === 'create' ? 'required' : 'sometimes';
+        $opt = 'sometimes';
+
+        return [
+            // Required only on create — retailer_id is immutable after creation.
+            'retailer_id'             => $mode === 'create' ? 'required|string|max:100' : 'prohibited',
+            'name'                    => "{$req}|string|max:150",
+            'description'             => "{$req}|string|min:3|max:5000",
+            // Meta rejects price=0; minor unit semantics handled client-side.
+            'price'                   => "{$req}|integer|min:1",
+            'sale_price'              => "{$opt}|integer|min:1|lt:price",
+            'currency'                => "{$req}|string|size:3|regex:/^[A-Z]{3}$/",
+            // Meta crawls image_url + url; both must be HTTPS publicly reachable.
+            'image_url'               => "{$req}|url|starts_with:https://",
+            'additional_image_link'   => "{$opt}|array|max:9",
+            'additional_image_link.*' => 'url|starts_with:https://',
+            'url'                     => "{$req}|url|starts_with:https://",
+            'availability'            => $opt . '|string|in:' . self::AVAILABILITY_VALUES,
+            'condition'               => $opt . '|string|in:' . self::CONDITION_VALUES,
+            'inventory'               => "{$opt}|integer|min:0",
+            'category'                => "{$opt}|string|max:250",
+            'google_product_category' => "{$opt}|string|max:250",
+            'brand'                   => "{$opt}|string|max:100",
+        ];
+    }
+
+    /**
+     * Extract validated, non-null fields to forward to Meta. Normalizes:
+     * - currency → uppercase
+     * - additional_image_link → CSV (Meta form-encoded format)
+     * - availability/condition defaults applied here, not in service
+     */
+    protected function preparePayload(Request $request, string $mode): array
+    {
+        $data = array_filter(
+            $request->only(self::PRODUCT_FIELDS),
+            fn ($v) => $v !== null && $v !== ''
+        );
+
+        if (isset($data['currency'])) {
+            $data['currency'] = strtoupper($data['currency']);
+        }
+
+        if (isset($data['additional_image_link']) && is_array($data['additional_image_link'])) {
+            // Meta accepts a comma-separated string in form-encoded payloads.
+            $data['additional_image_link'] = implode(',', $data['additional_image_link']);
+        }
+
+        if ($mode === 'create') {
+            $data['availability'] = $data['availability'] ?? 'in stock';
+            $data['condition']    = $data['condition']    ?? 'new';
+        }
+
+        return $data;
+    }
+
+    /**
      * POST /api/whatsapp/catalog/{catalogId}/products
      * Create a new product in a catalog.
      */
     public function createProduct(Request $request, string $catalogId): JsonResponse
     {
-        $request->validate([
-            'retailer_id' => 'required|string',
-            'name' => 'required|string|max:255',
-            'price' => 'required|integer|min:0',
-            'currency' => 'required|string|size:3',
-            'image_url' => 'required|url',
-            'url' => 'required|url',
-            'availability' => 'sometimes|string|in:in stock,out of stock,preorder,available for order,discontinued,pending',
-            'description' => 'sometimes|string|max:5000',
-            'brand' => 'sometimes|string',
-            'condition' => 'sometimes|string|in:new,refurbished,used',
-            'category' => 'sometimes|string',
-        ]);
+        $request->validate($this->productRules('create'));
 
         try {
             $account = $this->getAccount();
-
-            $data = array_filter($request->only([
-                'retailer_id', 'name', 'price', 'currency', 'image_url', 'url',
-                'availability', 'description', 'brand', 'condition', 'category',
-            ]), fn ($v) => $v !== null);
-
-            $data['availability'] = $data['availability'] ?? 'in stock';
+            $data = $this->preparePayload($request, 'create');
 
             $result = $this->catalogService->createProduct($account, $catalogId, $data);
 
             if (! $result['success']) {
                 return response()->json([
-                    'success' => false,
+                    'success'    => false,
                     'error_code' => $result['error_code'],
-                    'message' => $result['error'],
-                ], 422);
+                    'message'    => $result['error'],
+                ], $this->statusFromErrorCode($result['error_code']));
             }
 
             return response()->json([
@@ -202,35 +262,28 @@ class CatalogController extends Controller
      */
     public function updateProduct(Request $request, string $productId): JsonResponse
     {
-        $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'price' => 'sometimes|integer|min:0',
-            'currency' => 'sometimes|string|size:3',
-            'image_url' => 'sometimes|url',
-            'url' => 'sometimes|url',
-            'availability' => 'sometimes|string|in:in stock,out of stock,preorder,available for order,discontinued,pending',
-            'description' => 'sometimes|string|max:5000',
-            'brand' => 'sometimes|string',
-            'condition' => 'sometimes|string|in:new,refurbished,used',
-            'category' => 'sometimes|string',
-        ]);
+        $request->validate($this->productRules('update'));
 
         try {
             $account = $this->getAccount();
+            $data = $this->preparePayload($request, 'update');
 
-            $data = array_filter($request->only([
-                'name', 'price', 'currency', 'image_url', 'url',
-                'availability', 'description', 'brand', 'condition', 'category',
-            ]), fn ($v) => $v !== null);
+            if (empty($data)) {
+                return response()->json([
+                    'success'    => false,
+                    'error_code' => 'EMPTY_UPDATE',
+                    'message'    => 'Tidak ada perubahan yang dikirim.',
+                ], 422);
+            }
 
             $result = $this->catalogService->updateProduct($account, $productId, $data);
 
             if (! $result['success']) {
                 return response()->json([
-                    'success' => false,
+                    'success'    => false,
                     'error_code' => $result['error_code'],
-                    'message' => $result['error'],
-                ], 422);
+                    'message'    => $result['error'],
+                ], $this->statusFromErrorCode($result['error_code']));
             }
 
             return response()->json(['success' => true]);
@@ -241,6 +294,18 @@ class CatalogController extends Controller
                 'message' => $e->getMessage(),
             ], $e->getCode());
         }
+    }
+
+    protected function statusFromErrorCode(string $code): int
+    {
+        return match ($code) {
+            'PERMISSION_DENIED'                  => 403,
+            'WRONG_VERTICAL', 'DUPLICATE_SKU',
+            'INVALID_IMAGE', 'INVALID_PRICE',
+            'INVALID_PARAMETER', 'EMPTY_UPDATE'  => 422,
+            'RATE_LIMITED'                       => 429,
+            default                              => 422,
+        };
     }
 
     /**
