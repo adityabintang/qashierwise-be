@@ -31,13 +31,16 @@ class AiAgentService
 
     protected ConversationGuard $conversationGuard;
 
+    protected CatalogOrderFlowService $catalogOrderFlow;
+
     public function __construct(
         WhatsAppAccountService $whatsappAccountService,
         OrderService $orderService,
         QrisService $qrisService,
         ConversationSummarizer $conversationSummarizer,
         IntentTracker $intentTracker,
-        ConversationGuard $conversationGuard
+        ConversationGuard $conversationGuard,
+        CatalogOrderFlowService $catalogOrderFlow
     ) {
         $this->whatsappAccountService = $whatsappAccountService;
         $this->orderService = $orderService;
@@ -45,6 +48,7 @@ class AiAgentService
         $this->conversationSummarizer = $conversationSummarizer;
         $this->intentTracker = $intentTracker;
         $this->conversationGuard = $conversationGuard;
+        $this->catalogOrderFlow = $catalogOrderFlow;
     }
 
     /**
@@ -73,6 +77,46 @@ class AiAgentService
 
             // Get or create conversation
             $conversation = $this->getOrCreateConversation($aiAgent->id, $contact->id);
+
+            // Catalog flow takeover: when a catalog-driven flow is in progress,
+            // route text input through CatalogOrderFlowService so the LLM doesn't
+            // hijack the state machine. The webhook already routes for delivery
+            // info; this is defense-in-depth and also nudges the user when text
+            // arrives while we're waiting on a button.
+            if ($conversation->getFlowState() !== null) {
+                $handled = $this->catalogOrderFlow->handleDeliveryInfoText(
+                    $account,
+                    $contact,
+                    $conversation,
+                    $aiAgent,
+                    $messageText
+                );
+
+                if (! $handled) {
+                    $this->sendReply(
+                        $account,
+                        $contact->wa_id,
+                        'Mohon gunakan tombol pada pesan sebelumnya untuk melanjutkan, '
+                        .'atau kirim *batal* untuk membatalkan pesanan.'
+                    );
+                }
+
+                return;
+            }
+
+            // Catalog short-circuit: when AI Agent has a catalog and the user
+            // asks for the menu or wants to order, send the WhatsApp Catalog UI
+            // directly instead of having the LLM write a text menu.
+            if ($aiAgent->hasCatalog() && $aiAgent->isOrderEnabled()) {
+                $detected = UserIntent::detect($messageText);
+                if (in_array($detected, [UserIntent::VIEW_MENU, UserIntent::ORDER, UserIntent::NEXT_MENU_PAGE, UserIntent::SEARCH_PRODUCT], true)) {
+                    $conversation->addMessage('human', $messageText);
+                    $conversation->addMessage('ai', 'Mengirim katalog produk…');
+                    $this->catalogOrderFlow->sendCatalog($account, $contact, $aiAgent);
+
+                    return;
+                }
+            }
 
             // Check if there's a pending order confirmation
             $pendingOrder = $conversation->getPendingOrder();
