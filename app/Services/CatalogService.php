@@ -322,7 +322,7 @@ class CatalogService
      * Product fields fetched when listing products. Keep aligned with the
      * frontend's product card and edit modal expectations.
      */
-    protected const PRODUCT_FIELDS = 'id,retailer_id,name,description,price,sale_price,currency,image_url,additional_image_urls,availability,inventory,category,google_product_category,brand,condition,url,visibility';
+    protected const PRODUCT_FIELDS = 'id,retailer_id,name,description,price,sale_price,currency,image_url,additional_image_urls,availability,inventory,category,google_product_category,brand,condition,url,visibility,review_status,review_rejection_reasons';
 
     /**
      * Get products from a specific catalog.
@@ -480,6 +480,130 @@ class CatalogService
             'error_code' => $translated['code'],
             'error'      => $translated['message'],
         ];
+    }
+
+    /**
+     * Resolve display names for a batch of retailer_ids in a catalog.
+     * Used when WhatsApp's `order` webhook only ships SKUs but we want to show
+     * human-readable product names in the chat summary.
+     *
+     * Returns: ['SKU-A' => 'Nasi Goreng', 'SKU-B' => 'Es Teh', ...]
+     * Missing SKUs are simply omitted from the map.
+     */
+    public function getProductNamesByRetailerIds(WhatsAppAccount $account, string $catalogId, array $retailerIds): array
+    {
+        $retailerIds = array_values(array_unique(array_filter($retailerIds)));
+        if (empty($retailerIds)) {
+            return [];
+        }
+
+        // Meta supports a Mongo-ish filter on /products. Encode the SKU set
+        // as a single request rather than N round-trips.
+        $filter = json_encode(['retailer_id' => ['is_any' => $retailerIds]]);
+
+        $response = Http::withToken($account->access_token)
+            ->get("{$this->baseUrl()}/{$catalogId}/products", [
+                'fields' => 'retailer_id,name',
+                'filter' => $filter,
+                'limit'  => max(count($retailerIds), 30),
+            ]);
+
+        if (! $response->successful()) {
+            Log::warning('CatalogService: name lookup failed', [
+                'catalog_id' => $catalogId,
+                'count'      => count($retailerIds),
+                'status'     => $response->status(),
+                'error'      => $response->json('error.message'),
+            ]);
+            return [];
+        }
+
+        $map = [];
+        foreach ($response->json('data', []) as $row) {
+            $rid = $row['retailer_id'] ?? null;
+            $name = $row['name'] ?? null;
+            if ($rid && $name) {
+                $map[$rid] = $name;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * Link a catalog as the active commerce catalog for a WABA, and enable
+     * cart + catalog visibility on the phone number. Idempotent — calling
+     * again with the same catalog is a no-op for Meta.
+     *
+     * Required so that WhatsApp Cloud API's interactive product_list and
+     * product messages accept the catalog_id (otherwise Meta returns
+     * "(#131009) Invalid catalog_id" even when the catalog itself exists).
+     *
+     * @return array{success: bool, linked: bool, commerce_enabled: bool, error?: string}
+     */
+    public function linkCatalogToWaba(WhatsAppAccount $account, string $catalogId): array
+    {
+        $token = $account->access_token;
+        $wabaId = $account->waba_id ?? $account->business_account_id;
+        $phoneNumberId = $account->phone_number_id;
+
+        $result = ['success' => true, 'linked' => false, 'commerce_enabled' => false];
+
+        // 1) Associate the catalog with the WABA.
+        $linkResp = Http::withToken($token)
+            ->asForm()
+            ->post("{$this->baseUrl()}/{$wabaId}/product_catalogs", [
+                'catalog_id' => $catalogId,
+            ]);
+
+        if ($linkResp->successful()) {
+            $result['linked'] = true;
+            Log::info('CatalogService: linked catalog to WABA', [
+                'waba_id'    => $wabaId,
+                'catalog_id' => $catalogId,
+            ]);
+        } else {
+            $err = $linkResp->json('error', []);
+            $msg = $err['message'] ?? 'unknown';
+            // If already linked, Meta replies with a specific error — treat as success.
+            if (str_contains(strtolower($msg), 'already')) {
+                $result['linked'] = true;
+            } else {
+                $result['success'] = false;
+                $result['error'] = $msg;
+                Log::warning('CatalogService: failed to link catalog to WABA', [
+                    'waba_id'    => $wabaId,
+                    'catalog_id' => $catalogId,
+                    'status'     => $linkResp->status(),
+                    'error'      => $msg,
+                ]);
+            }
+        }
+
+        // 2) Enable commerce on the phone number (cart visible + catalog visible).
+        if ($phoneNumberId) {
+            $cs = Http::withToken($token)
+                ->asForm()
+                ->post("{$this->baseUrl()}/{$phoneNumberId}/whatsapp_commerce_settings", [
+                    'is_cart_enabled'    => 'true',
+                    'is_catalog_visible' => 'true',
+                ]);
+
+            if ($cs->successful()) {
+                $result['commerce_enabled'] = true;
+                Log::info('CatalogService: enabled commerce settings', [
+                    'phone_number_id' => $phoneNumberId,
+                ]);
+            } else {
+                Log::warning('CatalogService: failed to enable commerce settings', [
+                    'phone_number_id' => $phoneNumberId,
+                    'status'          => $cs->status(),
+                    'error'           => $cs->json('error.message'),
+                ]);
+            }
+        }
+
+        return $result;
     }
 
     /**
