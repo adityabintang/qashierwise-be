@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Netflie\WhatsAppCloudApi\Message\ButtonReply\Button;
 use Netflie\WhatsAppCloudApi\Message\ButtonReply\ButtonAction;
+use Netflie\WhatsAppCloudApi\Message\MultiProduct\Action as MultiProductAction;
+use Netflie\WhatsAppCloudApi\Message\MultiProduct\Row as MultiProductRow;
+use Netflie\WhatsAppCloudApi\Message\MultiProduct\Section as MultiProductSection;
 use Netflie\WhatsAppCloudApi\WhatsAppCloudApi;
 
 /**
@@ -30,9 +33,17 @@ class CatalogOrderFlowService
 {
     public function __construct(
         protected QrisService $qrisService,
+        protected CatalogService $catalogService,
     ) {}
 
+    /** WhatsApp Multi-Product Message constraints. */
+    private const MAX_SECTIONS = 10;
+    private const MAX_ROWS_PER_SECTION = 30;
+    private const MAX_TOTAL_ITEMS = 30;
+
     // ---- Button IDs ---------------------------------------------------------
+
+    public const BTN_SHOW_MENU = 'show_menu';
 
     public const BTN_PICKUP = 'fulfill_pickup';
 
@@ -61,8 +72,158 @@ class CatalogOrderFlowService
     // ---- Entry points -------------------------------------------------------
 
     /**
+     * Deterministic reply for off-topic / unrecognised input outside the order
+     * flow, attached to a single *Lihat Menu* button. Avoids dead-end text-only
+     * fallbacks where the customer had to type "menu" manually.
+     */
+    public function sendFallbackWithMenuButton(
+        WhatsAppAccount $account,
+        WhatsAppContact $contact,
+        AiAgent $aiAgent,
+        string $body
+    ): void {
+        $client = $this->client($account);
+
+        try {
+            $buttons = [];
+            if ($aiAgent->hasCatalog()) {
+                $buttons[] = new Button(self::BTN_SHOW_MENU, 'Lihat Menu');
+            }
+            if (! empty($buttons)) {
+                $action = new ButtonAction($buttons);
+                $client->sendButton(
+                    $contact->wa_id,
+                    $body,
+                    $action,
+                    null,
+                    $aiAgent->bot_name ?: null
+                );
+            } else {
+                $this->sendText($client, $contact->wa_id, $body);
+            }
+        } catch (\Throwable $e) {
+            Log::error('Failed to send fallback button reply', [
+                'contact_wa_id' => $contact->wa_id,
+                'error'         => $e->getMessage(),
+            ]);
+            $this->sendText($client, $contact->wa_id, $body);
+        }
+    }
+
+    /**
+     * Customer typed text while we're waiting on a button. Show the "use
+     * the buttons above" nudge — but with an actual *Batal* button so they
+     * don't have to type the magic word.
+     */
+    public function sendStuckPrompt(
+        WhatsAppAccount $account,
+        WhatsAppContact $contact
+    ): void {
+        $client = $this->client($account);
+        $body = "Mohon gunakan tombol pada pesan sebelumnya untuk melanjutkan, "
+              . "atau tap *Batal* untuk membatalkan pesanan.";
+
+        try {
+            $action = new ButtonAction([
+                new Button(self::BTN_CANCEL_ORDER, '❌ Batal'),
+            ]);
+            $client->sendButton($contact->wa_id, $body, $action, null, null);
+        } catch (\Throwable $e) {
+            Log::error('Failed to send stuck prompt button', [
+                'contact_wa_id' => $contact->wa_id,
+                'error'         => $e->getMessage(),
+            ]);
+            $this->sendText($client, $contact->wa_id,
+                "Mohon gunakan tombol pada pesan sebelumnya, atau kirim *batal* untuk membatalkan.");
+        }
+    }
+
+    /**
+     * Cancelled-order reply with a Lihat Menu button so the customer can
+     * one-tap straight back to ordering without typing "menu".
+     */
+    public function sendCancelledReply(
+        WhatsAppAccount $account,
+        WhatsAppContact $contact,
+        AiAgent $aiAgent
+    ): void {
+        $client = $this->client($account);
+        $body = "❌ Pesanan dibatalkan. Tap *Lihat Menu* untuk memesan lagi kapan saja.";
+
+        try {
+            $buttons = [];
+            if ($aiAgent->hasCatalog()) {
+                $buttons[] = new Button(self::BTN_SHOW_MENU, 'Lihat Menu');
+            }
+            if (! empty($buttons)) {
+                $action = new ButtonAction($buttons);
+                $client->sendButton($contact->wa_id, $body, $action, null, null);
+            } else {
+                $this->sendText($client, $contact->wa_id,
+                    "❌ Pesanan dibatalkan. Ketik *menu* kapan saja untuk memesan lagi.");
+            }
+        } catch (\Throwable $e) {
+            Log::error('Failed to send cancelled reply button', [
+                'contact_wa_id' => $contact->wa_id,
+                'error'         => $e->getMessage(),
+            ]);
+            $this->sendText($client, $contact->wa_id,
+                "❌ Pesanan dibatalkan. Ketik *menu* kapan saja untuk memesan lagi.");
+        }
+    }
+
+    /**
+     * Reply to a greeting ("Halo", "Hi", "Selamat pagi") with a quick-reply
+     * button that opens the catalog directly. Saves the customer from having
+     * to type "menu" and saves us an LLM call.
+     *
+     * The button reply ID `BTN_SHOW_MENU` is routed back to sendCatalog()
+     * by WhatsAppWebhookController::handleInteractive.
+     */
+    public function sendGreetingWithMenuButton(
+        WhatsAppAccount $account,
+        WhatsAppContact $contact,
+        AiAgent $aiAgent,
+        string $greetingText
+    ): void {
+        $client = $this->client($account);
+
+        try {
+            $action = new ButtonAction([
+                new Button(self::BTN_SHOW_MENU, 'Lihat Menu'),
+            ]);
+
+            $client->sendButton(
+                $contact->wa_id,
+                $greetingText,
+                $action,
+                null,                                  // header (optional)
+                $aiAgent->bot_name ?: 'Pesan via WhatsApp' // footer
+            );
+
+            Log::info('Greeting with menu button sent', [
+                'ai_agent_id'   => $aiAgent->id,
+                'contact_wa_id' => $contact->wa_id,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to send greeting button, falling back to text', [
+                'ai_agent_id'   => $aiAgent->id,
+                'contact_wa_id' => $contact->wa_id,
+                'error'         => $e->getMessage(),
+            ]);
+
+            // Fallback to plain text so the customer still gets a reply.
+            $this->sendText($client, $contact->wa_id, $greetingText);
+        }
+    }
+
+    /**
      * Send the merchant's Meta product catalog to the customer.
      * Called when the AI detects VIEW_MENU / ORDER intent and a catalog is set.
+     *
+     * Uses Netflie's sendMultiProduct / sendSingleProduct — both accept an
+     * explicit catalog_id so the WABA does NOT need a "primary" catalog linked
+     * (avoiding Meta error 131009 "Check if a catalog is linked...").
      */
     public function sendCatalog(
         WhatsAppAccount $account,
@@ -70,29 +231,229 @@ class CatalogOrderFlowService
         AiAgent $aiAgent
     ): void {
         $client = $this->client($account);
+        $catalogId = $aiAgent->catalog_id;
+        $botName   = $aiAgent->bot_name ?? 'Pesan via WhatsApp';
 
-        $body = 'Halo! Silakan pilih menu favorit Anda dari katalog kami. '
-              .'Tambahkan ke keranjang lalu kirim pesanan saat selesai.';
-        $footer = $aiAgent->bot_name ?? 'Pesan via WhatsApp';
+        if (! $catalogId) {
+            Log::warning('sendCatalog called without catalog_id', [
+                'ai_agent_id' => $aiAgent->id,
+            ]);
+            $this->sendText($client, $contact->wa_id,
+                'Katalog menu belum dikonfigurasi. Silakan hubungi admin.');
+            return;
+        }
+
+        // Fetch products from Meta. WhatsApp MPM caps at 30 items / 10 sections.
+        $result = $this->catalogService->getCatalogProducts($account, $catalogId, self::MAX_TOTAL_ITEMS);
+
+        if (! ($result['success'] ?? false)) {
+            Log::error('Failed to fetch catalog products for MPM', [
+                'ai_agent_id' => $aiAgent->id,
+                'catalog_id'  => $catalogId,
+                'error'       => $result['error'] ?? 'unknown',
+            ]);
+            $this->sendText($client, $contact->wa_id,
+                'Maaf, katalog menu tidak dapat ditampilkan saat ini. Silakan coba lagi nanti.');
+            return;
+        }
+
+        $products = $this->filterAvailableProducts($result['products'] ?? []);
+
+        if (empty($products)) {
+            $this->sendText($client, $contact->wa_id,
+                'Maaf, saat ini belum ada menu yang tersedia. Silakan coba lagi nanti.');
+            return;
+        }
 
         try {
-            $client->sendCatalog($contact->wa_id, $body, $footer);
+            $this->sendMultiProductMessage($client, $contact, $catalogId, $products, $botName);
 
             Log::info('Catalog sent to customer', [
-                'ai_agent_id' => $aiAgent->id,
+                'ai_agent_id'   => $aiAgent->id,
                 'contact_wa_id' => $contact->wa_id,
-                'catalog_id' => $aiAgent->catalog_id,
+                'catalog_id'    => $catalogId,
+                'product_count' => count($products),
             ]);
         } catch (\Throwable $e) {
+            $errorMessage = $e->getMessage();
+            $reason = $this->classifyCatalogError($errorMessage);
+
             Log::error('Failed to send catalog message', [
-                'ai_agent_id' => $aiAgent->id,
+                'ai_agent_id'   => $aiAgent->id,
                 'contact_wa_id' => $contact->wa_id,
-                'error' => $e->getMessage(),
+                'catalog_id'    => $catalogId,
+                'product_count' => count($products),
+                'reason'        => $reason,
+                'error'         => $errorMessage,
             ]);
+
+            // Smart fallback: when WhatsApp rejects the products (most often
+            // because they're still in Meta's automated review queue), still
+            // give the customer a usable text menu built from what we just
+            // fetched — far better UX than a bare error message.
+            if ($reason === 'products_not_approved' || $reason === 'products_invalid') {
+                $this->sendTextMenuFallback($client, $contact, $aiAgent, $products);
+                return;
+            }
 
             $this->sendText($client, $contact->wa_id,
                 'Maaf, katalog menu tidak dapat ditampilkan saat ini. Silakan coba lagi nanti.');
         }
+    }
+
+    /**
+     * Map Meta error responses to a stable reason code so the fallback path
+     * can decide whether to retry, show a text menu, or just apologize.
+     */
+    private function classifyCatalogError(string $rawError): string
+    {
+        $h = strtolower($rawError);
+
+        // 131009 + "None of the products provided could be sent" → review pending / rejected
+        if (str_contains($h, 'none of the products')) return 'products_not_approved';
+        if (str_contains($h, 'check your catalog'))   return 'products_not_approved';
+        // 131009 + "Invalid catalog_id" → catalog not associated with WABA
+        if (str_contains($h, 'invalid catalog_id'))   return 'catalog_not_linked';
+        // Bad SKU
+        if (str_contains($h, 'invalid retailer_id'))  return 'products_invalid';
+
+        return 'unknown';
+    }
+
+    /**
+     * Plain-text fallback menu, built from the product list we already fetched.
+     * Used when the WhatsApp catalog UI can't render — keeps the customer in
+     * the conversation instead of dead-ending them.
+     */
+    private function sendTextMenuFallback(
+        WhatsAppCloudApi $client,
+        WhatsAppContact $contact,
+        AiAgent $aiAgent,
+        array $products
+    ): void {
+        $botName = $aiAgent->bot_name ?: 'Kami';
+
+        // Group by category for readability — same grouping logic as MPM sections.
+        $grouped = [];
+        foreach ($products as $p) {
+            $cat = trim((string) ($p['category'] ?? '')) ?: 'Menu Lainnya';
+            $grouped[$cat][] = $p;
+        }
+
+        $lines = ["*Menu {$botName}*", ''];
+        foreach ($grouped as $catName => $items) {
+            $lines[] = "_{$catName}_";
+            foreach ($items as $p) {
+                $name  = $p['name'] ?? '(tanpa nama)';
+                $price = $p['price'] ?? '';
+                $lines[] = "• {$name}" . ($price !== '' ? " — {$price}" : '');
+            }
+            $lines[] = '';
+        }
+        $lines[] = 'Ketik nama menu yang ingin dipesan, atau kirim *batal* untuk berhenti.';
+
+        $body = trim(implode("\n", $lines));
+
+        $this->sendText($client, $contact->wa_id, $body);
+
+        Log::info('Catalog fallback: sent text menu', [
+            'ai_agent_id'   => $aiAgent->id,
+            'contact_wa_id' => $contact->wa_id,
+            'product_count' => count($products),
+        ]);
+    }
+
+    /**
+     * Keep only products with a usable retailer_id and (where set) availability=in stock.
+     * Meta MPM silently drops unknown SKUs; preventing them upfront keeps the message stable.
+     */
+    private function filterAvailableProducts(array $products): array
+    {
+        return array_values(array_filter($products, function ($p) {
+            if (empty($p['retailer_id'])) {
+                return false;
+            }
+            $avail = strtolower($p['availability'] ?? 'in stock');
+            return in_array($avail, ['in stock', 'preorder', 'available for order'], true);
+        }));
+    }
+
+    private function sendMultiProductMessage(
+        WhatsAppCloudApi $client,
+        WhatsAppContact $contact,
+        string $catalogId,
+        array $products,
+        string $botName
+    ): void {
+        $sections = $this->buildMultiProductSections($products);
+
+        $header = mb_substr('Menu ' . $botName, 0, 60);
+        $body   = count($products) === 1
+            ? 'Berikut menu kami. Tap "View" lalu "Add to cart" untuk memesan.'
+            : 'Silakan pilih menu favorit Anda. Tap "View" untuk detail, '
+              . 'lalu "Add to cart" untuk menambahkan ke keranjang.';
+        $footer = mb_substr($botName, 0, 60);
+
+        // Netflie 2.x types catalog_id as int — Meta catalog IDs are numeric
+        // strings; cast safely on 64-bit PHP. PHP_INT_SIZE is 8 on prod servers.
+        $client->sendMultiProduct(
+            $contact->wa_id,
+            (int) $catalogId,
+            new MultiProductAction($sections),
+            $header,
+            $body,
+            $footer
+        );
+    }
+
+    /**
+     * Group products into Sections by `category` (Kategori Menu F&B).
+     * Sections preserve insertion order; WhatsApp requires 1-10 sections,
+     * each with 1-30 rows, total 30 items max.
+     */
+    private function buildMultiProductSections(array $products): array
+    {
+        $grouped = [];
+        foreach ($products as $p) {
+            $cat = trim((string) ($p['category'] ?? '')) ?: 'Menu Lainnya';
+            // Section title hard-capped to 24 chars per WhatsApp spec.
+            $cat = mb_substr($cat, 0, 24);
+            $grouped[$cat][] = $p['retailer_id'];
+        }
+
+        $sections = [];
+        $totalItems = 0;
+
+        foreach ($grouped as $title => $skus) {
+            if (count($sections) >= self::MAX_SECTIONS) {
+                break;
+            }
+
+            $rows = [];
+            foreach ($skus as $sku) {
+                if ($totalItems >= self::MAX_TOTAL_ITEMS
+                    || count($rows) >= self::MAX_ROWS_PER_SECTION) {
+                    break;
+                }
+                $rows[] = new MultiProductRow($sku);
+                $totalItems++;
+            }
+
+            if (! empty($rows)) {
+                $sections[] = new MultiProductSection($title, $rows);
+            }
+        }
+
+        // Fallback: single unnamed section if grouping somehow yielded nothing.
+        if (empty($sections)) {
+            $rows = [];
+            foreach (array_slice($products, 0, self::MAX_TOTAL_ITEMS) as $p) {
+                $rows[] = new MultiProductRow($p['retailer_id']);
+            }
+            $sections[] = new MultiProductSection('Menu', $rows);
+        }
+
+        return $sections;
     }
 
     /**
@@ -118,6 +479,24 @@ class CatalogOrderFlowService
             );
 
             return;
+        }
+
+        // Resolve product names — Meta's order webhook only ships retailer_ids,
+        // so without this lookup the order summary would read "SKU-XXX x1".
+        if ($aiAgent->catalog_id) {
+            $skus = array_column($items, 'product_retailer_id');
+            $nameMap = $this->catalogService->getProductNamesByRetailerIds(
+                $account,
+                (string) $aiAgent->catalog_id,
+                $skus
+            );
+            foreach ($items as &$item) {
+                $resolved = $nameMap[$item['product_retailer_id']] ?? null;
+                if ($resolved) {
+                    $item['product_name'] = $resolved;
+                }
+            }
+            unset($item);
         }
 
         $conversation->setCatalogItems($items);
@@ -152,6 +531,25 @@ class CatalogOrderFlowService
             'conversation_id' => $conversation->id,
         ]);
 
+        // "Lihat Menu" button works regardless of flow state — it's the
+        // greeting CTA shortcut. Equivalent to user typing "menu".
+        if ($buttonId === self::BTN_SHOW_MENU && $aiAgent->hasCatalog()) {
+            $this->sendCatalog($account, $contact, $aiAgent);
+            return true;
+        }
+
+        // "Batal" button is also universal — same behavior as typing "batal".
+        // Previously only handled inside the order-summary state which left
+        // customers stuck if the button appeared elsewhere.
+        if ($buttonId === self::BTN_CANCEL_ORDER) {
+            $conversation->clearCatalogItems();
+            $conversation->clearDeliveryContext();
+            $conversation->clearPendingOrder();
+            $conversation->clearFlowState();
+            $this->sendCancelledReply($account, $contact, $aiAgent);
+            return true;
+        }
+
         if ($state === self::STATE_AWAITING_FULFILLMENT) {
             return $this->handleFulfillmentChoice($account, $contact, $conversation, $aiAgent, $buttonId);
         }
@@ -182,12 +580,236 @@ class CatalogOrderFlowService
             return false;
         }
 
-        $conversation->setDeliveryRawInfo(trim($text));
+        $clean = trim($text);
+
+        // Escape hatch: customer types "batal/cancel/stop" while we're awaiting
+        // their delivery details — don't save it as their delivery name.
+        if (preg_match('/^\s*(batal|cancel|stop|berhenti|gajadi|gak\s+jadi|tidak\s+jadi)\.?\s*$/iu', $clean)) {
+            Log::info('Catalog flow cancelled via text in delivery-info state', [
+                'ai_agent_id'   => $aiAgent->id,
+                'contact_wa_id' => $contact->wa_id,
+            ]);
+            $conversation->clearFlowState();
+            $conversation->clearDeliveryContext();
+            $conversation->clearCatalogItems();
+            $conversation->clearPendingOrder();
+            $this->sendCancelledReply($account, $contact, $aiAgent);
+            return true;
+        }
+
+        // Partial edit: "ubah/ganti/edit/update <field> = <value>"
+        // Only one field updates; others remain. Returns to confirmation step.
+        if ($this->applyPartialDeliveryEdit($conversation, $clean)) {
+            $conversation->setFlowState(self::STATE_CONFIRMING_DELIVERY_INFO);
+            $this->sendDeliveryInfoSummary($account, $contact, $conversation);
+            return true;
+        }
+
+        $conversation->setDeliveryRawInfo($clean);
+        $conversation->setDeliveryParsed($this->parseDeliveryInfo($clean));
         $conversation->setFlowState(self::STATE_CONFIRMING_DELIVERY_INFO);
 
         $this->sendDeliveryInfoSummary($account, $contact, $conversation);
 
         return true;
+    }
+
+    /**
+     * If the message matches a partial-edit pattern like "ubah nama = Budi"
+     * or "ganti alamat: Jl. baru", merge that single field into the existing
+     * parsed delivery info and return true. Otherwise return false so the
+     * caller falls through to full re-parse.
+     */
+    private function applyPartialDeliveryEdit(AiAgentConversation $conversation, string $text): bool
+    {
+        // Field aliases → canonical key in delivery_parsed.
+        $fieldMap = [
+            'nama'     => 'name',
+            'name'     => 'name',
+            'telepon'  => 'phone',
+            'telpon'   => 'phone',
+            'telp'     => 'phone',
+            'phone'    => 'phone',
+            'hp'       => 'phone',
+            'no'       => 'phone',
+            'nomor'    => 'phone',
+            'wa'       => 'phone',
+            'alamat'   => 'address',
+            'address'  => 'address',
+            'catatan'  => 'note',
+            'note'     => 'note',
+            'keterangan' => 'note',
+        ];
+
+        $aliasGroup = implode('|', array_keys($fieldMap));
+        $re = '/^\s*(?:ubah|ganti|edit|update|set|isi)\s+(' . $aliasGroup . ')\s*(?:=|:|menjadi|jadi|ke|adalah)?\s*(.+)$/iu';
+
+        if (! preg_match($re, $text, $m)) {
+            return false;
+        }
+
+        $alias = strtolower($m[1]);
+        $newValue = trim($m[2], " \t.,-");
+        if ($newValue === '') {
+            return false;
+        }
+
+        $field = $fieldMap[$alias] ?? null;
+        if ($field === null) {
+            return false;
+        }
+
+        // Normalize per-field.
+        if ($field === 'phone') {
+            if (preg_match('/(?:\+?62|0)[\s\-]?[2-9]\d(?:[\s\-]?\d){6,11}/', $newValue, $pm)) {
+                $newValue = $this->normalizePhone($pm[0]);
+            } else {
+                return false; // not a recognisable phone — let user retry
+            }
+        } elseif ($field === 'name') {
+            $newValue = $this->titleCase($newValue);
+        }
+
+        $existing = $conversation->getDeliveryParsed() ?? [];
+        $existing[$field] = $newValue;
+
+        // Backfill keys so the structure stays predictable.
+        foreach (['name', 'phone', 'address', 'note'] as $k) {
+            if (! array_key_exists($k, $existing)) $existing[$k] = null;
+        }
+
+        $conversation->setDeliveryParsed($existing);
+
+        // Recompose raw display from the merged structure so subsequent
+        // edits also reflect the latest state.
+        $rawParts = [];
+        if (! empty($existing['name']))    $rawParts[] = $existing['name'];
+        if (! empty($existing['phone']))   $rawParts[] = $existing['phone'];
+        if (! empty($existing['address'])) $rawParts[] = $existing['address'];
+        if (! empty($existing['note']))    $rawParts[] = $existing['note'];
+        $conversation->setDeliveryRawInfo(implode(', ', $rawParts));
+
+        Log::info('Partial delivery edit applied', [
+            'field' => $field,
+            'value_preview' => mb_substr($newValue, 0, 40),
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Best-effort extraction of structured delivery fields from a free-text
+     * customer message. Regex-based & deterministic; surfaces uncertain fields
+     * as null so the UI can flag them rather than fabricate.
+     *
+     * Returns ['name' => ?string, 'phone' => ?string, 'address' => ?string, 'note' => ?string]
+     */
+    public function parseDeliveryInfo(string $text): array
+    {
+        $text = preg_replace('/\s+/', ' ', trim($text));
+
+        // Split on commas/semicolons only — splitting on "." breaks "Jl." abbreviations.
+        $rawSegments = array_filter(array_map('trim',
+            preg_split('/\s*[,;]\s*/u', $text) ?: []
+        ), fn ($s) => $s !== '');
+
+        // Second-pass split: for any segment that contains BOTH a geographic
+        // term (city/province) and a note keyword separated by a sentence-end
+        // period, split on the period so each part can be classified separately.
+        // Avoids "sumatera barat. Untuk pesanannya jangan pedas" landing entirely
+        // in notes when the first half is actually part of the address.
+        $segments = [];
+        foreach ($rawSegments as $seg) {
+            if (str_contains($seg, '. ') && preg_match('/\b(jakarta|bandung|surabaya|medan|semarang|makassar|palembang|tangerang|depok|bekasi|bogor|padang|pekanbaru|denpasar|yogya|malang|solo|sumatera|sumatra|jawa|kalimantan|sulawesi|bali|aceh|riau|lampung|banten|papua)\b/i', $seg)
+                && preg_match('/\b(jangan|tanpa|tolong|minta|catatan|note)\b/i', $seg)) {
+                foreach (preg_split('/\.\s+/u', $seg) as $sub) {
+                    $sub = trim($sub, " .");
+                    if ($sub !== '') $segments[] = $sub;
+                }
+            } else {
+                $segments[] = $seg;
+            }
+        }
+
+        $phone = null;
+        $addressParts = [];
+        $noteParts = [];
+        $nameCandidates = [];
+
+        $phoneRe   = '/(?:\+?62|0)[\s\-]?[2-9]\d(?:[\s\-]?\d){6,11}/';
+        $addressRe = '/\b(jl\.?|jalan|gang|gg\.?|komplek|kompleks|kel\.|kelurahan|kec\.|kecamatan|rt\b|rw\b|no\.?\s*\d|nomor\s+\d|alamat|blok|kampung|desa|dusun|perumahan)\b/i';
+        // Geographic continuation: city/province segment after an address segment.
+        $geoRe     = '/\b(jakarta|bandung|surabaya|medan|semarang|makassar|palembang|tangerang|depok|bekasi|bogor|padang|pekanbaru|denpasar|yogya(?:karta)?|malang|solo|sumatera|sumatra|jawa|kalimantan|sulawesi|bali|aceh|riau|lampung|banten|papua)\b/i';
+        $noteRe    = '/\b(jangan|tanpa|tolong|minta|catatan|note|gak\s+pakai|tidak\s+pakai|extra|less|more|tambah)\b/i';
+        $labelRe   = '/^(nomor|no\.?|telp\.?|telepon|hp|wa|nama(?:nya)?(?:\s+saya)?|saya|alamat)$/iu';
+
+        foreach ($segments as $seg) {
+            // Phone — extract first valid match, strip from segment, keep remainder for further classification.
+            if ($phone === null && preg_match($phoneRe, $seg, $m)) {
+                $phone = $this->normalizePhone($m[0]);
+                $remainder = trim(preg_replace($phoneRe, '', $seg, 1, $count) ?? '');
+                // Strip any leading "nomor/telp/hp" label or trailing punctuation.
+                $remainder = trim(preg_replace('/^\s*(nomor|no\.?|telp\.?|telepon|hp|wa|telp)\s*[:.-]?\s*/iu', '', $remainder), " \t,.-");
+                if ($remainder === '' || preg_match($labelRe, $remainder)) {
+                    continue;
+                }
+                $seg = $remainder;
+            }
+
+            if (preg_match($addressRe, $seg)) {
+                $addressParts[] = $seg;
+                continue;
+            }
+            // If we already have an address and this segment looks like a city/province, merge it.
+            if (! empty($addressParts) && preg_match($geoRe, $seg) && ! preg_match($noteRe, $seg)) {
+                $addressParts[] = $seg;
+                continue;
+            }
+            if (preg_match($noteRe, $seg)) {
+                $noteParts[] = $seg;
+                continue;
+            }
+
+            // Default bucket: name candidate (segments without phone/address/note markers).
+            $nameCandidates[] = $seg;
+        }
+
+        $name = null;
+        if (! empty($nameCandidates)) {
+            $first = array_shift($nameCandidates);
+            // Strip leading "saya"/"nama saya"/"nama".
+            $first = preg_replace('/^\s*(nama(?:nya)?(?:\s+saya)?|saya)\s+/iu', '', $first);
+            $first = trim($first);
+            // Reject "names" that are too long (likely a sentence misclassified)
+            // or contain verbs/greetings.
+            if ($first !== '' && mb_strlen($first) <= 60 && ! preg_match('/\b(halo|hai|hi|kasih|info|dulu|deh|pesan|order|tolong)\b/iu', $first)) {
+                $name = $this->titleCase($first);
+            } else {
+                array_unshift($nameCandidates, $first); // put it back; treat as note
+            }
+            $noteParts = array_merge($nameCandidates, $noteParts);
+        }
+
+        return [
+            'name'    => $name !== null && $name !== '' ? $name : null,
+            'phone'   => $phone,
+            'address' => ! empty($addressParts) ? trim(implode(', ', $addressParts), " ,") : null,
+            'note'    => ! empty($noteParts) ? trim(implode('. ', $noteParts), " .") : null,
+        ];
+    }
+
+    private function normalizePhone(string $raw): string
+    {
+        $digits = preg_replace('/[^\d+]/', '', $raw);
+        // Normalize "+62..." or "62..." to "08..." for local Indonesian readability.
+        if (str_starts_with($digits, '+62')) $digits = '0' . substr($digits, 3);
+        elseif (str_starts_with($digits, '62')) $digits = '0' . substr($digits, 2);
+        return $digits;
+    }
+
+    private function titleCase(string $s): string
+    {
+        return mb_convert_case(mb_strtolower($s), MB_CASE_TITLE, 'UTF-8');
     }
 
     // ---- Internal button branches -------------------------------------------
@@ -261,14 +883,29 @@ class CatalogOrderFlowService
             $this->sendText(
                 $client,
                 $contact->wa_id,
-                'Silakan kirim ulang informasi delivery Anda dalam satu pesan.'
+                "✏️ *Edit Informasi Delivery*\n\n"
+                ."Pilih salah satu:\n"
+                ."1️⃣ Kirim ulang *semua* info dalam satu pesan, atau\n"
+                ."2️⃣ Edit satu field saja dengan format:\n"
+                ."   • _ubah nama = Budi_\n"
+                ."   • _ubah telepon = 0812xxxx_\n"
+                ."   • _ubah alamat = Jl. Mawar no 12_\n"
+                ."   • _ubah catatan = jangan pedas_"
             );
 
             return true;
         }
 
         if ($buttonId === self::BTN_CONFIRM_DELIVERY) {
-            $conversation->setDeliveryAddress($conversation->getDeliveryRawInfo() ?? '');
+            // Prefer parsed structured fields over the raw text.
+            $parsed = $conversation->getDeliveryParsed() ?? [];
+            $address = $parsed['address'] ?? $conversation->getDeliveryRawInfo() ?? '';
+            $note    = $parsed['note']    ?? null;
+
+            $conversation->setDeliveryAddress($address);
+            if ($note) {
+                $conversation->setDeliveryNotes($note);
+            }
             $conversation->setFlowState(self::STATE_CONFIRMING_ORDER_SUMMARY);
             $this->sendOrderSummary($account, $contact, $conversation, $aiAgent);
 
@@ -287,19 +924,8 @@ class CatalogOrderFlowService
     ): bool {
         $client = $this->client($account);
 
-        if ($buttonId === self::BTN_CANCEL_ORDER) {
-            $conversation->clearCatalogItems();
-            $conversation->clearDeliveryContext();
-            $conversation->clearFlowState();
-
-            $this->sendText(
-                $client,
-                $contact->wa_id,
-                '❌ Pesanan dibatalkan. Ketik *menu* kapan saja untuk memesan lagi.'
-            );
-
-            return true;
-        }
+        // Note: BTN_CANCEL_ORDER is handled at the top of handleButtonReply()
+        // as a universal escape — no per-state branch needed here.
 
         if ($buttonId === self::BTN_CONFIRM_ORDER) {
             $this->createOrderAndRespond($account, $contact, $conversation, $aiAgent);
@@ -373,11 +999,48 @@ class CatalogOrderFlowService
         AiAgentConversation $conversation
     ): void {
         $client = $this->client($account);
-        $info = $conversation->getDeliveryRawInfo() ?: '(kosong)';
+        $parsed = $conversation->getDeliveryParsed() ?: [];
+        $raw    = $conversation->getDeliveryRawInfo() ?: '';
 
-        $body = "📍 *Konfirmasi Informasi Delivery*\n\n"
-              .$info
-              ."\n\nApakah informasi di atas sudah benar?";
+        $name    = $parsed['name']    ?? null;
+        $phone   = $parsed['phone']   ?? null;
+        $address = $parsed['address'] ?? null;
+        $note    = $parsed['note']    ?? null;
+
+        // If parser missed all required fields, show raw as a single block + ask
+        // user to re-send in the requested format.
+        $hasAny = $name || $phone || $address;
+
+        if (! $hasAny) {
+            $body = "📍 *Konfirmasi Informasi Delivery*\n\n"
+                  . "Maaf, kami tidak dapat membaca informasi dari pesan:\n\n"
+                  . "_" . $raw . "_\n\n"
+                  . "Mohon kirim ulang dengan format:\n"
+                  . "_Budi, 0812xxxx, Jl. Mawar no 12 RT 03/04, jangan pedas_";
+        } else {
+            $missing = array_filter([
+                ! $name    ? 'nama'    : null,
+                ! $phone   ? 'nomor telepon' : null,
+                ! $address ? 'alamat'  : null,
+            ]);
+
+            $lines = ["📍 *Konfirmasi Informasi Delivery*", ''];
+            $lines[] = '👤 *Nama:* '     . ($name    ?: '_belum terdeteksi_');
+            $lines[] = '📱 *Telepon:* '  . ($phone   ?: '_belum terdeteksi_');
+            $lines[] = '📍 *Alamat:* '   . ($address ?: '_belum terdeteksi_');
+            if ($note) {
+                $lines[] = '📝 *Catatan:* ' . $note;
+            }
+            $lines[] = '';
+
+            if (! empty($missing)) {
+                $lines[] = '⚠️ Belum lengkap: ' . implode(', ', $missing) . '. '
+                         . 'Tap *Edit* untuk koreksi atau *Konfirmasi* kalau sudah benar.';
+            } else {
+                $lines[] = 'Apakah informasi di atas sudah benar?';
+            }
+            $body = implode("\n", $lines);
+        }
 
         $action = new ButtonAction([
             new Button(self::BTN_EDIT_DELIVERY, '✏️ Edit'),
@@ -523,13 +1186,24 @@ class CatalogOrderFlowService
                 $ongkir = $isDelivery ? (float) $conversation->getOngkir() : 0;
                 $total = $subtotal + $tax + $ongkir;
 
+                // For delivery orders, prefer the recipient details the customer
+                // typed (parsed) over their WhatsApp profile — the WA name/number
+                // may not match the delivery recipient.
+                $parsed = $conversation->getDeliveryParsed() ?? [];
+                $customerName  = $isDelivery && ! empty($parsed['name'])
+                    ? $parsed['name']
+                    : ($contact->name ?? 'WhatsApp Customer');
+                $customerPhone = $isDelivery && ! empty($parsed['phone'])
+                    ? $parsed['phone']
+                    : $contact->wa_id;
+
                 $order = Order::create([
                     'store_id' => $aiAgent->default_store_id,
                     'order_number' => $this->generateOrderNumber($aiAgent->default_store_id),
                     'status' => Order::STATUS_PENDING,
                     'source' => Order::SOURCE_WHATSAPP_AI,
-                    'customer_name' => $contact->name ?? 'WhatsApp Customer',
-                    'customer_phone' => $contact->wa_id,
+                    'customer_name' => $customerName,
+                    'customer_phone' => $customerPhone,
                     'delivery_type' => $deliveryType,
                     'alamat' => $isDelivery ? $conversation->getDeliveryAddress() : null,
                     'ongkir' => $ongkir,
