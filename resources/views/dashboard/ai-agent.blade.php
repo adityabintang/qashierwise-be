@@ -261,6 +261,35 @@
                                     </p>
                                 </div>
 
+                                <!-- Meta Catalog Selection -->
+                                <div class="space-y-2">
+                                    <label class="block text-sm font-medium text-[hsl(var(--foreground))]">
+                                        <i class="fas fa-book-open text-emerald-400 mr-1.5"></i>
+                                        Katalog Meta
+                                    </label>
+                                    <select
+                                        x-model="form.catalog_id"
+                                        class="w-full h-10 px-3 rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--background))] text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                                        :disabled="catalogsLoading"
+                                    >
+                                        <option value="">-- Tidak menggunakan katalog (mode AI text) --</option>
+                                        <template x-for="catalog in catalogs" :key="catalog.id">
+                                            <option :value="catalog.id" x-text="catalog.name + ' (' + (catalog.product_count || 0) + ' produk)'"></option>
+                                        </template>
+                                    </select>
+                                    <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                                        Saat dipilih, AI akan langsung mengirim katalog ke pelanggan ketika mereka ingin melihat menu atau memesan
+                                    </p>
+                                    <p x-show="!catalogsLoading && catalogs.length === 0" class="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        Belum ada katalog. <a href="/dashboard/meta-catalog" class="underline hover:no-underline">Buat katalog terlebih dahulu</a>
+                                    </p>
+                                    <p x-show="catalogsLoading" class="text-xs text-[hsl(var(--muted-foreground))] mt-1 flex items-center gap-1">
+                                        <i class="fas fa-spinner fa-spin"></i>
+                                        Memuat daftar katalog…
+                                    </p>
+                                </div>
+
                                 <!-- Order Toggle - AFTER store selection -->
                                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl" :class="config.order_enabled && form.default_store_id ? 'bg-emerald-100 border border-emerald-400 shadow-sm shadow-emerald-100' : (form.default_store_id ? 'bg-emerald-50 border border-emerald-200' : 'bg-gray-50 border border-gray-200')">
                                     <div class="flex-1">
@@ -662,6 +691,8 @@ function aiAgentApp() {
         togglingOrder: false,
         lastSaved: null,
         stores: [],
+        catalogs: [],
+        catalogsLoading: false,
         config: {
             id: null,
             is_active: false,
@@ -680,6 +711,7 @@ function aiAgentApp() {
                 phone: '',
             },
             default_store_id: '',
+            catalog_id: '',
             default_ongkir: 0,
         },
         // Test modal
@@ -693,8 +725,11 @@ function aiAgentApp() {
             this.initSidebar();
 
             try {
-                // Load stores
-                await this.loadStores();
+                // Load stores and catalogs in parallel
+                await Promise.all([
+                    this.loadStores(),
+                    this.loadCatalogs(),
+                ]);
 
                 // Load AI Agent config
                 await this.loadConfig();
@@ -702,6 +737,27 @@ function aiAgentApp() {
                 console.error('Init error:', error);
             } finally {
                 this.loading = false;
+            }
+        },
+
+        async loadCatalogs() {
+            const token = localStorage.getItem('token');
+            this.catalogsLoading = true;
+            try {
+                const response = await fetch('/api/whatsapp/catalog/catalogs', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json',
+                    }
+                });
+                const data = await response.json();
+                if (data.success && Array.isArray(data.catalogs)) {
+                    this.catalogs = data.catalogs;
+                }
+            } catch (error) {
+                console.error('Failed to load catalogs:', error);
+            } finally {
+                this.catalogsLoading = false;
             }
         },
 
@@ -764,6 +820,7 @@ function aiAgentApp() {
                             phone: data.data.business_info?.phone || '',
                         },
                         default_store_id: data.data.default_store_id || '',
+                        catalog_id: data.data.catalog_id || '',
                         default_ongkir: data.data.default_ongkir || 0,
                     };
                     if (data.data.updated_at) {
@@ -797,6 +854,7 @@ function aiAgentApp() {
                         system_prompt: this.form.system_prompt,
                         business_info: this.form.business_info,
                         default_store_id: this.form.default_store_id || null,
+                        catalog_id: this.form.catalog_id || null,
                         is_active: this.config.is_active,
                         order_enabled: this.config.order_enabled,
                         qris_enabled: this.config.qris_enabled,
