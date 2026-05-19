@@ -15,6 +15,7 @@ use App\Models\SubMerchant;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
 use App\Services\AiAgentService;
+use App\Services\CatalogService;
 use App\Services\OrderService;
 use App\Services\QrisService;
 use App\Services\SubMerchantService;
@@ -34,12 +35,15 @@ class AiAgentController extends Controller
 
     protected SubMerchantService $subMerchantService;
 
-    public function __construct(AiAgentService $aiAgentService, QrisService $qrisService, OrderService $orderService, SubMerchantService $subMerchantService)
+    protected CatalogService $catalogService;
+
+    public function __construct(AiAgentService $aiAgentService, QrisService $qrisService, OrderService $orderService, SubMerchantService $subMerchantService, CatalogService $catalogService)
     {
         $this->aiAgentService = $aiAgentService;
         $this->qrisService = $qrisService;
         $this->orderService = $orderService;
         $this->subMerchantService = $subMerchantService;
+        $this->catalogService = $catalogService;
     }
 
     /**
@@ -150,6 +154,9 @@ class AiAgentController extends Controller
                 }
             }
 
+            $previousCatalogId = AiAgent::where('whatsapp_account_id', $whatsappAccount->id)->value('catalog_id');
+            $newCatalogId = $request->input('catalog_id');
+
             $aiAgent = AiAgent::updateOrCreate(
                 ['whatsapp_account_id' => $whatsappAccount->id],
                 [
@@ -157,7 +164,7 @@ class AiAgentController extends Controller
                     'system_prompt' => $request->system_prompt,
                     'business_info' => $request->business_info,
                     'default_store_id' => $request->default_store_id,
-                    'catalog_id' => $request->input('catalog_id'),
+                    'catalog_id' => $newCatalogId,
                     'order_enabled' => $request->boolean('order_enabled', false),
                     'qris_enabled' => $request->boolean('qris_enabled', false),
                     'reservation_enabled' => $request->boolean('reservation_enabled', false),
@@ -167,6 +174,21 @@ class AiAgentController extends Controller
                     'settings' => $request->settings,
                 ]
             );
+
+            // When a catalog is selected (new or changed), associate it with the
+            // WABA so interactive product messages can reference it. Without this
+            // Meta returns "(#131009) Invalid catalog_id" even though the catalog
+            // exists and is owned by the same business. Idempotent — safe to call
+            // again on subsequent saves with the same catalog.
+            if ($newCatalogId && $newCatalogId !== $previousCatalogId) {
+                $linkResult = $this->catalogService->linkCatalogToWaba($whatsappAccount, (string) $newCatalogId);
+                Log::info('AI Agent: catalog link attempt', [
+                    'ai_agent_id' => $aiAgent->id,
+                    'catalog_id'  => $newCatalogId,
+                    'linked'      => $linkResult['linked'] ?? false,
+                    'commerce'    => $linkResult['commerce_enabled'] ?? false,
+                ]);
+            }
 
             return response()->json([
                 'success' => true,
