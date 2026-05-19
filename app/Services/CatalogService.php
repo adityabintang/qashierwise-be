@@ -319,6 +319,12 @@ class CatalogService
     }
 
     /**
+     * Product fields fetched when listing products. Keep aligned with the
+     * frontend's product card and edit modal expectations.
+     */
+    protected const PRODUCT_FIELDS = 'id,retailer_id,name,description,price,sale_price,currency,image_url,additional_image_urls,availability,inventory,category,google_product_category,brand,condition,url,visibility';
+
+    /**
      * Get products from a specific catalog.
      *
      * @return array{success: bool, products?: array, paging?: array, error?: string, error_code?: string}
@@ -326,8 +332,8 @@ class CatalogService
     public function getCatalogProducts(WhatsAppAccount $account, string $catalogId, int $limit = 30, ?string $after = null): array
     {
         $params = [
-            'fields' => 'id,retailer_id,name,description,price,currency,image_url,availability,category,brand,condition,url',
-            'limit' => $limit,
+            'fields' => self::PRODUCT_FIELDS,
+            'limit'  => $limit,
         ];
 
         if ($after) {
@@ -352,25 +358,26 @@ class CatalogService
             ];
         }
 
-        $error = $response->json('error', []);
-        $errorMessage = $error['message'] ?? 'Failed to fetch products';
+        $translated = $this->translateMetaError($response, 'fetch_products');
 
         Log::error('CatalogService: failed to fetch products', [
             'catalog_id' => $catalogId,
-            'error' => $errorMessage,
+            'status'     => $response->status(),
+            'error'      => $translated['raw'],
         ]);
 
         return [
-            'success' => false,
+            'success'    => false,
             'error_code' => 'API_ERROR',
-            'error' => $errorMessage,
+            'error'      => $translated['message'],
         ];
     }
 
     /**
      * Create a product in a catalog.
      *
-     * Required fields: retailer_id, name, price, currency, image_url, url, availability
+     * Required fields: retailer_id, name, price, currency, image_url, url, availability, condition, description
+     * Optional F&B-friendly fields: category, google_product_category, brand, sale_price, inventory, additional_image_link
      *
      * @return array{success: bool, id?: string, error?: string, error_code?: string}
      */
@@ -384,36 +391,28 @@ class CatalogService
             $id = $response->json('id');
 
             Log::info('CatalogService: product created', [
-                'catalog_id' => $catalogId,
-                'product_id' => $id,
+                'catalog_id'  => $catalogId,
+                'product_id'  => $id,
                 'retailer_id' => $data['retailer_id'] ?? null,
             ]);
 
             return ['success' => true, 'id' => $id];
         }
 
-        $error = $response->json('error', []);
-        $errorMessage = $error['message'] ?? 'Failed to create product';
-        $errorUserMessage = $error['error_user_msg'] ?? null;
-        $errorUserTitle = $error['error_user_title'] ?? null;
+        $translated = $this->translateMetaError($response, 'create_product');
 
         Log::error('CatalogService: failed to create product', [
-            'catalog_id'    => $catalogId,
-            'status'        => $response->status(),
-            'error_code'    => $error['code'] ?? null,
-            'error_subcode' => $error['error_subcode'] ?? null,
-            'error_type'    => $error['type'] ?? null,
-            'error'         => $errorMessage,
-            'user_title'    => $errorUserTitle,
-            'user_msg'      => $errorUserMessage,
-            'fbtrace_id'    => $error['fbtrace_id'] ?? null,
-            'data_sent'     => $data,
+            'catalog_id' => $catalogId,
+            'status'     => $response->status(),
+            'error'      => $translated['raw'],
+            'fbtrace_id' => $translated['fbtrace_id'],
+            'data_sent'  => $data,
         ]);
 
         return [
             'success'    => false,
-            'error_code' => 'API_ERROR',
-            'error'      => $errorUserMessage ?: $errorMessage,
+            'error_code' => $translated['code'],
+            'error'      => $translated['message'],
         ];
     }
 
@@ -434,22 +433,20 @@ class CatalogService
             return ['success' => true];
         }
 
-        $error = $response->json('error', []);
-        $errorMessage = $error['message'] ?? 'Failed to update product';
+        $translated = $this->translateMetaError($response, 'update_product');
 
         Log::error('CatalogService: failed to update product', [
-            'product_id'    => $productId,
-            'error_code'    => $error['code'] ?? null,
-            'error_type'    => $error['type'] ?? null,
-            'error_subcode' => $error['error_subcode'] ?? null,
-            'error'         => $errorMessage,
-            'data_sent'     => $data,
+            'product_id' => $productId,
+            'status'     => $response->status(),
+            'error'      => $translated['raw'],
+            'fbtrace_id' => $translated['fbtrace_id'],
+            'data_sent'  => $data,
         ]);
 
         return [
-            'success' => false,
-            'error_code' => 'API_ERROR',
-            'error' => $errorMessage,
+            'success'    => false,
+            'error_code' => $translated['code'],
+            'error'      => $translated['message'],
         ];
     }
 
@@ -469,18 +466,124 @@ class CatalogService
             return ['success' => true];
         }
 
-        $error = $response->json('error', []);
-        $errorMessage = $error['message'] ?? 'Failed to delete product';
+        $translated = $this->translateMetaError($response, 'delete_product');
 
         Log::error('CatalogService: failed to delete product', [
             'product_id' => $productId,
-            'error' => $errorMessage,
+            'status'     => $response->status(),
+            'error'      => $translated['raw'],
+            'fbtrace_id' => $translated['fbtrace_id'],
         ]);
 
         return [
-            'success' => false,
-            'error_code' => 'API_ERROR',
-            'error' => $errorMessage,
+            'success'    => false,
+            'error_code' => $translated['code'],
+            'error'      => $translated['message'],
+        ];
+    }
+
+    /**
+     * Translate a Meta Graph API error response into a localized,
+     * user-friendly Indonesian message plus a stable error_code for the FE.
+     *
+     * Returns: ['code' => string, 'message' => string, 'raw' => string, 'fbtrace_id' => ?string]
+     */
+    protected function translateMetaError($response, string $context): array
+    {
+        $error = is_object($response) ? ($response->json('error') ?? []) : [];
+        if (! is_array($error)) {
+            $error = [];
+        }
+
+        $raw      = $error['message']         ?? 'Unknown Meta API error';
+        $userMsg  = $error['error_user_msg']  ?? null;
+        $code     = $error['code']            ?? null;
+        $subcode  = $error['error_subcode']   ?? null;
+        $fbtrace  = $error['fbtrace_id']      ?? null;
+
+        // Lowercase for case-insensitive matching against Meta's English variants.
+        $haystack = strtolower(($userMsg ?? '') . ' ' . $raw);
+
+        // Vertical mismatch — the catalog isn't commerce.
+        if (str_contains($haystack, 'catalog vertical')
+            || str_contains($haystack, 'vertikal katalog')) {
+            return [
+                'code'       => 'WRONG_VERTICAL',
+                'message'    => 'Katalog ini bukan bertipe commerce sehingga tidak bisa menyimpan produk umum. Buat katalog baru dengan tipe E-Commerce / Produk Online.',
+                'raw'        => $raw,
+                'fbtrace_id' => $fbtrace,
+            ];
+        }
+
+        // Duplicate retailer_id.
+        if (str_contains($haystack, 'duplicate') && str_contains($haystack, 'retailer_id')
+            || ($code === 100 && str_contains($haystack, 'retailer_id'))) {
+            return [
+                'code'       => 'DUPLICATE_SKU',
+                'message'    => 'SKU (retailer_id) ini sudah digunakan di katalog yang sama. Gunakan SKU lain.',
+                'raw'        => $raw,
+                'fbtrace_id' => $fbtrace,
+            ];
+        }
+
+        // Image URL not reachable by Meta crawler.
+        if (str_contains($haystack, 'image_url') || str_contains($haystack, 'image url')
+            || str_contains($haystack, 'invalid image')) {
+            return [
+                'code'       => 'INVALID_IMAGE',
+                'message'    => 'URL gambar tidak bisa diakses oleh Meta. Pastikan gambar diupload ke storage publik (HTTPS) dan ukuran minimal 500×500 px.',
+                'raw'        => $raw,
+                'fbtrace_id' => $fbtrace,
+            ];
+        }
+
+        // Permission / token scope problem.
+        if (str_contains($haystack, 'permission') || str_contains($haystack, 'oauth')
+            || $code === 200 || $code === 190) {
+            return [
+                'code'       => 'PERMISSION_DENIED',
+                'message'    => 'Token akses tidak memiliki izin yang cukup untuk operasi katalog. Coba hubungkan ulang akun WhatsApp Business Anda.',
+                'raw'        => $raw,
+                'fbtrace_id' => $fbtrace,
+            ];
+        }
+
+        // Price-related validation.
+        if (str_contains($haystack, 'price')) {
+            return [
+                'code'       => 'INVALID_PRICE',
+                'message'    => 'Harga tidak valid. Pastikan harga lebih besar dari 0 dan dalam unit yang sesuai mata uang (untuk IDR/JPY/VND: nominal langsung, untuk USD/SGD/MYR: dalam sen).',
+                'raw'        => $raw,
+                'fbtrace_id' => $fbtrace,
+            ];
+        }
+
+        // Generic "Invalid parameter" from Meta — surface user-friendly hint.
+        if (str_contains($haystack, 'invalid parameter')) {
+            return [
+                'code'       => 'INVALID_PARAMETER',
+                'message'    => 'Salah satu kolom produk tidak valid. Periksa kembali data yang Anda masukkan (harga, mata uang, gambar, URL).',
+                'raw'        => $raw,
+                'fbtrace_id' => $fbtrace,
+            ];
+        }
+
+        // Rate limit.
+        if ($code === 4 || $code === 17 || $code === 32 || str_contains($haystack, 'rate limit')) {
+            return [
+                'code'       => 'RATE_LIMITED',
+                'message'    => 'Terlalu banyak permintaan ke Meta. Coba lagi dalam beberapa saat.',
+                'raw'        => $raw,
+                'fbtrace_id' => $fbtrace,
+            ];
+        }
+
+        // Fallback — prefer Meta's user-facing message if present, else raw.
+        return [
+            'code'       => 'API_ERROR',
+            'message'    => $userMsg ?: $raw,
+            'raw'        => $raw,
+            'fbtrace_id' => $fbtrace,
         ];
     }
 }
