@@ -463,6 +463,23 @@ class AiAgentConversation extends Model
     }
 
     /**
+     * Structured delivery fields parsed from the customer's free-text input.
+     * Shape: ['name' => ?string, 'phone' => ?string, 'address' => ?string, 'note' => ?string]
+     */
+    public function getDeliveryParsed(): ?array
+    {
+        return $this->order_context['delivery_parsed'] ?? null;
+    }
+
+    public function setDeliveryParsed(array $parsed): void
+    {
+        $orderContext = $this->order_context ?? [];
+        $orderContext['delivery_parsed'] = $parsed;
+        $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    /**
      * Catalog order items (raw payload from WhatsApp `order` webhook).
      * Each item: ['product_retailer_id' => string, 'product_name' => string,
      *             'quantity' => int, 'item_price' => float, 'currency' => string]
