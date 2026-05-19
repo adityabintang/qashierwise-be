@@ -22,6 +22,7 @@ class AiAgent extends Model
     protected $fillable = [
         'whatsapp_account_id',
         'default_store_id',
+        'catalog_id',
         'bot_name',
         'system_prompt',
         'business_info',
@@ -114,6 +115,11 @@ class AiAgent extends Model
     public function isDeliveryEnabled(): bool
     {
         return $this->delivery_enabled;
+    }
+
+    public function hasCatalog(): bool
+    {
+        return ! empty($this->catalog_id);
     }
 
     /**
