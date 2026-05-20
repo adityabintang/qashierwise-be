@@ -59,6 +59,9 @@ class CatalogOrderFlowService
 
     public const BTN_CANCEL_ORDER = 'order_cancel';
 
+    // Drip-message CTA: resume the in-progress order after an off-context message.
+    public const BTN_CONTINUE_FLOW = 'flow_continue';
+
     // ---- Flow states --------------------------------------------------------
 
     public const STATE_AWAITING_FULFILLMENT = 'awaiting_fulfillment_choice';
@@ -68,6 +71,11 @@ class CatalogOrderFlowService
     public const STATE_CONFIRMING_DELIVERY_INFO = 'confirming_delivery_info';
 
     public const STATE_CONFIRMING_ORDER_SUMMARY = 'confirming_order_summary';
+
+    // Set after a QRIS payment link is sent; lets the bot keep the order context
+    // alive so off-context chatter triggers a "lanjutkan pembayaran" drip instead
+    // of dropping back to the generic LLM.
+    public const STATE_AWAITING_PAYMENT = 'awaiting_payment';
 
     // ---- Entry points -------------------------------------------------------
 
@@ -107,34 +115,6 @@ class CatalogOrderFlowService
                 'error'         => $e->getMessage(),
             ]);
             $this->sendText($client, $contact->wa_id, $body);
-        }
-    }
-
-    /**
-     * Customer typed text while we're waiting on a button. Show the "use
-     * the buttons above" nudge — but with an actual *Batal* button so they
-     * don't have to type the magic word.
-     */
-    public function sendStuckPrompt(
-        WhatsAppAccount $account,
-        WhatsAppContact $contact
-    ): void {
-        $client = $this->client($account);
-        $body = "Mohon gunakan tombol pada pesan sebelumnya untuk melanjutkan, "
-              . "atau tap *Batal* untuk membatalkan pesanan.";
-
-        try {
-            $action = new ButtonAction([
-                new Button(self::BTN_CANCEL_ORDER, '❌ Batal'),
-            ]);
-            $client->sendButton($contact->wa_id, $body, $action, null, null);
-        } catch (\Throwable $e) {
-            Log::error('Failed to send stuck prompt button', [
-                'contact_wa_id' => $contact->wa_id,
-                'error'         => $e->getMessage(),
-            ]);
-            $this->sendText($client, $contact->wa_id,
-                "Mohon gunakan tombol pada pesan sebelumnya, atau kirim *batal* untuk membatalkan.");
         }
     }
 
@@ -538,15 +518,35 @@ class CatalogOrderFlowService
             return true;
         }
 
-        // "Batal" button is also universal — same behavior as typing "batal".
-        // Previously only handled inside the order-summary state which left
-        // customers stuck if the button appeared elsewhere.
+        // "Lanjutkan" (drip CTA) — resume whatever step the order is at.
+        if ($buttonId === self::BTN_CONTINUE_FLOW) {
+            if ($state === null) {
+                $this->sendFallbackWithMenuButton($account, $contact, $aiAgent,
+                    'Tidak ada pesanan yang sedang berjalan. Tap *Lihat Menu* untuk mulai memesan.');
+            } else {
+                $this->resumeFlow($account, $contact, $conversation, $aiAgent);
+            }
+            return true;
+        }
+
+        // "Batal" button is universal — same behavior as typing "batal".
         if ($buttonId === self::BTN_CANCEL_ORDER) {
+            // During payment the order already exists; don't claim it's
+            // "dibatalkan" — the QRIS link stays valid until it expires.
+            $wasAwaitingPayment = $state === self::STATE_AWAITING_PAYMENT;
+
             $conversation->clearCatalogItems();
             $conversation->clearDeliveryContext();
             $conversation->clearPendingOrder();
             $conversation->clearFlowState();
-            $this->sendCancelledReply($account, $contact, $aiAgent);
+
+            if ($wasAwaitingPayment) {
+                $this->sendFallbackWithMenuButton($account, $contact, $aiAgent,
+                    'Baik. Link pembayaran tetap aktif sampai kadaluarsa — pesanan otomatis batal jika belum dibayar. '
+                    .'Tap *Lihat Menu* kalau ingin memesan lagi.');
+            } else {
+                $this->sendCancelledReply($account, $contact, $aiAgent);
+            }
             return true;
         }
 
@@ -597,14 +597,35 @@ class CatalogOrderFlowService
             return true;
         }
 
-        // Partial edit: "ubah/ganti/edit/update <field> = <value>"
-        // Only one field updates; others remain. Returns to confirmation step.
-        if ($this->applyPartialDeliveryEdit($conversation, $clean)) {
+        // Labeled input / partial edit: any "label = value" pairs
+        // (e.g. "ubah nama = Budi", "nama = Budi, alamat = Jl X", multi-line,
+        // bullets). Each labeled field is MERGED into the existing parsed info
+        // so single-field edits keep the rest intact.
+        $labeled = $this->extractLabeledFields($clean);
+        if (! empty($labeled)) {
+            $existing = $conversation->getDeliveryParsed() ?? [];
+            foreach (['name', 'phone', 'address', 'note'] as $k) {
+                if (! array_key_exists($k, $existing)) {
+                    $existing[$k] = null;
+                }
+            }
+            foreach ($labeled as $field => $value) {
+                $existing[$field] = $value;
+            }
+
+            $conversation->setDeliveryParsed($existing);
+            $conversation->setDeliveryRawInfo($this->composeRawFromParsed($existing));
             $conversation->setFlowState(self::STATE_CONFIRMING_DELIVERY_INFO);
+
+            Log::info('Labeled delivery fields applied', [
+                'fields' => array_keys($labeled),
+            ]);
+
             $this->sendDeliveryInfoSummary($account, $contact, $conversation);
             return true;
         }
 
+        // Otherwise: free-text full parse (e.g. "Budi, 0812xxxx, Jl. Mawar 12").
         $conversation->setDeliveryRawInfo($clean);
         $conversation->setDeliveryParsed($this->parseDeliveryInfo($clean));
         $conversation->setFlowState(self::STATE_CONFIRMING_DELIVERY_INFO);
@@ -614,87 +635,83 @@ class CatalogOrderFlowService
         return true;
     }
 
+    /** Field aliases → canonical key in delivery_parsed. */
+    private const FIELD_ALIASES = [
+        'nama' => 'name', 'name' => 'name',
+        'telepon' => 'phone', 'telpon' => 'phone', 'telp' => 'phone',
+        'phone' => 'phone', 'hp' => 'phone', 'no' => 'phone',
+        'nomor' => 'phone', 'wa' => 'phone',
+        'alamat' => 'address', 'address' => 'address',
+        'catatan' => 'note', 'note' => 'note', 'keterangan' => 'note',
+    ];
+
     /**
-     * If the message matches a partial-edit pattern like "ubah nama = Budi"
-     * or "ganti alamat: Jl. baru", merge that single field into the existing
-     * parsed delivery info and return true. Otherwise return false so the
-     * caller falls through to full re-parse.
+     * Extract every "label = value" pair from a message and return them mapped
+     * to canonical fields. Handles:
+     *   - optional verbs: "ubah/ganti/edit/update/set/isi nama = Budi"
+     *   - separators: "=", ":"
+     *   - multiple fields in one line/message, comma- or newline-separated
+     *   - bullet/markdown noise the user may copy: "* ", "• ", "- ", "_"
+     *   - values containing commas (address) — value runs until the next label
+     *
+     * Returns e.g. ['name' => 'Budi', 'phone' => '08123', 'address' => 'Jl X, Padang'].
+     * Empty array when no labeled pairs found (caller falls back to heuristic parse).
      */
-    private function applyPartialDeliveryEdit(AiAgentConversation $conversation, string $text): bool
+    private function extractLabeledFields(string $text): array
     {
-        // Field aliases → canonical key in delivery_parsed.
-        $fieldMap = [
-            'nama'     => 'name',
-            'name'     => 'name',
-            'telepon'  => 'phone',
-            'telpon'   => 'phone',
-            'telp'     => 'phone',
-            'phone'    => 'phone',
-            'hp'       => 'phone',
-            'no'       => 'phone',
-            'nomor'    => 'phone',
-            'wa'       => 'phone',
-            'alamat'   => 'address',
-            'address'  => 'address',
-            'catatan'  => 'note',
-            'note'     => 'note',
-            'keterangan' => 'note',
-        ];
+        $aliasGroup = implode('|', array_keys(self::FIELD_ALIASES));
 
-        $aliasGroup = implode('|', array_keys($fieldMap));
-        $re = '/^\s*(?:ubah|ganti|edit|update|set|isi)\s+(' . $aliasGroup . ')\s*(?:=|:|menjadi|jadi|ke|adalah)?\s*(.+)$/iu';
+        // Value is lazy and ends right before the next label (with optional verb
+        // + separator) or end-of-string. Leading bullet/markdown chars on the
+        // next label are tolerated in the lookahead.
+        $re = '/(?:ubah|ganti|edit|update|set|isi)?\s*\b(' . $aliasGroup . ')\b\s*[:=]\s*'
+            . '(.+?)\s*'
+            . '(?=(?:[\s,;\n•*_\-]+(?:ubah|ganti|edit|update|set|isi)?\s*\b(?:' . $aliasGroup . ')\b\s*[:=])|$)/iu';
 
-        if (! preg_match($re, $text, $m)) {
-            return false;
+        if (! preg_match_all($re, $text, $matches, PREG_SET_ORDER)) {
+            return [];
         }
 
-        $alias = strtolower($m[1]);
-        $newValue = trim($m[2], " \t.,-");
-        if ($newValue === '') {
-            return false;
-        }
-
-        $field = $fieldMap[$alias] ?? null;
-        if ($field === null) {
-            return false;
-        }
-
-        // Normalize per-field.
-        if ($field === 'phone') {
-            if (preg_match('/(?:\+?62|0)[\s\-]?[2-9]\d(?:[\s\-]?\d){6,11}/', $newValue, $pm)) {
-                $newValue = $this->normalizePhone($pm[0]);
-            } else {
-                return false; // not a recognisable phone — let user retry
+        $result = [];
+        foreach ($matches as $m) {
+            $alias = strtolower(trim($m[1]));
+            $field = self::FIELD_ALIASES[$alias] ?? null;
+            if ($field === null) {
+                continue;
             }
-        } elseif ($field === 'name') {
-            $newValue = $this->titleCase($newValue);
+
+            $value = trim($m[2], " \t.,-_*•\n");
+            if ($value === '') {
+                continue;
+            }
+
+            if ($field === 'phone') {
+                if (preg_match('/(?:\+?62|0)[\s\-]?[2-9]\d(?:[\s\-]?\d){6,11}/', $value, $pm)) {
+                    $value = $this->normalizePhone($pm[0]);
+                } else {
+                    continue; // not a usable phone — skip, keep previous
+                }
+            } elseif ($field === 'name') {
+                $value = $this->titleCase($value);
+            }
+
+            $result[$field] = $value;
         }
 
-        $existing = $conversation->getDeliveryParsed() ?? [];
-        $existing[$field] = $newValue;
+        return $result;
+    }
 
-        // Backfill keys so the structure stays predictable.
+    /** Rebuild a human-readable raw string from parsed fields (for re-display/edit). */
+    private function composeRawFromParsed(array $parsed): string
+    {
+        $parts = [];
         foreach (['name', 'phone', 'address', 'note'] as $k) {
-            if (! array_key_exists($k, $existing)) $existing[$k] = null;
+            if (! empty($parsed[$k])) {
+                $parts[] = $parsed[$k];
+            }
         }
 
-        $conversation->setDeliveryParsed($existing);
-
-        // Recompose raw display from the merged structure so subsequent
-        // edits also reflect the latest state.
-        $rawParts = [];
-        if (! empty($existing['name']))    $rawParts[] = $existing['name'];
-        if (! empty($existing['phone']))   $rawParts[] = $existing['phone'];
-        if (! empty($existing['address'])) $rawParts[] = $existing['address'];
-        if (! empty($existing['note']))    $rawParts[] = $existing['note'];
-        $conversation->setDeliveryRawInfo(implode(', ', $rawParts));
-
-        Log::info('Partial delivery edit applied', [
-            'field' => $field,
-            'value_preview' => mb_substr($newValue, 0, 40),
-        ]);
-
-        return true;
+        return implode(', ', $parts);
     }
 
     /**
@@ -844,17 +861,7 @@ class CatalogOrderFlowService
             $conversation->setOngkir((float) $aiAgent->default_ongkir);
             $conversation->setFlowState(self::STATE_AWAITING_DELIVERY_INFO);
 
-            $this->sendText(
-                $client,
-                $contact->wa_id,
-                "🚚 *Delivery dipilih*\n\n"
-                ."Mohon kirim *dalam satu pesan* informasi berikut:\n"
-                ."• Nama penerima\n"
-                ."• Nomor telepon\n"
-                ."• Alamat lengkap (jalan, nomor, RT/RW)\n"
-                ."• Patokan / catatan kurir (opsional)\n\n"
-                ."Contoh: _Budi, 0812xxxx, Jl. Mawar no 12 RT 03/04, dekat warung Ibu Siti._"
-            );
+            $this->sendDeliveryInfoPrompt($account, $contact);
 
             return true;
         }
@@ -884,13 +891,15 @@ class CatalogOrderFlowService
                 $client,
                 $contact->wa_id,
                 "✏️ *Edit Informasi Delivery*\n\n"
-                ."Pilih salah satu:\n"
-                ."1️⃣ Kirim ulang *semua* info dalam satu pesan, atau\n"
-                ."2️⃣ Edit satu field saja dengan format:\n"
-                ."   • _ubah nama = Budi_\n"
-                ."   • _ubah telepon = 0812xxxx_\n"
-                ."   • _ubah alamat = Jl. Mawar no 12_\n"
-                ."   • _ubah catatan = jangan pedas_"
+                ."Ketik field yang ingin diperbaiki, contoh:\n"
+                ."ubah nama = Budi\n"
+                ."ubah telepon = 0812xxxx\n"
+                ."ubah alamat = Jl. Mawar no 12\n"
+                ."ubah catatan = jangan pedas\n\n"
+                ."Bisa beberapa sekaligus, pisahkan dengan koma:\n"
+                ."nama = Budi, telepon = 0812xxxx, alamat = Jl. Mawar 12\n\n"
+                ."Atau kirim ulang lengkap dalam satu pesan:\n"
+                ."Budi, 0812xxxx, Jl. Mawar no 12, jangan pedas"
             );
 
             return true;
@@ -991,6 +1000,160 @@ class CatalogOrderFlowService
             $this->sendText($client, $contact->wa_id,
                 'Pesanan Anda diterima. Silakan balas dengan "pickup", "delivery", atau "reservasi".');
         }
+    }
+
+    /**
+     * Prompt asking the customer to send their delivery details in one message.
+     * Extracted so the drip "Lanjutkan" path can re-show it.
+     */
+    protected function sendDeliveryInfoPrompt(
+        WhatsAppAccount $account,
+        WhatsAppContact $contact
+    ): void {
+        $this->sendText(
+            $this->client($account),
+            $contact->wa_id,
+            "🚚 *Delivery dipilih*\n\n"
+            ."Mohon kirim *dalam satu pesan* informasi berikut:\n"
+            ."• Nama penerima\n"
+            ."• Nomor telepon\n"
+            ."• Alamat lengkap (jalan, nomor, RT/RW)\n"
+            ."• Patokan / catatan kurir (opsional)\n\n"
+            ."Contoh: _Budi, 0812xxxx, Jl. Mawar no 12 RT 03/04, dekat warung Ibu Siti._"
+        );
+    }
+
+    // ---- Drip / off-context handling ----------------------------------------
+
+    /**
+     * Human-readable label for the current flow step (Bahasa Indonesia).
+     * Used in the drip message so the customer knows where they left off.
+     */
+    protected function flowStepLabel(?string $state): string
+    {
+        return match ($state) {
+            self::STATE_AWAITING_FULFILLMENT      => 'memilih metode (Pickup / Delivery / Reservasi)',
+            self::STATE_AWAITING_DELIVERY_INFO    => 'mengisi informasi pengiriman',
+            self::STATE_CONFIRMING_DELIVERY_INFO  => 'konfirmasi informasi pengiriman',
+            self::STATE_CONFIRMING_ORDER_SUMMARY  => 'konfirmasi ringkasan pesanan',
+            self::STATE_AWAITING_PAYMENT          => 'menunggu pembayaran',
+            default                               => 'pemesanan',
+        };
+    }
+
+    /**
+     * Drip message: customer sent something that doesn't fit the current flow
+     * step. Nudge them with a contextual reminder + two buttons:
+     *   [✅ Lanjutkan]  -> resume / re-show the current step
+     *   [❌ Batal]      -> cancel the in-progress order
+     *
+     * Keeps the flow consistent and the UX friendly instead of a dead-end nag.
+     */
+    public function sendDripPrompt(
+        WhatsAppAccount $account,
+        WhatsAppContact $contact,
+        AiAgent $aiAgent,
+        AiAgentConversation $conversation
+    ): void {
+        $client = $this->client($account);
+        $state  = $conversation->getFlowState();
+        $step   = $this->flowStepLabel($state);
+
+        $isPayment = $state === self::STATE_AWAITING_PAYMENT;
+        $body = $isPayment
+            ? "Pesanan Anda sudah dibuat dan sedang *menunggu pembayaran*.\n\n"
+              . "Mau lanjut ke pembayaran, atau batalkan pesanan?"
+            : "Sepertinya pesan Anda di luar konteks pesanan yang sedang berjalan.\n\n"
+              . "📌 Pesanan masih tersimpan di tahap: *{$step}*.\n\n"
+              . "Mau lanjutkan pesanan ini?";
+
+        try {
+            $action = new ButtonAction([
+                new Button(self::BTN_CONTINUE_FLOW, $isPayment ? '💳 Lanjutkan' : '✅ Lanjutkan'),
+                new Button(self::BTN_CANCEL_ORDER, '❌ Batal'),
+            ]);
+            $client->sendButton($contact->wa_id, $this->truncate($body, 1020), $action, null, null);
+
+            Log::info('Drip prompt sent', [
+                'ai_agent_id'   => $aiAgent->id,
+                'contact_wa_id' => $contact->wa_id,
+                'flow_state'    => $state,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to send drip prompt', [
+                'contact_wa_id' => $contact->wa_id,
+                'error'         => $e->getMessage(),
+            ]);
+            $this->sendText($client, $contact->wa_id,
+                "Mohon gunakan tombol pada pesan sebelumnya, atau kirim *batal* untuk membatalkan.");
+        }
+    }
+
+    /**
+     * Re-show the prompt/buttons for whatever step the order is currently at.
+     * Triggered by the drip "Lanjutkan" button.
+     */
+    public function resumeFlow(
+        WhatsAppAccount $account,
+        WhatsAppContact $contact,
+        AiAgentConversation $conversation,
+        AiAgent $aiAgent
+    ): void {
+        switch ($conversation->getFlowState()) {
+            case self::STATE_AWAITING_FULFILLMENT:
+                $this->sendFulfillmentButtons($account, $contact, $aiAgent, $conversation->getCatalogItems());
+                break;
+            case self::STATE_AWAITING_DELIVERY_INFO:
+                $this->sendDeliveryInfoPrompt($account, $contact);
+                break;
+            case self::STATE_CONFIRMING_DELIVERY_INFO:
+                $this->sendDeliveryInfoSummary($account, $contact, $conversation);
+                break;
+            case self::STATE_CONFIRMING_ORDER_SUMMARY:
+                $this->sendOrderSummary($account, $contact, $conversation, $aiAgent);
+                break;
+            case self::STATE_AWAITING_PAYMENT:
+                $this->resendPaymentLink($account, $contact, $conversation);
+                break;
+            default:
+                // No active flow — nudge back to the menu.
+                $this->sendFallbackWithMenuButton($account, $contact, $aiAgent,
+                    'Tidak ada pesanan yang sedang berjalan. Tap *Lihat Menu* untuk mulai memesan.');
+        }
+    }
+
+    /**
+     * Re-send the active QRIS payment link (drip "Lanjutkan" while awaiting payment).
+     */
+    protected function resendPaymentLink(
+        WhatsAppAccount $account,
+        WhatsAppContact $contact,
+        AiAgentConversation $conversation
+    ): void {
+        $client = $this->client($account);
+        $qris   = $conversation->getCurrentQrisTransaction();
+        $order  = $conversation->getCurrentOrder();
+
+        if (! $qris || ! $order) {
+            $conversation->clearFlowState();
+            $this->sendText($client, $contact->wa_id,
+                'Sesi pembayaran sudah berakhir. Ketik *menu* untuk memesan lagi.');
+            return;
+        }
+
+        $total  = 'Rp '.number_format($order->total, 0, ',', '.');
+        $link   = $qris->getShareableLink();
+        $expiry = optional($qris->expires_at)->format('H:i');
+
+        $msg = "💳 *Lanjutkan Pembayaran*\n\n"
+             ."📋 No. Pesanan: {$order->order_number}\n"
+             ."💰 Total: {$total}\n\n"
+             ."Bayar melalui link berikut:\n{$link}";
+        if ($expiry) {
+            $msg .= "\n\n⏰ Berlaku hingga: {$expiry}";
+        }
+
+        $this->sendText($client, $contact->wa_id, $msg);
     }
 
     protected function sendDeliveryInfoSummary(
@@ -1336,10 +1499,10 @@ class CatalogOrderFlowService
 
             $this->sendText($client, $contact->wa_id, $msg);
 
-            // Flow ends; catalog items and delivery context are no longer needed.
-            $conversation->clearCatalogItems();
-            $conversation->clearDeliveryContext();
-            $conversation->clearFlowState();
+            // Keep the order context alive in AWAITING_PAYMENT so off-context
+            // chatter triggers a "lanjutkan pembayaran" drip. State + context are
+            // cleared on payment success (AiAgentService::sendPaymentConfirmation).
+            $conversation->setFlowState(self::STATE_AWAITING_PAYMENT);
 
         } catch (\Throwable $e) {
             Log::error('QRIS generation failed in catalog flow', [

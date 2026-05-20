@@ -111,7 +111,9 @@ class AiAgentService
                 );
 
                 if (! $handled) {
-                    $this->catalogOrderFlow->sendStuckPrompt($account, $contact);
+                    // Off-context message during an active flow -> contextual drip
+                    // with "Lanjutkan" / "Batal" buttons (keeps flow consistent).
+                    $this->catalogOrderFlow->sendDripPrompt($account, $contact, $aiAgent, $conversation);
                 }
 
                 return;
@@ -2960,10 +2962,14 @@ class AiAgentService
             // Add message to conversation history
             $conversation->addMessage('ai', $message);
 
-            // Clear payment context
+            // Clear payment context + catalog flow state so the AWAITING_PAYMENT
+            // drip stops once payment succeeds.
             $conversation->clearPaymentContext();
             $conversation->clearCart();
             $conversation->clearPendingOrder();
+            $conversation->clearCatalogItems();
+            $conversation->clearDeliveryContext();
+            $conversation->clearFlowState();
 
             Log::info('Payment confirmation sent via WhatsApp', [
                 'qris_transaction_id' => $qrisTransaction->id,
