@@ -148,11 +148,12 @@ class AiAgentService
 
             $detected = UserIntent::detect($messageText);
 
-            // Catalog short-circuit: when AI Agent has a catalog and the user
-            // asks for the menu or wants to order, send the WhatsApp Catalog UI
-            // directly instead of having the LLM write a text menu.
-            if ($aiAgent->isOrderEnabled()) {
-                if ($aiAgent->hasCatalog() && in_array($detected, [UserIntent::VIEW_MENU, UserIntent::ORDER, UserIntent::NEXT_MENU_PAGE, UserIntent::SEARCH_PRODUCT], true)) {
+            // Catalog short-circuits only apply when the Meta Catalog flow is
+            // active (catalog_id configured AND META_CATALOG flag on). When the
+            // catalog is inactive, everything falls through to the standard LLM
+            // flow which serves local POS products (get_all_products tool).
+            if ($aiAgent->isOrderEnabled() && $aiAgent->isCatalogActive()) {
+                if (in_array($detected, [UserIntent::VIEW_MENU, UserIntent::ORDER, UserIntent::NEXT_MENU_PAGE, UserIntent::SEARCH_PRODUCT], true)) {
                     $conversation->addMessage('human', $messageText);
                     $conversation->addMessage('ai', 'Mengirim katalog produk…');
                     $this->catalogOrderFlow->sendCatalog($account, $contact, $aiAgent);
@@ -161,7 +162,7 @@ class AiAgentService
                 }
 
                 // Greeting short-circuit: skip LLM and reply with a quick-reply
-                // button so the customer can open the menu with one tap
+                // button so the customer can open the catalog with one tap
                 // instead of having to type "menu". Token-saving + better UX.
                 if ($detected === UserIntent::GREETING) {
                     $conversation->addMessage('human', $messageText);

@@ -516,12 +516,13 @@ class CatalogOrderFlowService
         // "Lihat Menu" button works regardless of flow state — it's the
         // greeting CTA shortcut. Equivalent to user typing "menu".
         if ($buttonId === self::BTN_SHOW_MENU) {
-            if ($aiAgent->hasCatalog()) {
+            if ($aiAgent->isCatalogActive()) {
                 $this->sendCatalog($account, $contact, $aiAgent);
 
                 return true;
             }
 
+            // Catalog inactive -> route to the standard LLM/POS-products flow.
             app(AiAgentService::class)->processMessage($account, $contact, 'menu');
 
             return true;

@@ -142,6 +142,16 @@ class AiAgent extends Model
     }
 
     /**
+     * Whether the Meta Catalog flow should drive product selection.
+     * Requires BOTH a configured catalog_id AND the global META_CATALOG flag.
+     * When false, the agent falls back to the LLM/POS-products flow.
+     */
+    public function isCatalogActive(): bool
+    {
+        return $this->hasCatalog() && (bool) config('catalog.meta_enabled', true);
+    }
+
+    /**
      * Get reservation form URL for this AI Agent.
      */
     public function getReservationFormUrl(): ?string
