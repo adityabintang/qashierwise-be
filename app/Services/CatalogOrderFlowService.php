@@ -38,7 +38,9 @@ class CatalogOrderFlowService
 
     /** WhatsApp Multi-Product Message constraints. */
     private const MAX_SECTIONS = 10;
+
     private const MAX_ROWS_PER_SECTION = 30;
+
     private const MAX_TOTAL_ITEMS = 30;
 
     // ---- Button IDs ---------------------------------------------------------
@@ -93,26 +95,20 @@ class CatalogOrderFlowService
         $client = $this->client($account);
 
         try {
-            $buttons = [];
-            if ($aiAgent->hasCatalog()) {
-                $buttons[] = new Button(self::BTN_SHOW_MENU, 'Lihat Menu');
-            }
-            if (! empty($buttons)) {
-                $action = new ButtonAction($buttons);
-                $client->sendButton(
-                    $contact->wa_id,
-                    $body,
-                    $action,
-                    null,
-                    $aiAgent->bot_name ?: null
-                );
-            } else {
-                $this->sendText($client, $contact->wa_id, $body);
-            }
+            $action = new ButtonAction([
+                new Button(self::BTN_SHOW_MENU, 'Lihat Menu'),
+            ]);
+            $client->sendButton(
+                $contact->wa_id,
+                $body,
+                $action,
+                null,
+                $aiAgent->bot_name ?: null
+            );
         } catch (\Throwable $e) {
             Log::error('Failed to send fallback button reply', [
                 'contact_wa_id' => $contact->wa_id,
-                'error'         => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
             $this->sendText($client, $contact->wa_id, $body);
         }
@@ -128,27 +124,20 @@ class CatalogOrderFlowService
         AiAgent $aiAgent
     ): void {
         $client = $this->client($account);
-        $body = "❌ Pesanan dibatalkan. Tap *Lihat Menu* untuk memesan lagi kapan saja.";
+        $body = '❌ Pesanan dibatalkan. Tap *Lihat Menu* untuk memesan lagi kapan saja.';
 
         try {
-            $buttons = [];
-            if ($aiAgent->hasCatalog()) {
-                $buttons[] = new Button(self::BTN_SHOW_MENU, 'Lihat Menu');
-            }
-            if (! empty($buttons)) {
-                $action = new ButtonAction($buttons);
-                $client->sendButton($contact->wa_id, $body, $action, null, null);
-            } else {
-                $this->sendText($client, $contact->wa_id,
-                    "❌ Pesanan dibatalkan. Ketik *menu* kapan saja untuk memesan lagi.");
-            }
+            $action = new ButtonAction([
+                new Button(self::BTN_SHOW_MENU, 'Lihat Menu'),
+            ]);
+            $client->sendButton($contact->wa_id, $body, $action, null, null);
         } catch (\Throwable $e) {
             Log::error('Failed to send cancelled reply button', [
                 'contact_wa_id' => $contact->wa_id,
-                'error'         => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
             $this->sendText($client, $contact->wa_id,
-                "❌ Pesanan dibatalkan. Ketik *menu* kapan saja untuk memesan lagi.");
+                '❌ Pesanan dibatalkan. Ketik *menu* kapan saja untuk memesan lagi.');
         }
     }
 
@@ -182,14 +171,14 @@ class CatalogOrderFlowService
             );
 
             Log::info('Greeting with menu button sent', [
-                'ai_agent_id'   => $aiAgent->id,
+                'ai_agent_id' => $aiAgent->id,
                 'contact_wa_id' => $contact->wa_id,
             ]);
         } catch (\Throwable $e) {
             Log::error('Failed to send greeting button, falling back to text', [
-                'ai_agent_id'   => $aiAgent->id,
+                'ai_agent_id' => $aiAgent->id,
                 'contact_wa_id' => $contact->wa_id,
-                'error'         => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
 
             // Fallback to plain text so the customer still gets a reply.
@@ -212,7 +201,7 @@ class CatalogOrderFlowService
     ): void {
         $client = $this->client($account);
         $catalogId = $aiAgent->catalog_id;
-        $botName   = $aiAgent->bot_name ?? 'Pesan via WhatsApp';
+        $botName = $aiAgent->bot_name ?? 'Pesan via WhatsApp';
 
         if (! $catalogId) {
             Log::warning('sendCatalog called without catalog_id', [
@@ -220,6 +209,7 @@ class CatalogOrderFlowService
             ]);
             $this->sendText($client, $contact->wa_id,
                 'Katalog menu belum dikonfigurasi. Silakan hubungi admin.');
+
             return;
         }
 
@@ -229,11 +219,12 @@ class CatalogOrderFlowService
         if (! ($result['success'] ?? false)) {
             Log::error('Failed to fetch catalog products for MPM', [
                 'ai_agent_id' => $aiAgent->id,
-                'catalog_id'  => $catalogId,
-                'error'       => $result['error'] ?? 'unknown',
+                'catalog_id' => $catalogId,
+                'error' => $result['error'] ?? 'unknown',
             ]);
             $this->sendText($client, $contact->wa_id,
                 'Maaf, katalog menu tidak dapat ditampilkan saat ini. Silakan coba lagi nanti.');
+
             return;
         }
 
@@ -242,6 +233,7 @@ class CatalogOrderFlowService
         if (empty($products)) {
             $this->sendText($client, $contact->wa_id,
                 'Maaf, saat ini belum ada menu yang tersedia. Silakan coba lagi nanti.');
+
             return;
         }
 
@@ -249,9 +241,9 @@ class CatalogOrderFlowService
             $this->sendMultiProductMessage($client, $contact, $catalogId, $products, $botName);
 
             Log::info('Catalog sent to customer', [
-                'ai_agent_id'   => $aiAgent->id,
+                'ai_agent_id' => $aiAgent->id,
                 'contact_wa_id' => $contact->wa_id,
-                'catalog_id'    => $catalogId,
+                'catalog_id' => $catalogId,
                 'product_count' => count($products),
             ]);
         } catch (\Throwable $e) {
@@ -259,12 +251,12 @@ class CatalogOrderFlowService
             $reason = $this->classifyCatalogError($errorMessage);
 
             Log::error('Failed to send catalog message', [
-                'ai_agent_id'   => $aiAgent->id,
+                'ai_agent_id' => $aiAgent->id,
                 'contact_wa_id' => $contact->wa_id,
-                'catalog_id'    => $catalogId,
+                'catalog_id' => $catalogId,
                 'product_count' => count($products),
-                'reason'        => $reason,
-                'error'         => $errorMessage,
+                'reason' => $reason,
+                'error' => $errorMessage,
             ]);
 
             // Smart fallback: when WhatsApp rejects the products (most often
@@ -273,6 +265,7 @@ class CatalogOrderFlowService
             // fetched — far better UX than a bare error message.
             if ($reason === 'products_not_approved' || $reason === 'products_invalid') {
                 $this->sendTextMenuFallback($client, $contact, $aiAgent, $products);
+
                 return;
             }
 
@@ -290,12 +283,20 @@ class CatalogOrderFlowService
         $h = strtolower($rawError);
 
         // 131009 + "None of the products provided could be sent" → review pending / rejected
-        if (str_contains($h, 'none of the products')) return 'products_not_approved';
-        if (str_contains($h, 'check your catalog'))   return 'products_not_approved';
+        if (str_contains($h, 'none of the products')) {
+            return 'products_not_approved';
+        }
+        if (str_contains($h, 'check your catalog')) {
+            return 'products_not_approved';
+        }
         // 131009 + "Invalid catalog_id" → catalog not associated with WABA
-        if (str_contains($h, 'invalid catalog_id'))   return 'catalog_not_linked';
+        if (str_contains($h, 'invalid catalog_id')) {
+            return 'catalog_not_linked';
+        }
         // Bad SKU
-        if (str_contains($h, 'invalid retailer_id'))  return 'products_invalid';
+        if (str_contains($h, 'invalid retailer_id')) {
+            return 'products_invalid';
+        }
 
         return 'unknown';
     }
@@ -324,9 +325,9 @@ class CatalogOrderFlowService
         foreach ($grouped as $catName => $items) {
             $lines[] = "_{$catName}_";
             foreach ($items as $p) {
-                $name  = $p['name'] ?? '(tanpa nama)';
+                $name = $p['name'] ?? '(tanpa nama)';
                 $price = $p['price'] ?? '';
-                $lines[] = "• {$name}" . ($price !== '' ? " — {$price}" : '');
+                $lines[] = "• {$name}".($price !== '' ? " — {$price}" : '');
             }
             $lines[] = '';
         }
@@ -337,7 +338,7 @@ class CatalogOrderFlowService
         $this->sendText($client, $contact->wa_id, $body);
 
         Log::info('Catalog fallback: sent text menu', [
-            'ai_agent_id'   => $aiAgent->id,
+            'ai_agent_id' => $aiAgent->id,
             'contact_wa_id' => $contact->wa_id,
             'product_count' => count($products),
         ]);
@@ -354,6 +355,7 @@ class CatalogOrderFlowService
                 return false;
             }
             $avail = strtolower($p['availability'] ?? 'in stock');
+
             return in_array($avail, ['in stock', 'preorder', 'available for order'], true);
         }));
     }
@@ -367,11 +369,11 @@ class CatalogOrderFlowService
     ): void {
         $sections = $this->buildMultiProductSections($products);
 
-        $header = mb_substr('Menu ' . $botName, 0, 60);
-        $body   = count($products) === 1
+        $header = mb_substr('Menu '.$botName, 0, 60);
+        $body = count($products) === 1
             ? 'Berikut menu kami. Tap "View" lalu "Add to cart" untuk memesan.'
             : 'Silakan pilih menu favorit Anda. Tap "View" untuk detail, '
-              . 'lalu "Add to cart" untuk menambahkan ke keranjang.';
+              .'lalu "Add to cart" untuk menambahkan ke keranjang.';
         $footer = mb_substr($botName, 0, 60);
 
         // Netflie 2.x types catalog_id as int — Meta catalog IDs are numeric
@@ -513,8 +515,15 @@ class CatalogOrderFlowService
 
         // "Lihat Menu" button works regardless of flow state — it's the
         // greeting CTA shortcut. Equivalent to user typing "menu".
-        if ($buttonId === self::BTN_SHOW_MENU && $aiAgent->hasCatalog()) {
-            $this->sendCatalog($account, $contact, $aiAgent);
+        if ($buttonId === self::BTN_SHOW_MENU) {
+            if ($aiAgent->hasCatalog()) {
+                $this->sendCatalog($account, $contact, $aiAgent);
+
+                return true;
+            }
+
+            app(AiAgentService::class)->processMessage($account, $contact, 'menu');
+
             return true;
         }
 
@@ -526,6 +535,7 @@ class CatalogOrderFlowService
             } else {
                 $this->resumeFlow($account, $contact, $conversation, $aiAgent);
             }
+
             return true;
         }
 
@@ -547,6 +557,7 @@ class CatalogOrderFlowService
             } else {
                 $this->sendCancelledReply($account, $contact, $aiAgent);
             }
+
             return true;
         }
 
@@ -586,7 +597,7 @@ class CatalogOrderFlowService
         // their delivery details — don't save it as their delivery name.
         if (preg_match('/^\s*(batal|cancel|stop|berhenti|gajadi|gak\s+jadi|tidak\s+jadi)\.?\s*$/iu', $clean)) {
             Log::info('Catalog flow cancelled via text in delivery-info state', [
-                'ai_agent_id'   => $aiAgent->id,
+                'ai_agent_id' => $aiAgent->id,
                 'contact_wa_id' => $contact->wa_id,
             ]);
             $conversation->clearFlowState();
@@ -594,6 +605,7 @@ class CatalogOrderFlowService
             $conversation->clearCatalogItems();
             $conversation->clearPendingOrder();
             $this->sendCancelledReply($account, $contact, $aiAgent);
+
             return true;
         }
 
@@ -622,6 +634,7 @@ class CatalogOrderFlowService
             ]);
 
             $this->sendDeliveryInfoSummary($account, $contact, $conversation);
+
             return true;
         }
 
@@ -664,9 +677,9 @@ class CatalogOrderFlowService
         // Value is lazy and ends right before the next label (with optional verb
         // + separator) or end-of-string. Leading bullet/markdown chars on the
         // next label are tolerated in the lookahead.
-        $re = '/(?:ubah|ganti|edit|update|set|isi)?\s*\b(' . $aliasGroup . ')\b\s*[:=]\s*'
-            . '(.+?)\s*'
-            . '(?=(?:[\s,;\n•*_\-]+(?:ubah|ganti|edit|update|set|isi)?\s*\b(?:' . $aliasGroup . ')\b\s*[:=])|$)/iu';
+        $re = '/(?:ubah|ganti|edit|update|set|isi)?\s*\b('.$aliasGroup.')\b\s*[:=]\s*'
+            .'(.+?)\s*'
+            .'(?=(?:[\s,;\n•*_\-]+(?:ubah|ganti|edit|update|set|isi)?\s*\b(?:'.$aliasGroup.')\b\s*[:=])|$)/iu';
 
         if (! preg_match_all($re, $text, $matches, PREG_SET_ORDER)) {
             return [];
@@ -740,8 +753,10 @@ class CatalogOrderFlowService
             if (str_contains($seg, '. ') && preg_match('/\b(jakarta|bandung|surabaya|medan|semarang|makassar|palembang|tangerang|depok|bekasi|bogor|padang|pekanbaru|denpasar|yogya|malang|solo|sumatera|sumatra|jawa|kalimantan|sulawesi|bali|aceh|riau|lampung|banten|papua)\b/i', $seg)
                 && preg_match('/\b(jangan|tanpa|tolong|minta|catatan|note)\b/i', $seg)) {
                 foreach (preg_split('/\.\s+/u', $seg) as $sub) {
-                    $sub = trim($sub, " .");
-                    if ($sub !== '') $segments[] = $sub;
+                    $sub = trim($sub, ' .');
+                    if ($sub !== '') {
+                        $segments[] = $sub;
+                    }
                 }
             } else {
                 $segments[] = $seg;
@@ -753,12 +768,12 @@ class CatalogOrderFlowService
         $noteParts = [];
         $nameCandidates = [];
 
-        $phoneRe   = '/(?:\+?62|0)[\s\-]?[2-9]\d(?:[\s\-]?\d){6,11}/';
+        $phoneRe = '/(?:\+?62|0)[\s\-]?[2-9]\d(?:[\s\-]?\d){6,11}/';
         $addressRe = '/\b(jl\.?|jalan|gang|gg\.?|komplek|kompleks|kel\.|kelurahan|kec\.|kecamatan|rt\b|rw\b|no\.?\s*\d|nomor\s+\d|alamat|blok|kampung|desa|dusun|perumahan)\b/i';
         // Geographic continuation: city/province segment after an address segment.
-        $geoRe     = '/\b(jakarta|bandung|surabaya|medan|semarang|makassar|palembang|tangerang|depok|bekasi|bogor|padang|pekanbaru|denpasar|yogya(?:karta)?|malang|solo|sumatera|sumatra|jawa|kalimantan|sulawesi|bali|aceh|riau|lampung|banten|papua)\b/i';
-        $noteRe    = '/\b(jangan|tanpa|tolong|minta|catatan|note|gak\s+pakai|tidak\s+pakai|extra|less|more|tambah)\b/i';
-        $labelRe   = '/^(nomor|no\.?|telp\.?|telepon|hp|wa|nama(?:nya)?(?:\s+saya)?|saya|alamat)$/iu';
+        $geoRe = '/\b(jakarta|bandung|surabaya|medan|semarang|makassar|palembang|tangerang|depok|bekasi|bogor|padang|pekanbaru|denpasar|yogya(?:karta)?|malang|solo|sumatera|sumatra|jawa|kalimantan|sulawesi|bali|aceh|riau|lampung|banten|papua)\b/i';
+        $noteRe = '/\b(jangan|tanpa|tolong|minta|catatan|note|gak\s+pakai|tidak\s+pakai|extra|less|more|tambah)\b/i';
+        $labelRe = '/^(nomor|no\.?|telp\.?|telepon|hp|wa|nama(?:nya)?(?:\s+saya)?|saya|alamat)$/iu';
 
         foreach ($segments as $seg) {
             // Phone — extract first valid match, strip from segment, keep remainder for further classification.
@@ -775,15 +790,18 @@ class CatalogOrderFlowService
 
             if (preg_match($addressRe, $seg)) {
                 $addressParts[] = $seg;
+
                 continue;
             }
             // If we already have an address and this segment looks like a city/province, merge it.
             if (! empty($addressParts) && preg_match($geoRe, $seg) && ! preg_match($noteRe, $seg)) {
                 $addressParts[] = $seg;
+
                 continue;
             }
             if (preg_match($noteRe, $seg)) {
                 $noteParts[] = $seg;
+
                 continue;
             }
 
@@ -808,10 +826,10 @@ class CatalogOrderFlowService
         }
 
         return [
-            'name'    => $name !== null && $name !== '' ? $name : null,
-            'phone'   => $phone,
-            'address' => ! empty($addressParts) ? trim(implode(', ', $addressParts), " ,") : null,
-            'note'    => ! empty($noteParts) ? trim(implode('. ', $noteParts), " .") : null,
+            'name' => $name !== null && $name !== '' ? $name : null,
+            'phone' => $phone,
+            'address' => ! empty($addressParts) ? trim(implode(', ', $addressParts), ' ,') : null,
+            'note' => ! empty($noteParts) ? trim(implode('. ', $noteParts), ' .') : null,
         ];
     }
 
@@ -819,8 +837,12 @@ class CatalogOrderFlowService
     {
         $digits = preg_replace('/[^\d+]/', '', $raw);
         // Normalize "+62..." or "62..." to "08..." for local Indonesian readability.
-        if (str_starts_with($digits, '+62')) $digits = '0' . substr($digits, 3);
-        elseif (str_starts_with($digits, '62')) $digits = '0' . substr($digits, 2);
+        if (str_starts_with($digits, '+62')) {
+            $digits = '0'.substr($digits, 3);
+        } elseif (str_starts_with($digits, '62')) {
+            $digits = '0'.substr($digits, 2);
+        }
+
         return $digits;
     }
 
@@ -899,7 +921,7 @@ class CatalogOrderFlowService
                 ."Bisa beberapa sekaligus, pisahkan dengan koma:\n"
                 ."nama = Budi, telepon = 0812xxxx, alamat = Jl. Mawar 12\n\n"
                 ."Atau kirim ulang lengkap dalam satu pesan:\n"
-                ."Budi, 0812xxxx, Jl. Mawar no 12, jangan pedas"
+                .'Budi, 0812xxxx, Jl. Mawar no 12, jangan pedas'
             );
 
             return true;
@@ -909,7 +931,7 @@ class CatalogOrderFlowService
             // Prefer parsed structured fields over the raw text.
             $parsed = $conversation->getDeliveryParsed() ?? [];
             $address = $parsed['address'] ?? $conversation->getDeliveryRawInfo() ?? '';
-            $note    = $parsed['note']    ?? null;
+            $note = $parsed['note'] ?? null;
 
             $conversation->setDeliveryAddress($address);
             if ($note) {
@@ -1019,7 +1041,7 @@ class CatalogOrderFlowService
             ."• Nomor telepon\n"
             ."• Alamat lengkap (jalan, nomor, RT/RW)\n"
             ."• Patokan / catatan kurir (opsional)\n\n"
-            ."Contoh: _Budi, 0812xxxx, Jl. Mawar no 12 RT 03/04, dekat warung Ibu Siti._"
+            .'Contoh: _Budi, 0812xxxx, Jl. Mawar no 12 RT 03/04, dekat warung Ibu Siti._'
         );
     }
 
@@ -1032,12 +1054,12 @@ class CatalogOrderFlowService
     protected function flowStepLabel(?string $state): string
     {
         return match ($state) {
-            self::STATE_AWAITING_FULFILLMENT      => 'memilih metode (Pickup / Delivery / Reservasi)',
-            self::STATE_AWAITING_DELIVERY_INFO    => 'mengisi informasi pengiriman',
-            self::STATE_CONFIRMING_DELIVERY_INFO  => 'konfirmasi informasi pengiriman',
-            self::STATE_CONFIRMING_ORDER_SUMMARY  => 'konfirmasi ringkasan pesanan',
-            self::STATE_AWAITING_PAYMENT          => 'menunggu pembayaran',
-            default                               => 'pemesanan',
+            self::STATE_AWAITING_FULFILLMENT => 'memilih metode (Pickup / Delivery / Reservasi)',
+            self::STATE_AWAITING_DELIVERY_INFO => 'mengisi informasi pengiriman',
+            self::STATE_CONFIRMING_DELIVERY_INFO => 'konfirmasi informasi pengiriman',
+            self::STATE_CONFIRMING_ORDER_SUMMARY => 'konfirmasi ringkasan pesanan',
+            self::STATE_AWAITING_PAYMENT => 'menunggu pembayaran',
+            default => 'pemesanan',
         };
     }
 
@@ -1056,16 +1078,16 @@ class CatalogOrderFlowService
         AiAgentConversation $conversation
     ): void {
         $client = $this->client($account);
-        $state  = $conversation->getFlowState();
-        $step   = $this->flowStepLabel($state);
+        $state = $conversation->getFlowState();
+        $step = $this->flowStepLabel($state);
 
         $isPayment = $state === self::STATE_AWAITING_PAYMENT;
         $body = $isPayment
             ? "Pesanan Anda sudah dibuat dan sedang *menunggu pembayaran*.\n\n"
-              . "Mau lanjut ke pembayaran, atau batalkan pesanan?"
+              .'Mau lanjut ke pembayaran, atau batalkan pesanan?'
             : "Sepertinya pesan Anda di luar konteks pesanan yang sedang berjalan.\n\n"
-              . "📌 Pesanan masih tersimpan di tahap: *{$step}*.\n\n"
-              . "Mau lanjutkan pesanan ini?";
+              ."📌 Pesanan masih tersimpan di tahap: *{$step}*.\n\n"
+              .'Mau lanjutkan pesanan ini?';
 
         try {
             $action = new ButtonAction([
@@ -1075,17 +1097,17 @@ class CatalogOrderFlowService
             $client->sendButton($contact->wa_id, $this->truncate($body, 1020), $action, null, null);
 
             Log::info('Drip prompt sent', [
-                'ai_agent_id'   => $aiAgent->id,
+                'ai_agent_id' => $aiAgent->id,
                 'contact_wa_id' => $contact->wa_id,
-                'flow_state'    => $state,
+                'flow_state' => $state,
             ]);
         } catch (\Throwable $e) {
             Log::error('Failed to send drip prompt', [
                 'contact_wa_id' => $contact->wa_id,
-                'error'         => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
             $this->sendText($client, $contact->wa_id,
-                "Mohon gunakan tombol pada pesan sebelumnya, atau kirim *batal* untuk membatalkan.");
+                'Mohon gunakan tombol pada pesan sebelumnya, atau kirim *batal* untuk membatalkan.');
         }
     }
 
@@ -1131,18 +1153,39 @@ class CatalogOrderFlowService
         AiAgentConversation $conversation
     ): void {
         $client = $this->client($account);
-        $qris   = $conversation->getCurrentQrisTransaction();
-        $order  = $conversation->getCurrentOrder();
+        $qris = $conversation->getCurrentQrisTransaction();
+        $order = $conversation->getCurrentOrder();
 
         if (! $qris || ! $order) {
             $conversation->clearFlowState();
             $this->sendText($client, $contact->wa_id,
                 'Sesi pembayaran sudah berakhir. Ketik *menu* untuk memesan lagi.');
+
             return;
         }
 
-        $total  = 'Rp '.number_format($order->total, 0, ',', '.');
-        $link   = $qris->getShareableLink();
+        if ($qris->isExpired()) {
+            $qris->markAsExpired();
+            $qris->save();
+
+            $conversation->clearFlowState();
+            $conversation->clearPaymentContext();
+            $conversation->clearPendingOrder();
+            $conversation->clearCart();
+
+            $orderContext = $conversation->order_context ?? [];
+            unset($orderContext['last_qris_transaction_id']);
+            $conversation->order_context = $orderContext;
+            $conversation->save();
+
+            $this->sendText($client, $contact->wa_id,
+                "⏰ Kode pembayaran sudah kadaluarsa.\n\nPesanan otomatis dibatalkan.");
+
+            return;
+        }
+
+        $total = 'Rp '.number_format($order->total, 0, ',', '.');
+        $link = $qris->getShareableLink();
         $expiry = optional($qris->expires_at)->format('H:i');
 
         $msg = "💳 *Lanjutkan Pembayaran*\n\n"
@@ -1163,12 +1206,12 @@ class CatalogOrderFlowService
     ): void {
         $client = $this->client($account);
         $parsed = $conversation->getDeliveryParsed() ?: [];
-        $raw    = $conversation->getDeliveryRawInfo() ?: '';
+        $raw = $conversation->getDeliveryRawInfo() ?: '';
 
-        $name    = $parsed['name']    ?? null;
-        $phone   = $parsed['phone']   ?? null;
+        $name = $parsed['name'] ?? null;
+        $phone = $parsed['phone'] ?? null;
         $address = $parsed['address'] ?? null;
-        $note    = $parsed['note']    ?? null;
+        $note = $parsed['note'] ?? null;
 
         // If parser missed all required fields, show raw as a single block + ask
         // user to re-send in the requested format.
@@ -1176,29 +1219,29 @@ class CatalogOrderFlowService
 
         if (! $hasAny) {
             $body = "📍 *Konfirmasi Informasi Delivery*\n\n"
-                  . "Maaf, kami tidak dapat membaca informasi dari pesan:\n\n"
-                  . "_" . $raw . "_\n\n"
-                  . "Mohon kirim ulang dengan format:\n"
-                  . "_Budi, 0812xxxx, Jl. Mawar no 12 RT 03/04, jangan pedas_";
+                  ."Maaf, kami tidak dapat membaca informasi dari pesan:\n\n"
+                  .'_'.$raw."_\n\n"
+                  ."Mohon kirim ulang dengan format:\n"
+                  .'_Budi, 0812xxxx, Jl. Mawar no 12 RT 03/04, jangan pedas_';
         } else {
             $missing = array_filter([
-                ! $name    ? 'nama'    : null,
-                ! $phone   ? 'nomor telepon' : null,
-                ! $address ? 'alamat'  : null,
+                ! $name ? 'nama' : null,
+                ! $phone ? 'nomor telepon' : null,
+                ! $address ? 'alamat' : null,
             ]);
 
-            $lines = ["📍 *Konfirmasi Informasi Delivery*", ''];
-            $lines[] = '👤 *Nama:* '     . ($name    ?: '_belum terdeteksi_');
-            $lines[] = '📱 *Telepon:* '  . ($phone   ?: '_belum terdeteksi_');
-            $lines[] = '📍 *Alamat:* '   . ($address ?: '_belum terdeteksi_');
+            $lines = ['📍 *Konfirmasi Informasi Delivery*', ''];
+            $lines[] = '👤 *Nama:* '.($name ?: '_belum terdeteksi_');
+            $lines[] = '📱 *Telepon:* '.($phone ?: '_belum terdeteksi_');
+            $lines[] = '📍 *Alamat:* '.($address ?: '_belum terdeteksi_');
             if ($note) {
-                $lines[] = '📝 *Catatan:* ' . $note;
+                $lines[] = '📝 *Catatan:* '.$note;
             }
             $lines[] = '';
 
             if (! empty($missing)) {
-                $lines[] = '⚠️ Belum lengkap: ' . implode(', ', $missing) . '. '
-                         . 'Tap *Edit* untuk koreksi atau *Konfirmasi* kalau sudah benar.';
+                $lines[] = '⚠️ Belum lengkap: '.implode(', ', $missing).'. '
+                         .'Tap *Edit* untuk koreksi atau *Konfirmasi* kalau sudah benar.';
             } else {
                 $lines[] = 'Apakah informasi di atas sudah benar?';
             }
@@ -1236,7 +1279,7 @@ class CatalogOrderFlowService
         $deliveryType = $conversation->getDeliveryType() ?? Order::DELIVERY_TYPE_PICKUP;
         $total = $subtotal + $tax + $ongkir;
 
-        $lines = ["🧾 *Ringkasan Pesanan*", ''];
+        $lines = ['🧾 *Ringkasan Pesanan*', ''];
         foreach ($items as $item) {
             $itemTotal = $item['item_price'] * $item['quantity'];
             $lines[] = sprintf(
@@ -1309,7 +1352,7 @@ class CatalogOrderFlowService
                 .'Tim kami akan menghubungi Anda untuk konfirmasi.');
         } else {
             $this->sendText($client, $contact->wa_id,
-                "📅 Untuk reservasi, silakan hubungi kami langsung. Tim kami akan membantu.");
+                '📅 Untuk reservasi, silakan hubungi kami langsung. Tim kami akan membantu.');
         }
     }
 
@@ -1353,7 +1396,7 @@ class CatalogOrderFlowService
                 // typed (parsed) over their WhatsApp profile — the WA name/number
                 // may not match the delivery recipient.
                 $parsed = $conversation->getDeliveryParsed() ?? [];
-                $customerName  = $isDelivery && ! empty($parsed['name'])
+                $customerName = $isDelivery && ! empty($parsed['name'])
                     ? $parsed['name']
                     : ($contact->name ?? 'WhatsApp Customer');
                 $customerPhone = $isDelivery && ! empty($parsed['phone'])
@@ -1495,7 +1538,7 @@ class CatalogOrderFlowService
                  ."💰 Total: {$formattedTotal}\n\n"
                  ."💳 Silakan bayar melalui link berikut:\n{$shareableLink}\n\n"
                  ."⏰ Berlaku hingga: {$expiryTime}\n\n"
-                 ."Pesanan akan disiapkan setelah pembayaran berhasil. Terima kasih! 🙏";
+                 .'Pesanan akan disiapkan setelah pembayaran berhasil. Terima kasih! 🙏';
 
             $this->sendText($client, $contact->wa_id, $msg);
 

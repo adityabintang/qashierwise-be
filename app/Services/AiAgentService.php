@@ -90,8 +90,8 @@ class AiAgentService
                 // no handler was wired up — leaving them stuck.
                 if (preg_match('/^\s*(batal|cancel|stop|berhenti|gajadi|gak\s+jadi|tidak\s+jadi)\.?\s*$/iu', $messageText)) {
                     Log::info('Catalog flow cancelled by customer', [
-                        'ai_agent_id'    => $aiAgent->id,
-                        'contact_wa_id'  => $contact->wa_id,
+                        'ai_agent_id' => $aiAgent->id,
+                        'contact_wa_id' => $contact->wa_id,
                         'previous_state' => $conversation->getFlowState(),
                     ]);
                     $conversation->clearFlowState();
@@ -99,7 +99,34 @@ class AiAgentService
                     $conversation->clearCatalogItems();
                     $conversation->clearPendingOrder();
                     $this->catalogOrderFlow->sendCancelledReply($account, $contact, $aiAgent);
+
                     return;
+                }
+
+                if ($conversation->getFlowState() === CatalogOrderFlowService::STATE_AWAITING_PAYMENT) {
+                    $qrisTransaction = $conversation->getCurrentQrisTransaction();
+                    if ($qrisTransaction && $qrisTransaction->isExpired()) {
+                        $qrisTransaction->markAsExpired();
+                        $qrisTransaction->save();
+
+                        $conversation->clearFlowState();
+                        $conversation->clearPaymentContext();
+                        $conversation->clearPendingOrder();
+                        $conversation->clearCart();
+
+                        $orderContext = $conversation->order_context ?? [];
+                        unset($orderContext['last_qris_transaction_id']);
+                        $conversation->order_context = $orderContext;
+                        $conversation->save();
+
+                        $this->sendReply(
+                            $account,
+                            $contact->wa_id,
+                            "⏰ Kode pembayaran sudah kadaluarsa.\n\nPesanan otomatis dibatalkan."
+                        );
+
+                        return;
+                    }
                 }
 
                 $handled = $this->catalogOrderFlow->handleDeliveryInfoText(
@@ -119,12 +146,13 @@ class AiAgentService
                 return;
             }
 
+            $detected = UserIntent::detect($messageText);
+
             // Catalog short-circuit: when AI Agent has a catalog and the user
             // asks for the menu or wants to order, send the WhatsApp Catalog UI
             // directly instead of having the LLM write a text menu.
-            if ($aiAgent->hasCatalog() && $aiAgent->isOrderEnabled()) {
-                $detected = UserIntent::detect($messageText);
-                if (in_array($detected, [UserIntent::VIEW_MENU, UserIntent::ORDER, UserIntent::NEXT_MENU_PAGE, UserIntent::SEARCH_PRODUCT], true)) {
+            if ($aiAgent->isOrderEnabled()) {
+                if ($aiAgent->hasCatalog() && in_array($detected, [UserIntent::VIEW_MENU, UserIntent::ORDER, UserIntent::NEXT_MENU_PAGE, UserIntent::SEARCH_PRODUCT], true)) {
                     $conversation->addMessage('human', $messageText);
                     $conversation->addMessage('ai', 'Mengirim katalog produk…');
                     $this->catalogOrderFlow->sendCatalog($account, $contact, $aiAgent);
@@ -133,7 +161,7 @@ class AiAgentService
                 }
 
                 // Greeting short-circuit: skip LLM and reply with a quick-reply
-                // button so the customer can open the catalog with one tap
+                // button so the customer can open the menu with one tap
                 // instead of having to type "menu". Token-saving + better UX.
                 if ($detected === UserIntent::GREETING) {
                     $conversation->addMessage('human', $messageText);
@@ -2565,8 +2593,21 @@ class AiAgentService
 
                 case QrisTransaction::STATUS_PENDING:
                     if ($qrisTransaction->isExpired()) {
+                        $qrisTransaction->markAsExpired();
+                        $qrisTransaction->save();
+
+                        $conversation->clearFlowState();
+                        $conversation->clearPaymentContext();
+                        $conversation->clearCart();
+                        $conversation->clearPendingOrder();
+
+                        $orderContext = $conversation->order_context ?? [];
+                        unset($orderContext['last_qris_transaction_id']);
+                        $conversation->order_context = $orderContext;
+                        $conversation->save();
+
                         return "⏰ Kode pembayaran sudah kadaluarsa.\n\n".
-                               "Ketik 'buat qris baru' untuk mendapatkan kode pembayaran baru.";
+                               'Pesanan otomatis dibatalkan.';
                     }
 
                     $remainingMinutes = ceil($qrisTransaction->getRemainingTimeInSeconds() / 60);
@@ -2578,8 +2619,18 @@ class AiAgentService
                            'Jika sudah membayar, tunggu beberapa saat lalu cek status kembali.';
 
                 case QrisTransaction::STATUS_EXPIRE:
+                    $conversation->clearFlowState();
+                    $conversation->clearPaymentContext();
+                    $conversation->clearCart();
+                    $conversation->clearPendingOrder();
+
+                    $orderContext = $conversation->order_context ?? [];
+                    unset($orderContext['last_qris_transaction_id']);
+                    $conversation->order_context = $orderContext;
+                    $conversation->save();
+
                     return "⏰ Kode pembayaran sudah kadaluarsa.\n\n".
-                           "Ketik 'buat qris baru' untuk mendapatkan kode pembayaran baru.";
+                        'Pesanan otomatis dibatalkan.';
 
                 case QrisTransaction::STATUS_CANCEL:
                     return "❌ Pembayaran dibatalkan.\n\n".
@@ -2613,13 +2664,13 @@ class AiAgentService
         }
 
         $business = $this->businessName($aiAgent);
-        $botName  = $aiAgent->bot_name ?: 'asisten kami';
+        $botName = $aiAgent->bot_name ?: 'asisten kami';
 
         // Note: business name (merchant) and bot name (assistant) are distinct —
         // "Selamat datang di <business>" then the bot introduces itself.
         return "Halo! Selamat datang di *{$business}*. 👋\n\n"
-             . "Saya {$botName}, asisten pemesanan Anda. "
-             . "Tap *Lihat Menu* untuk mulai memesan, atau kirim pesan jika ada yang ingin ditanyakan.";
+             ."Saya {$botName}, asisten pemesanan Anda. "
+             .'Tap *Lihat Menu* untuk mulai memesan, atau kirim pesan jika ada yang ingin ditanyakan.';
     }
 
     /**
