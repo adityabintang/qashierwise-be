@@ -2606,15 +2606,40 @@ class AiAgentService
      */
     protected function buildGreeting(AiAgent $aiAgent): string
     {
-        $botName = $aiAgent->bot_name ?: 'asisten kami';
+        // Merchant-defined custom greeting always wins.
         $custom = $aiAgent->settings['greeting_message'] ?? null;
-
         if (is_string($custom) && trim($custom) !== '') {
             return $custom;
         }
 
-        return "Halo! Selamat datang di {$botName}. Tap *Lihat Menu* untuk mulai memesan, "
-             . "atau kirim pesan kalau ada yang ingin ditanyakan.";
+        $business = $this->businessName($aiAgent);
+        $botName  = $aiAgent->bot_name ?: 'asisten kami';
+
+        // Note: business name (merchant) and bot name (assistant) are distinct —
+        // "Selamat datang di <business>" then the bot introduces itself.
+        return "Halo! Selamat datang di *{$business}*. 👋\n\n"
+             . "Saya {$botName}, asisten pemesanan Anda. "
+             . "Tap *Lihat Menu* untuk mulai memesan, atau kirim pesan jika ada yang ingin ditanyakan.";
+    }
+
+    /**
+     * Resolve the merchant's business name for greetings/messages.
+     * Priority: explicit business_info.name → default store name → fallback.
+     * Never uses bot_name (that's the assistant, not the business).
+     */
+    protected function businessName(AiAgent $aiAgent): string
+    {
+        $info = $aiAgent->business_info ?? [];
+        if (! empty($info['name']) && is_string($info['name'])) {
+            return trim($info['name']);
+        }
+
+        $storeName = optional($aiAgent->defaultStore)->name;
+        if (! empty($storeName)) {
+            return trim($storeName);
+        }
+
+        return 'toko kami';
     }
 
     /**
