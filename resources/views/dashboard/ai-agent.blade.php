@@ -316,23 +316,47 @@
                                     </button>
                                 </div>
 
-                                <!-- Reservation Toggle -->
-                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl" :class="config.reservation_enabled ? 'bg-purple-100 border border-purple-400 shadow-sm shadow-purple-100' : 'bg-gray-50 border border-gray-200'">
+                                <!-- No Reservation Config Warning -->
+                                <div x-show="!hasReservationConfig" x-transition class="bg-red-50 border border-red-200 rounded-xl p-4">
+                                    <p class="text-sm text-red-800 font-medium">
+                                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                                        Konfigurasi reservasi belum dibuat
+                                    </p>
+                                    <p class="text-sm text-red-700 mt-1">
+                                        Reservasi via chat memerlukan konfigurasi reservasi aktif. Silakan atur jadwal, kapasitas, dan slot reservasi terlebih dahulu agar dapat menggunakan fitur ini.
+                                    </p>
+                                    <a href="{{ config('app.url') }}/dashboard/reservations/config"
+                                        class="inline-flex items-center gap-2 mt-3 text-sm font-medium text-red-700 underline hover:no-underline">
+                                        <i class="fas fa-external-link-alt"></i>
+                                        Atur konfigurasi reservasi sekarang
+                                    </a>
+                                </div>
+
+                                <!-- Reservation Toggle (locked until reservation config exists) -->
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl"
+                                    :class="!hasReservationConfig ? 'bg-gray-50 border border-gray-200 opacity-60' : (config.reservation_enabled ? 'bg-purple-100 border border-purple-400 shadow-sm shadow-purple-100' : 'bg-gray-50 border border-gray-200')">
                                     <div class="flex-1">
-                                        <p class="font-medium" :class="config.reservation_enabled ? 'text-purple-950' : 'text-gray-600'">Enable Reservation via Chat</p>
-                                        <p class="text-sm" :class="config.reservation_enabled ? 'text-purple-800' : 'text-gray-500'">
-                                            <span x-show="config.reservation_enabled">AI Agent akan mengirim form reservasi agar pelanggan bisa booking meja via chat</span>
-                                            <span x-show="!config.reservation_enabled">Reservasi via chat nonaktif</span>
+                                        <p class="font-medium" :class="config.reservation_enabled && hasReservationConfig ? 'text-purple-950' : 'text-gray-600'">Enable Reservation via Chat</p>
+                                        <p class="text-sm" :class="config.reservation_enabled && hasReservationConfig ? 'text-purple-800' : 'text-gray-500'">
+                                            <span x-show="config.reservation_enabled && hasReservationConfig">AI Agent akan mengirim form reservasi agar pelanggan bisa booking meja via chat</span>
+                                            <span x-show="!config.reservation_enabled || !hasReservationConfig">Reservasi via chat nonaktif</span>
                                         </p>
                                     </div>
                                     <button
                                         type="button"
-                                        @click="config.reservation_enabled = !config.reservation_enabled"
-                                        :class="config.reservation_enabled ? 'bg-purple-600 ring-2 ring-purple-200' : 'bg-gray-300'"
-                                        class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 flex-shrink-0 cursor-pointer"
+                                        @click="hasReservationConfig && (config.reservation_enabled = !config.reservation_enabled)"
+                                        :class="{
+                                            'bg-purple-600 ring-2 ring-purple-200': config.reservation_enabled && hasReservationConfig,
+                                            'bg-gray-300': !(config.reservation_enabled && hasReservationConfig),
+                                            'cursor-not-allowed': !hasReservationConfig,
+                                            'cursor-pointer': hasReservationConfig
+                                        }"
+                                        :disabled="!hasReservationConfig"
+                                        :title="!hasReservationConfig ? 'Atur konfigurasi reservasi terlebih dahulu untuk mengaktifkan fitur ini' : ''"
+                                        class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 flex-shrink-0"
                                     >
                                         <span
-                                            :class="config.reservation_enabled ? 'translate-x-6' : 'translate-x-1'"
+                                            :class="config.reservation_enabled && hasReservationConfig ? 'translate-x-6' : 'translate-x-1'"
                                             class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md"
                                         ></span>
                                     </button>
@@ -687,6 +711,7 @@ function aiAgentApp() {
         saving: false,
         hasWhatsAppAccount: false,
         hasSubMerchant: false,
+        hasReservationConfig: false,
         togglingActive: false,
         togglingOrder: false,
         lastSaved: null,
@@ -802,14 +827,18 @@ function aiAgentApp() {
 
                 this.hasWhatsAppAccount = true;
                 this.hasSubMerchant = data.has_sub_merchant || false;
+                this.hasReservationConfig = data.has_reservation_config || false;
 
                 if (data.success && data.data) {
                     this.config = {
                         id: data.data.id,
                         is_active: data.data.is_active,
                         order_enabled: data.data.order_enabled,
-                        qris_enabled: data.data.qris_enabled || false,
-                        reservation_enabled: data.data.reservation_enabled || false,
+                        // Force features off when their prerequisite config is
+                        // missing — keeps the locked toggle visually OFF and
+                        // prevents the save endpoint from rejecting with 422.
+                        qris_enabled: (data.data.qris_enabled && this.hasSubMerchant) || false,
+                        reservation_enabled: (data.data.reservation_enabled && this.hasReservationConfig) || false,
                         delivery_enabled: data.data.delivery_enabled || false,
                     };
                     this.form = {

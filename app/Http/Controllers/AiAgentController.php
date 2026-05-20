@@ -70,6 +70,9 @@ class AiAgentController extends Controller
             $aiAgent = AiAgent::where('whatsapp_account_id', $whatsappAccount->id)->first();
 
             $hasSubMerchant = SubMerchant::where('user_id', $userId)->exists();
+            $hasReservationConfig = \App\Models\ReservationConfig::where('user_id', $userId)
+                ->where('is_active', true)
+                ->exists();
 
             if (! $aiAgent) {
                 return response()->json([
@@ -77,6 +80,7 @@ class AiAgentController extends Controller
                     'message' => 'AI Agent not configured yet',
                     'data' => null,
                     'has_sub_merchant' => $hasSubMerchant,
+                    'has_reservation_config' => $hasReservationConfig,
                 ], 200);
             }
 
@@ -101,6 +105,7 @@ class AiAgentController extends Controller
                     'updated_at' => $aiAgent->updated_at,
                 ],
                 'has_sub_merchant' => $hasSubMerchant,
+                'has_reservation_config' => $hasReservationConfig,
             ], 200);
 
         } catch (\Exception $e) {
@@ -150,6 +155,19 @@ class AiAgentController extends Controller
                     return response()->json([
                         'success' => false,
                         'message' => 'QRIS Payment tidak bisa diaktifkan. Silakan buat Sub Merchant terlebih dahulu di halaman Sub Merchant.',
+                    ], 422);
+                }
+            }
+
+            // Validate reservation config exists before enabling reservation
+            if ($request->boolean('reservation_enabled', false)) {
+                $hasReservationConfig = \App\Models\ReservationConfig::where('user_id', $userId)
+                    ->where('is_active', true)
+                    ->exists();
+                if (! $hasReservationConfig) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Reservasi tidak bisa diaktifkan. Silakan atur konfigurasi reservasi terlebih dahulu di halaman Reservasi.',
                     ], 422);
                 }
             }

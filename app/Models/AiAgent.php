@@ -105,11 +105,30 @@ class AiAgent extends Model
     }
 
     /**
-     * Check if reservation feature is enabled.
+     * Check if reservation feature is enabled AND configured.
+     * Mirrors isQrisEnabled(): the toggle alone isn't enough — the merchant
+     * must have an active ReservationConfig (analogous to QRIS needing a
+     * SubMerchant). Without it the "Reservasi" button is suppressed in chat.
      */
     public function isReservationEnabled(): bool
     {
-        return $this->reservation_enabled;
+        return $this->reservation_enabled
+            && $this->hasReservationConfig();
+    }
+
+    /**
+     * Whether the merchant has an active reservation configuration.
+     */
+    public function hasReservationConfig(): bool
+    {
+        $user = $this->getUser();
+        if (! $user) {
+            return false;
+        }
+
+        return ReservationConfig::where('user_id', $user->id)
+            ->where('is_active', true)
+            ->exists();
     }
 
     public function isDeliveryEnabled(): bool
