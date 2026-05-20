@@ -267,6 +267,7 @@
                                         <i class="fas fa-book-open text-emerald-400 mr-1.5"></i>
                                         Katalog Meta
                                     </label>
+                                    @if(config('catalog.meta_enabled'))
                                     <select
                                         x-model="form.catalog_id"
                                         class="w-full h-10 px-3 rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--background))] text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
@@ -288,6 +289,19 @@
                                         <i class="fas fa-spinner fa-spin"></i>
                                         Memuat daftar katalog…
                                     </p>
+                                    @else
+                                    <select disabled
+                                        x-init="form.catalog_id = ''"
+                                        class="w-full h-10 px-3 rounded-lg border border-[hsl(var(--input))] bg-gray-100 text-sm text-gray-500 opacity-60 cursor-not-allowed"
+                                        title="Fitur Meta Catalog sedang dinonaktifkan"
+                                    >
+                                        <option value="">-- Tidak menggunakan katalog (mode AI ) --</option>
+                                    </select>
+                                    <p class="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                                        <i class="fas fa-lock"></i>
+                                        Fitur Meta Catalog sedang dinonaktifkan. AI Agent berjalan dalam mode AI text.
+                                    </p>
+                                    @endif
                                 </div>
 
                                 <!-- Order Toggle - AFTER store selection -->
