@@ -413,7 +413,94 @@ class AiAgentConversation extends Model
         unset($orderContext['delivery_type']);
         unset($orderContext['delivery_address']);
         unset($orderContext['delivery_notes']);
+        unset($orderContext['delivery_raw_info']);
         unset($orderContext['ongkir']);
+        $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    /**
+     * Catalog order flow state machine.
+     * Possible values: null | awaiting_fulfillment_choice | awaiting_delivery_info
+     *                  | confirming_delivery_info | confirming_order_summary
+     */
+    public function getFlowState(): ?string
+    {
+        return $this->order_context['flow_state'] ?? null;
+    }
+
+    public function setFlowState(?string $state): void
+    {
+        $orderContext = $this->order_context ?? [];
+        if ($state === null) {
+            unset($orderContext['flow_state']);
+        } else {
+            $orderContext['flow_state'] = $state;
+        }
+        $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    public function clearFlowState(): void
+    {
+        $this->setFlowState(null);
+    }
+
+    /**
+     * Free-text delivery info supplied by the user.
+     */
+    public function getDeliveryRawInfo(): ?string
+    {
+        return $this->order_context['delivery_raw_info'] ?? null;
+    }
+
+    public function setDeliveryRawInfo(string $info): void
+    {
+        $orderContext = $this->order_context ?? [];
+        $orderContext['delivery_raw_info'] = $info;
+        $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    /**
+     * Structured delivery fields parsed from the customer's free-text input.
+     * Shape: ['name' => ?string, 'phone' => ?string, 'address' => ?string, 'note' => ?string]
+     */
+    public function getDeliveryParsed(): ?array
+    {
+        return $this->order_context['delivery_parsed'] ?? null;
+    }
+
+    public function setDeliveryParsed(array $parsed): void
+    {
+        $orderContext = $this->order_context ?? [];
+        $orderContext['delivery_parsed'] = $parsed;
+        $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    /**
+     * Catalog order items (raw payload from WhatsApp `order` webhook).
+     * Each item: ['product_retailer_id' => string, 'product_name' => string,
+     *             'quantity' => int, 'item_price' => float, 'currency' => string]
+     */
+    public function getCatalogItems(): array
+    {
+        return $this->order_context['catalog_items'] ?? [];
+    }
+
+    public function setCatalogItems(array $items): void
+    {
+        $orderContext = $this->order_context ?? [];
+        $orderContext['catalog_items'] = $items;
+        $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    public function clearCatalogItems(): void
+    {
+        $orderContext = $this->order_context ?? [];
+        unset($orderContext['catalog_items']);
         $this->order_context = $orderContext;
         $this->save();
     }

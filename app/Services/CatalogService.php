@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\WhatsAppAccount;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -20,18 +21,13 @@ class CatalogService
         return "https://graph.facebook.com/{$this->apiVersion}";
     }
 
-    protected function getCatalogAccessToken(WhatsAppAccount $account): string
-    {
-        return $account->catalog_access_token ?? $account->access_token;
-    }
-
     /**
      * Resolve the Meta Business Portfolio ID from a WABA.
      * Returns null when the token lacks business_management scope.
      */
     public function getBusinessId(WhatsAppAccount $account): ?string
     {
-        $accessToken = $this->getCatalogAccessToken($account);
+        $accessToken = $account->access_token;
         $wabaId = $account->waba_id ?? $account->business_account_id;
 
         if (! empty($account->catalog_business_id)) {
@@ -47,6 +43,7 @@ class CatalogService
         if ($response->successful()) {
             $businessId = $response->json('owner_business_info.id');
             if ($businessId) {
+                DB::table('whatsapp_accounts')->where('id', $account->id)->update(['catalog_business_id' => $businessId]);
                 return $businessId;
             }
         }
@@ -71,6 +68,7 @@ class CatalogService
                 Log::info('CatalogService: resolved business_id via /me/businesses', [
                     'business_id' => $businessId,
                 ]);
+                DB::table('whatsapp_accounts')->where('id', $account->id)->update(['catalog_business_id' => $businessId]);
 
                 return $businessId;
             }
@@ -91,6 +89,7 @@ class CatalogService
                         'business_id' => $businessId,
                         'business_name' => $bu['business']['name'] ?? null,
                     ]);
+                    DB::table('whatsapp_accounts')->where('id', $account->id)->update(['catalog_business_id' => $businessId]);
 
                     return $businessId;
                 }
@@ -110,6 +109,7 @@ class CatalogService
                 Log::info('CatalogService: resolved business_id via businesses field', [
                     'business_id' => $businessId,
                 ]);
+                DB::table('whatsapp_accounts')->where('id', $account->id)->update(['catalog_business_id' => $businessId]);
 
                 return $businessId;
             }
@@ -128,16 +128,40 @@ class CatalogService
                     'business_id' => $businessId,
                     'business_name' => $systemUserBizResponse->json('business.name'),
                 ]);
+                DB::table('whatsapp_accounts')->where('id', $account->id)->update(['catalog_business_id' => $businessId]);
+
+                return $businessId;
+            }
+        }
+
+        // Method 6: owned_product_catalogs directly on WABA (last resort)
+        // Some setups expose the business through the WABA's product catalog link
+        $wabaResponse = Http::withToken($accessToken)
+            ->get("{$this->baseUrl()}/{$wabaId}", [
+                'fields' => 'id,name,business',
+            ]);
+
+        if ($wabaResponse->successful()) {
+            $businessId = $wabaResponse->json('business.id');
+            if ($businessId) {
+                Log::info('CatalogService: resolved business_id via WABA business field', [
+                    'business_id' => $businessId,
+                    'business_name' => $wabaResponse->json('business.name'),
+                ]);
+                DB::table('whatsapp_accounts')->where('id', $account->id)->update(['catalog_business_id' => $businessId]);
 
                 return $businessId;
             }
         }
 
         Log::warning('CatalogService: all business_id discovery methods failed', [
-            'me_businesses_body' => $meResponse->json(),
-            'business_users_body' => $bizUsersResponse->json(),
-            'businesses_field_body' => $bizFieldResponse->json(),
-            'system_user_business_body' => $systemUserBizResponse->json(),
+            'waba_id' => $wabaId,
+            'method1_status' => $response->status(),
+            'method1_error' => $response->json('error.message'),
+            'method2_status' => $meResponse->status(),
+            'method2_error' => $meResponse->json('error.message'),
+            'method5_response' => $systemUserBizResponse->json(),
+            'method6_response' => $wabaResponse->json(),
         ]);
 
         return null;
@@ -150,7 +174,6 @@ class CatalogService
      */
     public function createCatalog(WhatsAppAccount $account, string $name, ?string $vertical = null): array
     {
-        $accessToken = $this->getCatalogAccessToken($account);
         $businessId = $this->getBusinessId($account);
 
         if (! $businessId) {
@@ -166,7 +189,7 @@ class CatalogService
             $payload['vertical'] = $vertical;
         }
 
-        $response = Http::withToken($accessToken)
+        $response = Http::withToken($account->access_token)
             ->post("{$this->baseUrl()}/{$businessId}/owned_product_catalogs", $payload);
 
         if ($response->successful()) {
@@ -193,66 +216,113 @@ class CatalogService
     }
 
     /**
-     * List all product catalogs owned by the business linked to this WhatsApp account.
+     * List all product catalogs accessible by this account.
+     *
+     * Merges owned, client (shared-in), and shared (shared-out) catalogs so that
+     * catalogs the user did not explicitly select during Embedded Signup but exist
+     * under the business are still visible.
      *
      * @return array{success: bool, catalogs?: array, error?: string, error_code?: string}
      */
     public function getCatalogs(WhatsAppAccount $account, ?string $overrideBusinessId = null): array
     {
-        $accessToken = $this->getCatalogAccessToken($account);
         $businessId = $overrideBusinessId ?: $this->getBusinessId($account);
 
         if (! $businessId) {
             return [
                 'success' => false,
                 'error_code' => 'BUSINESS_ID_NOT_FOUND',
-                'error' => 'Unable to resolve Meta Business ID. Ensure your catalog is connected using the Catalog OAuth configuration which includes catalog_management permission.',
+                'error' => 'Unable to resolve Meta Business ID. Pastikan akun WhatsApp Business Anda sudah terhubung dengan benar.',
             ];
         }
 
-        $response = Http::withToken($accessToken)
-            ->get("{$this->baseUrl()}/{$businessId}/owned_product_catalogs", [
-                'fields' => 'id,name,product_count,vertical',
-            ]);
+        $fields = 'id,name,product_count,vertical';
+        $edges = ['owned_product_catalogs', 'client_product_catalogs', 'shared_product_catalogs'];
 
-        if ($response->successful()) {
-            $catalogs = $response->json('data', []);
+        $seen = [];
+        $catalogs = [];
+        $filteredOut = 0;
+        $lastError = null;
+        $anyEdgeOk = false;
 
+        foreach ($edges as $edge) {
+            $response = Http::withToken($account->access_token)
+                ->get("{$this->baseUrl()}/{$businessId}/{$edge}", [
+                    'fields' => $fields,
+                    'limit' => 100,
+                ]);
+
+            if ($response->successful()) {
+                $anyEdgeOk = true;
+                foreach ($response->json('data', []) as $catalog) {
+                    if (isset($seen[$catalog['id']])) {
+                        continue;
+                    }
+
+                    // Only include catalogs with vertical=commerce — WhatsApp Cart /
+                    // Multi-Product Messages and our POST /{catalog_id}/products
+                    // schema only work on commerce-vertical catalogs.
+                    $vertical = strtolower((string) ($catalog['vertical'] ?? ''));
+                    if ($vertical !== 'commerce') {
+                        $seen[$catalog['id']] = true;
+                        $filteredOut++;
+                        continue;
+                    }
+
+                    $seen[$catalog['id']] = true;
+                    $catalogs[] = $catalog;
+                }
+            } else {
+                $error = $response->json('error', []);
+                $lastError = $error['message'] ?? null;
+                Log::debug("CatalogService: {$edge} not accessible", [
+                    'business_id' => $businessId,
+                    'error' => $lastError,
+                ]);
+            }
+        }
+
+        if ($anyEdgeOk) {
             Log::info('CatalogService: fetched catalogs', [
-                'business_id' => $businessId,
-                'count' => count($catalogs),
+                'business_id'  => $businessId,
+                'count'        => count($catalogs),
+                'filtered_out' => $filteredOut,
             ]);
 
             return [
-                'success' => true,
-                'catalogs' => $catalogs,
-                'business_id' => $businessId,
+                'success'      => true,
+                'catalogs'     => $catalogs,
+                'business_id'  => $businessId,
+                'filtered_out' => $filteredOut,
             ];
         }
 
-        $error = $response->json('error', []);
-        $errorMessage = $error['message'] ?? 'Failed to fetch catalogs';
-
-        // Detect missing catalog_management permission
-        if (($error['code'] ?? 0) === 200 || str_contains($errorMessage, 'catalog')) {
+        // All edges failed — surface the error
+        if ($lastError && (str_contains($lastError, 'permission') || str_contains($lastError, 'catalog'))) {
             return [
                 'success' => false,
-                'error_code' => 'PERMISSION_DENIED',
-                'error' => 'The connected WhatsApp account does not have catalog_management permission. Please reconnect using the Catalog OAuth configuration.',
+                'error_code' => 'PERMISSION_PENDING_REVIEW',
+                'error' => 'Fitur katalog Meta masih dalam proses peninjauan oleh Meta. Saat ini akses katalog hanya tersedia untuk akun penguji yang terdaftar di aplikasi developer kami.',
             ];
         }
 
-        Log::error('CatalogService: failed to fetch catalogs', [
+        Log::error('CatalogService: failed to fetch catalogs from all edges', [
             'business_id' => $businessId,
-            'error' => $errorMessage,
+            'last_error' => $lastError,
         ]);
 
         return [
             'success' => false,
             'error_code' => 'API_ERROR',
-            'error' => $errorMessage,
+            'error' => $lastError ?? 'Failed to fetch catalogs',
         ];
     }
+
+    /**
+     * Product fields fetched when listing products. Keep aligned with the
+     * frontend's product card and edit modal expectations.
+     */
+    protected const PRODUCT_FIELDS = 'id,retailer_id,name,description,price,sale_price,currency,image_url,additional_image_urls,availability,inventory,category,google_product_category,brand,condition,url,visibility,review_status,review_rejection_reasons';
 
     /**
      * Get products from a specific catalog.
@@ -261,17 +331,16 @@ class CatalogService
      */
     public function getCatalogProducts(WhatsAppAccount $account, string $catalogId, int $limit = 30, ?string $after = null): array
     {
-        $accessToken = $this->getCatalogAccessToken($account);
         $params = [
-            'fields' => 'id,retailer_id,name,description,price,currency,image_url,availability,category,brand,condition,url',
-            'limit' => $limit,
+            'fields' => self::PRODUCT_FIELDS,
+            'limit'  => $limit,
         ];
 
         if ($after) {
             $params['after'] = $after;
         }
 
-        $response = Http::withToken($accessToken)
+        $response = Http::withToken($account->access_token)
             ->get("{$this->baseUrl()}/{$catalogId}/products", $params);
 
         if ($response->successful()) {
@@ -289,70 +358,73 @@ class CatalogService
             ];
         }
 
-        $error = $response->json('error', []);
-        $errorMessage = $error['message'] ?? 'Failed to fetch products';
+        $translated = $this->translateMetaError($response, 'fetch_products');
 
         Log::error('CatalogService: failed to fetch products', [
             'catalog_id' => $catalogId,
-            'error' => $errorMessage,
+            'status'     => $response->status(),
+            'error'      => $translated['raw'],
         ]);
 
         return [
-            'success' => false,
+            'success'    => false,
             'error_code' => 'API_ERROR',
-            'error' => $errorMessage,
+            'error'      => $translated['message'],
         ];
     }
 
     /**
      * Create a product in a catalog.
      *
-     * Required fields: retailer_id, name, price, currency, image_url, url, availability
+     * Required fields: retailer_id, name, price, currency, image_url, url, availability, condition, description
+     * Optional F&B-friendly fields: category, google_product_category, brand, sale_price, inventory, additional_image_link
      *
      * @return array{success: bool, id?: string, error?: string, error_code?: string}
      */
     public function createProduct(WhatsAppAccount $account, string $catalogId, array $data): array
     {
-        $response = Http::withToken($this->getCatalogAccessToken($account))
+        $response = Http::withToken($account->access_token)
+            ->asForm()
             ->post("{$this->baseUrl()}/{$catalogId}/products", $data);
 
         if ($response->successful()) {
             $id = $response->json('id');
 
             Log::info('CatalogService: product created', [
-                'catalog_id' => $catalogId,
-                'product_id' => $id,
+                'catalog_id'  => $catalogId,
+                'product_id'  => $id,
                 'retailer_id' => $data['retailer_id'] ?? null,
             ]);
 
             return ['success' => true, 'id' => $id];
         }
 
-        $error = $response->json('error', []);
-        $errorMessage = $error['message'] ?? 'Failed to create product';
+        $translated = $this->translateMetaError($response, 'create_product');
 
         Log::error('CatalogService: failed to create product', [
             'catalog_id' => $catalogId,
-            'error' => $errorMessage,
+            'status'     => $response->status(),
+            'error'      => $translated['raw'],
+            'fbtrace_id' => $translated['fbtrace_id'],
+            'data_sent'  => $data,
         ]);
 
         return [
-            'success' => false,
-            'error_code' => 'API_ERROR',
-            'error' => $errorMessage,
+            'success'    => false,
+            'error_code' => $translated['code'],
+            'error'      => $translated['message'],
         ];
     }
 
     /**
      * Update a product item.
      *
-     * Update is done on the product item node directly, not on the /products edge.
-     *
      * @return array{success: bool, error?: string, error_code?: string}
      */
     public function updateProduct(WhatsAppAccount $account, string $productId, array $data): array
     {
-        $response = Http::withToken($this->getCatalogAccessToken($account))
+        $response = Http::withToken($account->access_token)
+            ->asForm()
             ->post("{$this->baseUrl()}/{$productId}", $data);
 
         if ($response->successful()) {
@@ -361,18 +433,20 @@ class CatalogService
             return ['success' => true];
         }
 
-        $error = $response->json('error', []);
-        $errorMessage = $error['message'] ?? 'Failed to update product';
+        $translated = $this->translateMetaError($response, 'update_product');
 
         Log::error('CatalogService: failed to update product', [
             'product_id' => $productId,
-            'error' => $errorMessage,
+            'status'     => $response->status(),
+            'error'      => $translated['raw'],
+            'fbtrace_id' => $translated['fbtrace_id'],
+            'data_sent'  => $data,
         ]);
 
         return [
-            'success' => false,
-            'error_code' => 'API_ERROR',
-            'error' => $errorMessage,
+            'success'    => false,
+            'error_code' => $translated['code'],
+            'error'      => $translated['message'],
         ];
     }
 
@@ -383,7 +457,7 @@ class CatalogService
      */
     public function deleteProduct(WhatsAppAccount $account, string $productId): array
     {
-        $response = Http::withToken($this->getCatalogAccessToken($account))
+        $response = Http::withToken($account->access_token)
             ->delete("{$this->baseUrl()}/{$productId}");
 
         if ($response->successful()) {
@@ -392,18 +466,248 @@ class CatalogService
             return ['success' => true];
         }
 
-        $error = $response->json('error', []);
-        $errorMessage = $error['message'] ?? 'Failed to delete product';
+        $translated = $this->translateMetaError($response, 'delete_product');
 
         Log::error('CatalogService: failed to delete product', [
             'product_id' => $productId,
-            'error' => $errorMessage,
+            'status'     => $response->status(),
+            'error'      => $translated['raw'],
+            'fbtrace_id' => $translated['fbtrace_id'],
         ]);
 
         return [
-            'success' => false,
-            'error_code' => 'API_ERROR',
-            'error' => $errorMessage,
+            'success'    => false,
+            'error_code' => $translated['code'],
+            'error'      => $translated['message'],
+        ];
+    }
+
+    /**
+     * Resolve display names for a batch of retailer_ids in a catalog.
+     * Used when WhatsApp's `order` webhook only ships SKUs but we want to show
+     * human-readable product names in the chat summary.
+     *
+     * Returns: ['SKU-A' => 'Nasi Goreng', 'SKU-B' => 'Es Teh', ...]
+     * Missing SKUs are simply omitted from the map.
+     */
+    public function getProductNamesByRetailerIds(WhatsAppAccount $account, string $catalogId, array $retailerIds): array
+    {
+        $retailerIds = array_values(array_unique(array_filter($retailerIds)));
+        if (empty($retailerIds)) {
+            return [];
+        }
+
+        // Meta supports a Mongo-ish filter on /products. Encode the SKU set
+        // as a single request rather than N round-trips.
+        $filter = json_encode(['retailer_id' => ['is_any' => $retailerIds]]);
+
+        $response = Http::withToken($account->access_token)
+            ->get("{$this->baseUrl()}/{$catalogId}/products", [
+                'fields' => 'retailer_id,name',
+                'filter' => $filter,
+                'limit'  => max(count($retailerIds), 30),
+            ]);
+
+        if (! $response->successful()) {
+            Log::warning('CatalogService: name lookup failed', [
+                'catalog_id' => $catalogId,
+                'count'      => count($retailerIds),
+                'status'     => $response->status(),
+                'error'      => $response->json('error.message'),
+            ]);
+            return [];
+        }
+
+        $map = [];
+        foreach ($response->json('data', []) as $row) {
+            $rid = $row['retailer_id'] ?? null;
+            $name = $row['name'] ?? null;
+            if ($rid && $name) {
+                $map[$rid] = $name;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * Link a catalog as the active commerce catalog for a WABA, and enable
+     * cart + catalog visibility on the phone number. Idempotent — calling
+     * again with the same catalog is a no-op for Meta.
+     *
+     * Required so that WhatsApp Cloud API's interactive product_list and
+     * product messages accept the catalog_id (otherwise Meta returns
+     * "(#131009) Invalid catalog_id" even when the catalog itself exists).
+     *
+     * @return array{success: bool, linked: bool, commerce_enabled: bool, error?: string}
+     */
+    public function linkCatalogToWaba(WhatsAppAccount $account, string $catalogId): array
+    {
+        $token = $account->access_token;
+        $wabaId = $account->waba_id ?? $account->business_account_id;
+        $phoneNumberId = $account->phone_number_id;
+
+        $result = ['success' => true, 'linked' => false, 'commerce_enabled' => false];
+
+        // 1) Associate the catalog with the WABA.
+        $linkResp = Http::withToken($token)
+            ->asForm()
+            ->post("{$this->baseUrl()}/{$wabaId}/product_catalogs", [
+                'catalog_id' => $catalogId,
+            ]);
+
+        if ($linkResp->successful()) {
+            $result['linked'] = true;
+            Log::info('CatalogService: linked catalog to WABA', [
+                'waba_id'    => $wabaId,
+                'catalog_id' => $catalogId,
+            ]);
+        } else {
+            $err = $linkResp->json('error', []);
+            $msg = $err['message'] ?? 'unknown';
+            // If already linked, Meta replies with a specific error — treat as success.
+            if (str_contains(strtolower($msg), 'already')) {
+                $result['linked'] = true;
+            } else {
+                $result['success'] = false;
+                $result['error'] = $msg;
+                Log::warning('CatalogService: failed to link catalog to WABA', [
+                    'waba_id'    => $wabaId,
+                    'catalog_id' => $catalogId,
+                    'status'     => $linkResp->status(),
+                    'error'      => $msg,
+                ]);
+            }
+        }
+
+        // 2) Enable commerce on the phone number (cart visible + catalog visible).
+        if ($phoneNumberId) {
+            $cs = Http::withToken($token)
+                ->asForm()
+                ->post("{$this->baseUrl()}/{$phoneNumberId}/whatsapp_commerce_settings", [
+                    'is_cart_enabled'    => 'true',
+                    'is_catalog_visible' => 'true',
+                ]);
+
+            if ($cs->successful()) {
+                $result['commerce_enabled'] = true;
+                Log::info('CatalogService: enabled commerce settings', [
+                    'phone_number_id' => $phoneNumberId,
+                ]);
+            } else {
+                Log::warning('CatalogService: failed to enable commerce settings', [
+                    'phone_number_id' => $phoneNumberId,
+                    'status'          => $cs->status(),
+                    'error'           => $cs->json('error.message'),
+                ]);
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Translate a Meta Graph API error response into a localized,
+     * user-friendly Indonesian message plus a stable error_code for the FE.
+     *
+     * Returns: ['code' => string, 'message' => string, 'raw' => string, 'fbtrace_id' => ?string]
+     */
+    protected function translateMetaError($response, string $context): array
+    {
+        $error = is_object($response) ? ($response->json('error') ?? []) : [];
+        if (! is_array($error)) {
+            $error = [];
+        }
+
+        $raw      = $error['message']         ?? 'Unknown Meta API error';
+        $userMsg  = $error['error_user_msg']  ?? null;
+        $code     = $error['code']            ?? null;
+        $subcode  = $error['error_subcode']   ?? null;
+        $fbtrace  = $error['fbtrace_id']      ?? null;
+
+        // Lowercase for case-insensitive matching against Meta's English variants.
+        $haystack = strtolower(($userMsg ?? '') . ' ' . $raw);
+
+        // Vertical mismatch — the catalog isn't commerce.
+        if (str_contains($haystack, 'catalog vertical')
+            || str_contains($haystack, 'vertikal katalog')) {
+            return [
+                'code'       => 'WRONG_VERTICAL',
+                'message'    => 'Katalog ini bukan bertipe commerce sehingga tidak bisa menyimpan produk umum. Buat katalog baru dengan tipe E-Commerce / Produk Online.',
+                'raw'        => $raw,
+                'fbtrace_id' => $fbtrace,
+            ];
+        }
+
+        // Duplicate retailer_id.
+        if (str_contains($haystack, 'duplicate') && str_contains($haystack, 'retailer_id')
+            || ($code === 100 && str_contains($haystack, 'retailer_id'))) {
+            return [
+                'code'       => 'DUPLICATE_SKU',
+                'message'    => 'SKU (retailer_id) ini sudah digunakan di katalog yang sama. Gunakan SKU lain.',
+                'raw'        => $raw,
+                'fbtrace_id' => $fbtrace,
+            ];
+        }
+
+        // Image URL not reachable by Meta crawler.
+        if (str_contains($haystack, 'image_url') || str_contains($haystack, 'image url')
+            || str_contains($haystack, 'invalid image')) {
+            return [
+                'code'       => 'INVALID_IMAGE',
+                'message'    => 'URL gambar tidak bisa diakses oleh Meta. Pastikan gambar diupload ke storage publik (HTTPS) dan ukuran minimal 500×500 px.',
+                'raw'        => $raw,
+                'fbtrace_id' => $fbtrace,
+            ];
+        }
+
+        // Permission / token scope problem.
+        if (str_contains($haystack, 'permission') || str_contains($haystack, 'oauth')
+            || $code === 200 || $code === 190) {
+            return [
+                'code'       => 'PERMISSION_DENIED',
+                'message'    => 'Token akses tidak memiliki izin yang cukup untuk operasi katalog. Coba hubungkan ulang akun WhatsApp Business Anda.',
+                'raw'        => $raw,
+                'fbtrace_id' => $fbtrace,
+            ];
+        }
+
+        // Price-related validation.
+        if (str_contains($haystack, 'price')) {
+            return [
+                'code'       => 'INVALID_PRICE',
+                'message'    => 'Harga tidak valid. Pastikan harga lebih besar dari 0 dan dalam unit yang sesuai mata uang (untuk IDR/JPY/VND: nominal langsung, untuk USD/SGD/MYR: dalam sen).',
+                'raw'        => $raw,
+                'fbtrace_id' => $fbtrace,
+            ];
+        }
+
+        // Generic "Invalid parameter" from Meta — surface user-friendly hint.
+        if (str_contains($haystack, 'invalid parameter')) {
+            return [
+                'code'       => 'INVALID_PARAMETER',
+                'message'    => 'Salah satu kolom produk tidak valid. Periksa kembali data yang Anda masukkan (harga, mata uang, gambar, URL).',
+                'raw'        => $raw,
+                'fbtrace_id' => $fbtrace,
+            ];
+        }
+
+        // Rate limit.
+        if ($code === 4 || $code === 17 || $code === 32 || str_contains($haystack, 'rate limit')) {
+            return [
+                'code'       => 'RATE_LIMITED',
+                'message'    => 'Terlalu banyak permintaan ke Meta. Coba lagi dalam beberapa saat.',
+                'raw'        => $raw,
+                'fbtrace_id' => $fbtrace,
+            ];
+        }
+
+        // Fallback — prefer Meta's user-facing message if present, else raw.
+        return [
+            'code'       => 'API_ERROR',
+            'message'    => $userMsg ?: $raw,
+            'raw'        => $raw,
+            'fbtrace_id' => $fbtrace,
         ];
     }
 }

@@ -3,6 +3,23 @@
 
 @section('title', 'Meta Catalog - QashierWise')
 
+@push('scripts')
+<script>
+    window.fbAsyncInit = function() {
+        if (window.__fbSdkReady) return;
+        window.__fbSdkReady = true;
+        window.dispatchEvent(new Event('fb-sdk-ready'));
+    };
+    (function(d, s, id) {
+        if (d.getElementById(id)) { window.fbAsyncInit(); return; }
+        var js = d.createElement(s); js.id = id;
+        js.src = 'https://connect.facebook.net/en_US/sdk.js';
+        js.async = true; js.defer = true;
+        d.head.appendChild(js);
+    }(document, 'script', 'facebook-jssdk'));
+</script>
+@endpush
+
 @section('content')
 <div x-data="metaCatalogApp()" x-init="init()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     @include('components.dashboard-sidebar', ['activePage' => 'meta-catalog'])
@@ -48,22 +65,22 @@
                                 <i class="fas fa-arrow-left mr-1.5"></i>Kembali
                             </button>
                         </template>
-                        <template x-if="!selectedCatalog">
-                            <button @click="launchCatalogSignup()" :disabled="connectingCatalog" class="btn btn-outline btn-sm">
-                                <i class="fas fa-sync-alt mr-1.5" :class="connectingCatalog ? 'animate-spin' : ''"></i>Muat Ulang
+                        <template x-if="!selectedCatalog && !(error && (error.code === 'WHATSAPP_NOT_CONNECTED' || error.code === 'PERMISSION_PENDING_REVIEW'))">
+                            <button @click="launchSignup()" :disabled="signingUp || loading" class="btn btn-outline btn-sm">
+                                <template x-if="signingUp">
+                                    <span><i class="fas fa-spinner animate-spin mr-1.5"></i>Menghubungkan...</span>
+                                </template>
+                                <template x-if="!signingUp">
+                                    <span><i class="fas fa-sync-alt mr-1.5"></i>Muat Ulang</span>
+                                </template>
                             </button>
                         </template>
-                        <template x-if="!selectedCatalog && businessId">
+                        <template x-if="!selectedCatalog && businessId && !(error && (error.code === 'WHATSAPP_NOT_CONNECTED' || error.code === 'PERMISSION_PENDING_REVIEW'))">
                             <a :href="`https://web.facebook.com/products/catalogs/new/?business_id=${businessId}&nav_source=commerce_manager_launchpad`"
                                target="_blank" rel="noopener"
                                class="btn btn-primary btn-sm">
                                 <i class="fas fa-plus mr-1.5"></i>Buat Katalog
                             </a>
-                        </template>
-                        <template x-if="!selectedCatalog">
-                            <button @click="showDisconnectConfirm = true" class="btn btn-outline btn-sm text-red-500 border-red-200 hover:bg-red-50 dark:hover:bg-red-950/20">
-                                <i class="fas fa-unlink mr-1.5"></i>Disconnect
-                            </button>
                         </template>
                         <template x-if="selectedCatalog">
                             <button @click="openCreateModal()" class="btn btn-primary btn-sm">
@@ -73,47 +90,8 @@
                     </div>
                 </div>
 
-                <!-- ── Error: WhatsApp belum terhubung ── -->
-                <template x-if="error && error.code === 'WHATSAPP_NOT_CONNECTED'">
-                    <div class="rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900/50 p-4">
-                        <div class="flex gap-3">
-                            <div class="h-9 w-9 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center flex-shrink-0">
-                                <i class="fab fa-whatsapp text-red-500"></i>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <p class="font-semibold text-red-800 dark:text-red-300 text-sm">Akun WhatsApp Belum Terhubung</p>
-                                <p class="text-sm text-red-700 dark:text-red-400 mt-0.5">Hubungkan akun WhatsApp Business Anda terlebih dahulu untuk mengakses katalog produk Meta.</p>
-                                <a href="/dashboard/whatsapp-account"
-                                   class="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-lg text-sm font-medium btn btn-primary btn-sm">
-                                    <i class="fab fa-whatsapp"></i>Hubungkan WhatsApp
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </template>
-
-                <!-- ── Error: Katalog belum terhubung / izin diperlukan ── -->
-                <template x-if="error && (error.code === 'CATALOG_NOT_CONNECTED' || error.code === 'PERMISSION_DENIED')">
-                    <div class="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/50 p-4">
-                        <div class="flex gap-3">
-                            <div class="h-9 w-9 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0">
-                                <i class="fas fa-store text-amber-600"></i>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <p class="font-semibold text-amber-800 dark:text-amber-300 text-sm"
-                                   x-text="error.code === 'PERMISSION_DENIED' ? 'Izin Katalog Diperlukan' : 'Katalog Belum Terhubung'"></p>
-                                <p class="text-sm text-amber-700 dark:text-amber-400 mt-0.5" x-text="error.message"></p>
-                                <button @click="launchCatalogSignup()"
-                                        class="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-lg text-sm font-medium bg-[#1877f2] hover:bg-[#166fe5] text-white transition-colors">
-                                    <i class="fab fa-facebook"></i>Hubungkan Katalog Meta
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </template>
-
                 <!-- ── Generic Error ── -->
-                <template x-if="error && error.code !== 'PERMISSION_DENIED' && error.code !== 'WHATSAPP_NOT_CONNECTED' && error.code !== 'CATALOG_NOT_CONNECTED'">
+                <template x-if="error && error.code !== 'WHATSAPP_NOT_CONNECTED' && error.code !== 'PERMISSION_PENDING_REVIEW'">
                     <div class="rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/20 p-4 flex gap-3 items-start">
                         <i class="fas fa-circle-exclamation text-red-500 mt-0.5 flex-shrink-0"></i>
                         <p class="text-sm text-red-800 dark:text-red-300" x-text="error.message"></p>
@@ -150,8 +128,139 @@
                     </div>
                 </div>
 
+                <!-- ════════ WHATSAPP NOT CONNECTED STATE ════════ -->
+                <template x-if="!selectedCatalog && error && error.code === 'WHATSAPP_NOT_CONNECTED'">
+                    <div class="flex items-center justify-center py-16">
+                        <div class="card max-w-md w-full p-8 text-center shadow-sm">
+                            <!-- Icon -->
+                            <div class="flex items-center justify-center mb-6">
+                                <div class="relative">
+                                    <div class="h-20 w-20 rounded-2xl flex items-center justify-center"
+                                         style="background:rgba(37,211,102,0.12)">
+                                        <i class="fab fa-whatsapp text-4xl" style="color:#25d366"></i>
+                                    </div>
+                                    <div class="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-[hsl(var(--card))] flex items-center justify-center border-2 border-[hsl(var(--border))]">
+                                        <i class="fas fa-link-slash text-[10px] text-[hsl(var(--muted-foreground))]"></i>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Title & desc -->
+                            <h2 class="text-xl font-bold mb-2">WhatsApp Belum Terhubung</h2>
+                            <p class="text-sm text-[hsl(var(--muted-foreground))] leading-relaxed mb-8">
+                                Untuk mengakses dan mengelola katalog produk Meta, Anda perlu menghubungkan akun WhatsApp Business terlebih dahulu.
+                            </p>
+
+                            <!-- Steps -->
+                            <div class="flex items-start gap-3 text-left mb-8">
+                                <div class="flex flex-col items-center flex-shrink-0 mt-0.5">
+                                    <div class="h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style="background:#25d366">1</div>
+                                    <div class="w-px flex-1 mt-1" style="background:rgba(37,211,102,0.25); min-height:28px"></div>
+                                </div>
+                                <div class="pb-7">
+                                    <p class="text-sm font-medium">Hubungkan WhatsApp Business</p>
+                                    <p class="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">Masuk ke pengaturan akun dan ikuti proses Embedded Signup.</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3 text-left mb-8 -mt-8">
+                                <div class="flex flex-col items-center flex-shrink-0 mt-0.5">
+                                    <div class="h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style="background:#25d366">2</div>
+                                    <div class="w-px flex-1 mt-1" style="background:rgba(37,211,102,0.25); min-height:28px"></div>
+                                </div>
+                                <div class="pb-7">
+                                    <p class="text-sm font-medium">Pilih katalog saat signup</p>
+                                    <p class="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">Centang katalog yang ingin Anda kelola di popup Meta.</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3 text-left -mt-8">
+                                <div class="flex flex-col items-center flex-shrink-0 mt-0.5">
+                                    <div class="h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style="background:#25d366">3</div>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium">Kelola produk dari sini</p>
+                                    <p class="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">Tambah, edit, dan hapus produk langsung dari dashboard.</p>
+                                </div>
+                            </div>
+
+                            <!-- CTA -->
+                            <a href="/dashboard/whatsapp-account"
+                               class="mt-8 flex items-center justify-center gap-2 w-full py-3 px-6 rounded-xl font-semibold text-sm text-white transition-opacity hover:opacity-90"
+                               style="background:#25d366">
+                                <i class="fab fa-whatsapp text-base"></i>
+                                Hubungkan WhatsApp Sekarang
+                            </a>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- ════════ PERMISSION PENDING REVIEW STATE ════════ -->
+                <template x-if="!selectedCatalog && error && error.code === 'PERMISSION_PENDING_REVIEW'">
+                    <div class="flex items-center justify-center py-16">
+                        <div class="card max-w-lg w-full p-8 text-center shadow-sm">
+                            <!-- Icon -->
+                            <div class="flex items-center justify-center mb-6">
+                                <div class="relative">
+                                    <div class="h-20 w-20 rounded-2xl flex items-center justify-center"
+                                         style="background:rgba(245,158,11,0.12)">
+                                        <i class="fas fa-hourglass-half text-4xl" style="color:#f59e0b"></i>
+                                    </div>
+                                    <div class="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-[hsl(var(--card))] flex items-center justify-center border-2 border-[hsl(var(--border))]">
+                                        <i class="fab fa-meta text-[11px]" style="color:#1877f2"></i>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Badge -->
+                            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold mb-4"
+                                 style="background:rgba(245,158,11,0.12); color:#b45309">
+                                <span class="w-1.5 h-1.5 rounded-full" style="background:#f59e0b"></span>
+                                Menunggu Persetujuan Meta
+                            </div>
+
+                            <!-- Title & desc -->
+                            <h2 class="text-xl font-bold mb-2">Fitur Katalog Sedang Ditinjau</h2>
+                            <p class="text-sm text-[hsl(var(--muted-foreground))] leading-relaxed mb-6">
+                                Akses ke fitur <strong>Meta Catalog Management</strong> masih dalam tahap <strong>Standard Access</strong> dan sedang menunggu peninjauan resmi dari Meta. Setelah disetujui, semua pengguna akan dapat mengelola katalog produk mereka di sini.
+                            </p>
+
+                            <!-- Status box -->
+                            <div class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.4)] p-4 text-left mb-6">
+                                <div class="flex items-start gap-3">
+                                    <i class="fas fa-info-circle text-base mt-0.5 flex-shrink-0" style="color:#1877f2"></i>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm font-semibold mb-1">Saat ini hanya tersedia untuk:</p>
+                                        <ul class="text-xs text-[hsl(var(--muted-foreground))] space-y-1">
+                                            <li class="flex items-center gap-2">
+                                                <i class="fas fa-check text-[10px]" style="color:#22c55e"></i>
+                                                Akun penguji (Tester) yang terdaftar di aplikasi developer
+                                            </li>
+                                            <li class="flex items-center gap-2">
+                                                <i class="fas fa-check text-[10px]" style="color:#22c55e"></i>
+                                                Akun developer / admin aplikasi
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Progress -->
+                            <div class="flex items-center justify-between text-xs text-[hsl(var(--muted-foreground))] mb-2">
+                                <span class="font-medium">Status Peninjauan</span>
+                                <span class="font-semibold" style="color:#b45309">Dalam Proses</span>
+                            </div>
+                            <div class="h-1.5 w-full rounded-full bg-[hsl(var(--muted))] overflow-hidden">
+                                <div class="h-full rounded-full animate-pulse" style="width:60%; background:linear-gradient(90deg,#f59e0b,#fbbf24)"></div>
+                            </div>
+
+                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-6">
+                                Mohon menunggu hingga proses peninjauan selesai. Anda akan otomatis mendapat akses penuh setelah disetujui Meta.
+                            </p>
+                        </div>
+                    </div>
+                </template>
+
                 <!-- ════════ CATALOG LIST VIEW ════════ -->
-                <template x-if="!selectedCatalog">
+                <template x-if="!selectedCatalog && !(error && (error.code === 'WHATSAPP_NOT_CONNECTED' || error.code === 'PERMISSION_PENDING_REVIEW'))">
                     <div>
                         <!-- Skeleton loading -->
                         <template x-if="loading">
@@ -178,8 +287,15 @@
                                 <div class="h-14 w-14 rounded-2xl bg-[hsl(var(--muted))] flex items-center justify-center mx-auto mb-4">
                                     <i class="fas fa-store text-2xl text-[hsl(var(--muted-foreground))]"></i>
                                 </div>
-                                <h3 class="font-semibold text-base mb-1">Tidak Ada Katalog</h3>
-                                <p class="text-sm text-[hsl(var(--muted-foreground))] max-w-xs mx-auto">Pastikan akun Meta Business Anda memiliki katalog produk yang aktif dan sudah terhubung.</p>
+                                <h3 class="font-semibold text-base mb-1">Tidak Ada Katalog Commerce</h3>
+                                <template x-if="filteredOut === 0">
+                                    <p class="text-sm text-[hsl(var(--muted-foreground))] max-w-md mx-auto">Pastikan akun Meta Business Anda memiliki katalog produk yang aktif dengan tipe <strong>commerce</strong>.</p>
+                                </template>
+                                <template x-if="filteredOut > 0">
+                                    <p class="text-sm text-[hsl(var(--muted-foreground))] max-w-md mx-auto">
+                                        Ditemukan <strong x-text="filteredOut"></strong> katalog di Business Anda, tetapi tidak ada yang bertipe <strong>commerce</strong>. Buat katalog baru dengan tipe E-Commerce untuk mulai mengelola produk WhatsApp.
+                                    </p>
+                                </template>
                             </div>
                         </template>
 
@@ -217,6 +333,62 @@
                                 </template>
                             </div>
                         </template>
+
+                        <!-- ════════ COMMERCE FILTER INFO ════════ -->
+                        <template x-if="!loading && !error">
+                            <div class="card border-[hsl(var(--primary)/0.2)] bg-[hsl(var(--primary)/0.04)] p-5 mt-2">
+                                <div class="flex items-start gap-3">
+                                    <div class="h-9 w-9 rounded-lg bg-[hsl(var(--primary)/0.12)] flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <i class="fas fa-circle-info text-[hsl(var(--primary))]"></i>
+                                    </div>
+                                    <div class="flex-1 space-y-3">
+                                        <div>
+                                            <h4 class="font-semibold text-sm">Mengapa katalog saya tidak muncul di sini?</h4>
+                                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1 leading-relaxed">
+                                                Halaman ini <strong>hanya menampilkan katalog bertipe <span class="font-mono">commerce</span></strong>, karena hanya tipe inilah yang kompatibel dengan fitur produk WhatsApp Business (cart, multi-product message, dan order flow QashierWise).
+                                                <template x-if="filteredOut > 0">
+                                                    <span> Saat ini ada <strong x-text="filteredOut"></strong> katalog lain di Business Anda yang disembunyikan karena tipe-nya bukan <span class="font-mono">commerce</span>.</span>
+                                                </template>
+                                            </p>
+                                        </div>
+
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                                            <div class="rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/60 dark:bg-emerald-950/20 p-3">
+                                                <div class="flex items-center gap-1.5 font-semibold text-emerald-700 dark:text-emerald-400 mb-1.5">
+                                                    <i class="fas fa-circle-check"></i>
+                                                    <span>Pilih ini saat membuat katalog di Meta</span>
+                                                </div>
+                                                <ul class="space-y-1 text-[hsl(var(--foreground))]/85 list-disc list-inside leading-snug">
+                                                    <li><strong>Produk fisik → Produk online</strong> <span class="text-[hsl(var(--muted-foreground))]">(disarankan untuk F&B / retail)</span></li>
+                                                    <li><strong>Produk atau layanan lokal</strong> <span class="text-[hsl(var(--muted-foreground))]">(restoran, warung dengan delivery)</span></li>
+                                                    <li><strong>Layanan → Jasa profesional</strong></li>
+                                                    <li><strong>Produk atau konten digital → Aplikasi / Artikel</strong></li>
+                                                </ul>
+                                            </div>
+
+                                            <div class="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50/60 dark:bg-red-950/20 p-3">
+                                                <div class="flex items-center gap-1.5 font-semibold text-red-700 dark:text-red-400 mb-1.5">
+                                                    <i class="fas fa-circle-xmark"></i>
+                                                    <span>Hindari — tidak akan muncul di sini</span>
+                                                </div>
+                                                <ul class="space-y-1 text-[hsl(var(--foreground))]/85 list-disc list-inside leading-snug">
+                                                    <li><strong>Real estate</strong> <span class="text-[hsl(var(--muted-foreground))]">(home_listings)</span></li>
+                                                    <li><strong>Kendaraan / Kendaraan dan promo</strong> <span class="text-[hsl(var(--muted-foreground))]">(vehicles)</span></li>
+                                                    <li><strong>Hotel dan penyewaan</strong> <span class="text-[hsl(var(--muted-foreground))]">(hotels)</span></li>
+                                                    <li><strong>Penerbangan / Tujuan</strong> <span class="text-[hsl(var(--muted-foreground))]">(flights, destinations)</span></li>
+                                                    <li><strong>Media streaming</strong> <span class="text-[hsl(var(--muted-foreground))]">(media_title)</span></li>
+                                                </ul>
+                                            </div>
+                                        </div>
+
+                                        <p class="text-xs text-[hsl(var(--muted-foreground))] leading-relaxed">
+                                            <i class="fas fa-lightbulb text-amber-500 mr-1"></i>
+                                            <strong>Tip:</strong> Tipe katalog <span class="italic">tidak bisa diubah setelah dibuat</span>. Untuk menghindari kesalahan, disarankan membuat katalog langsung dari tombol <span class="font-semibold">"Buat Katalog Baru"</span> di halaman ini — tipe <span class="font-mono">commerce</span> akan otomatis diterapkan.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
                     </div>
                 </template>
 
@@ -236,6 +408,58 @@
                                 <span x-text="filteredProducts.length"></span> / <span x-text="products.length"></span> produk
                             </span>
                         </div>
+
+                        <!-- Review status summary + Commerce Manager CTA -->
+                        <template x-if="!loadingProducts && products.length > 0">
+                            <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)] px-3 py-2 flex flex-col sm:flex-row sm:items-center gap-2 text-xs">
+                                <div class="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+                                    <span class="text-[hsl(var(--muted-foreground))] whitespace-nowrap">FB/IG Shops:</span>
+                                    <template x-if="reviewCounts.approved > 0">
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
+                                              style="background:rgba(34,197,94,0.12);color:rgb(22,163,74)">
+                                            <i class="fas fa-circle-check text-[9px]"></i>
+                                            <span x-text="reviewCounts.approved + ' approved'"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="reviewCounts.pending > 0">
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
+                                              style="background:rgba(245,158,11,0.12);color:rgb(180,83,9)">
+                                            <i class="fas fa-hourglass-half text-[9px]"></i>
+                                            <span x-text="reviewCounts.pending + ' pending'"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="reviewCounts.rejected > 0">
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
+                                              style="background:rgba(239,68,68,0.12);color:rgb(185,28,28)">
+                                            <i class="fas fa-circle-xmark text-[9px]"></i>
+                                            <span x-text="reviewCounts.rejected + ' ditolak'"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="reviewCounts.not_reviewed > 0">
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
+                                              style="background:rgba(100,116,139,0.10);color:rgb(71,85,105)">
+                                            <i class="fas fa-minus text-[9px]"></i>
+                                            <span x-text="reviewCounts.not_reviewed + ' belum direview'"></span>
+                                        </span>
+                                    </template>
+                                </div>
+                                <a :href="commerceManagerProductUrl()"
+                                   target="_blank" rel="noopener"
+                                   class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-[#1877f2]/10 text-[#1877f2] hover:bg-[#1877f2]/20 transition-colors whitespace-nowrap">
+                                    <i class="fab fa-meta text-[10px]"></i>
+                                    Status WhatsApp di Commerce Manager
+                                    <i class="fas fa-arrow-up-right-from-square text-[9px]"></i>
+                                </a>
+                            </div>
+                        </template>
+                        <template x-if="!loadingProducts && products.length > 0">
+                            <p class="text-[10px] text-[hsl(var(--muted-foreground))] -mt-1 leading-relaxed">
+                                <i class="fas fa-circle-info mr-1"></i>
+                                Badge di atas adalah status review untuk <strong>Facebook Shops / Instagram Shopping</strong> (dari Graph API).
+                                Status <strong>WhatsApp</strong> tidak tersedia via API — cek langsung di Commerce Manager → tab <em>Status and issues → WhatsApp</em>.
+                                Produk bisa <em>Belum Direview</em> di sini tetapi <em>sudah ditampilkan</em> di WhatsApp.
+                            </p>
+                        </template>
 
                         <!-- Loading skeleton -->
                         <template x-if="loadingProducts">
@@ -297,12 +521,39 @@
                                             <!-- Info -->
                                             <div class="p-4 flex flex-col gap-1.5 flex-1">
                                                 <h3 class="font-semibold text-sm leading-snug line-clamp-2" x-text="product.name"></h3>
+                                                <div class="flex items-center gap-1.5 flex-wrap">
+                                                    <template x-if="product.category">
+                                                        <span class="inline-flex w-fit items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))]">
+                                                            <i class="fas fa-tag text-[8px]"></i>
+                                                            <span x-text="product.category"></span>
+                                                        </span>
+                                                    </template>
+                                                    <span class="inline-flex w-fit items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+                                                          :style="reviewBadgeStyle(product.review_status)"
+                                                          :title="reviewBadgeTooltip(product)">
+                                                        <i class="fas text-[8px]" :class="reviewBadgeIcon(product.review_status)"></i>
+                                                        <span x-text="reviewBadgeLabel(product.review_status)"></span>
+                                                    </span>
+                                                </div>
+                                                <template x-if="(product.review_rejection_reasons || []).length > 0">
+                                                    <div class="rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 px-2 py-1">
+                                                        <p class="text-[10px] text-red-700 dark:text-red-300 leading-tight">
+                                                            <i class="fas fa-circle-exclamation mr-1"></i>
+                                                            <span x-text="(product.review_rejection_reasons || []).join(', ')"></span>
+                                                        </p>
+                                                    </div>
+                                                </template>
                                                 <template x-if="product.description">
                                                     <p class="text-xs text-[hsl(var(--muted-foreground))] line-clamp-2" x-text="product.description"></p>
                                                 </template>
-                                                <template x-if="product.retailer_id">
-                                                    <p class="text-xs text-[hsl(var(--muted-foreground))] font-mono truncate" x-text="'SKU: ' + product.retailer_id"></p>
-                                                </template>
+                                                <div class="flex items-center gap-3 text-xs text-[hsl(var(--muted-foreground))]">
+                                                    <template x-if="product.retailer_id">
+                                                        <span class="font-mono truncate" x-text="'SKU: ' + product.retailer_id"></span>
+                                                    </template>
+                                                    <template x-if="product.inventory != null">
+                                                        <span class="font-medium whitespace-nowrap" x-text="'Stok: ' + product.inventory"></span>
+                                                    </template>
+                                                </div>
                                                 <!-- Harga + availability -->
                                                 <div class="flex items-center justify-between mt-auto pt-2 border-t border-[hsl(var(--border))]">
                                                     <span class="font-bold text-[hsl(var(--primary))] text-sm"
@@ -384,31 +635,56 @@
                 <form @submit.prevent="createProduct()" class="p-5 space-y-3">
                     <div>
                         <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Nama Produk <span class="text-red-500">*</span></label>
-                        <input type="text" x-model="createForm.name" class="input w-full" placeholder="Nama produk" required>
+                        <input type="text" x-model="createForm.name" class="input w-full" placeholder="Contoh: Nasi Goreng Spesial" maxlength="150" required>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Ketersediaan</label>
-                        <select x-model="createForm.availability" class="input w-full">
-                            <option value="in stock">Tersedia</option>
-                            <option value="out of stock">Habis</option>
-                            <option value="preorder">Pre-order</option>
-                        </select>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">SKU / Kode Produk</label>
+                        <div class="flex gap-2">
+                            <input type="text" x-model="createForm.retailer_id" class="input flex-1 font-mono text-xs" readonly>
+                            <button type="button" @click="createForm.retailer_id = generateSku()" class="btn btn-outline btn-sm" title="Generate ulang">
+                                <i class="fas fa-rotate"></i>
+                            </button>
+                        </div>
+                        <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Otomatis dibuat — tidak bisa diubah setelah produk dibuat.</p>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
+                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Kategori Menu</label>
+                            <select x-model="createForm.category" class="input w-full">
+                                <template x-for="opt in fnbCategories" :key="opt">
+                                    <option :value="opt" x-text="opt"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Ketersediaan</label>
+                            <select x-model="createForm.availability" class="input w-full">
+                                <option value="in stock">Tersedia</option>
+                                <option value="out of stock">Habis</option>
+                                <option value="preorder">Pre-order</option>
+                                <option value="discontinued">Tidak Dijual Lagi</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="col-span-2">
                             <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Harga <span class="text-red-500">*</span></label>
-                            <input type="number" x-model="createForm.price_display" class="input w-full" placeholder="30000" min="0" required>
-                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Dalam Rupiah</p>
+                            <input type="number" x-model="createForm.price_display" class="input w-full" :placeholder="pricePlaceholder(createForm.currency)" min="1" step="any" required>
+                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1" x-text="pricePreview(createForm.price_display, createForm.currency)"></p>
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Mata Uang</label>
                             <select x-model="createForm.currency" class="input w-full">
-                                <option value="IDR">IDR</option>
-                                <option value="USD">USD</option>
-                                <option value="SGD">SGD</option>
-                                <option value="MYR">MYR</option>
+                                <template x-for="cur in currencies" :key="cur">
+                                    <option :value="cur" x-text="cur"></option>
+                                </template>
                             </select>
                         </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Stok (opsional)</label>
+                        <input type="number" x-model="createForm.inventory" class="input w-full" placeholder="Misal: 50" min="0">
+                        <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Kosongkan jika stok tak terbatas.</p>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Gambar Produk <span class="text-red-500">*</span></label>
@@ -451,25 +727,20 @@
                         </template>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Deskripsi</label>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Deskripsi <span class="text-red-500">*</span></label>
                         <textarea x-model="createForm.description"
                             x-init="$el.style.height='auto';$el.style.height=$el.scrollHeight+'px'"
                             x-on:input="$el.style.height='auto';$el.style.height=$el.scrollHeight+'px'"
-                            class="input w-full resize-none overflow-hidden" rows="3" placeholder="Deskripsi produk..."></textarea>
+                            class="input w-full resize-none overflow-hidden" rows="3"
+                            placeholder="Contoh: Nasi goreng ayam dengan bumbu rumahan, disajikan hangat dengan kerupuk dan telur."
+                            minlength="3" maxlength="5000" required></textarea>
+                        <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                            <span x-text="(createForm.description || '').length"></span> / 5000 karakter
+                        </p>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Brand</label>
-                            <input type="text" x-model="createForm.brand" class="input w-full" placeholder="Nama brand">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Kondisi</label>
-                            <select x-model="createForm.condition" class="input w-full">
-                                <option value="new">Baru</option>
-                                <option value="refurbished">Refurbished</option>
-                                <option value="used">Bekas</option>
-                            </select>
-                        </div>
+                    <div>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Brand / Nama Restoran</label>
+                        <input type="text" x-model="createForm.brand" class="input w-full" placeholder="Contoh: Warung Bu Tini" maxlength="100">
                     </div>
                     <template x-if="createError">
                         <div class="flex gap-2 items-start rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 p-3">
@@ -508,41 +779,50 @@
                 <form @submit.prevent="updateProduct()" class="p-5 space-y-3">
                     <div>
                         <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Nama Produk</label>
-                        <input type="text" x-model="editForm.name" class="input w-full" placeholder="Nama produk">
+                        <input type="text" x-model="editForm.name" class="input w-full" placeholder="Nama produk" maxlength="150">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">SKU / Kode Produk</label>
+                        <input type="text" :value="editForm.retailer_id || '–'" class="input w-full font-mono text-xs bg-[hsl(var(--muted)/0.5)]" readonly>
+                        <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">SKU tidak bisa diubah setelah produk dibuat.</p>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Kategori Menu</label>
+                            <select x-model="editForm.category" class="input w-full">
+                                <template x-for="opt in fnbCategories" :key="opt">
+                                    <option :value="opt" x-text="opt"></option>
+                                </template>
+                            </select>
+                        </div>
                         <div>
                             <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Ketersediaan</label>
                             <select x-model="editForm.availability" class="input w-full">
                                 <option value="in stock">Tersedia</option>
                                 <option value="out of stock">Habis</option>
                                 <option value="preorder">Pre-order</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Kondisi</label>
-                            <select x-model="editForm.condition" class="input w-full">
-                                <option value="new">Baru</option>
-                                <option value="refurbished">Refurbished</option>
-                                <option value="used">Bekas</option>
+                                <option value="discontinued">Tidak Dijual Lagi</option>
                             </select>
                         </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="col-span-2">
                             <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Harga</label>
-                            <input type="number" x-model="editForm.price_display" class="input w-full" placeholder="30000" min="0">
-                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Dalam Rupiah</p>
+                            <input type="number" x-model="editForm.price_display" class="input w-full" :placeholder="pricePlaceholder(editForm.currency)" min="1" step="any">
+                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1" x-text="pricePreview(editForm.price_display, editForm.currency)"></p>
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Mata Uang</label>
                             <select x-model="editForm.currency" class="input w-full">
-                                <option value="IDR">IDR</option>
-                                <option value="USD">USD</option>
-                                <option value="SGD">SGD</option>
-                                <option value="MYR">MYR</option>
+                                <template x-for="cur in currencies" :key="cur">
+                                    <option :value="cur" x-text="cur"></option>
+                                </template>
                             </select>
                         </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Stok</label>
+                        <input type="number" x-model="editForm.inventory" class="input w-full" placeholder="Kosongkan jika tak terbatas" min="0">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Gambar Produk</label>
@@ -585,11 +865,16 @@
                         <textarea x-model="editForm.description"
                             x-init="$el.style.height='auto';$el.style.height=$el.scrollHeight+'px'"
                             x-on:input="$el.style.height='auto';$el.style.height=$el.scrollHeight+'px'"
-                            class="input w-full resize-none overflow-hidden" rows="3"></textarea>
+                            class="input w-full resize-none overflow-hidden" rows="3"
+                            minlength="3" maxlength="5000"
+                            placeholder="Deskripsi produk..."></textarea>
+                        <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                            <span x-text="(editForm.description || '').length"></span> / 5000 karakter
+                        </p>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Brand</label>
-                        <input type="text" x-model="editForm.brand" class="input w-full">
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Brand / Nama Restoran</label>
+                        <input type="text" x-model="editForm.brand" class="input w-full" maxlength="100">
                     </div>
                     <template x-if="editError">
                         <div class="flex gap-2 items-start rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 p-3">
@@ -631,31 +916,6 @@
                     <button @click="deleteProduct()" :disabled="deleting" class="btn flex-1 bg-red-500 text-white hover:bg-red-600 border-0">
                         <template x-if="deleting"><span><i class="fas fa-spinner animate-spin mr-2"></i>Menghapus...</span></template>
                         <template x-if="!deleting"><span><i class="fas fa-trash mr-2"></i>Ya, Hapus</span></template>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </template>
-
-    <!-- ════════ DISCONNECT CONFIRM ════════ -->
-    <template x-if="showDisconnectConfirm">
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showDisconnectConfirm = false"></div>
-            <div class="relative bg-[hsl(var(--card))] rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4">
-                <div class="flex items-start gap-4">
-                    <div class="h-10 w-10 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center flex-shrink-0">
-                        <i class="fas fa-unlink text-red-500"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-semibold">Putuskan Koneksi Katalog</h3>
-                        <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">Token katalog Meta akan dihapus dari akun ini. Kamu perlu menghubungkan ulang untuk mengakses katalog kembali.</p>
-                    </div>
-                </div>
-                <div class="flex gap-3">
-                    <button @click="showDisconnectConfirm = false" class="btn btn-outline flex-1">Batal</button>
-                    <button @click="disconnectCatalog()" :disabled="disconnecting" class="btn flex-1 bg-red-500 text-white hover:bg-red-600 border-0">
-                        <template x-if="disconnecting"><span><i class="fas fa-spinner animate-spin mr-2"></i>Memutuskan...</span></template>
-                        <template x-if="!disconnecting"><span><i class="fas fa-unlink mr-2"></i>Ya, Putuskan</span></template>
                     </button>
                 </div>
             </div>
@@ -714,37 +974,6 @@
 
 </div>
 
-<!-- Facebook SDK -->
-<script>
-    window.fbAsyncInit = function() {
-        FB.init({
-            appId: window.catalogConfig?.app_id || '',
-            autoLogAppEvents: true,
-            xfbml: true,
-            version: 'v24.0',
-        });
-        window.dispatchEvent(new CustomEvent('fb-catalog-sdk-ready'));
-    };
-
-    function loadFacebookSDK() {
-        var d = document, s = 'script', id = 'facebook-jssdk';
-        var js, fjs = d.getElementsByTagName(s)[0];
-        if (d.getElementById(id)) return;
-        js = d.createElement(s);
-        js.id = id;
-        js.async = true;
-        js.defer = true;
-        js.src = "https://connect.facebook.net/en_US/sdk.js";
-        fjs.parentNode.insertBefore(js, fjs);
-    }
-
-    if (document.readyState === 'complete') {
-        setTimeout(loadFacebookSDK, 100);
-    } else {
-        window.addEventListener('load', function() { setTimeout(loadFacebookSDK, 100); });
-    }
-</script>
-
 <script>
 function metaCatalogApp() {
     return {
@@ -754,6 +983,7 @@ function metaCatalogApp() {
         loading: false,
         catalogs: [],
         businessId: null,
+        filteredOut: 0,
         selectedCatalog: null,
         products: [],
         loadingProducts: false,
@@ -762,23 +992,21 @@ function metaCatalogApp() {
         productSearch: '',
         error: null,
         toast: null,
-        catalogConfig: null,
-        connectingCatalog: false,
 
-        // Create
+        // Create product
         showCreateModal: false,
         creating: false,
         createError: null,
         createForm: {},
 
-        // Edit
+        // Edit product
         showEditModal: false,
         editing: false,
         editError: null,
         editForm: {},
         editingProductId: null,
 
-        // Delete
+        // Delete product
         showDeleteConfirm: false,
         deleting: false,
         deleteTarget: null,
@@ -794,14 +1022,29 @@ function metaCatalogApp() {
         createCatalogForm: { name: '', vertical: 'commerce' },
         createCatalogError: null,
 
-        // Disconnect catalog
-        showDisconnectConfirm: false,
-        disconnecting: false,
+        // Embedded signup (Muat Ulang)
+        signingUp: false,
+        sdkLoaded: false,
+        signupConfig: null,
 
         sidebarOpen: window.innerWidth >= 1024,
         isMobile: window.innerWidth < 768,
         user: null,
         notifications: [],
+
+        // F&B preset categories — shown in create/edit modal "Kategori Menu" dropdown
+        fnbCategories: [
+            'Makanan Utama',
+            'Cemilan / Snack',
+            'Minuman',
+            'Dessert',
+            'Paket Hemat',
+            'Topping / Tambahan',
+            'Lainnya',
+        ],
+
+        // Currencies relevant to SEA F&B businesses
+        currencies: ['IDR', 'USD', 'SGD', 'MYR', 'THB', 'PHP', 'VND', 'JPY'],
 
         get filteredProducts() {
             if (!this.productSearch) return this.products;
@@ -813,31 +1056,25 @@ function metaCatalogApp() {
             );
         },
 
-        sdkLoaded: false,
+        get reviewCounts() {
+            const c = { approved: 0, pending: 0, rejected: 0, outdated: 0, unknown: 0 };
+            for (const p of this.products) {
+                c[this._normalizeReview(p.review_status)] += 1;
+            }
+            return c;
+        },
 
         async init() {
             this.initDashboard();
-            this.setupCatalogMessageListener();
+            this.loadSignupConfig();
+            this.setupSignupMessageListener();
+            await this.fetchCatalogs();
 
-            window.addEventListener('fb-catalog-sdk-ready', () => {
-                this.sdkLoaded = true;
-            });
-            if (typeof FB !== 'undefined') {
-                this.sdkLoaded = true;
-            }
-            setTimeout(() => { this.sdkLoaded = true; }, 5000);
-
-            await Promise.all([
-                this.loadCatalogConfig(),
-                this.fetchCatalogs(),
-            ]);
-            // Auto-open catalog from URL if present
             if (this.initialCatalogId && this.catalogs.length > 0) {
                 const found = this.catalogs.find(c => c.id === String(this.initialCatalogId));
                 if (found) {
                     await this.selectCatalog(found, false);
                 } else {
-                    // Catalog ID from URL not in list — open directly
                     this.selectedCatalog = { id: String(this.initialCatalogId), name: 'Katalog ' + this.initialCatalogId };
                     await this.fetchProducts();
                 }
@@ -865,7 +1102,6 @@ function metaCatalogApp() {
                     this.sidebarOpen = false;
                 }
             });
-            // Handle browser back/forward button
             window.addEventListener('popstate', () => {
                 const path = window.location.pathname;
                 const match = path.match(/\/dashboard\/meta-catalog\/(.+)/);
@@ -885,6 +1121,85 @@ function metaCatalogApp() {
             }
         },
 
+        // ─── EMBEDDED SIGNUP (MUAT ULANG) ────────────────────
+        async loadSignupConfig() {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/embedded-signup/config`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.signupConfig = data.data;
+                    const initFB = () => {
+                        FB.init({ appId: data.data.app_id, version: data.data.api_version || 'v22.0', xfbml: false, cookie: true });
+                        this.sdkLoaded = true;
+                    };
+                    if (window.FB) {
+                        initFB();
+                    } else {
+                        window.addEventListener('fb-sdk-ready', initFB, { once: true });
+                    }
+                }
+            } catch(e) {}
+        },
+
+        setupSignupMessageListener() {
+            window.addEventListener('message', (event) => {
+                if (event.origin !== 'https://www.facebook.com' && event.origin !== 'https://web.facebook.com') return;
+                try {
+                    const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+                    if (data.type === 'WA_EMBEDDED_SIGNUP' && data.event === 'FINISH') {
+                        const { phone_number_id, waba_id, business_id } = data.data || {};
+                        this._pendingSessionInfo = { phone_number_id, waba_id, business_id };
+                    }
+                } catch(e) {}
+            });
+        },
+
+        launchSignup() {
+            if (!this.sdkLoaded || !this.signupConfig) {
+                this.showToast('Konfigurasi signup belum siap, coba lagi.', 'error');
+                return;
+            }
+            this._pendingSessionInfo = null;
+            FB.login((response) => {
+                if (response.authResponse?.code) {
+                    this.signingUp = true;
+                    this.sendCodeToBackend(response.authResponse.code, this._pendingSessionInfo || {});
+                } else if (response.status === 'not_authorized' || response.status === 'unknown') {
+                    // user cancelled — do nothing
+                }
+            }, {
+                config_id: this.signupConfig.config_id,
+                response_type: 'code',
+                override_default_response_type: true,
+                extras: { sessionInfoVersion: 3 },
+            });
+        },
+
+        async sendCodeToBackend(code, sessionInfo) {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/embedded-signup/callback`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code, session_info: sessionInfo }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.showToast('Akun berhasil diperbarui. Memuat katalog...', 'success');
+                    await this.fetchCatalogs();
+                } else {
+                    this.showToast(data.message || 'Gagal memperbarui akun.', 'error');
+                }
+            } catch(e) {
+                this.showToast('Gagal terhubung ke server.', 'error');
+            } finally {
+                this.signingUp = false;
+            }
+        },
+
         async fetchCatalogs() {
             this.loading = true;
             this.error = null;
@@ -899,6 +1214,7 @@ function metaCatalogApp() {
                 if (data.success) {
                     this.catalogs = data.data.catalogs || [];
                     this.businessId = data.data.business_id || null;
+                    this.filteredOut = data.data.filtered_out || 0;
                 } else {
                     this.error = { code: data.error_code || 'UNKNOWN', message: data.message || 'Gagal memuat katalog.' };
                 }
@@ -906,158 +1222,6 @@ function metaCatalogApp() {
                 this.error = { code: 'NETWORK_ERROR', message: 'Gagal terhubung ke server.' };
             } finally {
                 this.loading = false;
-            }
-        },
-
-        async loadCatalogConfig() {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-            try {
-                const token = localStorage.getItem('token');
-                if (!token) return;
-
-                const res = await fetch(`${this.API_BASE_URL}/catalog/embedded-signup/config`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json',
-                    },
-                    signal: controller.signal,
-                });
-
-                clearTimeout(timeoutId);
-
-                if (!res.ok) return;
-
-                const data = await res.json();
-                if (data.success) {
-                    this.catalogConfig = data.data;
-                    window.catalogConfig = data.data;
-
-                    if (typeof FB !== 'undefined' && this.catalogConfig?.app_id) {
-                        FB.init({
-                            appId: this.catalogConfig.app_id,
-                            autoLogAppEvents: true,
-                            xfbml: true,
-                            version: 'v24.0',
-                        });
-                        this.sdkLoaded = true;
-                    }
-                }
-            } catch (e) {
-                if (e.name !== 'AbortError') {
-                    console.error('Error loading catalog config:', e);
-                }
-            } finally {
-                clearTimeout(timeoutId);
-            }
-        },
-
-        setupCatalogMessageListener() {
-            window.addEventListener('message', (event) => {
-                if (event.origin !== 'https://www.facebook.com' &&
-                    event.origin !== 'https://web.facebook.com') {
-                    return;
-                }
-                try {
-                    const data = JSON.parse(event.data);
-                    if (data.type === 'WA_EMBEDDED_SIGNUP' && data.event === 'FINISH') {
-                        console.log('Catalog signup completed via message event:', data.data);
-                    } else if (data.type === 'WA_EMBEDDED_SIGNUP' && data.event === 'CANCEL') {
-                        this.showToast('Koneksi dibatalkan.', 'error');
-                    } else if (data.type === 'WA_EMBEDDED_SIGNUP' && data.event === 'ERROR') {
-                        this.showToast('Terjadi kesalahan saat menghubungkan katalog.', 'error');
-                    }
-                } catch (e) {}
-            });
-        },
-
-        launchCatalogSignup() {
-            if (!this.catalogConfig?.config_id || !this.catalogConfig?.app_id) {
-                this.showToast('Konfigurasi katalog belum tersedia. Silakan muat ulang halaman.', 'error');
-                return;
-            }
-
-            if (typeof FB !== 'undefined') {
-                const self = this;
-
-                FB.login((response) => {
-                    if (response.authResponse) {
-                        const code = response.authResponse.code;
-                        const sessionInfo = response.authResponse.extras?.session_info || null;
-                        self.sendCatalogCodeToBackend(code, sessionInfo);
-                    } else {
-                        self.showToast('Koneksi dibatalkan atau tidak diizinkan.', 'error');
-                    }
-                }, {
-                    config_id: this.catalogConfig.config_id,
-                    response_type: 'code',
-                    override_default_response_type: true,
-                    extras: {
-                        setup: {},
-                        sessionInfoVersion: '3',
-                    },
-                });
-            } else {
-                this.launchCatalogSignupRedirect();
-            }
-        },
-
-        launchCatalogSignupRedirect() {
-            const appId = this.catalogConfig.app_id;
-            const configId = this.catalogConfig.config_id;
-            const extras = encodeURIComponent(JSON.stringify({
-                sessionInfoVersion: '3',
-                version: 'v3',
-            }));
-
-            const url = `https://business.facebook.com/messaging/whatsapp/onboard/?app_id=${appId}&config_id=${configId}&extras=${extras}`;
-            const width = 600;
-            const height = 700;
-            const left = (window.innerWidth - width) / 2;
-            const top = (window.innerHeight - height) / 2;
-
-            const popup = window.open(
-                url,
-                'catalog_signup',
-                `width=${width},height=${height},left=${left},top=${top},scrollbars=yes`
-            );
-
-            if (!popup) {
-                this.showToast('Popup diblokir. Izinkan popup untuk situs ini.', 'error');
-            }
-        },
-
-        async sendCatalogCodeToBackend(code, sessionInfo = null) {
-            try {
-                const token = localStorage.getItem('token');
-                const body = { code };
-                if (sessionInfo?.business_id) {
-                    body.business_id = sessionInfo.business_id;
-                }
-
-                const res = await fetch(`${this.API_BASE_URL}/catalog/embedded-signup/callback`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json',
-                    },
-                    body: JSON.stringify(body),
-                });
-
-                const data = await res.json();
-                if (data.success) {
-                    this.showToast('Katalog berhasil terhubung.', 'success');
-                    await this.fetchCatalogs();
-                } else {
-                    this.showToast(data.message || 'Gagal menghubungkan katalog.', 'error');
-                }
-            } catch (e) {
-                console.error('Error sending catalog code to backend:', e);
-                this.showToast('Gagal terhubung ke server.', 'error');
-            } finally {
-                this.connectingCatalog = false;
             }
         },
 
@@ -1125,17 +1289,20 @@ function metaCatalogApp() {
             }
         },
 
-        // ─── CREATE ───────────────────────────────────────────
+        // ─── CREATE PRODUCT ───────────────────────────────────
         openCreateModal() {
-            const ts = Date.now().toString(36).toUpperCase();
-            const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
-            const catalogUrl = `https://qashierwise.com/dashboard/meta-catalog/${this.selectedCatalog?.id || ''}`;
-            const defaultBrand = this.user?.name || '';
-            const defaultDesc = 'Produk makanan & minuman pilihan, disiapkan dengan bahan segar berkualitas untuk pengalaman kuliner terbaik Anda.';
             this.createForm = {
-                name: '', retailer_id: `SKU-${ts}-${rand}`, price_display: '', currency: 'IDR',
-                image_url: '', url: catalogUrl, availability: 'in stock',
-                description: defaultDesc, brand: defaultBrand, condition: 'new',
+                name:          '',
+                retailer_id:   this.generateSku(),
+                price_display: '',
+                currency:      'IDR',
+                image_url:     '',
+                url:           this.defaultProductUrl(),
+                availability:  'in stock',
+                description:   '',
+                brand:         '',
+                category:      'Makanan Utama',
+                inventory:     '',
             };
             this.createError = null;
             this.createImageTouched = false;
@@ -1148,15 +1315,18 @@ function metaCatalogApp() {
                 this.createError = 'Gambar produk wajib diupload terlebih dahulu.';
                 return;
             }
+
+            const priceMinor = this.toMinorUnit(this.createForm.price_display, this.createForm.currency);
+            if (!priceMinor || priceMinor < 1) {
+                this.createError = 'Harga harus lebih besar dari 0.';
+                return;
+            }
+
             this.creating = true;
             this.createError = null;
             try {
                 const token = localStorage.getItem('token');
-                const payload = {
-                    ...this.createForm,
-                    price: Math.round(parseFloat(this.createForm.price_display || 0) * 100),
-                };
-                delete payload.price_display;
+                const payload = this.buildProductPayload(this.createForm, priceMinor);
 
                 const response = await fetch(
                     `${this.API_BASE_URL}/catalog/${this.selectedCatalog.id}/products`,
@@ -1181,44 +1351,51 @@ function metaCatalogApp() {
             }
         },
 
-        // ─── EDIT ─────────────────────────────────────────────
+        // ─── EDIT PRODUCT ─────────────────────────────────────
         openEditModal(product) {
             this.editingProductId = product.id;
-            // Parse price: Meta returns formatted string like "Rp30.000", extract number
-            let priceNum = 0;
-            if (product.price) {
-                const raw = String(product.price).replace(/[^0-9.]/g, '');
-                priceNum = parseFloat(raw) || 0;
-                // If price > 1000 it's likely already in cents format (divide by 100)
-                if (priceNum > 1000) priceNum = priceNum / 100;
-            }
+            const currency = product.currency || 'IDR';
+            const priceMinor = this.parseMetaPrice(product.price);
+            const priceDisplay = priceMinor > 0 ? String(this.fromMinorUnit(priceMinor, currency)) : '';
+
             this.editForm = {
-                name: product.name || '',
+                retailer_id:  product.retailer_id || '',
+                name:         product.name        || '',
                 availability: product.availability || 'in stock',
-                condition: product.condition || 'new',
-                price_display: priceNum > 0 ? String(Math.round(priceNum)) : '',
-                currency: product.currency || 'IDR',
-                image_url: product.image_url || '',
-                url: product.url || '',
-                description: product.description || 'Produk makanan & minuman pilihan, disiapkan dengan bahan segar berkualitas untuk pengalaman kuliner terbaik Anda.',
-                brand: product.brand || this.user?.name || '',
+                price_display: priceDisplay,
+                currency,
+                image_url:    product.image_url   || '',
+                url:          product.url         || this.defaultProductUrl(),
+                description:  product.description || '',
+                brand:        product.brand       || '',
+                category:     product.category    || 'Makanan Utama',
+                inventory:    product.inventory != null ? String(product.inventory) : '',
             };
             this.editError = null;
             this.showEditModal = true;
         },
 
         async updateProduct() {
+            if (!this.editForm.image_url) {
+                this.editError = 'Gambar produk tidak boleh kosong.';
+                return;
+            }
+
             this.editing = true;
             this.editError = null;
             try {
                 const token = localStorage.getItem('token');
-                const payload = { ...this.editForm };
-                if (payload.price_display) {
-                    payload.price = Math.round(parseFloat(payload.price_display) * 100);
+                const priceMinor = this.editForm.price_display
+                    ? this.toMinorUnit(this.editForm.price_display, this.editForm.currency)
+                    : null;
+                if (this.editForm.price_display && (!priceMinor || priceMinor < 1)) {
+                    this.editError = 'Harga harus lebih besar dari 0.';
+                    this.editing = false;
+                    return;
                 }
-                delete payload.price_display;
-                // Remove empty fields
-                Object.keys(payload).forEach(k => { if (payload[k] === '') delete payload[k]; });
+                const payload = this.buildProductPayload(this.editForm, priceMinor);
+                // retailer_id is immutable; controller treats it as prohibited on update.
+                delete payload.retailer_id;
 
                 const response = await fetch(
                     `${this.API_BASE_URL}/catalog/products/${this.editingProductId}`,
@@ -1243,7 +1420,7 @@ function metaCatalogApp() {
             }
         },
 
-        // ─── DELETE ───────────────────────────────────────────
+        // ─── DELETE PRODUCT ───────────────────────────────────
         confirmDelete(product) {
             this.deleteTarget = product;
             this.showDeleteConfirm = true;
@@ -1276,33 +1453,6 @@ function metaCatalogApp() {
                 this.showDeleteConfirm = false;
             } finally {
                 this.deleting = false;
-            }
-        },
-
-        // ─── DISCONNECT CATALOG ───────────────────────────────
-        async disconnectCatalog() {
-            this.disconnecting = true;
-            try {
-                const token = localStorage.getItem('token');
-                const res = await fetch(`${this.API_BASE_URL}/catalog/disconnect`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
-                });
-                const data = await res.json();
-                if (data.success) {
-                    this.showDisconnectConfirm = false;
-                    this.showToast('Katalog berhasil diputuskan.', 'success');
-                    this.catalogs = [];
-                    this.error = { code: 'CATALOG_NOT_CONNECTED', message: 'Katalog telah diputuskan. Hubungkan kembali untuk mengakses katalog.' };
-                } else {
-                    this.showToast(data.message || 'Gagal memutuskan katalog.', 'error');
-                    this.showDisconnectConfirm = false;
-                }
-            } catch (e) {
-                this.showToast('Gagal terhubung ke server.', 'error');
-                this.showDisconnectConfirm = false;
-            } finally {
-                this.disconnecting = false;
             }
         },
 
@@ -1381,21 +1531,215 @@ function metaCatalogApp() {
             setTimeout(() => { this.toast = null; }, 3000);
         },
 
+        // Currencies displayed WITHOUT decimal places (UI formatting only).
+        // Note: This list does NOT affect what we send to Meta — Meta always
+        // expects price in "cents" (multiplied by 100) regardless of currency,
+        // per https://developers.facebook.com/docs/marketing-api/reference/product-item/
+        _noSubunit: ['IDR', 'JPY', 'KRW', 'VND', 'XOF', 'XAF', 'CLP', 'ISK'],
+
+        // Meta Marketing API stores price as int64 with 2 implicit decimal
+        // digits ALWAYS (e.g. send 599 to get $5.99, send 10000000 to get
+        // Rp 100.000). So toMinorUnit always × 100, regardless of currency.
+        priceMultiplier(currency) {
+            return 100;
+        },
+
+        // How many decimal places to SHOW the user in the UI.
+        // IDR/JPY/KRW/VND → 0 decimal; USD/EUR/etc. → 2 decimals.
+        displayFractionDigits(currency) {
+            return this._noSubunit.includes(String(currency || '').toUpperCase()) ? 0 : 2;
+        },
+
+        // ── Meta review_status badges ────────────────────────────────────────
+        // IMPORTANT: `review_status` di Graph API adalah review legacy untuk
+        // Facebook Shops / Instagram Shopping — BUKAN status WhatsApp.
+        // Status WhatsApp sesungguhnya hanya bisa dilihat di Commerce Manager
+        // (tab "Status and Issues" → "WhatsApp"). Meta tidak ekspos itu via API.
+        //
+        // Empty `review_status` ("") sangat umum untuk catalog yang hanya
+        // dipakai WhatsApp — bukan berarti produk ditolak.
+        _normalizeReview(s) {
+            const v = String(s ?? '').toLowerCase();
+            if (v === '')         return 'not_reviewed';   // empty = belum direview untuk FB/IG (normal)
+            if (v === 'pending')  return 'pending';
+            if (v === 'approved') return 'approved';
+            if (v === 'rejected') return 'rejected';
+            if (v === 'outdated') return 'outdated';
+            return 'unknown';
+        },
+        reviewBadgeLabel(status) {
+            return {
+                approved:     'Approved (FB/IG)',
+                pending:      'Pending (FB/IG)',
+                rejected:     'Ditolak (FB/IG)',
+                outdated:     'Perlu Update',
+                not_reviewed: 'Belum Direview',
+                unknown:      'Status ?',
+            }[this._normalizeReview(status)];
+        },
+        reviewBadgeIcon(status) {
+            return {
+                approved:     'fa-circle-check',
+                pending:      'fa-hourglass-half',
+                rejected:     'fa-circle-xmark',
+                outdated:     'fa-rotate',
+                not_reviewed: 'fa-minus',
+                unknown:      'fa-circle-question',
+            }[this._normalizeReview(status)];
+        },
+        reviewBadgeStyle(status) {
+            const map = {
+                approved:     'background:rgba(34,197,94,0.12);color:rgb(22,163,74)',
+                pending:      'background:rgba(245,158,11,0.12);color:rgb(180,83,9)',
+                rejected:     'background:rgba(239,68,68,0.12);color:rgb(185,28,28)',
+                outdated:     'background:rgba(168,85,247,0.12);color:rgb(126,34,206)',
+                not_reviewed: 'background:rgba(100,116,139,0.10);color:rgb(71,85,105)',
+                unknown:      'background:rgba(100,116,139,0.12);color:rgb(71,85,105)',
+            };
+            return map[this._normalizeReview(status)];
+        },
+        reviewBadgeTooltip(product) {
+            const norm = this._normalizeReview(product?.review_status);
+            const reasons = product?.review_rejection_reasons || [];
+            if (norm === 'approved')     return 'Produk disetujui untuk Facebook Shops / Instagram Shopping. Status WhatsApp cek di Commerce Manager.';
+            if (norm === 'pending')      return 'Sedang direview Meta untuk Facebook/Instagram (umumnya 30 menit – 24 jam).';
+            if (norm === 'rejected')     return reasons.length ? 'Ditolak: ' + reasons.join(', ') : 'Ditolak Meta untuk FB/IG. Cek alasan di Commerce Manager.';
+            if (norm === 'outdated')     return 'Produk perlu diperbarui — data sudah usang.';
+            if (norm === 'not_reviewed') return 'Produk belum direview untuk Facebook/Instagram Shops. Ini normal untuk katalog WhatsApp — status WhatsApp sebenarnya lihat di Commerce Manager → Status and Issues → WhatsApp.';
+            return 'Status review tidak dikenali.';
+        },
+
+        commerceManagerProductUrl(productId) {
+            const cid = this.selectedCatalog?.id;
+            const bid = this.businessId;
+            if (!cid) return '#';
+            const q = bid ? `?business_id=${bid}` : '';
+            return `https://business.facebook.com/commerce/catalogs/${cid}/products/${q}`;
+        },
+
+        // User-typed display value → integer in minor units (what Meta wants).
+        toMinorUnit(displayValue, currency) {
+            const n = parseFloat(String(displayValue ?? '').replace(',', '.'));
+            if (!isFinite(n) || n <= 0) return 0;
+            return Math.round(n * this.priceMultiplier(currency));
+        },
+
+        // Minor unit integer → display value (decimals only for non-zero-decimal currencies).
+        fromMinorUnit(minorValue, currency) {
+            const m = Number(minorValue) || 0;
+            const div = this.priceMultiplier(currency);
+            return div === 1 ? m : (m / div);
+        },
+
+        // Meta returns `price` as a formatted string like "Rp 35.000", "Rp1",
+        // "10.00 USD", "$5.99", etc. Parse to integer in minor units (cents)
+        // regardless of locale/format/currency prefix or suffix.
+        parseMetaPrice(price) {
+            if (price == null || price === '') return 0;
+            if (typeof price === 'number') return Math.max(0, Math.round(price));
+
+            const str = String(price).trim();
+            // Try to detect currency code suffix (USD/EUR/SGD/...).
+            const ccyMatch = str.match(/([A-Z]{3})\s*$/);
+            const currency = ccyMatch ? ccyMatch[1] : 'IDR';
+            const mult = this.priceMultiplier(currency);
+
+            // Extract only the digit/decimal/comma run — drops "Rp", "$", commas
+            // outside numbers, etc.
+            const runMatch = str.match(/[\d][\d.,\s]*/);
+            if (!runMatch) return 0;
+            let numStr = runMatch[0].trim();
+
+            // Indonesian/European decimal heuristic: last separator with 1-2
+            // trailing digits is the decimal point.
+            const lastComma = numStr.lastIndexOf(',');
+            const lastDot   = numStr.lastIndexOf('.');
+            let decimalSep = null;
+            if (lastComma > lastDot && /,\d{1,2}$/.test(numStr)) decimalSep = ',';
+            else if (lastDot > lastComma && /\.\d{1,2}$/.test(numStr)) decimalSep = '.';
+
+            if (decimalSep) {
+                const thousandsSep = decimalSep === ',' ? '.' : ',';
+                numStr = numStr.split(thousandsSep).join('').replace(decimalSep, '.');
+            } else {
+                // No decimal point — strip all separators (e.g. "Rp 35.000" → "35000").
+                numStr = numStr.replace(/[.,\s]/g, '');
+            }
+
+            const n = parseFloat(numStr);
+            if (!isFinite(n) || n <= 0) return 0;
+
+            // Display major-unit × 100 = stored minor unit Meta expects.
+            return Math.round(n * mult);
+        },
+
         formatPrice(price, currency) {
             if (!price) return '–';
             try {
-                const raw = String(price).replace(/[^0-9.]/g, '');
-                const num = parseFloat(raw);
-                if (isNaN(num)) return price;
+                const minor = this.parseMetaPrice(price);
+                if (!minor) return '–';
+                const display = this.fromMinorUnit(minor, currency);
+                const digits = this.displayFractionDigits(currency);
                 return new Intl.NumberFormat('id-ID', {
                     style: 'currency',
                     currency: currency || 'IDR',
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0,
-                }).format(num);
+                    minimumFractionDigits: digits,
+                    maximumFractionDigits: digits,
+                }).format(display);
             } catch(e) {
-                return price;
+                return String(price);
             }
+        },
+
+        // Real-time price preview shown under the input.
+        pricePreview(displayValue, currency) {
+            const n = parseFloat(String(displayValue ?? '').replace(',', '.'));
+            const digits = this.displayFractionDigits(currency);
+            if (!isFinite(n) || n <= 0) {
+                return digits === 0
+                    ? 'Masukkan nominal langsung (mis. 25000 = Rp 25.000)'
+                    : 'Masukkan nominal dengan desimal (mis. 10.00 = $10.00)';
+            }
+            try {
+                return new Intl.NumberFormat('id-ID', {
+                    style: 'currency',
+                    currency: currency || 'IDR',
+                    minimumFractionDigits: digits,
+                    maximumFractionDigits: digits,
+                }).format(n);
+            } catch(e) {
+                return '';
+            }
+        },
+
+        pricePlaceholder(currency) {
+            return this.displayFractionDigits(currency) === 0 ? '25000' : '10.00';
+        },
+
+        // SKU pattern: SKU-{base36 timestamp}-{4 random alnum}. Max 17 chars.
+        generateSku() {
+            const ts = Date.now().toString(36).toUpperCase();
+            const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+            return `SKU-${ts}-${rand}`;
+        },
+
+        // Default landing URL for a product. Meta validates this is HTTPS and reachable.
+        // We point at our public homepage as a safe fallback when there's no public storefront yet.
+        defaultProductUrl() {
+            return `${window.location.origin}/`;
+        },
+
+        // Build the JSON payload sent to our API (which forwards form-encoded to Meta).
+        // Centralizes the price conversion & strips display-only fields.
+        buildProductPayload(form, priceMinor) {
+            const out = {};
+            const passthrough = ['retailer_id', 'name', 'description', 'currency', 'image_url', 'url',
+                                 'availability', 'category', 'brand', 'condition'];
+            passthrough.forEach(k => { if (form[k] != null && form[k] !== '') out[k] = form[k]; });
+            if (priceMinor && priceMinor > 0) out.price = priceMinor;
+            if (form.inventory !== '' && form.inventory != null) out.inventory = Number(form.inventory);
+            if (out.currency) out.currency = String(out.currency).toUpperCase();
+            return out;
         },
 
         logout() {

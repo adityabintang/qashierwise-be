@@ -7,11 +7,14 @@ use App\Events\NewWhatsAppMessage;
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessAiAgentMessage;
 use App\Models\AiAgent;
+use App\Models\AiAgentConversation;
 use App\Models\Reservation;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
 use App\Models\WhatsAppMessage;
 use App\Models\WhatsAppTemplate;
+use App\Services\AiAgentService;
+use App\Services\CatalogOrderFlowService;
 use App\Services\MediaStorageService;
 use App\Services\WebhookForwardingService;
 use App\Services\WhatsAppAccountService;
@@ -330,6 +333,14 @@ class WhatsAppWebhookController extends Controller
                 }
                 break;
 
+            case 'order':
+                // WhatsApp catalog cart submission. Payload contains product_items.
+                $orderPayload = $message['order'] ?? [];
+                $itemCount = count($orderPayload['product_items'] ?? []);
+                $content = "Catalog order received ({$itemCount} items)";
+                $metadata = $orderPayload;
+                break;
+
             default:
                 $content = "Unsupported message type: $type";
                 $metadata = $message;
@@ -386,7 +397,7 @@ class WhatsAppWebhookController extends Controller
             ->where('is_active', true)
             ->first();
 
-        if ($aiAgent && $type === 'text') {
+        if ($aiAgent) {
             $contact->refresh();
             if (! $contact->ai_active) {
                 Log::info('AI disabled for this contact, skipping', [
@@ -396,20 +407,144 @@ class WhatsAppWebhookController extends Controller
                 return $messageData;
             }
 
-            // Dispatch AI Agent processing to queue
-            ProcessAiAgentMessage::dispatch(
+            // Catalog flow handles order webhook + button replies synchronously
+            // because they're state-machine transitions, not LLM calls.
+            $handledByCatalogFlow = $this->routeToCatalogFlow(
+                $type,
+                $message,
+                $metadata,
+                $content,
                 $whatsappAccount,
                 $contact,
-                $content
-            )->onQueue('ai-agent');
+                $aiAgent
+            );
 
-            Log::info('AI Agent message dispatched to queue', [
-                'contact_id' => $contact->id,
-                'ai_agent_id' => $aiAgent->id,
-            ]);
+            if ($handledByCatalogFlow) {
+                Log::info('Message handled by catalog order flow', [
+                    'contact_id' => $contact->id,
+                    'message_type' => $type,
+                ]);
+
+                return $messageData;
+            }
+
+            if ($type === 'text') {
+                // Dispatch AI Agent processing to queue
+                ProcessAiAgentMessage::dispatch(
+                    $whatsappAccount,
+                    $contact,
+                    $content
+                )->onQueue('ai-agent');
+
+                Log::info('AI Agent message dispatched to queue', [
+                    'contact_id' => $contact->id,
+                    'ai_agent_id' => $aiAgent->id,
+                ]);
+            }
         }
 
         return $messageData;
+    }
+
+    /**
+     * Route catalog-driven flow messages (order webhook, button replies, and
+     * free-text delivery info) to CatalogOrderFlowService. Returns true if the
+     * message was consumed by the catalog flow.
+     */
+    protected function routeToCatalogFlow(
+        string $type,
+        array $message,
+        array $metadata,
+        ?string $content,
+        WhatsAppAccount $whatsappAccount,
+        WhatsAppContact $contact,
+        AiAgent $aiAgent
+    ): bool {
+        try {
+            $service = app(CatalogOrderFlowService::class);
+
+            if ($type === 'order') {
+                if (! $aiAgent->hasCatalog()) {
+                    Log::warning('Received catalog order webhook but AI agent has no catalog_id configured', [
+                        'ai_agent_id' => $aiAgent->id,
+                    ]);
+
+                    return false;
+                }
+
+                // Idempotency: Meta retries delivery of webhooks that returned a
+                // non-2xx response (eg. when our earlier check-constraint bug
+                // caused 500s). Without dedup, retried order events restart the
+                // flow midway through delivery info confirmation.
+                $messageId = $message['id'] ?? null;
+                if ($messageId && \App\Models\WhatsAppMessage::where('message_id', $messageId)->exists()) {
+                    Log::info('Duplicate catalog order webhook ignored', [
+                        'message_id'   => $messageId,
+                        'ai_agent_id'  => $aiAgent->id,
+                        'contact_id'   => $contact->id,
+                    ]);
+                    return true;
+                }
+
+                $conversation = app(AiAgentService::class)->getOrCreateConversation($aiAgent->id, $contact->id);
+                $service->handleCatalogOrderReceived(
+                    $whatsappAccount,
+                    $contact,
+                    $conversation,
+                    $aiAgent,
+                    $message['order'] ?? []
+                );
+
+                return true;
+            }
+
+            $conversation = AiAgentConversation::where('ai_agent_id', $aiAgent->id)
+                ->where('whatsapp_contact_id', $contact->id)
+                ->first();
+
+            if (! $conversation) {
+                return false;
+            }
+
+            if ($type === 'interactive') {
+                $interactiveType = $message['interactive']['type'] ?? null;
+                if ($interactiveType !== 'button_reply') {
+                    return false;
+                }
+
+                $buttonId = $message['interactive']['button_reply']['id'] ?? null;
+                if (! $buttonId) {
+                    return false;
+                }
+
+                return $service->handleButtonReply(
+                    $whatsappAccount,
+                    $contact,
+                    $conversation,
+                    $aiAgent,
+                    $buttonId
+                );
+            }
+
+            if ($type === 'text' && $conversation->getFlowState() === CatalogOrderFlowService::STATE_AWAITING_DELIVERY_INFO) {
+                return $service->handleDeliveryInfoText(
+                    $whatsappAccount,
+                    $contact,
+                    $conversation,
+                    $aiAgent,
+                    $content ?? ''
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::error('Catalog flow routing error', [
+                'error' => $e->getMessage(),
+                'contact_id' => $contact->id,
+                'type' => $type,
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
+
+        return false;
     }
 
     /**

@@ -31,13 +31,16 @@ class AiAgentService
 
     protected ConversationGuard $conversationGuard;
 
+    protected CatalogOrderFlowService $catalogOrderFlow;
+
     public function __construct(
         WhatsAppAccountService $whatsappAccountService,
         OrderService $orderService,
         QrisService $qrisService,
         ConversationSummarizer $conversationSummarizer,
         IntentTracker $intentTracker,
-        ConversationGuard $conversationGuard
+        ConversationGuard $conversationGuard,
+        CatalogOrderFlowService $catalogOrderFlow
     ) {
         $this->whatsappAccountService = $whatsappAccountService;
         $this->orderService = $orderService;
@@ -45,6 +48,7 @@ class AiAgentService
         $this->conversationSummarizer = $conversationSummarizer;
         $this->intentTracker = $intentTracker;
         $this->conversationGuard = $conversationGuard;
+        $this->catalogOrderFlow = $catalogOrderFlow;
     }
 
     /**
@@ -73,6 +77,86 @@ class AiAgentService
 
             // Get or create conversation
             $conversation = $this->getOrCreateConversation($aiAgent->id, $contact->id);
+
+            // Catalog flow takeover: when a catalog-driven flow is in progress,
+            // route text input through CatalogOrderFlowService so the LLM doesn't
+            // hijack the state machine. The webhook already routes for delivery
+            // info; this is defense-in-depth and also nudges the user when text
+            // arrives while we're waiting on a button.
+            if ($conversation->getFlowState() !== null) {
+                // Universal escape hatch: typing "batal" / "cancel" / "stop"
+                // at ANY point in the catalog flow resets state and frees the
+                // customer. Previously the bot told them to "kirim batal" but
+                // no handler was wired up — leaving them stuck.
+                if (preg_match('/^\s*(batal|cancel|stop|berhenti|gajadi|gak\s+jadi|tidak\s+jadi)\.?\s*$/iu', $messageText)) {
+                    Log::info('Catalog flow cancelled by customer', [
+                        'ai_agent_id'    => $aiAgent->id,
+                        'contact_wa_id'  => $contact->wa_id,
+                        'previous_state' => $conversation->getFlowState(),
+                    ]);
+                    $conversation->clearFlowState();
+                    $conversation->clearDeliveryContext();
+                    $conversation->clearCatalogItems();
+                    $conversation->clearPendingOrder();
+                    $this->catalogOrderFlow->sendCancelledReply($account, $contact, $aiAgent);
+                    return;
+                }
+
+                $handled = $this->catalogOrderFlow->handleDeliveryInfoText(
+                    $account,
+                    $contact,
+                    $conversation,
+                    $aiAgent,
+                    $messageText
+                );
+
+                if (! $handled) {
+                    $this->catalogOrderFlow->sendStuckPrompt($account, $contact);
+                }
+
+                return;
+            }
+
+            // Catalog short-circuit: when AI Agent has a catalog and the user
+            // asks for the menu or wants to order, send the WhatsApp Catalog UI
+            // directly instead of having the LLM write a text menu.
+            if ($aiAgent->hasCatalog() && $aiAgent->isOrderEnabled()) {
+                $detected = UserIntent::detect($messageText);
+                if (in_array($detected, [UserIntent::VIEW_MENU, UserIntent::ORDER, UserIntent::NEXT_MENU_PAGE, UserIntent::SEARCH_PRODUCT], true)) {
+                    $conversation->addMessage('human', $messageText);
+                    $conversation->addMessage('ai', 'Mengirim katalog produk…');
+                    $this->catalogOrderFlow->sendCatalog($account, $contact, $aiAgent);
+
+                    return;
+                }
+
+                // Greeting short-circuit: skip LLM and reply with a quick-reply
+                // button so the customer can open the catalog with one tap
+                // instead of having to type "menu". Token-saving + better UX.
+                if ($detected === UserIntent::GREETING) {
+                    $conversation->addMessage('human', $messageText);
+                    $greeting = $this->buildGreeting($aiAgent);
+                    $this->catalogOrderFlow->sendGreetingWithMenuButton($account, $contact, $aiAgent, $greeting);
+                    $conversation->addMessage('ai', $greeting);
+
+                    return;
+                }
+
+                // Unknown / off-topic short-circuit: deterministic reply with a
+                // Lihat Menu button so the customer never has to type "menu".
+                // Saves tokens AND keeps UX consistent (every fallback has the
+                // same CTA button).
+                if (in_array($detected, [UserIntent::UNKNOWN, UserIntent::OFF_TOPIC], true)) {
+                    $conversation->addMessage('human', $messageText);
+                    $reply = $detected === UserIntent::OFF_TOPIC
+                        ? 'Maaf, saya hanya melayani pemesanan. Tap *Lihat Menu* untuk mulai memesan.'
+                        : 'Maaf, saya kurang paham pesan Anda. Tap *Lihat Menu* untuk melihat daftar menu, atau sebutkan nama menu yang ingin dipesan.';
+                    $this->catalogOrderFlow->sendFallbackWithMenuButton($account, $contact, $aiAgent, $reply);
+                    $conversation->addMessage('ai', $reply);
+
+                    return;
+                }
+            }
 
             // Check if there's a pending order confirmation
             $pendingOrder = $conversation->getPendingOrder();
@@ -2512,6 +2596,23 @@ class AiAgentService
 
             return 'Maaf, terjadi kesalahan saat mengecek status pembayaran. Silakan coba lagi.';
         }
+    }
+
+    /**
+     * Build a short, deterministic greeting message. Used by the GREETING
+     * short-circuit so we don't burn LLM tokens on a "hello" reply.
+     */
+    protected function buildGreeting(AiAgent $aiAgent): string
+    {
+        $botName = $aiAgent->bot_name ?: 'asisten kami';
+        $custom = $aiAgent->settings['greeting_message'] ?? null;
+
+        if (is_string($custom) && trim($custom) !== '') {
+            return $custom;
+        }
+
+        return "Halo! Selamat datang di {$botName}. Tap *Lihat Menu* untuk mulai memesan, "
+             . "atau kirim pesan kalau ada yang ingin ditanyakan.";
     }
 
     /**

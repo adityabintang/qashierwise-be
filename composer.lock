@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "9592aa9af6ef0080d8dce1b9a6efb797",
+    "content-hash": "00b63f83c0e9fa94553d3f3f9b4f68fe",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -4676,30 +4676,30 @@
         },
         {
             "name": "netflie/whatsapp-cloud-api",
-            "version": "2.2.1",
+            "version": "4.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/netflie/whatsapp-cloud-api.git",
-                "reference": "3c3aea95cac49658eef8c1e361af35fd0567427c"
+                "reference": "acdabf30c5838afaa46c98a671dc38c0c77593dc"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/netflie/whatsapp-cloud-api/zipball/3c3aea95cac49658eef8c1e361af35fd0567427c",
-                "reference": "3c3aea95cac49658eef8c1e361af35fd0567427c",
+                "url": "https://api.github.com/repos/netflie/whatsapp-cloud-api/zipball/acdabf30c5838afaa46c98a671dc38c0c77593dc",
+                "reference": "acdabf30c5838afaa46c98a671dc38c0c77593dc",
                 "shasum": ""
             },
             "require": {
                 "guzzlehttp/guzzle": "^7.0",
                 "myclabs/php-enum": "^1.8",
-                "php": "^7.4 || ^8.0 || ^8.1",
+                "php": ">=8.1",
                 "vlucas/phpdotenv": "^5.4"
             },
             "require-dev": {
                 "fakerphp/faker": "^1.19",
                 "friendsofphp/php-cs-fixer": "^3.13",
                 "phpspec/prophecy-phpunit": "^2.0",
-                "phpstan/phpstan": "^1.9",
-                "phpunit/phpunit": "^9.0",
+                "phpstan/phpstan": "^1.9 || ^2.0",
+                "phpunit/phpunit": ">=10.0",
                 "symfony/var-dumper": "^5.0"
             },
             "type": "library",
@@ -4725,7 +4725,7 @@
             "description": "The first PHP SDK to send and receive messages using a cloud-hosted version of the WhatsApp Business Platform",
             "support": {
                 "issues": "https://github.com/netflie/whatsapp-cloud-api/issues",
-                "source": "https://github.com/netflie/whatsapp-cloud-api/tree/2.2.1"
+                "source": "https://github.com/netflie/whatsapp-cloud-api/tree/4.0.0"
             },
             "funding": [
                 {
@@ -4733,7 +4733,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2024-08-28T10:43:39+00:00"
+            "time": "2026-04-14T17:12:07+00:00"
         },
         {
             "name": "nette/php-generator",
@@ -13071,13 +13071,13 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": [],
+    "stability-flags": {},
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
         "php": "^8.2"
     },
-    "platform-dev": [],
+    "platform-dev": {},
     "platform-overrides": {
         "php": "8.2.30"
     },
