@@ -61,10 +61,17 @@ class CatalogOrderFlowService
 
     public const BTN_CANCEL_ORDER = 'order_cancel';
 
+    // Convergence point ("titik temu"): confirm the selected items (from catalog
+    // OR POS) before choosing a fulfillment method.
+    public const BTN_CONFIRM_CART = 'cart_confirm';
+
     // Drip-message CTA: resume the in-progress order after an off-context message.
     public const BTN_CONTINUE_FLOW = 'flow_continue';
 
     // ---- Flow states --------------------------------------------------------
+
+    // Items selected (catalog or POS) — awaiting Konfirmasi/Batal before fulfillment.
+    public const STATE_CONFIRMING_CART = 'confirming_cart';
 
     public const STATE_AWAITING_FULFILLMENT = 'awaiting_fulfillment_choice';
 
@@ -482,16 +489,63 @@ class CatalogOrderFlowService
         }
 
         $conversation->setCatalogItems($items);
-        $conversation->setFlowState(self::STATE_AWAITING_FULFILLMENT);
+        $conversation->setFlowState(self::STATE_CONFIRMING_CART);
 
-        Log::info('Catalog order received, prompting fulfillment choice', [
+        Log::info('Catalog order received, prompting cart confirmation', [
             'ai_agent_id' => $aiAgent->id,
             'contact_wa_id' => $contact->wa_id,
             'item_count' => count($items),
             'subtotal' => $this->itemsSubtotal($items),
         ]);
 
-        $this->sendFulfillmentButtons($account, $contact, $aiAgent, $items);
+        // Convergence point: confirm items before fulfillment selection.
+        $this->sendCartConfirmation($account, $contact, $aiAgent, $items);
+    }
+
+    /**
+     * Enter the unified order flow from a POS (non-catalog) cart. Converts the
+     * LLM cart [{product_id, product_name, price, quantity}] into the catalog
+     * item shape and shows the same cart-confirmation as the catalog flow.
+     */
+    public function startPosOrderFlow(
+        WhatsAppAccount $account,
+        WhatsAppContact $contact,
+        AiAgentConversation $conversation,
+        AiAgent $aiAgent
+    ): bool {
+        $cart = $conversation->getCart();
+        if (empty($cart)) {
+            return false;
+        }
+
+        $items = [];
+        foreach ($cart as $c) {
+            $items[] = [
+                'product_retailer_id' => 'POS-'.($c['product_id'] ?? ''),
+                'pos_product_id'      => $c['product_id'] ?? null,
+                'product_name'        => $c['product_name'] ?? 'Produk',
+                'quantity'            => (int) ($c['quantity'] ?? 1),
+                'item_price'          => (float) ($c['price'] ?? 0),
+                'currency'            => 'IDR',
+            ];
+        }
+
+        $conversation->setCatalogItems($items);
+        // LLM cart copied into the unified order items — clear it to avoid
+        // double-counting if the customer orders again later.
+        $conversation->clearCart();
+        $conversation->setFlowState(self::STATE_CONFIRMING_CART);
+
+        Log::info('POS order entering unified flow, prompting cart confirmation', [
+            'ai_agent_id'   => $aiAgent->id,
+            'contact_wa_id' => $contact->wa_id,
+            'item_count'    => count($items),
+            'subtotal'      => $this->itemsSubtotal($items),
+        ]);
+
+        $this->sendCartConfirmation($account, $contact, $aiAgent, $items);
+
+        return true;
     }
 
     /**
@@ -560,6 +614,18 @@ class CatalogOrderFlowService
             }
 
             return true;
+        }
+
+        if ($state === self::STATE_CONFIRMING_CART) {
+            if ($buttonId === self::BTN_CONFIRM_CART) {
+                // Items confirmed -> proceed to fulfillment selection.
+                $conversation->setFlowState(self::STATE_AWAITING_FULFILLMENT);
+                $this->sendFulfillmentButtons($account, $contact, $aiAgent, $conversation->getCatalogItems());
+
+                return true;
+            }
+
+            return false;
         }
 
         if ($state === self::STATE_AWAITING_FULFILLMENT) {
@@ -970,7 +1036,12 @@ class CatalogOrderFlowService
 
     // ---- Outbound messages --------------------------------------------------
 
-    protected function sendFulfillmentButtons(
+    /**
+     * Convergence point ("titik temu") for BOTH modes: show the selected items
+     * + subtotal and ask the customer to confirm before choosing fulfillment.
+     * Catalog (MPM submit) and POS (LLM cart + checkout) both land here.
+     */
+    public function sendCartConfirmation(
         WhatsAppAccount $account,
         WhatsAppContact $contact,
         AiAgent $aiAgent,
@@ -980,25 +1051,56 @@ class CatalogOrderFlowService
 
         $itemsLines = [];
         foreach ($items as $idx => $item) {
-            $line = sprintf(
-                '%d. %s x%d',
+            $itemTotal = (float) ($item['item_price'] ?? 0) * (int) ($item['quantity'] ?? 1);
+            $itemsLines[] = sprintf(
+                '%d. %s x%d — Rp %s',
                 $idx + 1,
-                $item['product_name'] ?: $item['product_retailer_id'],
-                $item['quantity']
+                $item['product_name'] ?: ($item['product_retailer_id'] ?? 'Produk'),
+                $item['quantity'] ?? 1,
+                number_format($itemTotal, 0, ',', '.')
             );
-            $itemsLines[] = $line;
         }
 
         $subtotal = $this->itemsSubtotal($items);
-        $itemsBlock = implode("\n", array_slice($itemsLines, 0, 8));
-        if (count($itemsLines) > 8) {
-            $itemsBlock .= "\n... dan ".(count($itemsLines) - 8).' item lainnya';
+        $itemsBlock = implode("\n", array_slice($itemsLines, 0, 10));
+        if (count($itemsLines) > 10) {
+            $itemsBlock .= "\n... dan ".(count($itemsLines) - 10).' item lainnya';
         }
 
-        $body = "🛒 *Pesanan Diterima*\n\n"
+        $body = "🛒 *Ringkasan Pesanan*\n\n"
               .$itemsBlock
               ."\n\nSubtotal: Rp ".number_format($subtotal, 0, ',', '.')
-              ."\n\nPilih metode lanjutan:";
+              ."\n\nLanjutkan pesanan ini?";
+
+        try {
+            $action = new ButtonAction([
+                new Button(self::BTN_CONFIRM_CART, '✅ Konfirmasi'),
+                new Button(self::BTN_CANCEL_ORDER, '❌ Batal'),
+            ]);
+            $client->sendButton($contact->wa_id, $this->truncate($body, 1020), $action, null, null);
+        } catch (\Throwable $e) {
+            Log::error('Failed to send cart confirmation', [
+                'error' => $e->getMessage(),
+                'contact_wa_id' => $contact->wa_id,
+            ]);
+            $this->sendText($client, $contact->wa_id,
+                'Pesanan Anda diterima. Balas *konfirmasi* untuk lanjut atau *batal* untuk membatalkan.');
+        }
+    }
+
+    /**
+     * Fulfillment method picker (shown AFTER cart confirmation). Pickup always
+     * available; delivery & reservasi follow the agent's feature flags.
+     */
+    protected function sendFulfillmentButtons(
+        WhatsAppAccount $account,
+        WhatsAppContact $contact,
+        AiAgent $aiAgent,
+        array $items
+    ): void {
+        $client = $this->client($account);
+
+        $body = "Silakan pilih metode lanjutan:";
 
         // sendButton supports max 3 buttons; we always show pickup. Delivery and
         // reservasi follow the agent's feature flags.
@@ -1021,7 +1123,7 @@ class CatalogOrderFlowService
                 'contact_wa_id' => $contact->wa_id,
             ]);
             $this->sendText($client, $contact->wa_id,
-                'Pesanan Anda diterima. Silakan balas dengan "pickup", "delivery", atau "reservasi".');
+                'Silakan balas dengan "pickup", "delivery", atau "reservasi".');
         }
     }
 
@@ -1055,6 +1157,7 @@ class CatalogOrderFlowService
     protected function flowStepLabel(?string $state): string
     {
         return match ($state) {
+            self::STATE_CONFIRMING_CART => 'konfirmasi pesanan',
             self::STATE_AWAITING_FULFILLMENT => 'memilih metode (Pickup / Delivery / Reservasi)',
             self::STATE_AWAITING_DELIVERY_INFO => 'mengisi informasi pengiriman',
             self::STATE_CONFIRMING_DELIVERY_INFO => 'konfirmasi informasi pengiriman',
@@ -1123,6 +1226,9 @@ class CatalogOrderFlowService
         AiAgent $aiAgent
     ): void {
         switch ($conversation->getFlowState()) {
+            case self::STATE_CONFIRMING_CART:
+                $this->sendCartConfirmation($account, $contact, $aiAgent, $conversation->getCatalogItems());
+                break;
             case self::STATE_AWAITING_FULFILLMENT:
                 $this->sendFulfillmentButtons($account, $contact, $aiAgent, $conversation->getCatalogItems());
                 break;
@@ -1424,7 +1530,9 @@ class CatalogOrderFlowService
                 foreach ($items as $item) {
                     OrderItem::create([
                         'order_id' => $order->id,
-                        'product_id' => null,
+                        // Link to a real POS product when the order originated
+                        // from the POS flow; catalog items have no local product.
+                        'product_id' => $item['pos_product_id'] ?? null,
                         'product_name' => $item['product_name'] ?: $item['product_retailer_id'],
                         'product_retailer_id' => $item['product_retailer_id'],
                         'quantity' => $item['quantity'],

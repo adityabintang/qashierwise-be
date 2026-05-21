@@ -113,6 +113,8 @@ class AiAgentService
                         $conversation->clearPaymentContext();
                         $conversation->clearPendingOrder();
                         $conversation->clearCart();
+                        $conversation->clearCatalogItems();
+                        $conversation->clearDeliveryContext();
 
                         $orderContext = $conversation->order_context ?? [];
                         unset($orderContext['last_qris_transaction_id']);
@@ -122,8 +124,13 @@ class AiAgentService
                         $this->sendReply(
                             $account,
                             $contact->wa_id,
-                            "⏰ Kode pembayaran sudah kadaluarsa.\n\nPesanan otomatis dibatalkan."
+                            "⏰ Pembayaran pesanan sebelumnya sudah kadaluarsa, jadi pesanan dibatalkan."
                         );
+
+                        // State is now clean — continue handling the customer's
+                        // current message normally (greeting/menu) instead of
+                        // dead-ending on the expiry notice.
+                        $this->processMessage($account, $contact, $messageText);
 
                         return;
                     }
@@ -148,12 +155,17 @@ class AiAgentService
 
             $detected = UserIntent::detect($messageText);
 
-            // Catalog short-circuits only apply when the Meta Catalog flow is
-            // active (catalog_id configured AND META_CATALOG flag on). When the
-            // catalog is inactive, everything falls through to the standard LLM
-            // flow which serves local POS products (get_all_products tool).
-            if ($aiAgent->isOrderEnabled() && $aiAgent->isCatalogActive()) {
-                if (in_array($detected, [UserIntent::VIEW_MENU, UserIntent::ORDER, UserIntent::NEXT_MENU_PAGE, UserIntent::SEARCH_PRODUCT], true)) {
+            // Greeting / menu / fallback short-circuits. These provide the same
+            // "Lihat Menu" button UX in BOTH modes — the only difference is what
+            // happens when the button/menu intent is resolved:
+            //   - catalog active   -> Meta Catalog MPM (sendCatalog)
+            //   - catalog inactive -> LLM/POS products flow (falls through)
+            if ($aiAgent->isOrderEnabled()) {
+                // Direct menu/order intent: send the Meta Catalog UI ONLY when
+                // the catalog is active. Otherwise fall through to the LLM flow
+                // which serves local POS products (get_all_products tool).
+                if ($aiAgent->isCatalogActive()
+                    && in_array($detected, [UserIntent::VIEW_MENU, UserIntent::ORDER, UserIntent::NEXT_MENU_PAGE, UserIntent::SEARCH_PRODUCT], true)) {
                     $conversation->addMessage('human', $messageText);
                     $conversation->addMessage('ai', 'Mengirim katalog produk…');
                     $this->catalogOrderFlow->sendCatalog($account, $contact, $aiAgent);
@@ -161,9 +173,9 @@ class AiAgentService
                     return;
                 }
 
-                // Greeting short-circuit: skip LLM and reply with a quick-reply
-                // button so the customer can open the catalog with one tap
-                // instead of having to type "menu". Token-saving + better UX.
+                // Greeting short-circuit — always reply with the "Lihat Menu"
+                // button (token-saving + consistent UX). Tapping it routes to
+                // catalog or POS depending on isCatalogActive().
                 if ($detected === UserIntent::GREETING) {
                     $conversation->addMessage('human', $messageText);
                     $greeting = $this->buildGreeting($aiAgent);
@@ -173,11 +185,12 @@ class AiAgentService
                     return;
                 }
 
-                // Unknown / off-topic short-circuit: deterministic reply with a
-                // Lihat Menu button so the customer never has to type "menu".
-                // Saves tokens AND keeps UX consistent (every fallback has the
-                // same CTA button).
-                if (in_array($detected, [UserIntent::UNKNOWN, UserIntent::OFF_TOPIC], true)) {
+                // Unknown / off-topic short-circuit — only in catalog mode, where
+                // the customer orders by tapping (not typing). In POS mode an
+                // "unknown" message is usually a typed product order (e.g.
+                // "ayam bakar madu 2") and MUST reach the LLM to be added to cart.
+                if ($aiAgent->isCatalogActive()
+                    && in_array($detected, [UserIntent::UNKNOWN, UserIntent::OFF_TOPIC], true)) {
                     $conversation->addMessage('human', $messageText);
                     $reply = $detected === UserIntent::OFF_TOPIC
                         ? 'Maaf, saya hanya melayani pemesanan. Tap *Lihat Menu* untuk mulai memesan.'
@@ -186,6 +199,23 @@ class AiAgentService
                     $conversation->addMessage('ai', $reply);
 
                     return;
+                }
+            }
+
+            // POS checkout hand-off: in POS mode (catalog inactive), once the
+            // customer has items in their LLM cart and signals checkout, enter
+            // the SAME unified order flow as the catalog (cart confirmation ->
+            // fulfillment -> delivery -> payment). The only difference vs catalog
+            // is HOW items got into the cart (typed vs tapped).
+            if ($aiAgent->isOrderEnabled() && ! $aiAgent->isCatalogActive() && ! empty($conversation->getCart())) {
+                $wantsCheckout = $detected === UserIntent::CHECKOUT
+                    || preg_match('/^\s*(selesai|sudah|udah|cukup|itu saja|itu aja|lanjut(kan)?)\s*$/iu', $messageText);
+
+                if ($wantsCheckout) {
+                    $conversation->addMessage('human', $messageText);
+                    if ($this->catalogOrderFlow->startPosOrderFlow($account, $contact, $conversation, $aiAgent)) {
+                        return;
+                    }
                 }
             }
 
