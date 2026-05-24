@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\AiAgentSettings as AiAgentSettingsCast;
 use App\Enums\UserIntent;
 use App\Services\AiAgentPromptBuilder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -23,6 +24,7 @@ class AiAgent extends Model
         'whatsapp_account_id',
         'default_store_id',
         'catalog_id',
+        'catalog_enabled',
         'bot_name',
         'system_prompt',
         'business_info',
@@ -48,13 +50,14 @@ class AiAgent extends Model
     {
         return [
             'business_info' => 'array',
+            'catalog_enabled' => 'boolean',
             'order_enabled' => 'boolean',
             'qris_enabled' => 'boolean',
             'reservation_enabled' => 'boolean',
             'delivery_enabled' => 'boolean',
             'default_ongkir' => 'decimal:2',
             'is_active' => 'boolean',
-            'settings' => 'array',
+            'settings' => AiAgentSettingsCast::class,
             'use_optimized_prompt' => 'boolean',
             'enable_prompt_caching' => 'boolean',
             'use_toon_format' => 'boolean',
@@ -117,18 +120,25 @@ class AiAgent extends Model
     }
 
     /**
-     * Whether the merchant has an active reservation configuration.
+     * Whether the merchant has an active reservation configuration. Cached
+     * for 5 minutes — invalidated by ReservationConfigObserver on save/delete.
      */
     public function hasReservationConfig(): bool
     {
-        $user = $this->getUser();
-        if (! $user) {
-            return false;
-        }
+        return \Illuminate\Support\Facades\Cache::remember(
+            "ai_agent:{$this->id}:has_reservation_config",
+            300,
+            function (): bool {
+                $user = $this->getUser();
+                if (! $user) {
+                    return false;
+                }
 
-        return ReservationConfig::where('user_id', $user->id)
-            ->where('is_active', true)
-            ->exists();
+                return ReservationConfig::where('user_id', $user->id)
+                    ->where('is_active', true)
+                    ->exists();
+            }
+        );
     }
 
     public function isDeliveryEnabled(): bool
@@ -142,13 +152,47 @@ class AiAgent extends Model
     }
 
     /**
+     * Whether the platform admin has locked the catalog feature globally
+     * (env META_CATALOG=false → config('catalog.meta_enabled')=false). Used
+     * by the dashboard to render the toggle in read-only locked state.
+     */
+    public function isCatalogPlatformLocked(): bool
+    {
+        return ! (bool) config('catalog.meta_enabled', true);
+    }
+
+    /**
      * Whether the Meta Catalog flow should drive product selection.
-     * Requires BOTH a configured catalog_id AND the global META_CATALOG flag.
-     * When false, the agent falls back to the LLM/POS-products flow.
+     * Three things must align:
+     *   1. Platform flag enabled (META_CATALOG=true)
+     *   2. Merchant toggle on   (catalog_enabled=true)
+     *   3. Catalog picked       (catalog_id filled)
      */
     public function isCatalogActive(): bool
     {
-        return $this->hasCatalog() && (bool) config('catalog.meta_enabled', true);
+        return ! $this->isCatalogPlatformLocked()
+            && (bool) $this->catalog_enabled
+            && $this->hasCatalog();
+    }
+
+    /**
+     * Why isCatalogActive() returned false, in priority order. Returns null
+     * when catalog mode is fully active. Drives the dashboard banner copy
+     * so merchants always know which knob to flip next.
+     */
+    public function getCatalogUnavailableReason(): ?string
+    {
+        if ($this->isCatalogPlatformLocked()) {
+            return 'platform_locked';
+        }
+        if (! $this->catalog_enabled) {
+            return 'toggle_off';
+        }
+        if (! $this->hasCatalog()) {
+            return 'no_catalog_id';
+        }
+
+        return null;
     }
 
     /**
@@ -219,11 +263,16 @@ class AiAgent extends Model
     }
 
     /**
-     * Check if user has an active SubMerchant.
+     * Check if user has an active SubMerchant. Cached for 5 minutes —
+     * invalidated by SubMerchantObserver on save/delete.
      */
     public function hasActiveSubMerchant(): bool
     {
-        return $this->getSubMerchant() !== null;
+        return \Illuminate\Support\Facades\Cache::remember(
+            "ai_agent:{$this->id}:has_active_submerchant",
+            300,
+            fn (): bool => $this->getSubMerchant() !== null,
+        );
     }
 
     /**
@@ -268,5 +317,76 @@ class AiAgent extends Model
         $builder = new AiAgentPromptBuilder($this, $userId, $intent);
 
         return $builder->build();
+    }
+
+    /**
+     * Aggregate feature status with reasons. Service code should branch on the
+     * `reason` field instead of bare booleans so logging stays informative when
+     * a feature silently degrades (e.g. submerchant deleted while QRIS toggle
+     * was ON). Returns one entry per top-level feature.
+     */
+    public function getFeatureStatus(): array
+    {
+        return [
+            'order' => $this->buildOrderStatus(),
+            'qris' => $this->buildQrisStatus(),
+            'reservation' => $this->buildReservationStatus(),
+            'delivery' => $this->buildDeliveryStatus(),
+            'catalog' => $this->buildCatalogStatus(),
+        ];
+    }
+
+    protected function buildOrderStatus(): array
+    {
+        if (! $this->order_enabled) {
+            return ['enabled' => false, 'reason' => 'toggle_off'];
+        }
+        if ($this->default_store_id === null) {
+            return ['enabled' => false, 'reason' => 'missing_store'];
+        }
+
+        return ['enabled' => true, 'reason' => 'ok'];
+    }
+
+    protected function buildQrisStatus(): array
+    {
+        if (! $this->qris_enabled) {
+            return ['enabled' => false, 'reason' => 'toggle_off'];
+        }
+        if (! $this->hasActiveSubMerchant()) {
+            return ['enabled' => false, 'reason' => 'missing_submerchant'];
+        }
+
+        return ['enabled' => true, 'reason' => 'ok'];
+    }
+
+    protected function buildReservationStatus(): array
+    {
+        if (! $this->reservation_enabled) {
+            return ['enabled' => false, 'reason' => 'toggle_off'];
+        }
+        if (! $this->hasReservationConfig()) {
+            return ['enabled' => false, 'reason' => 'missing_reservation_config'];
+        }
+
+        return ['enabled' => true, 'reason' => 'ok'];
+    }
+
+    protected function buildDeliveryStatus(): array
+    {
+        return [
+            'enabled' => (bool) $this->delivery_enabled,
+            'reason' => $this->delivery_enabled ? 'ok' : 'toggle_off',
+        ];
+    }
+
+    protected function buildCatalogStatus(): array
+    {
+        $reason = $this->getCatalogUnavailableReason();
+
+        return [
+            'enabled' => $reason === null,
+            'reason' => $reason ?? 'ok',
+        ];
     }
 }
