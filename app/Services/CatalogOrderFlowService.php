@@ -65,6 +65,13 @@ class CatalogOrderFlowService
     // OR POS) before choosing a fulfillment method.
     public const BTN_CONFIRM_CART = 'cart_confirm';
 
+    // Drip CTA buttons (Sequence A — cart abandoned).
+    public const BTN_RESUME_CHECKOUT = 'drip_resume_checkout';
+
+    public const BTN_CLEAR_CART = 'drip_clear_cart';
+
+    public const BTN_STOP_DRIP = 'drip_stop';
+
     // Drip-message CTA: resume the in-progress order after an off-context message.
     public const BTN_CONTINUE_FLOW = 'flow_continue';
 
@@ -590,6 +597,46 @@ class CatalogOrderFlowService
             } else {
                 $this->resumeFlow($account, $contact, $conversation, $aiAgent);
             }
+
+            return true;
+        }
+
+        // Drip CTA: pause future drips for this contact for 30 days. Customer
+        // can still order normally — only the automated reminders stop.
+        if ($buttonId === self::BTN_STOP_DRIP) {
+            $contact->forceFill(['drips_paused_until' => now()->addDays(30)])->save();
+            app(\App\Services\AiAgent\Drip\DripScheduler::class)->onConversationResumed($conversation);
+            $this->sendText(
+                $this->client($account),
+                $contact->wa_id,
+                'Baik, pengingat otomatis dinonaktifkan untuk 30 hari ke depan. Kamu tetap bisa pesan kapan saja dengan ketik *menu*.'
+            );
+
+            return true;
+        }
+
+        // Drip CTA: resume checkout — funnel back into POS checkout flow.
+        if ($buttonId === self::BTN_RESUME_CHECKOUT) {
+            if (empty($conversation->getCart())) {
+                $this->sendFallbackWithMenuButton($account, $contact, $aiAgent,
+                    'Cart kamu kosong. Tap *Lihat Menu* untuk mulai memesan lagi.');
+
+                return true;
+            }
+            $this->startPosOrderFlow($account, $contact, $conversation, $aiAgent);
+
+            return true;
+        }
+
+        // Drip CTA: clear cart on user request from a Sequence A drip.
+        if ($buttonId === self::BTN_CLEAR_CART) {
+            $conversation->clearCart();
+            app(\App\Services\AiAgent\Drip\DripScheduler::class)->onConversationResumed($conversation);
+            $this->sendText(
+                $this->client($account),
+                $contact->wa_id,
+                '🗑️ Cart dikosongkan. Tap *Lihat Menu* kalau ingin pesan lagi.'
+            );
 
             return true;
         }
@@ -1665,6 +1712,94 @@ class CatalogOrderFlowService
                 "✅ Pesanan dibuat: {$order->order_number}\n".
                 'Namun pembuatan QRIS gagal. Silakan hubungi penjual.');
         }
+    }
+
+    /**
+     * Render and send a follow-up reminder for whatever state the conversation
+     * is in. Dispatched by the follow-up scheduler when the customer has been
+     * silent for the merchant-configured interval. Each branch reuses the
+     * regular state prompt so the customer sees the same UI they would on a
+     * fresh entry into the state.
+     */
+    public function sendStateReminder(
+        WhatsAppAccount $account,
+        WhatsAppContact $contact,
+        AiAgentConversation $conversation,
+        AiAgent $aiAgent
+    ): bool {
+        $state = $conversation->getFlowState();
+
+        switch ($state) {
+            case self::STATE_CONFIRMING_CART:
+                $items = $conversation->getCatalogItems();
+                if (empty($items)) {
+                    $items = $conversation->getCart();
+                }
+                $this->sendCartConfirmation($account, $contact, $aiAgent, $items);
+
+                return true;
+
+            case self::STATE_AWAITING_FULFILLMENT:
+                $items = $conversation->getCatalogItems() ?: $conversation->getCart();
+                $this->sendFulfillmentButtons($account, $contact, $aiAgent, $items);
+
+                return true;
+
+            case self::STATE_AWAITING_DELIVERY_INFO:
+                $this->sendDeliveryInfoPrompt($account, $contact);
+
+                return true;
+
+            case self::STATE_CONFIRMING_DELIVERY_INFO:
+                $this->sendDeliveryInfoSummary($account, $contact, $conversation);
+
+                return true;
+
+            case self::STATE_CONFIRMING_ORDER_SUMMARY:
+                $this->sendOrderSummary($account, $contact, $conversation, $aiAgent);
+
+                return true;
+
+            case self::STATE_AWAITING_PAYMENT:
+                return $this->sendPaymentReminder($account, $contact, $conversation, $aiAgent);
+        }
+
+        return false;
+    }
+
+    /**
+     * Lightweight payment-state reminder: re-send the QRIS link with the
+     * remaining minutes until expiry. Falls back gracefully when the QRIS
+     * transaction has been cleared from the conversation.
+     */
+    protected function sendPaymentReminder(
+        WhatsAppAccount $account,
+        WhatsAppContact $contact,
+        AiAgentConversation $conversation,
+        AiAgent $aiAgent
+    ): bool {
+        $qris = $conversation->getCurrentQrisTransaction();
+        if (! $qris) {
+            return false;
+        }
+
+        $client = $this->client($account);
+
+        if ($qris->isExpired()) {
+            $this->sendText($client, $contact->wa_id,
+                'Link pembayaran kadaluarsa. Tap *Lihat Menu* untuk pesan ulang.');
+
+            return true;
+        }
+
+        $minutesLeft = max(0, now()->diffInMinutes($qris->expires_at, false));
+        $msg = "💳 Link QRIS masih aktif (sisa {$minutesLeft} menit).\n\n"
+             ."{$qris->getShareableLink()}\n\n"
+             ."Pesanan dibatalkan otomatis jika belum dibayar.";
+
+        $this->sendText($client, $contact->wa_id, $msg);
+
+        return true;
     }
 
     // ---- Helpers ------------------------------------------------------------
