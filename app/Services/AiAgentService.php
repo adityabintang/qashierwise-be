@@ -59,10 +59,10 @@ class AiAgentService
         WhatsAppContact $contact,
         string $messageText
     ): void {
-        // DEBUG: Marker to verify code version
-        Log::info('AiAgentService::processMessage called [v2-buffer]', [
-            'contact_wa_id' => $contact->wa_id,
-            'message_preview' => substr($messageText, 0, 30),
+        Log::info('AI agent: processing message', [
+            'contact_id' => $contact->id,
+            'wa_id_hash' => substr(hash('sha256', $contact->wa_id), 0, 12),
+            'message_len' => strlen($messageText),
         ]);
 
         try {
@@ -153,7 +153,13 @@ class AiAgentService
                 return;
             }
 
-            $detected = UserIntent::detect($messageText);
+            // Single classification for the rest of processMessage. Context lets
+            // the enum disambiguate cases like "alamat" — order address vs.
+            // question about the cafe's location — based on conversation state.
+            $detected = UserIntent::detect($messageText, [
+                'flow_state' => $conversation->getFlowState(),
+                'has_cart' => ! empty($conversation->getCart()),
+            ]);
 
             // Greeting / menu / fallback short-circuits. These provide the same
             // "Lihat Menu" button UX in BOTH modes — the only difference is what
@@ -219,45 +225,24 @@ class AiAgentService
                 }
             }
 
-            // Check if there's a pending order confirmation
-            $pendingOrder = $conversation->getPendingOrder();
-            if ($pendingOrder && $this->isConfirmation($messageText)) {
-                Log::info('User confirmed order, calling confirmAndCreateOrder', [
-                    'ai_agent_id' => $aiAgent->id,
-                    'qris_enabled' => $aiAgent->qris_enabled,
-                    'contact_wa_id' => $contact->wa_id,
-                ]);
-
-                $this->confirmAndCreateOrder($conversation, $account, $contact, $aiAgent);
-
-                return;
-            } elseif ($pendingOrder && $this->isRejection($messageText)) {
-                $conversation->clearPendingOrder();
-                $this->sendReply(
-                    $account,
-                    $contact->wa_id,
-                    'Baik, pesanan dibatalkan. Ada yang bisa saya bantu lagi?'
-                );
-
-                return;
-            }
-
-            // Check if user wants next menu page (deterministic pagination)
-            if ($aiAgent->isOrderEnabled() && $this->isNextMenuPageIntent($messageText)) {
+            // Deterministic pagination — short-circuit the LLM when the customer
+            // explicitly asks for the next page of products.
+            if ($aiAgent->isOrderEnabled() && $detected === UserIntent::NEXT_MENU_PAGE) {
                 $this->handleNextMenuPage($conversation, $account, $contact, $aiAgent);
 
                 return;
             }
 
-            // Add user message to conversation
             $conversation->addMessage('human', $messageText);
 
-            // Hard guard: when ordering is disabled, block any menu/order flow immediately
-            if (! $aiAgent->isOrderEnabled() && $this->isOrderMenuIntent($messageText)) {
-                Log::info('AI Agent request blocked before LLM (order disabled)', [
+            // Hard guard: when ordering is disabled, block any menu/order flow
+            // immediately. Saves an LLM call + keeps the "feature off" copy
+            // consistent regardless of how the customer phrased their request.
+            if (! $aiAgent->isOrderEnabled() && $detected->isOrderOrMenuRelated()) {
+                Log::info('AI agent blocked before LLM (order disabled)', [
                     'agent_id' => $aiAgent->id,
                     'contact_id' => $contact->id,
-                    'message' => $messageText,
+                    'intent' => $detected->value,
                     'reservation_enabled' => $aiAgent->isReservationEnabled(),
                 ]);
 
@@ -268,7 +253,7 @@ class AiAgentService
                 return;
             }
 
-            $userIntent = UserIntent::detect($messageText);
+            $userIntent = $detected;
             $guardedReply = $this->conversationGuard->resolve($conversation, $aiAgent, $messageText, $userIntent);
             if ($guardedReply !== null) {
                 Log::info('Conversation guard handled response without LLM', [
@@ -678,7 +663,7 @@ class AiAgentService
                 'type' => 'function',
                 'function' => [
                     'name' => 'add_to_cart',
-                    'description' => 'DIRECTLY add items to cart by product name. Auto-searches product. Use this IMMEDIATELY when user wants to order - NO need to search first!',
+                    'description' => 'Add items to cart by product name. Returns an error with up to 3 alternative suggestions if the name is not found or is ambiguous (matches more than one product). When that happens, ask the customer to pick from the alternatives instead of guessing.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
@@ -688,7 +673,7 @@ class AiAgentService
                                 'items' => [
                                     'type' => 'object',
                                     'properties' => [
-                                        'product_name' => ['type' => 'string', 'description' => 'Product name (partial match OK)'],
+                                        'product_name' => ['type' => 'string', 'description' => 'Product name. Use the exact menu name when possible; close matches are accepted but ambiguous ones are rejected.'],
                                         'quantity' => ['type' => 'integer', 'description' => 'Quantity to order, default 1'],
                                     ],
                                     'required' => ['product_name', 'quantity'],
@@ -740,21 +725,6 @@ class AiAgentService
             [
                 'type' => 'function',
                 'function' => [
-                    'name' => 'set_delivery_type',
-                    'description' => 'Set delivery method. Ask user Pickup or Delivery first. If delivery, also ask address.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'delivery_type' => ['type' => 'string', 'description' => 'pickup or delivery'],
-                            'address' => ['type' => 'string', 'description' => 'Delivery address (only for delivery)'],
-                        ],
-                        'required' => ['delivery_type'],
-                    ],
-                ],
-            ],
-            [
-                'type' => 'function',
-                'function' => [
                     'name' => 'set_order_notes',
                     'description' => 'Save special instructions/catatan from customer. Call when user provides notes or says "tidak ada".',
                     'parameters' => [
@@ -770,22 +740,23 @@ class AiAgentService
     }
 
     /**
-     * Check if user intent requires tools to be loaded.
-     * Greeting, off-topic, and business info intents don't need tools.
-     * This saves ~500-800 tokens per request for simple messages.
+     * Whether the LLM call for this intent should be made with tool definitions
+     * attached. Skipping tools for cheap intents saves ~500-800 tokens per call.
+     *
+     * BUSINESS_INFO is in the skip-list now that UserIntent::detect() reclassifies
+     * "alamat" as ORDER when the conversation has a cart or is in the delivery
+     * flow state — the previous workaround (always send tools with BUSINESS_INFO)
+     * is no longer needed.
      */
     protected function intentNeedsTools(UserIntent $intent): bool
     {
-        // These intents don't need product/order tools.
-        // BUSINESS_INFO is intentionally excluded from this list: "alamat" in a delivery
-        // address message gets misclassified as BUSINESS_INFO, and without tools the LLM
-        // can never call set_delivery_type, causing confirm_order to loop forever.
         $noToolIntents = [
             UserIntent::GREETING,
             UserIntent::OFF_TOPIC,
+            UserIntent::BUSINESS_INFO,
         ];
 
-        return ! in_array($intent, $noToolIntents);
+        return ! in_array($intent, $noToolIntents, true);
     }
 
     /**
@@ -805,58 +776,6 @@ class AiAgentService
         }
 
         return $tools;
-    }
-
-    /**
-     * Check if user message is asking about menu/order/cart flow.
-     */
-    public function isOrderMenuIntent(string $messageText): bool
-    {
-        $text = strtolower(trim($messageText));
-
-        $keywords = [
-            'menu',
-            'produk',
-            'daftar',
-            'pesan',
-            'beli',
-            'order',
-            'keranjang',
-            'cart',
-            'checkout',
-            'konfirmasi pesanan',
-            'jual apa',
-            'ada apa aja',
-        ];
-
-        foreach ($keywords as $keyword) {
-            if (str_contains($text, $keyword)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    public function isNextMenuPageIntent(string $messageText): bool
-    {
-        $text = strtolower(trim($messageText));
-        $keywords = [
-            'menu lainnya', 'menu selanjutnya', 'menu berikutnya',
-            'menu lagi', 'lihat lagi', 'lihat selanjutnya',
-            'masih ada lagi', 'masih ada yang lain',
-            'ada lagi', 'ada yang lain', 'lainnya',
-            'lebih banyak', 'selanjutnya', 'next menu',
-            'page berikutnya', 'halaman berikutnya',
-        ];
-
-        foreach ($keywords as $keyword) {
-            if (str_contains($text, $keyword)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**
@@ -975,7 +894,7 @@ class AiAgentService
             if (in_array($functionName, ['search_products', 'search_multiple_products'])) {
                 $hasSearchCall = true;
             }
-            if (in_array($functionName, ['add_to_cart', 'confirm_order', 'get_cart_summary', 'generate_qris', 'check_payment_status', 'remove_from_cart', 'clear_cart', 'set_delivery_type', 'set_order_notes', 'get_all_products'])) {
+            if (in_array($functionName, ['add_to_cart', 'confirm_order', 'get_cart_summary', 'generate_qris', 'check_payment_status', 'remove_from_cart', 'clear_cart', 'set_order_notes', 'get_all_products'])) {
                 $hasFinalAction = true;
             }
 
@@ -1507,9 +1426,6 @@ class AiAgentService
 
                 case 'confirm_order':
                     return $this->prepareOrderConfirmation($conversation, $userId, $aiAgent);
-
-                case 'set_delivery_type':
-                    return $this->setDeliveryType($conversation, $arguments, $aiAgent);
 
                 case 'set_order_notes':
                     return $this->setOrderNotes($conversation, $arguments);
@@ -2078,21 +1994,31 @@ class AiAgentService
                 $quantity = 1;
             }
 
-            // Search product by name (case-insensitive)
-            $cleanName = trim(strtolower($productName));
+            $resolution = $this->resolveProductByName($userId, $productName);
 
-            $product = Product::where('user_id', $userId)
-                ->where('is_active', true)
-                ->where(function ($q) use ($cleanName) {
-                    $q->whereRaw('LOWER(name) LIKE ?', ["%{$cleanName}%"]);
-                })
-                ->first(['id', 'name', 'price', 'stock_quantity']);
-
-            if (! $product) {
-                $errors[] = "'{$productName}' tidak ditemukan";
+            if ($resolution['status'] === 'not_found') {
+                Log::info('add_to_cart: product not found', [
+                    'query' => $productName,
+                    'alternatives_count' => count($resolution['alternatives']),
+                ]);
+                $hint = $this->formatProductSuggestions($resolution['alternatives']);
+                $errors[] = "'{$productName}' tidak ditemukan.".($hint ? ' Mungkin maksudnya: '.$hint.'?' : '');
 
                 continue;
             }
+
+            if ($resolution['status'] === 'ambiguous') {
+                Log::info('add_to_cart: ambiguous match', [
+                    'query' => $productName,
+                    'candidates_count' => count($resolution['candidates']),
+                ]);
+                $list = $this->formatProductSuggestions($resolution['candidates']);
+                $errors[] = "'{$productName}' cocok dengan beberapa produk: {$list}. Mohon sebutkan nama yang tepat.";
+
+                continue;
+            }
+
+            $product = $resolution['product'];
 
             if ($product->stock_quantity !== null && $product->stock_quantity < $quantity) {
                 $errors[] = "{$product->name}: stok tidak mencukupi";
@@ -2100,7 +2026,6 @@ class AiAgentService
                 continue;
             }
 
-            // Add to cart
             $found = false;
             foreach ($cart as &$cartItem) {
                 if ($cartItem['product_id'] == $product->id) {
@@ -2109,6 +2034,7 @@ class AiAgentService
                     break;
                 }
             }
+            unset($cartItem);
 
             if (! $found) {
                 $cart[] = [
@@ -2155,6 +2081,116 @@ class AiAgentService
         $response .= "Ketik 'lihat keranjang' untuk melihat ringkasan pesanan atau 'konfirmasi' untuk checkout.";
 
         return $response;
+    }
+
+    /**
+     * Resolve a product name to a single Product, an ambiguity error, or a
+     * "not found" error with up to three alternatives. The previous code did a
+     * blind LIKE %name% and returned the first row — which silently picked the
+     * wrong product when the customer's wording matched multiple items.
+     *
+     * Resolution priority:
+     *   1. Exact match (case-insensitive)
+     *   2. Single LIKE %name% candidate → use it
+     *   3. Multiple LIKE candidates → check similarity to the query:
+     *        a. One candidate scores ≥ AMBIGUITY_LEAD pts above the rest → use it
+     *        b. Otherwise return "ambiguous" with top candidates
+     *   4. No LIKE candidates → return "not_found" with top alternatives by similarity
+     *
+     * Returns one of:
+     *   ['status' => 'matched',    'product' => Product]
+     *   ['status' => 'ambiguous',  'candidates' => Product[]]   // ≤ 3
+     *   ['status' => 'not_found',  'alternatives' => Product[]] // ≤ 3
+     */
+    protected function resolveProductByName(int $userId, string $rawName): array
+    {
+        $query = trim(strtolower($rawName));
+        if ($query === '') {
+            return ['status' => 'not_found', 'alternatives' => []];
+        }
+
+        $base = Product::where('user_id', $userId)
+            ->where('is_active', true);
+
+        $exact = (clone $base)
+            ->whereRaw('LOWER(name) = ?', [$query])
+            ->first(['id', 'name', 'price', 'stock_quantity']);
+
+        if ($exact) {
+            return ['status' => 'matched', 'product' => $exact];
+        }
+
+        $likeMatches = (clone $base)
+            ->whereRaw('LOWER(name) LIKE ?', ['%'.$query.'%'])
+            ->limit(8)
+            ->get(['id', 'name', 'price', 'stock_quantity']);
+
+        if ($likeMatches->count() === 1) {
+            return ['status' => 'matched', 'product' => $likeMatches->first()];
+        }
+
+        if ($likeMatches->count() > 1) {
+            $ranked = $this->rankBySimilarity($likeMatches->all(), $query);
+            // similar_text percent on PHP scales 0–100. A clear winner needs
+            // to lead the runner-up by at least AMBIGUITY_LEAD points; otherwise
+            // we ask the customer to disambiguate.
+            $lead = $ranked[0]['score'] - ($ranked[1]['score'] ?? 0);
+            if ($lead >= self::AMBIGUITY_LEAD) {
+                return ['status' => 'matched', 'product' => $ranked[0]['product']];
+            }
+
+            return [
+                'status' => 'ambiguous',
+                'candidates' => array_map(fn ($e) => $e['product'], array_slice($ranked, 0, 3)),
+            ];
+        }
+
+        // No LIKE candidates — surface the closest products by similarity from
+        // a small sample so the customer gets actionable alternatives.
+        $sample = (clone $base)
+            ->limit(50)
+            ->get(['id', 'name', 'price', 'stock_quantity']);
+
+        $ranked = $this->rankBySimilarity($sample->all(), $query);
+
+        return [
+            'status' => 'not_found',
+            'alternatives' => array_map(
+                fn ($e) => $e['product'],
+                array_slice(array_filter($ranked, fn ($e) => $e['score'] >= self::ALTERNATIVE_MIN_SCORE), 0, 3)
+            ),
+        ];
+    }
+
+    protected const AMBIGUITY_LEAD = 15.0;
+    protected const ALTERNATIVE_MIN_SCORE = 30.0;
+
+    /**
+     * Sort products by descending similar_text percent against $query.
+     * Each entry: ['product' => Product, 'score' => float].
+     */
+    protected function rankBySimilarity(array $products, string $query): array
+    {
+        $scored = [];
+        foreach ($products as $product) {
+            similar_text(strtolower($product->name), $query, $percent);
+            $scored[] = ['product' => $product, 'score' => $percent];
+        }
+        usort($scored, fn ($a, $b) => $b['score'] <=> $a['score']);
+
+        return $scored;
+    }
+
+    /**
+     * Render a comma-separated list of product names for an error message.
+     * Returns an empty string when the list is empty so the caller can decide
+     * whether to mention alternatives at all.
+     */
+    protected function formatProductSuggestions(array $products): string
+    {
+        $names = array_map(fn ($p) => "'{$p->name}'", $products);
+
+        return implode(', ', $names);
     }
 
     /**
@@ -2268,52 +2304,6 @@ class AiAgentService
         $conversation->updateCart([]);
 
         return "🗑️ Keranjang berhasil dikosongkan.\n\nSilakan mulai pesan lagi jika berubah pikiran! 😊";
-    }
-
-    protected function setDeliveryType(AiAgentConversation $conversation, array $arguments, ?AiAgent $aiAgent): string
-    {
-        $deliveryType = $arguments['delivery_type'] ?? null;
-        if (! in_array($deliveryType, ['pickup', 'delivery'])) {
-            return 'Maaf, pilihan tidak valid. Pilih Pickup atau Delivery.';
-        }
-
-        $conversation->setDeliveryType($deliveryType);
-
-        $ongkir = 0;
-        if ($deliveryType === 'delivery') {
-            $ongkir = $aiAgent ? (float) $aiAgent->default_ongkir : 0;
-            $address = $arguments['address'] ?? null;
-            if ($address) {
-                $conversation->setDeliveryAddress($address);
-            }
-        }
-        $conversation->setOngkir($ongkir);
-
-        if ($deliveryType === 'delivery') {
-            $address = $arguments['address'] ?? null;
-            $formattedOngkir = 'Rp '.number_format($ongkir, 0, ',', '.');
-
-            $response = "✅ Delivery dipilih.\n";
-            if ($address) {
-                $response .= "📍 Alamat: {$address}\n";
-            }
-            $response .= "🚚 Ongkir: {$formattedOngkir}\n";
-
-            if (! $address) {
-                $response .= "\nSilakan kirim alamat pengiriman Anda.";
-
-                return $response;
-            }
-
-            $response .= "\nAda catatan khusus untuk pesanan? (contoh: tidak pedas, tanpa bawang)\nKetik 'tidak ada' jika tidak ada catatan.";
-
-            return $response;
-        }
-
-        $response = "✅ Pickup dipilih. Ongkir: Rp 0.\n\n";
-        $response .= "Ada catatan khusus untuk pesanan? (contoh: tidak pedas, tanpa bawang)\nKetik 'tidak ada' jika tidak ada catatan.";
-
-        return $response;
     }
 
     protected function setOrderNotes(AiAgentConversation $conversation, array $arguments): string
@@ -2742,170 +2732,6 @@ class AiAgentService
         $message = strtolower(trim($message));
 
         return in_array($message, ['tidak', 'no', 'batal', 'cancel', 'gak', 'nggak']);
-    }
-
-    /**
-     * Confirm and create order.
-     */
-    protected function confirmAndCreateOrder(
-        AiAgentConversation $conversation,
-        WhatsAppAccount $account,
-        WhatsAppContact $contact,
-        AiAgent $aiAgent
-    ): void {
-        try {
-            $pendingOrder = $conversation->getPendingOrder();
-
-            if (! $aiAgent->default_store_id) {
-                $this->sendReply(
-                    $account,
-                    $contact->wa_id,
-                    'Maaf, toko default belum dikonfigurasi. Silakan hubungi administrator.'
-                );
-
-                return;
-            }
-
-            $deliveryType = $conversation->getDeliveryType() ?? 'pickup';
-            $deliveryAddress = $conversation->getDeliveryAddress();
-            $deliveryNotes = $conversation->getDeliveryNotes();
-            $ongkir = $conversation->getOngkir();
-
-            // Create order with source and customer info
-            $order = $this->orderService->create([
-                'store_id' => $aiAgent->default_store_id,
-                'table_id' => null,
-                'pos_user_id' => null,
-                'source' => Order::SOURCE_WHATSAPP_AI,
-                'customer_name' => $contact->name ?? 'WhatsApp Customer',
-                'customer_phone' => $contact->wa_id,
-                'delivery_type' => $deliveryType,
-                'alamat' => $deliveryType === 'delivery' ? $deliveryAddress : null,
-                'ongkir' => $ongkir,
-                'catatan' => $deliveryNotes,
-            ]);
-
-            // Add items
-            foreach ($pendingOrder['items'] as $item) {
-                $product = Product::find($item['product_id']);
-                if ($product) {
-                    $this->orderService->addItem($order, $product, $item['quantity']);
-                }
-            }
-
-            // Refresh order to get updated total
-            $order->refresh();
-
-            // Store order in conversation context
-            $conversation->setCurrentOrder($order->id);
-
-            // Clear cart and pending order
-            $conversation->clearCart();
-            $conversation->clearPendingOrder();
-            $conversation->clearDeliveryContext();
-
-            // Check if QRIS is enabled - auto generate QRIS
-            Log::info('QRIS check during order confirmation', [
-                'ai_agent_id' => $aiAgent->id,
-                'qris_enabled' => $aiAgent->qris_enabled,
-                'has_active_submerchant' => $aiAgent->hasActiveSubMerchant(),
-                'is_qris_enabled' => $aiAgent->isQrisEnabled(),
-                'order_id' => $order->id,
-                'order_total' => $order->total,
-            ]);
-
-            if ($aiAgent->isQrisEnabled()) {
-                $subMerchant = $aiAgent->getSubMerchant();
-
-                Log::info('QRIS enabled, attempting generation', [
-                    'submerchant_found' => $subMerchant !== null,
-                    'submerchant_id' => $subMerchant?->id,
-                ]);
-
-                if ($subMerchant) {
-                    try {
-                        // Generate QRIS for the order
-                        $qrisTransaction = $this->qrisService->generateQris($subMerchant, (float) $order->total, [
-                            'description' => "Pesanan #{$order->order_number}",
-                        ]);
-
-                        // Link QRIS to order
-                        $qrisTransaction->linked_order_id = $order->id;
-                        $qrisTransaction->save();
-
-                        // Create Payment record
-                        Payment::create([
-                            'order_id' => $order->id,
-                            'qris_transaction_id' => $qrisTransaction->id,
-                            'method' => Payment::METHOD_QRIS,
-                            'amount' => $order->total,
-                            'status' => Payment::STATUS_PENDING,
-                        ]);
-
-                        // Store QRIS transaction in conversation
-                        $conversation->setCurrentQrisTransaction($qrisTransaction->id);
-
-                        // Send order confirmation with QRIS
-                        $expiryTime = $qrisTransaction->expires_at->format('H:i');
-                        $formattedTotal = 'Rp '.number_format($order->total, 0, ',', '.');
-
-                        $shareableLink = $qrisTransaction->getShareableLink();
-
-                        $response = "✅ Pesanan berhasil dibuat!\n\n";
-                        $response .= "Nomor Pesanan: {$order->order_number}\n";
-                        $response .= "Total: {$formattedTotal}\n\n";
-                        $response .= "💳 Silakan bayar melalui link berikut:\n";
-                        $response .= "{$shareableLink}\n\n";
-                        $response .= "⏰ Berlaku hingga: {$expiryTime}\n\n";
-                        $response .= "Cara pembayaran:\n";
-                        $response .= "1. Klik link di atas\n";
-                        $response .= "2. Scan QR Code yang muncul\n";
-                        $response .= "3. Buka aplikasi e-wallet/mobile banking\n";
-                        $response .= "4. Konfirmasi pembayaran\n\n";
-                        $response .= "Ketik 'cek status' setelah membayar. 🙏";
-
-                        $this->sendReply($account, $contact->wa_id, $response);
-
-                        return;
-
-                    } catch (\Exception $e) {
-                        Log::error('QRIS generation failed during order confirmation', [
-                            'error' => $e->getMessage(),
-                            'order_id' => $order->id,
-                        ]);
-                        // Fall through to send order without QRIS
-                    }
-                }
-            }
-
-            // Send confirmation without QRIS (fallback or QRIS not enabled)
-            Log::warning('Order confirmed without QRIS', [
-                'ai_agent_id' => $aiAgent->id,
-                'is_qris_enabled' => $aiAgent->isQrisEnabled(),
-                'order_id' => $order->id,
-            ]);
-
-            $response = "✅ Pesanan Berhasil Dibuat!\n\n";
-            $response .= "📋 No. Pesanan: {$order->order_number}\n";
-            $response .= '💰 Total: Rp '.number_format($order->total, 0, ',', '.')."\n\n";
-            $response .= "Pesanan Anda sedang diproses.\n";
-            $response .= "Silakan tunjukkan pesan ini ke kasir untuk melakukan pembayaran.\n\n";
-            $response .= 'Terima kasih! 🙏';
-
-            $this->sendReply($account, $contact->wa_id, $response);
-
-        } catch (\Exception $e) {
-            Log::error('Order creation failed', [
-                'error' => $e->getMessage(),
-                'conversation_id' => $conversation->id,
-            ]);
-
-            $this->sendReply(
-                $account,
-                $contact->wa_id,
-                'Maaf, terjadi kesalahan saat membuat pesanan. Silakan coba lagi nanti.'
-            );
-        }
     }
 
     /**
