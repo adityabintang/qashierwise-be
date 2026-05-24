@@ -179,6 +179,25 @@ class WhatsAppWebhookController extends Controller
         $timestamp = $message['timestamp'];
         $type = $message['type'];
 
+        // Global idempotency guard. Meta retries delivery on any non-2xx
+        // response (and sometimes on slow 2xx). Without this, the AI agent
+        // can reply twice to the same customer message, and media downloads
+        // get re-attempted needlessly. The catalog-order branch had its own
+        // dedup; this one covers every type.
+        if ($messageId && WhatsAppMessage::withoutGlobalScopes()->where('message_id', $messageId)->exists()) {
+            Log::info('Duplicate webhook ignored', [
+                'message_id' => $messageId,
+                'type' => $type,
+                'user_id' => $userId,
+            ]);
+
+            return [
+                'message_id' => $messageId,
+                'from' => $from,
+                'duplicate' => true,
+            ];
+        }
+
         Log::info("Incoming $type message from $from", [
             'message_id' => $messageId,
             'user_id' => $userId,
@@ -373,6 +392,18 @@ class WhatsAppWebhookController extends Controller
             'unread_count' => $contact->unread_count + 1,
         ]);
 
+        // Customer is active again — wipe the follow-up counter on any open
+        // conversation so the scheduler restarts from zero when (and if) the
+        // next state transition fires. Pending SendFollowupJob jobs become
+        // stale on the next tick because followup_state_started_at is now null.
+        $openConversation = \App\Models\AiAgentConversation::where('whatsapp_contact_id', $contact->id)
+            ->whereNotNull('order_context')
+            ->latest('id')
+            ->first();
+        if ($openConversation) {
+            $openConversation->markActivity();
+        }
+
         // Broadcast event to frontend
         broadcast(new NewWhatsAppMessage($whatsappMessage, $contact));
 
@@ -472,19 +503,8 @@ class WhatsAppWebhookController extends Controller
                     return false;
                 }
 
-                // Idempotency: Meta retries delivery of webhooks that returned a
-                // non-2xx response (eg. when our earlier check-constraint bug
-                // caused 500s). Without dedup, retried order events restart the
-                // flow midway through delivery info confirmation.
-                $messageId = $message['id'] ?? null;
-                if ($messageId && \App\Models\WhatsAppMessage::where('message_id', $messageId)->exists()) {
-                    Log::info('Duplicate catalog order webhook ignored', [
-                        'message_id'   => $messageId,
-                        'ai_agent_id'  => $aiAgent->id,
-                        'contact_id'   => $contact->id,
-                    ]);
-                    return true;
-                }
+                // Dedup is handled globally at the top of handleIncomingMessage()
+                // — duplicates never reach this branch.
 
                 $conversation = app(AiAgentService::class)->getOrCreateConversation($aiAgent->id, $contact->id);
                 $service->handleCatalogOrderReceived(
