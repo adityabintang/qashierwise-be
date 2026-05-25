@@ -354,21 +354,27 @@ State setelah parse: `STATE_CONFIRMING_DELIVERY_INFO`.
 | VIEW_CART | `keranjang\|cart\|pesanan saya\|lihat pesanan` | iya |
 | CHECKOUT | `checkout\|bayar\|konfirmasi\|lanjut\|proses` | iya |
 | ORDER | `pesan\|beli\|order\|mau\|ambil` | iya |
-| BUSINESS_INFO | `jam\|buka\|tutup\|alamat\|lokasi\|dimana\|kontak\|telepon` | **iya** (krn "alamat" delivery juga match) |
+| BUSINESS_INFO | `jam\|buka\|tutup\|alamat\|lokasi\|dimana\|kontak\|telepon` | **tidak** (sejak F2: classifier reclassify "alamat" → ORDER saat dalam delivery flow / has_cart) |
 | OFF_TOPIC | keyword: `siapa presiden`, `chatgpt`, `claude`, `coding`, dll | tidak |
 | UNKNOWN | fallback | iya |
 
 ---
 
-## Lampiran D — Halangan Halusinasi yang Diketahui
+## Lampiran D — Halangan Halusinasi yang Diketahui (Resolved)
 
-Catatan kandidat-titik di mana legacy code masih menyebabkan halusinasi.
-Akan dikonfirmasi via audit `chat.js`:
+Daftar kandidat halusinasi awal beserta status resolusi setelah refactor Phase 1-6:
 
-1. **Intent BUSINESS_INFO** dengan tools aktif — LLM bisa salah call `set_delivery_type` saat customer cuma tanya alamat kafe.
-2. **POS mode setelah cart kosong** — kalau `cart` di-clear di tengah jalan, intent `CHECKOUT` masih bisa trigger `startPosOrderFlow` dengan cart kosong. Belum jelas siapa yang guard ini.
-3. **Catalog mode + LLM short-circuit untuk UNKNOWN/OFF_TOPIC** — bagus untuk catalog, tapi belum diperiksa apakah pesan order valid di POS mode tidak terjebak di branch ini.
-4. **Pending order legacy (`conversation.pendingOrder`)** — masih ada di baris 222-243 `processMessage`, kemungkinan jalur lama sebelum state machine. Perlu dicek apakah masih digunakan atau dead code.
-5. **`isOrderMenuIntent()` vs `UserIntent::detect()` keyword overlap** — dua mekanisme deteksi intent yang berjalan paralel, rawan inkonsistensi.
+| # | Halangan | Status | Resolusi |
+|---|---|---|---|
+| 1 | `BUSINESS_INFO` dengan tools aktif → LLM salah call `set_delivery_type` | ✅ Resolved | **F2**: classifier `UserIntent::detect` context-aware — "alamat" → ORDER saat `flow_state = awaiting_delivery_info` atau `has_cart=true`, kecuali ada question word (dimana/berapa/kapan). BUSINESS_INFO dimasukkan ke `intentNeedsTools()` skip-list. **F7**: tool `set_delivery_type` dihapus dari LLM tool definitions. |
+| 2 | POS mode checkout dengan cart kosong → `startPosOrderFlow` tetap fire | ✅ Resolved | `IntentRouter::tryPosCheckoutHandoff` guard: `if (empty($conversation->getCart())) return false`. |
+| 3 | Catalog mode short-circuit `UNKNOWN`/`OFF_TOPIC` ngambil order valid di POS mode | ✅ Resolved | **F5**: branch sudah benar gated `isCatalogActive()`. Audit konfirmasi tidak ada regresi di POS mode. |
+| 4 | Legacy `pending_order` paralel dengan state machine | ✅ Resolved | **F3**: dead branch `processMessage` (222-249) dihapus; method `confirmAndCreateOrder` dihapus; method model `getPendingOrder`/`setPendingOrder` dihapus. `clearPendingOrder` dipertahankan sebagai defensive cleanup data lama di DB. |
+| 5 | `isOrderMenuIntent()` vs `UserIntent::detect()` keyword overlap | ✅ Resolved | **F1**: method service dihapus; logic dipindah ke `UserIntent::detect()` + `UserIntent::isOrderOrMenuRelated()`. Single source of truth. |
+| 6 | `add_to_cart` blind fuzzy match → salah produk | ✅ Resolved | **F4**: `ProductResolver` baru — exact match, single LIKE, atau similarity ranking dengan threshold `AMBIGUITY_LEAD=15`. Return `matched` / `ambiguous` (top 3 candidates) / `not_found` (top 3 alternatives). |
+| 7 | Product injection di prompt → halusinasi produk yang tidak ada | ✅ Resolved | **C3**: `AiAgentPromptBuilder::shouldIncludeProductSamples()` return `false` permanen. LLM mempelajari produk hanya via tool `get_all_products`. |
+| 8 | Webhook retry → double reply | ✅ Resolved | **F6**: global idempotency check di awal `handleIncomingMessage` (dedup by `message_id`). |
 
-Update lampiran ini setiap kali audit chat.js menemukan kasus halusinasi baru.
+Lampiran ini sekarang sejarah; jangan menambah baru sebelum dikonfirmasi sebagai
+halusinasi nyata via audit chat.js. Setiap halusinasi baru ditrace ke kode +
+tambahkan baris dengan status open sampai resolusi PR mergedny ada.
