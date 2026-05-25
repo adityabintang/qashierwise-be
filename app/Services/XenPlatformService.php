@@ -31,62 +31,74 @@ class XenPlatformService
         $this->baseUrl = config('xendit.base_url', 'https://api.xendit.co');
     }
 
+    /** Maximum email-alias retries when the base email is already registered. */
+    private const MAX_EMAIL_ALIAS_ATTEMPTS = 10;
+
     /**
      * Create an OWNED sub-account on XenPlatform.
      *
+     * When the user's email already exists on Xendit (BUSINESS_DUPLICATE_EMAIL_ERROR,
+     * 409) we transparently retry with `name+01@domain` → `name+10@domain` aliases
+     * before giving up. Most providers route `+suffix` aliases to the same inbox,
+     * so the merchant still receives Xendit notifications.
+     *
      * @return array{id: string, status: string} The created account data
      *
-     * @throws RuntimeException If API call fails
+     * @throws RuntimeException If API call fails or all alias attempts exhausted
      */
     public function createSubAccount(SubMerchant $merchant): array
     {
         $this->ensureApiKey();
 
         $businessName = $merchant->business_name ?? $merchant->user->name ?? 'Merchant';
-        $email = $merchant->user->email ?? null;
+        $originalEmail = $merchant->user->email ?? null;
 
-        Log::info('XenPlatform: Creating sub-account', [
-            'sub_merchant_id' => $merchant->id,
-            'business_name' => $businessName,
-            'email' => $email,
-        ]);
+        // 1 attempt with the raw email, plus N alias retries on duplicate.
+        $maxAttempts = $originalEmail ? self::MAX_EMAIL_ALIAS_ATTEMPTS + 1 : 1;
 
-        try {
-            $payload = [
-                'type' => 'MANAGED',
-                'country' => 'ID',
-                'public_profile' => [
-                    'business_name' => $businessName,
-                ],
-            ];
+        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+            $email = $attempt === 0
+                ? $originalEmail
+                : $this->aliasEmail($originalEmail, $attempt);
 
-            if ($email) {
-                $payload['email'] = $email;
+            Log::info('XenPlatform: Creating sub-account', [
+                'sub_merchant_id' => $merchant->id,
+                'business_name' => $businessName,
+                'email' => $email,
+                'attempt' => $attempt,
+            ]);
+
+            try {
+                $response = $this->postCreateAccount($businessName, $email);
+            } catch (\Exception $e) {
+                Log::error('XenPlatform: Unexpected error creating sub-account', [
+                    'sub_merchant_id' => $merchant->id,
+                    'attempt' => $attempt,
+                    'error' => $e->getMessage(),
+                ]);
+                throw new RuntimeException("Failed to create XenPlatform sub-account: {$e->getMessage()}");
             }
 
-            $response = Http::withBasicAuth($this->apiKey, '')
-                ->withHeaders(['Content-Type' => 'application/json'])
-                ->timeout(30)
-                ->post("{$this->baseUrl}/v2/accounts", $payload);
+            if ($response->successful()) {
+                $data = $response->json();
+                Log::info('XenPlatform: Sub-account created', [
+                    'sub_merchant_id' => $merchant->id,
+                    'xendit_account_id' => $data['id'] ?? null,
+                    'email_used' => $email,
+                    'attempts_taken' => $attempt + 1,
+                ]);
 
-            // If the email is already registered (orphaned account from a failed prior registration),
-            // retry without email. MANAGED sub-accounts don't require email — the platform controls them.
-            // if (! $response->successful()
-            //     && $response->status() === 409
-            //     && $response->json('error_code') === 'BUSINESS_DUPLICATE_EMAIL_ERROR'
-            //     && isset($payload['email'])
-            // ) {
-            //     Log::warning('XenPlatform: Email already registered, retrying account creation without email', [
-            //         'sub_merchant_id' => $merchant->id,
-            //     ]);
-            //     unset($payload['email']);
-            //     $response = Http::withBasicAuth($this->apiKey, '')
-            //         ->withHeaders(['Content-Type' => 'application/json'])
-            //         ->timeout(30)
-            //         ->post("{$this->baseUrl}/v2/accounts", $payload);
-            // }
+                return [
+                    'id' => $data['id'],
+                    'status' => $data['status'] ?? 'ACTIVE',
+                ];
+            }
 
-            if (! $response->successful()) {
+            $isDuplicateEmail = $response->status() === 409
+                && $response->json('error_code') === 'BUSINESS_DUPLICATE_EMAIL_ERROR';
+
+            // Non-retryable error OR we have no email to alias — surface immediately.
+            if (! $isDuplicateEmail || ! $originalEmail) {
                 $errorMessage = $response->json('message') ?? $response->json('error_code') ?? 'Failed to create sub-account';
 
                 Log::error('XenPlatform: Failed to create sub-account', [
@@ -99,27 +111,65 @@ class XenPlatformService
                 throw new RuntimeException("XenPlatform API error: {$errorMessage}");
             }
 
-            $data = $response->json();
-
-            Log::info('XenPlatform: Sub-account created', [
+            Log::warning('XenPlatform: Email already registered, trying next alias', [
                 'sub_merchant_id' => $merchant->id,
-                'xendit_account_id' => $data['id'] ?? null,
+                'attempted_email' => $email,
+                'next_attempt' => $attempt + 1,
             ]);
-
-            return [
-                'id' => $data['id'],
-                'status' => $data['status'] ?? 'ACTIVE',
-            ];
-        } catch (RuntimeException $e) {
-            throw $e;
-        } catch (\Exception $e) {
-            Log::error('XenPlatform: Unexpected error creating sub-account', [
-                'sub_merchant_id' => $merchant->id,
-                'error' => $e->getMessage(),
-            ]);
-
-            throw new RuntimeException("Failed to create XenPlatform sub-account: {$e->getMessage()}");
         }
+
+        // All alias attempts exhausted.
+        Log::error('XenPlatform: All email aliases exhausted', [
+            'sub_merchant_id' => $merchant->id,
+            'original_email' => $originalEmail,
+            'aliases_tried' => self::MAX_EMAIL_ALIAS_ATTEMPTS,
+        ]);
+
+        throw new RuntimeException(
+            "Email {$originalEmail} dan 10 variasi alias (+01 sampai +10) semuanya sudah terdaftar di Xendit. ".
+            'Silakan gunakan akun dengan email berbeda atau hubungi support.'
+        );
+    }
+
+    /**
+     * Build a `localpart+NN@domain` alias from the merchant's email.
+     * Pads the index to 2 digits so the aliases sort naturally (+01..+10).
+     */
+    private function aliasEmail(string $email, int $index): string
+    {
+        $padded = str_pad((string) $index, 2, '0', STR_PAD_LEFT);
+        $atPos = strrpos($email, '@');
+        if ($atPos === false) {
+            // No @ — give up gracefully; caller will see a duplicate error.
+            return $email;
+        }
+
+        $local = substr($email, 0, $atPos);
+        $domain = substr($email, $atPos + 1);
+
+        return "{$local}+{$padded}@{$domain}";
+    }
+
+    /**
+     * Single HTTP call to the create-account endpoint. Extracted so the retry
+     * loop in createSubAccount() stays focused on retry logic, not payload build.
+     */
+    private function postCreateAccount(string $businessName, ?string $email): \Illuminate\Http\Client\Response
+    {
+        $payload = [
+            'type' => 'MANAGED',
+            'country' => 'ID',
+            'public_profile' => ['business_name' => $businessName],
+        ];
+
+        if ($email) {
+            $payload['email'] = $email;
+        }
+
+        return Http::withBasicAuth($this->apiKey, '')
+            ->withHeaders(['Content-Type' => 'application/json'])
+            ->timeout(30)
+            ->post("{$this->baseUrl}/v2/accounts", $payload);
     }
 
     /**
