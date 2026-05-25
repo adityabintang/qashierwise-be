@@ -190,5 +190,37 @@ Sebelum menambah field baru di `ai_agents`, periksa dulu:
 | "Apakah reservasi aktif?" | `$aiAgent->isReservationEnabled()` |
 | "Apakah catalog mode atau POS mode?" | `$aiAgent->isCatalogActive()` |
 | "Apakah order aktif?" | `$aiAgent->isOrderEnabled()` |
+| "Status feature secara umum + reason?" | `$aiAgent->getFeatureStatus()` (returns `['order'=>['enabled'=>bool, 'reason'=>string], ...]`) |
+| "Catalog locked oleh platform admin?" | `$aiAgent->isCatalogPlatformLocked()` (= !`config('catalog.meta_enabled')`) |
+| "Kenapa catalog tidak aktif?" | `$aiAgent->getCatalogUnavailableReason()` (`platform_locked`/`toggle_off`/`no_catalog_id`/`null`) |
 
 **Dilarang** mengulangi logic ini di service (mis. `if ($aiAgent->qris_enabled && $hasSubMerchant)`). Selalu panggil method model — kalau ada dependensi baru di masa depan, perubahan ke method otomatis berlaku di semua call site.
+
+`hasActiveSubMerchant()` dan `hasReservationConfig()` di-cache 5 menit dengan
+`SubMerchantObserver` + `ReservationConfigObserver` untuk invalidate saat row
+saved/deleted — bukan stale-able, refresh otomatis saat merchant ubah artefak.
+
+---
+
+## 6. Struktur Service AI Agent
+
+Setelah refactor Phase 1-6, service AI agent dipecah jadi sub-folder berdasarkan
+domain (sesuai aturan 1 & 2 di `development/aturan.md`):
+
+```
+app/Services/AiAgent/                       ← root namespace, lihat ai-agent.md
+├── Reply/         ReplySender              (kirim WhatsApp text)
+├── LLM/           LlmClient                (BytePlus ARK + retry)
+├── Intent/        IntentRouter             (5 short-circuit pre-LLM)
+├── Tools/         ProductResolver, CatalogTools, CartTools, ToolDispatcher
+├── Checkout/      CheckoutTools            (confirm_order, set_notes)
+├── Payment/       PaymentTools             (generate_qris, check_status)
+├── Catalog/       DeliveryInfoParser, OrderCreator, CatalogMessageRenderer
+├── Followup/      FollowupScheduler        (state-aware ping)
+└── Drip/          DripScheduler, DripContentRenderer  (longer-term sequence)
+```
+
+`AiAgentService.php` (sekarang 596 LOC dari 2920 awal) hanya orchestrator —
+tidak ada lagi tool dispatch, LLM HTTP, atau render logic di dalamnya.
+`CatalogOrderFlowService.php` (964 LOC dari 1880 awal) hanya state machine
+orchestrator + `sendCatalog` Meta API.
