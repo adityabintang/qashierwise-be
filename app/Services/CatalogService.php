@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\WhatsAppAccount;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -236,93 +237,95 @@ class CatalogService
             ];
         }
 
-        $fields = 'id,name,product_count,vertical';
-        $edges = ['owned_product_catalogs', 'client_product_catalogs', 'shared_product_catalogs'];
+        $cacheKey = "catalog.list.{$account->id}.{$businessId}";
 
-        $seen = [];
-        $catalogs = [];
-        $filteredOut = 0;
-        $lastError = null;
-        $anyEdgeOk = false;
+        return Cache::remember($cacheKey, 300, function () use ($account, $businessId) {
+            $fields = 'id,name,product_count,vertical';
+            $edges  = ['owned_product_catalogs', 'client_product_catalogs', 'shared_product_catalogs'];
 
-        foreach ($edges as $edge) {
-            $response = Http::withToken($account->access_token)
-                ->get("{$this->baseUrl()}/{$businessId}/{$edge}", [
-                    'fields' => $fields,
-                    'limit' => 100,
-                ]);
+            $seen        = [];
+            $catalogs    = [];
+            $filteredOut = 0;
+            $lastError   = null;
+            $anyEdgeOk   = false;
 
-            if ($response->successful()) {
-                $anyEdgeOk = true;
-                foreach ($response->json('data', []) as $catalog) {
-                    if (isset($seen[$catalog['id']])) {
-                        continue;
-                    }
+            foreach ($edges as $edge) {
+                $response = Http::withToken($account->access_token)
+                    ->get("{$this->baseUrl()}/{$businessId}/{$edge}", [
+                        'fields' => $fields,
+                        'limit'  => 100,
+                    ]);
 
-                    // Only include catalogs with vertical=commerce — WhatsApp Cart /
-                    // Multi-Product Messages and our POST /{catalog_id}/products
-                    // schema only work on commerce-vertical catalogs.
-                    $vertical = strtolower((string) ($catalog['vertical'] ?? ''));
-                    if ($vertical !== 'commerce') {
+                if ($response->successful()) {
+                    $anyEdgeOk = true;
+                    foreach ($response->json('data', []) as $catalog) {
+                        if (isset($seen[$catalog['id']])) {
+                            continue;
+                        }
+
+                        $vertical = strtolower((string) ($catalog['vertical'] ?? ''));
+                        if ($vertical !== 'commerce') {
+                            $seen[$catalog['id']] = true;
+                            $filteredOut++;
+                            continue;
+                        }
+
                         $seen[$catalog['id']] = true;
-                        $filteredOut++;
-                        continue;
+                        $catalogs[] = $catalog;
                     }
-
-                    $seen[$catalog['id']] = true;
-                    $catalogs[] = $catalog;
+                } else {
+                    $error     = $response->json('error', []);
+                    $lastError = $error['message'] ?? null;
+                    Log::debug("CatalogService: {$edge} not accessible", [
+                        'business_id' => $businessId,
+                        'error'       => $lastError,
+                    ]);
                 }
-            } else {
-                $error = $response->json('error', []);
-                $lastError = $error['message'] ?? null;
-                Log::debug("CatalogService: {$edge} not accessible", [
-                    'business_id' => $businessId,
-                    'error' => $lastError,
-                ]);
             }
-        }
 
-        if ($anyEdgeOk) {
-            Log::info('CatalogService: fetched catalogs', [
-                'business_id'  => $businessId,
-                'count'        => count($catalogs),
-                'filtered_out' => $filteredOut,
+            if ($anyEdgeOk) {
+                Log::info('CatalogService: fetched catalogs', [
+                    'business_id'  => $businessId,
+                    'count'        => count($catalogs),
+                    'filtered_out' => $filteredOut,
+                ]);
+
+                return [
+                    'success'      => true,
+                    'catalogs'     => $catalogs,
+                    'business_id'  => $businessId,
+                    'filtered_out' => $filteredOut,
+                ];
+            }
+
+            if ($lastError && (str_contains($lastError, 'permission') || str_contains($lastError, 'catalog'))) {
+                return [
+                    'success'    => false,
+                    'error_code' => 'PERMISSION_PENDING_REVIEW',
+                    'error'      => 'Fitur katalog Meta masih dalam proses peninjauan oleh Meta. Saat ini akses katalog hanya tersedia untuk akun penguji yang terdaftar di aplikasi developer kami.',
+                ];
+            }
+
+            Log::error('CatalogService: failed to fetch catalogs from all edges', [
+                'business_id' => $businessId,
+                'last_error'  => $lastError,
             ]);
 
             return [
-                'success'      => true,
-                'catalogs'     => $catalogs,
-                'business_id'  => $businessId,
-                'filtered_out' => $filteredOut,
+                'success'    => false,
+                'error_code' => 'API_ERROR',
+                'error'      => $lastError ?? 'Failed to fetch catalogs',
             ];
-        }
-
-        // All edges failed — surface the error
-        if ($lastError && (str_contains($lastError, 'permission') || str_contains($lastError, 'catalog'))) {
-            return [
-                'success' => false,
-                'error_code' => 'PERMISSION_PENDING_REVIEW',
-                'error' => 'Fitur katalog Meta masih dalam proses peninjauan oleh Meta. Saat ini akses katalog hanya tersedia untuk akun penguji yang terdaftar di aplikasi developer kami.',
-            ];
-        }
-
-        Log::error('CatalogService: failed to fetch catalogs from all edges', [
-            'business_id' => $businessId,
-            'last_error' => $lastError,
-        ]);
-
-        return [
-            'success' => false,
-            'error_code' => 'API_ERROR',
-            'error' => $lastError ?? 'Failed to fetch catalogs',
-        ];
+        });
     }
 
     /**
      * Product fields fetched when listing products. Keep aligned with the
      * frontend's product card and edit modal expectations.
      */
-    protected const PRODUCT_FIELDS = 'id,retailer_id,name,description,price,sale_price,currency,image_url,additional_image_urls,availability,inventory,category,google_product_category,brand,condition,url,visibility,review_status,review_rejection_reasons';
+    // inventory/review_status/review_rejection_reasons removed — stock is self-hosted,
+    // review badges were removed from the UI.
+    protected const PRODUCT_FIELDS = 'id,retailer_id,name,description,price,sale_price,currency,image_url,additional_image_urls,availability,category,google_product_category,brand,condition,url,visibility';
 
     /**
      * Get products from a specific catalog.
@@ -331,46 +334,60 @@ class CatalogService
      */
     public function getCatalogProducts(WhatsAppAccount $account, string $catalogId, int $limit = 30, ?string $after = null): array
     {
-        $params = [
-            'fields' => self::PRODUCT_FIELDS,
-            'limit'  => $limit,
-        ];
+        $cacheKey = $this->productsCacheKey($catalogId, $limit, $after);
 
-        if ($after) {
-            $params['after'] = $after;
-        }
+        return Cache::remember($cacheKey, 90, function () use ($account, $catalogId, $limit, $after) {
+            $params = [
+                'fields' => self::PRODUCT_FIELDS,
+                'limit'  => $limit,
+            ];
 
-        $response = Http::withToken($account->access_token)
-            ->get("{$this->baseUrl()}/{$catalogId}/products", $params);
+            if ($after) {
+                $params['after'] = $after;
+            }
 
-        if ($response->successful()) {
-            $data = $response->json();
+            $response = Http::withToken($account->access_token)
+                ->get("{$this->baseUrl()}/{$catalogId}/products", $params);
 
-            Log::info('CatalogService: fetched products', [
+            if ($response->successful()) {
+                $data = $response->json();
+
+                Log::info('CatalogService: fetched products from Meta', [
+                    'catalog_id' => $catalogId,
+                    'count'      => count($data['data'] ?? []),
+                ]);
+
+                return [
+                    'success'  => true,
+                    'products' => $data['data'] ?? [],
+                    'paging'   => $data['paging'] ?? null,
+                ];
+            }
+
+            $translated = $this->translateMetaError($response, 'fetch_products');
+
+            Log::error('CatalogService: failed to fetch products', [
                 'catalog_id' => $catalogId,
-                'count' => count($data['data'] ?? []),
+                'status'     => $response->status(),
+                'error'      => $translated['raw'],
             ]);
 
             return [
-                'success' => true,
-                'products' => $data['data'] ?? [],
-                'paging' => $data['paging'] ?? null,
+                'success'    => false,
+                'error_code' => 'API_ERROR',
+                'error'      => $translated['message'],
             ];
-        }
+        });
+    }
 
-        $translated = $this->translateMetaError($response, 'fetch_products');
+    public function clearProductsCache(string $catalogId, int $limit = 30, ?string $after = null): void
+    {
+        Cache::forget($this->productsCacheKey($catalogId, $limit, $after));
+    }
 
-        Log::error('CatalogService: failed to fetch products', [
-            'catalog_id' => $catalogId,
-            'status'     => $response->status(),
-            'error'      => $translated['raw'],
-        ]);
-
-        return [
-            'success'    => false,
-            'error_code' => 'API_ERROR',
-            'error'      => $translated['message'],
-        ];
+    protected function productsCacheKey(string $catalogId, int $limit, ?string $after): string
+    {
+        return 'catalog.products.' . $catalogId . '.' . $limit . '.' . ($after ?? 'first');
     }
 
     /**
