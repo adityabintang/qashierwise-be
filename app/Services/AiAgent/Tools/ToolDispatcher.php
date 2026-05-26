@@ -230,14 +230,15 @@ class ToolDispatcher
         AiAgentConversation $conversation,
         ?AiAgent $aiAgent = null,
     ): string {
-        $useToon = $aiAgent?->use_toon_format ?? false;
+        $useToon   = $aiAgent?->use_toon_format ?? false;
+        $catalogId = $aiAgent?->catalog_id ?? null;
 
         try {
             return match ($functionName) {
-                'get_all_products' => $this->dispatchGetAllProducts($conversation, $userId, $arguments, $useToon),
-                'search_products' => $this->dispatchSearchProducts($userId, $arguments, $useToon),
-                'search_multiple_products' => $this->dispatchSearchMultipleProducts($userId, $arguments, $useToon),
-                'get_product_details' => $this->dispatchGetProductDetails($userId, $arguments),
+                'get_all_products' => $this->dispatchGetAllProducts($conversation, $userId, $arguments, $useToon, $catalogId),
+                'search_products' => $this->dispatchSearchProducts($userId, $arguments, $useToon, $catalogId),
+                'search_multiple_products' => $this->dispatchSearchMultipleProducts($userId, $arguments, $useToon, $catalogId),
+                'get_product_details' => $this->dispatchGetProductDetails($userId, $arguments, $catalogId),
                 'add_to_cart' => $this->dispatchAddToCart($conversation, $userId, $arguments),
                 'get_cart_summary' => $this->cartTools->summary($conversation, $userId, $aiAgent),
                 'confirm_order' => $this->checkoutTools->confirmOrder($conversation, $userId, $aiAgent),
@@ -260,12 +261,12 @@ class ToolDispatcher
         }
     }
 
-    protected function dispatchGetAllProducts(AiAgentConversation $conversation, int $userId, array $arguments, bool $useToon): string
+    protected function dispatchGetAllProducts(AiAgentConversation $conversation, int $userId, array $arguments, bool $useToon, ?string $catalogId = null): string
     {
-        $page = isset($arguments['page']) ? (int) $arguments['page'] : 1;
+        $page   = isset($arguments['page']) ? (int) $arguments['page'] : 1;
         $search = $arguments['search'] ?? null;
 
-        $result = $this->catalogTools->getAllProducts($userId, $useToon, $page, $search);
+        $result = $this->catalogTools->getAllProducts($userId, $useToon, $page, $search, $catalogId);
 
         if (! str_starts_with($result, 'EMPTY')) {
             $conversation->setCurrentMenuPage($page);
@@ -274,31 +275,31 @@ class ToolDispatcher
         return $result;
     }
 
-    protected function dispatchSearchProducts(int $userId, array $arguments, bool $useToon): string
+    protected function dispatchSearchProducts(int $userId, array $arguments, bool $useToon, ?string $catalogId = null): string
     {
         if (! isset($arguments['query'])) {
             return 'Maaf, parameter pencarian tidak lengkap. Mohon berikan kata kunci pencarian.';
         }
 
-        return $this->catalogTools->searchProducts($userId, $arguments['query'], $useToon);
+        return $this->catalogTools->searchProducts($userId, $arguments['query'], $useToon, $catalogId);
     }
 
-    protected function dispatchSearchMultipleProducts(int $userId, array $arguments, bool $useToon): string
+    protected function dispatchSearchMultipleProducts(int $userId, array $arguments, bool $useToon, ?string $catalogId = null): string
     {
         if (! isset($arguments['queries']) || ! is_array($arguments['queries'])) {
             return 'Maaf, parameter pencarian tidak lengkap. Mohon berikan array kata kunci pencarian.';
         }
 
-        return $this->catalogTools->searchMultipleProducts($userId, $arguments['queries'], $useToon);
+        return $this->catalogTools->searchMultipleProducts($userId, $arguments['queries'], $useToon, $catalogId);
     }
 
-    protected function dispatchGetProductDetails(int $userId, array $arguments): string
+    protected function dispatchGetProductDetails(int $userId, array $arguments, ?string $catalogId = null): string
     {
         if (! isset($arguments['product_id']) || ! is_numeric($arguments['product_id'])) {
             return 'Maaf, parameter tidak lengkap atau ID produk bukan angka.';
         }
 
-        return $this->catalogTools->getProductDetails($userId, (int) $arguments['product_id']);
+        return $this->catalogTools->getProductDetails($userId, (int) $arguments['product_id'], $catalogId);
     }
 
     /**
