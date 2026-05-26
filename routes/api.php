@@ -207,6 +207,7 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::post('/catalog/{catalogId}/upload-image', [CatalogController::class, 'uploadImage']);
         Route::put('/catalog/products/{productId}', [CatalogController::class, 'updateProduct']);
         Route::delete('/catalog/products/{productId}', [CatalogController::class, 'deleteProduct']);
+        Route::put('/catalog/{catalogId}/products/{retailerId}/stock', [CatalogController::class, 'updateStock']);
     });
 
     // AI Agent routes
