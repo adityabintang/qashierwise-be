@@ -511,6 +511,7 @@
                                                         <span x-text="product.availability === 'in stock' ? 'Tersedia' :
                                                                       product.availability === 'out of stock' ? 'Habis' :
                                                                       product.availability === 'preorder' ? 'Pre-order' :
+                                                                      product.availability === 'discontinued' ? 'Tdk Dijual' :
                                                                       (product.availability ?? '–')"></span>
                                                     </span>
                                                 </div>
@@ -731,12 +732,18 @@
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Ketersediaan</label>
-                            <select x-model="editForm.availability" class="input w-full">
+                            <select x-model="editForm.availability" class="input w-full"
+                                @change="onAvailabilityChange()">
                                 <option value="in stock">Tersedia</option>
                                 <option value="out of stock">Habis</option>
                                 <option value="preorder">Pre-order</option>
                                 <option value="discontinued">Tidak Dijual Lagi</option>
                             </select>
+                            <p x-show="editForm.availability === 'out of stock' || editForm.availability === 'discontinued'"
+                               class="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                <i class="fas fa-circle-info mr-1"></i>
+                                <span x-text="editForm.availability === 'out of stock' ? 'Produk tidak akan tampil di WhatsApp.' : 'Produk dihentikan penjualannya secara permanen.'"></span>
+                            </p>
                         </div>
                     </div>
                     <div class="grid grid-cols-3 gap-3">
@@ -755,8 +762,9 @@
                         </div>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Stok</label>
-                        <input type="number" x-model="editForm.inventory" class="input w-full" placeholder="Kosongkan jika tak terbatas" min="0">
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Stok <span class="text-xs font-normal opacity-60">(disimpan lokal)</span></label>
+                        <input type="number" x-model="editForm.inventory" class="input w-full" placeholder="Kosongkan jika tak terbatas" min="0"
+                               @input="onStockInput()">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Gambar Produk</label>
@@ -1319,6 +1327,30 @@ function metaCatalogApp() {
             };
             this.editError = null;
             this.showEditModal = true;
+        },
+
+        // Saat availability diubah manual:
+        // "out of stock" → stok otomatis 0
+        // Availability lain → tidak ubah stok
+        onAvailabilityChange() {
+            if (this.editForm.availability === 'out of stock') {
+                this.editForm.inventory = '0';
+            }
+        },
+
+        // Saat stok diubah:
+        // 0 + availability "in stock" → otomatis "out of stock"
+        // > 0 + availability "out of stock" → otomatis "in stock"
+        // preorder / discontinued → tidak diubah
+        onStockInput() {
+            const qty = Number(this.editForm.inventory);
+            if (!isNaN(qty)) {
+                if (qty === 0 && this.editForm.availability === 'in stock') {
+                    this.editForm.availability = 'out of stock';
+                } else if (qty > 0 && this.editForm.availability === 'out of stock') {
+                    this.editForm.availability = 'in stock';
+                }
+            }
         },
 
         async updateProduct() {

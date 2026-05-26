@@ -17,8 +17,17 @@ class CatalogProduct extends Model
         'currency',
         'stock_quantity',
         'is_available',
+        'availability',
         'category',
     ];
+
+    // Availability values that make is_available = true
+    public const AVAILABLE_STATUSES = ['in stock', 'preorder', 'available for order', 'pending'];
+
+    public static function isAvailableFromStatus(string $availability): bool
+    {
+        return in_array($availability, self::AVAILABLE_STATUSES, true);
+    }
 
     protected function casts(): array
     {

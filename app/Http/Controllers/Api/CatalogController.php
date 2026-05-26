@@ -286,7 +286,8 @@ class CatalogController extends Controller
                 $this->catalogService->linkCatalogToWaba($account, $catalogId);
             } catch (\Throwable) {}
 
-            $userId = auth()->user()->getEffectiveUserId();
+            $userId       = auth()->user()->getEffectiveUserId();
+            $availability = $data['availability'] ?? 'in stock';
             CatalogProduct::updateOrCreate(
                 ['user_id' => $userId, 'catalog_id' => $catalogId, 'retailer_id' => $data['retailer_id']],
                 [
@@ -295,7 +296,8 @@ class CatalogController extends Controller
                     'price'           => isset($data['price']) ? $data['price'] / 100 : 0,
                     'currency'        => $data['currency'] ?? 'IDR',
                     'category'        => $data['category'] ?? null,
-                    'is_available'    => true,
+                    'availability'    => $availability,
+                    'is_available'    => CatalogProduct::isAvailableFromStatus($availability),
                 ]
             );
 
@@ -359,6 +361,10 @@ class CatalogController extends Controller
                 if (isset($data['category'])) $dbUpdates['category'] = $data['category'];
                 if (isset($data['currency'])) $dbUpdates['currency'] = $data['currency'];
                 if (isset($data['price']))    $dbUpdates['price']    = $data['price'] / 100;
+                if (isset($data['availability'])) {
+                    $dbUpdates['availability'] = $data['availability'];
+                    $dbUpdates['is_available'] = CatalogProduct::isAvailableFromStatus($data['availability']);
+                }
 
                 if (! empty($dbUpdates)) {
                     CatalogProduct::where('user_id', $userId)
@@ -454,12 +460,57 @@ class CatalogController extends Controller
                 throw new WhatsAppNotConnectedException('Authentication required.');
             }
 
-            $stockQty    = (int) $request->input('stock_quantity');
-            $isAvailable = $request->boolean('is_available', $stockQty > 0);
+            $account  = $this->getAccount();
+            $stockQty = (int) $request->input('stock_quantity');
+
+            // Load existing row so we know the current availability before updating.
+            $existing = CatalogProduct::where('user_id', $userId)
+                ->where('catalog_id', $catalogId)
+                ->where('retailer_id', $retailerId)
+                ->first();
+
+            $currentAvailability = $existing?->availability ?? 'in stock';
+            $newAvailability     = $currentAvailability;
+            $newIsAvailable      = $request->has('is_available')
+                ? $request->boolean('is_available')
+                : ($existing?->is_available ?? true);
+
+            // Sync availability ↔ stock, but ONLY for in stock / out of stock.
+            // preorder and discontinued are independent of stock count.
+            if ($stockQty === 0 && $currentAvailability === 'in stock') {
+                $newAvailability = 'out of stock';
+                $newIsAvailable  = false;
+                // Push to Meta API so WhatsApp reflects the change immediately.
+                $metaProductId = $existing?->meta_product_id;
+                if ($metaProductId) {
+                    try {
+                        $this->catalogService->updateProduct($account, $metaProductId, [
+                            'availability' => 'out of stock',
+                        ]);
+                        $this->catalogService->clearProductsCache($catalogId);
+                    } catch (\Throwable) {}
+                }
+            } elseif ($stockQty > 0 && $currentAvailability === 'out of stock') {
+                $newAvailability = 'in stock';
+                $newIsAvailable  = true;
+                $metaProductId   = $existing?->meta_product_id;
+                if ($metaProductId) {
+                    try {
+                        $this->catalogService->updateProduct($account, $metaProductId, [
+                            'availability' => 'in stock',
+                        ]);
+                        $this->catalogService->clearProductsCache($catalogId);
+                    } catch (\Throwable) {}
+                }
+            }
 
             $row = CatalogProduct::updateOrCreate(
                 ['user_id' => $userId, 'catalog_id' => $catalogId, 'retailer_id' => $retailerId],
-                ['stock_quantity' => $stockQty, 'is_available' => $isAvailable]
+                [
+                    'stock_quantity' => $stockQty,
+                    'is_available'   => $newIsAvailable,
+                    'availability'   => $newAvailability,
+                ]
             );
 
             return response()->json([
@@ -468,6 +519,7 @@ class CatalogController extends Controller
                     'retailer_id'    => $retailerId,
                     'stock_quantity' => $row->stock_quantity,
                     'is_available'   => $row->is_available,
+                    'availability'   => $row->availability,
                 ],
             ]);
         } catch (WhatsAppNotConnectedException $e) {
