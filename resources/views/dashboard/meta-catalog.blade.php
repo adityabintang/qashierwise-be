@@ -409,58 +409,6 @@
                             </span>
                         </div>
 
-                        <!-- Review status summary + Commerce Manager CTA -->
-                        <template x-if="!loadingProducts && products.length > 0">
-                            <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)] px-3 py-2 flex flex-col sm:flex-row sm:items-center gap-2 text-xs">
-                                <div class="flex items-center gap-2 flex-wrap flex-1 min-w-0">
-                                    <span class="text-[hsl(var(--muted-foreground))] whitespace-nowrap">FB/IG Shops:</span>
-                                    <template x-if="reviewCounts.approved > 0">
-                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
-                                              style="background:rgba(34,197,94,0.12);color:rgb(22,163,74)">
-                                            <i class="fas fa-circle-check text-[9px]"></i>
-                                            <span x-text="reviewCounts.approved + ' approved'"></span>
-                                        </span>
-                                    </template>
-                                    <template x-if="reviewCounts.pending > 0">
-                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
-                                              style="background:rgba(245,158,11,0.12);color:rgb(180,83,9)">
-                                            <i class="fas fa-hourglass-half text-[9px]"></i>
-                                            <span x-text="reviewCounts.pending + ' pending'"></span>
-                                        </span>
-                                    </template>
-                                    <template x-if="reviewCounts.rejected > 0">
-                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
-                                              style="background:rgba(239,68,68,0.12);color:rgb(185,28,28)">
-                                            <i class="fas fa-circle-xmark text-[9px]"></i>
-                                            <span x-text="reviewCounts.rejected + ' ditolak'"></span>
-                                        </span>
-                                    </template>
-                                    <template x-if="reviewCounts.not_reviewed > 0">
-                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
-                                              style="background:rgba(100,116,139,0.10);color:rgb(71,85,105)">
-                                            <i class="fas fa-minus text-[9px]"></i>
-                                            <span x-text="reviewCounts.not_reviewed + ' belum direview'"></span>
-                                        </span>
-                                    </template>
-                                </div>
-                                <a :href="commerceManagerProductUrl()"
-                                   target="_blank" rel="noopener"
-                                   class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-[#1877f2]/10 text-[#1877f2] hover:bg-[#1877f2]/20 transition-colors whitespace-nowrap">
-                                    <i class="fab fa-meta text-[10px]"></i>
-                                    Status WhatsApp di Commerce Manager
-                                    <i class="fas fa-arrow-up-right-from-square text-[9px]"></i>
-                                </a>
-                            </div>
-                        </template>
-                        <template x-if="!loadingProducts && products.length > 0">
-                            <p class="text-[10px] text-[hsl(var(--muted-foreground))] -mt-1 leading-relaxed">
-                                <i class="fas fa-circle-info mr-1"></i>
-                                Badge di atas adalah status review untuk <strong>Facebook Shops / Instagram Shopping</strong> (dari Graph API).
-                                Status <strong>WhatsApp</strong> tidak tersedia via API — cek langsung di Commerce Manager → tab <em>Status and issues → WhatsApp</em>.
-                                Produk bisa <em>Belum Direview</em> di sini tetapi <em>sudah ditampilkan</em> di WhatsApp.
-                            </p>
-                        </template>
-
                         <!-- Loading skeleton -->
                         <template x-if="loadingProducts">
                             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -528,21 +476,7 @@
                                                             <span x-text="product.category"></span>
                                                         </span>
                                                     </template>
-                                                    <span class="inline-flex w-fit items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
-                                                          :style="reviewBadgeStyle(product.review_status)"
-                                                          :title="reviewBadgeTooltip(product)">
-                                                        <i class="fas text-[8px]" :class="reviewBadgeIcon(product.review_status)"></i>
-                                                        <span x-text="reviewBadgeLabel(product.review_status)"></span>
-                                                    </span>
                                                 </div>
-                                                <template x-if="(product.review_rejection_reasons || []).length > 0">
-                                                    <div class="rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 px-2 py-1">
-                                                        <p class="text-[10px] text-red-700 dark:text-red-300 leading-tight">
-                                                            <i class="fas fa-circle-exclamation mr-1"></i>
-                                                            <span x-text="(product.review_rejection_reasons || []).join(', ')"></span>
-                                                        </p>
-                                                    </div>
-                                                </template>
                                                 <template x-if="product.description">
                                                     <p class="text-xs text-[hsl(var(--muted-foreground))] line-clamp-2" x-text="product.description"></p>
                                                 </template>
@@ -550,8 +484,8 @@
                                                     <template x-if="product.retailer_id">
                                                         <span class="font-mono truncate" x-text="'SKU: ' + product.retailer_id"></span>
                                                     </template>
-                                                    <template x-if="product.inventory != null">
-                                                        <span class="font-medium whitespace-nowrap" x-text="'Stok: ' + product.inventory"></span>
+                                                    <template x-if="product.stock_quantity != null">
+                                                        <span class="font-medium whitespace-nowrap" x-text="'Stok: ' + product.stock_quantity"></span>
                                                     </template>
                                                 </div>
                                                 <!-- Harga + availability -->
@@ -682,9 +616,9 @@
                         </div>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Stok (opsional)</label>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Stok Awal (opsional)</label>
                         <input type="number" x-model="createForm.inventory" class="input w-full" placeholder="Misal: 50" min="0">
-                        <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Kosongkan jika stok tak terbatas.</p>
+                        <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Disimpan di database kami, bukan di Meta.</p>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Gambar Produk <span class="text-red-500">*</span></label>
@@ -1032,16 +966,8 @@ function metaCatalogApp() {
         user: null,
         notifications: [],
 
-        // F&B preset categories — shown in create/edit modal "Kategori Menu" dropdown
-        fnbCategories: [
-            'Makanan Utama',
-            'Cemilan / Snack',
-            'Minuman',
-            'Dessert',
-            'Paket Hemat',
-            'Topping / Tambahan',
-            'Lainnya',
-        ],
+        // Loaded dynamically from /api/pos/categories in fetchCategories()
+        fnbCategories: [],
 
         // Currencies relevant to SEA F&B businesses
         currencies: ['IDR', 'USD', 'SGD', 'MYR', 'THB', 'PHP', 'VND', 'JPY'],
@@ -1056,18 +982,11 @@ function metaCatalogApp() {
             );
         },
 
-        get reviewCounts() {
-            const c = { approved: 0, pending: 0, rejected: 0, outdated: 0, unknown: 0 };
-            for (const p of this.products) {
-                c[this._normalizeReview(p.review_status)] += 1;
-            }
-            return c;
-        },
-
         async init() {
             this.initDashboard();
             this.loadSignupConfig();
             this.setupSignupMessageListener();
+            await this.fetchCategories();
             await this.fetchCatalogs();
 
             if (this.initialCatalogId && this.catalogs.length > 0) {
@@ -1200,6 +1119,19 @@ function metaCatalogApp() {
             }
         },
 
+        async fetchCategories() {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${window.location.origin}/api/pos/categories?active_only=true`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+                });
+                const data = await res.json();
+                if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+                    this.fnbCategories = data.data.map(c => c.name);
+                }
+            } catch(e) {}
+        },
+
         async fetchCatalogs() {
             this.loading = true;
             this.error = null;
@@ -1301,7 +1233,7 @@ function metaCatalogApp() {
                 availability:  'in stock',
                 description:   '',
                 brand:         '',
-                category:      'Makanan Utama',
+                category:      this.fnbCategories[0] || '',
                 inventory:     '',
             };
             this.createError = null;
@@ -1338,6 +1270,20 @@ function metaCatalogApp() {
                 );
                 const data = await response.json();
                 if (data.success) {
+                    // Save initial stock to our local DB if provided.
+                    const retailerId = this.createForm.retailer_id;
+                    if (retailerId && this.createForm.inventory !== '' && this.createForm.inventory != null) {
+                        try {
+                            await fetch(
+                                `${this.API_BASE_URL}/catalog/${this.selectedCatalog.id}/products/${encodeURIComponent(retailerId)}/stock`,
+                                {
+                                    method: 'PUT',
+                                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ stock_quantity: Number(this.createForm.inventory) }),
+                                }
+                            );
+                        } catch(e) {}
+                    }
                     this.showCreateModal = false;
                     this.showToast('Produk berhasil ditambahkan', 'success');
                     await this.fetchProducts();
@@ -1368,8 +1314,8 @@ function metaCatalogApp() {
                 url:          product.url         || this.defaultProductUrl(),
                 description:  product.description || '',
                 brand:        product.brand       || '',
-                category:     product.category    || 'Makanan Utama',
-                inventory:    product.inventory != null ? String(product.inventory) : '',
+                category:     product.category    || this.fnbCategories[0] || '',
+                inventory:    product.stock_quantity != null ? String(product.stock_quantity) : '',
             };
             this.editError = null;
             this.showEditModal = true;
@@ -1396,6 +1342,7 @@ function metaCatalogApp() {
                 const payload = this.buildProductPayload(this.editForm, priceMinor);
                 // retailer_id is immutable; controller treats it as prohibited on update.
                 delete payload.retailer_id;
+                if (this.selectedCatalog?.id) payload.catalog_id = this.selectedCatalog.id;
 
                 const response = await fetch(
                     `${this.API_BASE_URL}/catalog/products/${this.editingProductId}`,
@@ -1407,9 +1354,47 @@ function metaCatalogApp() {
                 );
                 const data = await response.json();
                 if (data.success) {
+                    // Update stock in our local DB (separate endpoint, not Meta).
+                    const editingProduct = this.products.find(p => p.id === this.editingProductId);
+                    const retailerId = editingProduct?.retailer_id;
+                    if (retailerId && this.selectedCatalog?.id && this.editForm.inventory !== '' && this.editForm.inventory != null) {
+                        try {
+                            await fetch(
+                                `${this.API_BASE_URL}/catalog/${this.selectedCatalog.id}/products/${encodeURIComponent(retailerId)}/stock`,
+                                {
+                                    method: 'PUT',
+                                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ stock_quantity: Number(this.editForm.inventory) }),
+                                }
+                            );
+                        } catch(e) {}
+                    }
+
+                    // Optimistic update: patch local state immediately.
+                    // Meta's read endpoint has a caching delay so re-fetching
+                    // right after a write returns stale data.
+                    const idx = this.products.findIndex(p => p.id === this.editingProductId);
+                    if (idx !== -1) {
+                        const p = { ...this.products[idx] };
+                        if (this.editForm.name)        p.name        = this.editForm.name;
+                        if (this.editForm.description) p.description = this.editForm.description;
+                        if (this.editForm.availability) p.availability = this.editForm.availability;
+                        if (this.editForm.image_url)   p.image_url   = this.editForm.image_url;
+                        if (this.editForm.category != null) p.category = this.editForm.category;
+                        if (this.editForm.brand != null)    p.brand    = this.editForm.brand;
+                        if (this.editForm.currency)    p.currency    = this.editForm.currency;
+                        if (priceMinor && priceMinor > 0) p.price = priceMinor;
+                        if (this.editForm.inventory !== '' && this.editForm.inventory != null) {
+                            p.stock_quantity = Number(this.editForm.inventory);
+                        }
+                        this.products = [
+                            ...this.products.slice(0, idx),
+                            p,
+                            ...this.products.slice(idx + 1),
+                        ];
+                    }
                     this.showEditModal = false;
                     this.showToast('Produk berhasil diperbarui', 'success');
-                    await this.fetchProducts();
                 } else {
                     this.editError = data.message || 'Gagal memperbarui produk.';
                 }
@@ -1431,8 +1416,10 @@ function metaCatalogApp() {
             this.deleting = true;
             try {
                 const token = localStorage.getItem('token');
+                const catalogParam = this.selectedCatalog?.id
+                    ? `?catalog_id=${this.selectedCatalog.id}` : '';
                 const response = await fetch(
-                    `${this.API_BASE_URL}/catalog/products/${this.deleteTarget.id}`,
+                    `${this.API_BASE_URL}/catalog/products/${this.deleteTarget.id}${catalogParam}`,
                     {
                         method: 'DELETE',
                         headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
@@ -1548,73 +1535,6 @@ function metaCatalogApp() {
         // IDR/JPY/KRW/VND → 0 decimal; USD/EUR/etc. → 2 decimals.
         displayFractionDigits(currency) {
             return this._noSubunit.includes(String(currency || '').toUpperCase()) ? 0 : 2;
-        },
-
-        // ── Meta review_status badges ────────────────────────────────────────
-        // IMPORTANT: `review_status` di Graph API adalah review legacy untuk
-        // Facebook Shops / Instagram Shopping — BUKAN status WhatsApp.
-        // Status WhatsApp sesungguhnya hanya bisa dilihat di Commerce Manager
-        // (tab "Status and Issues" → "WhatsApp"). Meta tidak ekspos itu via API.
-        //
-        // Empty `review_status` ("") sangat umum untuk catalog yang hanya
-        // dipakai WhatsApp — bukan berarti produk ditolak.
-        _normalizeReview(s) {
-            const v = String(s ?? '').toLowerCase();
-            if (v === '')         return 'not_reviewed';   // empty = belum direview untuk FB/IG (normal)
-            if (v === 'pending')  return 'pending';
-            if (v === 'approved') return 'approved';
-            if (v === 'rejected') return 'rejected';
-            if (v === 'outdated') return 'outdated';
-            return 'unknown';
-        },
-        reviewBadgeLabel(status) {
-            return {
-                approved:     'Approved (FB/IG)',
-                pending:      'Pending (FB/IG)',
-                rejected:     'Ditolak (FB/IG)',
-                outdated:     'Perlu Update',
-                not_reviewed: 'Belum Direview',
-                unknown:      'Status ?',
-            }[this._normalizeReview(status)];
-        },
-        reviewBadgeIcon(status) {
-            return {
-                approved:     'fa-circle-check',
-                pending:      'fa-hourglass-half',
-                rejected:     'fa-circle-xmark',
-                outdated:     'fa-rotate',
-                not_reviewed: 'fa-minus',
-                unknown:      'fa-circle-question',
-            }[this._normalizeReview(status)];
-        },
-        reviewBadgeStyle(status) {
-            const map = {
-                approved:     'background:rgba(34,197,94,0.12);color:rgb(22,163,74)',
-                pending:      'background:rgba(245,158,11,0.12);color:rgb(180,83,9)',
-                rejected:     'background:rgba(239,68,68,0.12);color:rgb(185,28,28)',
-                outdated:     'background:rgba(168,85,247,0.12);color:rgb(126,34,206)',
-                not_reviewed: 'background:rgba(100,116,139,0.10);color:rgb(71,85,105)',
-                unknown:      'background:rgba(100,116,139,0.12);color:rgb(71,85,105)',
-            };
-            return map[this._normalizeReview(status)];
-        },
-        reviewBadgeTooltip(product) {
-            const norm = this._normalizeReview(product?.review_status);
-            const reasons = product?.review_rejection_reasons || [];
-            if (norm === 'approved')     return 'Produk disetujui untuk Facebook Shops / Instagram Shopping. Status WhatsApp cek di Commerce Manager.';
-            if (norm === 'pending')      return 'Sedang direview Meta untuk Facebook/Instagram (umumnya 30 menit – 24 jam).';
-            if (norm === 'rejected')     return reasons.length ? 'Ditolak: ' + reasons.join(', ') : 'Ditolak Meta untuk FB/IG. Cek alasan di Commerce Manager.';
-            if (norm === 'outdated')     return 'Produk perlu diperbarui — data sudah usang.';
-            if (norm === 'not_reviewed') return 'Produk belum direview untuk Facebook/Instagram Shops. Ini normal untuk katalog WhatsApp — status WhatsApp sebenarnya lihat di Commerce Manager → Status and Issues → WhatsApp.';
-            return 'Status review tidak dikenali.';
-        },
-
-        commerceManagerProductUrl(productId) {
-            const cid = this.selectedCatalog?.id;
-            const bid = this.businessId;
-            if (!cid) return '#';
-            const q = bid ? `?business_id=${bid}` : '';
-            return `https://business.facebook.com/commerce/catalogs/${cid}/products/${q}`;
         },
 
         // User-typed display value → integer in minor units (what Meta wants).
@@ -1737,7 +1657,7 @@ function metaCatalogApp() {
                                  'availability', 'category', 'brand', 'condition'];
             passthrough.forEach(k => { if (form[k] != null && form[k] !== '') out[k] = form[k]; });
             if (priceMinor && priceMinor > 0) out.price = priceMinor;
-            if (form.inventory !== '' && form.inventory != null) out.inventory = Number(form.inventory);
+            // inventory is NOT forwarded to Meta — stock is managed in our local DB
             if (out.currency) out.currency = String(out.currency).toUpperCase();
             return out;
         },
