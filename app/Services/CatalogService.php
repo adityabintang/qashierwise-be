@@ -580,19 +580,25 @@ class CatalogService
                 'catalog_id' => $catalogId,
             ]);
         } else {
-            $err = $linkResp->json('error', []);
-            $msg = $err['message'] ?? 'unknown';
-            // If already linked, Meta replies with a specific error — treat as success.
-            if (str_contains(strtolower($msg), 'already')) {
+            $err     = $linkResp->json('error', []);
+            $msg     = $err['message'] ?? 'unknown';
+            $subcode = $err['error_subcode'] ?? null;
+            $userMsg = $err['error_user_msg'] ?? null;
+            // 2388099 = catalog already linked to another WABA (must unlink via Commerce Manager first).
+            $alreadyLinkedToOther = $subcode === 2388099;
+            // If already linked to THIS waba, Meta says "already" in the message.
+            if (str_contains(strtolower($msg), 'already') && ! $alreadyLinkedToOther) {
                 $result['linked'] = true;
             } else {
                 $result['success'] = false;
-                $result['error'] = $msg;
+                $result['error']   = $userMsg ?? $msg;
                 Log::warning('CatalogService: failed to link catalog to WABA', [
-                    'waba_id'    => $wabaId,
-                    'catalog_id' => $catalogId,
-                    'status'     => $linkResp->status(),
-                    'error'      => $msg,
+                    'waba_id'      => $wabaId,
+                    'catalog_id'   => $catalogId,
+                    'status'       => $linkResp->status(),
+                    'error'        => $msg,
+                    'user_msg'     => $userMsg,
+                    'subcode'      => $subcode,
                 ]);
             }
         }

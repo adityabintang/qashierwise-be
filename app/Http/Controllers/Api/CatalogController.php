@@ -141,7 +141,8 @@ class CatalogController extends Controller
                     ->get()
                     ->keyBy('retailer_id');
 
-                $products = array_map(function (array $p) use ($dbRows) {
+                $nameUpdates = [];   // [retailer_id => name] for stub rows missing a name
+                $products = array_map(function (array $p) use ($dbRows, &$nameUpdates) {
                     $rid = $p['retailer_id'] ?? null;
                     // Strip Meta's inventory — stock is owned by our DB only.
                     $metaInventory = $p['inventory'] ?? null;
@@ -154,6 +155,10 @@ class CatalogController extends Controller
                         if (! $row->is_available) {
                             $p['availability'] = 'out of stock';
                         }
+                        // Lazy-sync: backfill name if the row was created as a stub.
+                        if ($row->name === null && ! empty($p['name'])) {
+                            $nameUpdates[$rid] = $p['name'];
+                        }
                     } else {
                         // No local row yet — fall back to what Meta reported so
                         // the UI at least shows something for legacy products.
@@ -162,6 +167,14 @@ class CatalogController extends Controller
                     }
                     return $p;
                 }, $products);
+
+                // Persist any name backfills in a single query per row.
+                foreach ($nameUpdates as $rid => $name) {
+                    CatalogProduct::where('user_id', $userId)
+                        ->where('catalog_id', $catalogId)
+                        ->where('retailer_id', $rid)
+                        ->update(['name' => $name]);
+                }
             }
 
             return response()->json([
