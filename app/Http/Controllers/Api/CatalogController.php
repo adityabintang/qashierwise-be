@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Exceptions\WhatsAppNotConnectedException;
 use App\Http\Controllers\Controller;
+use App\Models\CatalogProduct;
 use App\Services\CatalogService;
 use App\Services\WhatsAppAccountService;
 use Illuminate\Http\JsonResponse;
@@ -45,6 +46,10 @@ class CatalogController extends Controller
                     'message' => $result['error'],
                 ], 422);
             }
+
+            try {
+                $this->catalogService->linkCatalogToWaba($account, $result['id']);
+            } catch (\Throwable) {}
 
             return response()->json([
                 'success' => true,
@@ -125,13 +130,47 @@ class CatalogController extends Controller
                 ], 422);
             }
 
+            $userId = auth()->user()->getEffectiveUserId();
+            $products = $result['products'];
+
+            if (! empty($products)) {
+                $retailerIds = array_column($products, 'retailer_id');
+                $dbRows = CatalogProduct::where('user_id', $userId)
+                    ->where('catalog_id', $catalogId)
+                    ->whereIn('retailer_id', $retailerIds)
+                    ->get()
+                    ->keyBy('retailer_id');
+
+                $products = array_map(function (array $p) use ($dbRows) {
+                    $rid = $p['retailer_id'] ?? null;
+                    // Strip Meta's inventory — stock is owned by our DB only.
+                    $metaInventory = $p['inventory'] ?? null;
+                    unset($p['inventory']);
+
+                    if ($rid && isset($dbRows[$rid])) {
+                        $row = $dbRows[$rid];
+                        $p['stock_quantity'] = $row->stock_quantity;
+                        $p['is_available']   = $row->is_available;
+                        if (! $row->is_available) {
+                            $p['availability'] = 'out of stock';
+                        }
+                    } else {
+                        // No local row yet — fall back to what Meta reported so
+                        // the UI at least shows something for legacy products.
+                        $p['stock_quantity'] = $metaInventory;
+                        $p['is_available']   = ($p['availability'] ?? '') !== 'out of stock';
+                    }
+                    return $p;
+                }, $products);
+            }
+
             return response()->json([
                 'success' => true,
                 'data' => [
                     'catalog_id' => $catalogId,
-                    'products' => $result['products'],
+                    'products' => $products,
                     'paging' => $result['paging'],
-                    'total' => count($result['products']),
+                    'total' => count($products),
                 ],
             ]);
         } catch (WhatsAppNotConnectedException $e) {
@@ -151,7 +190,7 @@ class CatalogController extends Controller
         'retailer_id', 'name', 'description',
         'price', 'sale_price', 'currency',
         'image_url', 'additional_image_link', 'url',
-        'availability', 'inventory',
+        'availability',
         'category', 'google_product_category',
         'brand', 'condition',
     ];
@@ -243,6 +282,25 @@ class CatalogController extends Controller
                 ], $this->statusFromErrorCode($result['error_code']));
             }
 
+            try {
+                $this->catalogService->linkCatalogToWaba($account, $catalogId);
+            } catch (\Throwable) {}
+
+            $userId = auth()->user()->getEffectiveUserId();
+            CatalogProduct::updateOrCreate(
+                ['user_id' => $userId, 'catalog_id' => $catalogId, 'retailer_id' => $data['retailer_id']],
+                [
+                    'meta_product_id' => $result['id'],
+                    'name'            => $data['name'] ?? '',
+                    'price'           => isset($data['price']) ? $data['price'] / 100 : 0,
+                    'currency'        => $data['currency'] ?? 'IDR',
+                    'category'        => $data['category'] ?? null,
+                    'is_available'    => true,
+                ]
+            );
+
+            $this->catalogService->clearProductsCache($catalogId);
+
             return response()->json([
                 'success' => true,
                 'data' => ['id' => $result['id']],
@@ -262,7 +320,9 @@ class CatalogController extends Controller
      */
     public function updateProduct(Request $request, string $productId): JsonResponse
     {
-        $request->validate($this->productRules('update'));
+        $rules = $this->productRules('update');
+        $rules['catalog_id'] = 'sometimes|nullable|string';
+        $request->validate($rules);
 
         try {
             $account = $this->getAccount();
@@ -284,6 +344,30 @@ class CatalogController extends Controller
                     'error_code' => $result['error_code'],
                     'message'    => $result['error'],
                 ], $this->statusFromErrorCode($result['error_code']));
+            }
+
+            $catalogId = $request->input('catalog_id');
+
+            if ($catalogId) {
+                try {
+                    $this->catalogService->linkCatalogToWaba($account, $catalogId);
+                } catch (\Throwable) {}
+
+                $userId = auth()->user()->getEffectiveUserId();
+                $dbUpdates = [];
+                if (isset($data['name']))     $dbUpdates['name']     = $data['name'];
+                if (isset($data['category'])) $dbUpdates['category'] = $data['category'];
+                if (isset($data['currency'])) $dbUpdates['currency'] = $data['currency'];
+                if (isset($data['price']))    $dbUpdates['price']    = $data['price'] / 100;
+
+                if (! empty($dbUpdates)) {
+                    CatalogProduct::where('user_id', $userId)
+                        ->where('catalog_id', $catalogId)
+                        ->where('meta_product_id', $productId)
+                        ->update($dbUpdates);
+                }
+
+                $this->catalogService->clearProductsCache($catalogId);
             }
 
             return response()->json(['success' => true]);
@@ -309,10 +393,10 @@ class CatalogController extends Controller
     }
 
     /**
-     * DELETE /api/whatsapp/catalog/products/{productId}
+     * DELETE /api/whatsapp/catalog/products/{productId}?catalog_id={catalogId}
      * Delete a product item.
      */
-    public function deleteProduct(string $productId): JsonResponse
+    public function deleteProduct(Request $request, string $productId): JsonResponse
     {
         try {
             $account = $this->getAccount();
@@ -327,7 +411,65 @@ class CatalogController extends Controller
                 ], 422);
             }
 
+            if ($catalogId = $request->query('catalog_id')) {
+                try {
+                    $this->catalogService->linkCatalogToWaba($account, $catalogId);
+                } catch (\Throwable) {}
+
+                $userId = auth()->user()->getEffectiveUserId();
+                CatalogProduct::where('user_id', $userId)
+                    ->where('catalog_id', $catalogId)
+                    ->where('meta_product_id', $productId)
+                    ->delete();
+
+                $this->catalogService->clearProductsCache($catalogId);
+            }
+
             return response()->json(['success' => true]);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => $e->getErrorCode(),
+                'message' => $e->getMessage(),
+            ], $e->getCode());
+        }
+    }
+
+    /**
+     * PUT /api/whatsapp/catalog/{catalogId}/products/{retailerId}/stock
+     * Update stock_quantity and availability for a product in our local DB.
+     * Does NOT call Meta API — stock is self-hosted.
+     */
+    public function updateStock(Request $request, string $catalogId, string $retailerId): JsonResponse
+    {
+        $request->validate([
+            'stock_quantity' => 'required|integer|min:0',
+            'is_available'   => 'sometimes|boolean',
+        ]);
+
+        try {
+            $userId = auth()->user()->getEffectiveUserId();
+
+            if (! $userId) {
+                throw new WhatsAppNotConnectedException('Authentication required.');
+            }
+
+            $stockQty    = (int) $request->input('stock_quantity');
+            $isAvailable = $request->boolean('is_available', $stockQty > 0);
+
+            $row = CatalogProduct::updateOrCreate(
+                ['user_id' => $userId, 'catalog_id' => $catalogId, 'retailer_id' => $retailerId],
+                ['stock_quantity' => $stockQty, 'is_available' => $isAvailable]
+            );
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'retailer_id'    => $retailerId,
+                    'stock_quantity' => $row->stock_quantity,
+                    'is_available'   => $row->is_available,
+                ],
+            ]);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
                 'success' => false,
