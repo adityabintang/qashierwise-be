@@ -424,7 +424,7 @@ class CatalogService
     // inventory removed — stock is self-hosted in our DB.
     // review_status/review_rejection_reasons are required to show approval state in the UI:
     // only products with review_status="approved" can be sent via MPM (Meta error 131009).
-    protected const PRODUCT_FIELDS = 'id,retailer_id,name,description,price,sale_price,currency,image_url,additional_image_urls,availability,category,google_product_category,brand,condition,url,visibility,review_status,review_rejection_reasons';
+    protected const PRODUCT_FIELDS = 'id,retailer_id,name,description,price,sale_price,currency,image_url,additional_image_urls,availability,category,google_product_category,brand,condition,url,visibility,review_status,review_rejection_reasons,image_fetch_status';
 
     /**
      * Get products from a specific catalog.
@@ -676,29 +676,37 @@ class CatalogService
 
         $result = ['success' => true, 'linked' => false, 'commerce_enabled' => false];
 
-        // 0) Unlink any catalog currently linked to this WABA that is not the one we want.
-        //    Meta only allows 1 catalog per WABA, so switching requires a DELETE first.
-        //    Note: Meta docs say DELETE is unsupported, but the API actually accepts it.
+        // 0) Read the WABA's current catalog bindings. Used both to unlink stale
+        //    bindings AND to disambiguate Meta's 2388099 error in step 1 — Meta
+        //    returns the same subcode for "already linked here" (no-op) and
+        //    "linked to another WABA" (real conflict).
+        $alreadyLinkedToThisWaba = false;
         $currentResp = Http::withToken($token)
             ->get("{$this->baseUrl()}/{$wabaId}/product_catalogs");
 
         if ($currentResp->successful()) {
             foreach ($currentResp->json('data', []) as $existing) {
                 $existingId = (string) ($existing['id'] ?? '');
-                if ($existingId && $existingId !== $catalogId) {
-                    $delResp = Http::withToken($token)
-                        ->delete("{$this->baseUrl()}/{$wabaId}/product_catalogs", [
-                            'catalog_id' => $existingId,
-                        ]);
-
-                    Log::info('CatalogService: unlinked existing catalog from WABA before re-linking', [
-                        'waba_id'        => $wabaId,
-                        'unlinked_id'    => $existingId,
-                        'new_catalog_id' => $catalogId,
-                        'delete_status'  => $delResp->status(),
-                        'delete_success' => $delResp->json('success'),
-                    ]);
+                if (! $existingId) {
+                    continue;
                 }
+                if ($existingId === $catalogId) {
+                    $alreadyLinkedToThisWaba = true;
+                    continue;
+                }
+                // Different catalog on this WABA → unlink (1 catalog per WABA limit).
+                $delResp = Http::withToken($token)
+                    ->delete("{$this->baseUrl()}/{$wabaId}/product_catalogs", [
+                        'catalog_id' => $existingId,
+                    ]);
+
+                Log::info('CatalogService: unlinked existing catalog from WABA before re-linking', [
+                    'waba_id'        => $wabaId,
+                    'unlinked_id'    => $existingId,
+                    'new_catalog_id' => $catalogId,
+                    'delete_status'  => $delResp->status(),
+                    'delete_success' => $delResp->json('success'),
+                ]);
             }
         } else {
             Log::warning('CatalogService: could not fetch current WABA catalogs before re-linking', [
@@ -708,42 +716,72 @@ class CatalogService
             ]);
         }
 
-        // 1) Associate the catalog with the WABA.
-        $linkResp = Http::withToken($token)
-            ->asForm()
-            ->post("{$this->baseUrl()}/{$wabaId}/product_catalogs", [
-                'catalog_id' => $catalogId,
-            ]);
-
-        if ($linkResp->successful()) {
+        // 1) Associate the catalog with the WABA. Skip the POST if already linked
+        //    here — Meta returns 2388099 ("already linked to another WABA") even
+        //    when the catalog is already on THIS WABA, so the no-op POST would
+        //    be misclassified as a conflict.
+        if ($alreadyLinkedToThisWaba) {
             $result['linked'] = true;
-            $this->clearCatalogsCache($account);
-            Log::info('CatalogService: linked catalog to WABA', [
+            Log::info('CatalogService: catalog already linked to this WABA, skipping POST', [
                 'waba_id'    => $wabaId,
                 'catalog_id' => $catalogId,
             ]);
         } else {
-            $err     = $linkResp->json('error', []);
-            $msg     = $err['message'] ?? 'unknown';
-            $subcode = $err['error_subcode'] ?? null;
-            $userMsg = $err['error_user_msg'] ?? null;
-            // 2388099 = catalog already linked to another WABA (must unlink via Commerce Manager first).
-            $alreadyLinkedToOther = $subcode === 2388099;
-            // If already linked to THIS waba, Meta says "already" in the message.
-            if (str_contains(strtolower($msg), 'already') && ! $alreadyLinkedToOther) {
-                $result['linked'] = true;
-            } else {
-                $result['success']    = false;
-                $result['error']      = $userMsg ?? $msg;
-                $result['error_code'] = $alreadyLinkedToOther ? 'CATALOG_ALREADY_LINKED_ELSEWHERE' : 'LINK_FAILED';
-                Log::warning('CatalogService: failed to link catalog to WABA', [
-                    'waba_id'      => $wabaId,
-                    'catalog_id'   => $catalogId,
-                    'status'       => $linkResp->status(),
-                    'error'        => $msg,
-                    'user_msg'     => $userMsg,
-                    'subcode'      => $subcode,
+            $linkResp = Http::withToken($token)
+                ->asForm()
+                ->post("{$this->baseUrl()}/{$wabaId}/product_catalogs", [
+                    'catalog_id' => $catalogId,
                 ]);
+
+            if ($linkResp->successful()) {
+                $result['linked'] = true;
+                $this->clearCatalogsCache($account);
+                Log::info('CatalogService: linked catalog to WABA', [
+                    'waba_id'    => $wabaId,
+                    'catalog_id' => $catalogId,
+                ]);
+            } else {
+                $err     = $linkResp->json('error', []);
+                $msg     = $err['message'] ?? 'unknown';
+                $subcode = $err['error_subcode'] ?? null;
+                $userMsg = $err['error_user_msg'] ?? null;
+
+                // 2388099 means "catalog already bound to a WABA". Re-fetch the
+                // WABA's catalogs to determine whether it's THIS one (treat as
+                // success) or another one (real conflict the merchant must
+                // resolve via Business Manager).
+                $reallyLinkedElsewhere = false;
+                if ($subcode === 2388099) {
+                    $recheck = Http::withToken($token)
+                        ->get("{$this->baseUrl()}/{$wabaId}/product_catalogs");
+                    if ($recheck->successful()) {
+                        foreach ($recheck->json('data', []) as $row) {
+                            if ((string) ($row['id'] ?? '') === $catalogId) {
+                                $result['linked'] = true;
+                                Log::info('CatalogService: 2388099 but catalog already on this WABA — treating as success', [
+                                    'waba_id'    => $wabaId,
+                                    'catalog_id' => $catalogId,
+                                ]);
+                                break;
+                            }
+                        }
+                    }
+                    $reallyLinkedElsewhere = ! $result['linked'];
+                }
+
+                if (! $result['linked']) {
+                    $result['success']    = false;
+                    $result['error']      = $userMsg ?? $msg;
+                    $result['error_code'] = $reallyLinkedElsewhere ? 'CATALOG_ALREADY_LINKED_ELSEWHERE' : 'LINK_FAILED';
+                    Log::warning('CatalogService: failed to link catalog to WABA', [
+                        'waba_id'      => $wabaId,
+                        'catalog_id'   => $catalogId,
+                        'status'       => $linkResp->status(),
+                        'error'        => $msg,
+                        'user_msg'     => $userMsg,
+                        'subcode'      => $subcode,
+                    ]);
+                }
             }
         }
 

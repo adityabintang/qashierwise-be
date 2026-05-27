@@ -403,10 +403,23 @@
                                        placeholder="Cari produk berdasarkan nama atau SKU..."
                                        class="input w-full !pl-9 min-h-[40px]">
                             </div>
-                            <span x-show="!loadingProducts && products.length > 0"
-                                  class="text-xs text-[hsl(var(--muted-foreground))] whitespace-nowrap flex-shrink-0 tabular-nums">
-                                <span x-text="filteredProducts.length"></span> / <span x-text="products.length"></span> produk
-                            </span>
+                            <div x-show="!loadingProducts && products.length > 0"
+                                 class="flex items-center gap-3 whitespace-nowrap flex-shrink-0">
+                                <span class="text-xs text-[hsl(var(--muted-foreground))] tabular-nums">
+                                    <span x-text="filteredProducts.length"></span> / <span x-text="products.length"></span> produk
+                                </span>
+                                <!-- MPM readiness summary: count products whose image was successfully fetched by Meta -->
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium tabular-nums"
+                                      :class="products.filter(p => p.image_fetch_status === 'FETCHED').length === products.length
+                                          ? 'bg-emerald-100 text-emerald-700'
+                                          : products.filter(p => p.image_fetch_status === 'FETCHED').length === 0
+                                          ? 'bg-red-100 text-red-700'
+                                          : 'bg-amber-100 text-amber-700'"
+                                      :title="'Hanya produk dengan status FETCHED yang bisa dikirim sebagai Multi-Product Message via WhatsApp.'">
+                                    <i class="fab fa-whatsapp"></i>
+                                    Siap MPM: <span x-text="products.filter(p => p.image_fetch_status === 'FETCHED').length"></span> / <span x-text="products.length"></span>
+                                </span>
+                            </div>
                         </div>
 
                         <!-- Loading skeleton -->
@@ -476,35 +489,34 @@
                                                             <span x-text="product.category"></span>
                                                         </span>
                                                     </template>
-                                                    <!-- Review status badge (per-product approval by Meta) -->
+                                                    <!-- MPM-readiness badge — image_fetch_status is the actual gate for Multi-Product Messages.
+                                                         FETCHED = Meta successfully crawled the image_url; product can appear in MPM.
+                                                         FETCH_FAILED = image URL unreachable; Meta drops product from fetch schedule after repeated failures.
+                                                         Re-fetch only triggers when image_url *changes*. -->
                                                     <span class="inline-flex w-fit items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
                                                           :class="{
-                                                              'bg-emerald-100 text-emerald-700': product.review_status === 'approved',
-                                                              'bg-amber-100 text-amber-700':    product.review_status === 'pending',
-                                                              'bg-red-100 text-red-700':        product.review_status === 'rejected',
-                                                              'bg-orange-100 text-orange-700':  product.review_status === 'outdated',
-                                                              'bg-gray-100 text-gray-600':      !product.review_status || product.review_status === ''
+                                                              'bg-emerald-100 text-emerald-700': product.image_fetch_status === 'FETCHED',
+                                                              'bg-red-100 text-red-700':        product.image_fetch_status === 'FETCH_FAILED',
+                                                              'bg-amber-100 text-amber-700':    product.image_fetch_status === 'OUTDATED' || product.image_fetch_status === 'PARTIAL_FETCH',
+                                                              'bg-gray-100 text-gray-600':      !product.image_fetch_status || product.image_fetch_status === 'NO_STATUS' || product.image_fetch_status === 'NOT_FETCHED'
                                                           }"
-                                                          :title="product.review_status === 'rejected' && Array.isArray(product.review_rejection_reasons) && product.review_rejection_reasons.length
-                                                              ? 'Alasan: ' + product.review_rejection_reasons.join(', ')
-                                                              : (product.review_status === 'approved' ? 'Produk lolos review Meta — bisa dikirim via WhatsApp'
-                                                                : product.review_status === 'pending'  ? 'Sedang direview Meta — belum bisa dikirim via WhatsApp'
-                                                                : product.review_status === 'rejected' ? 'Ditolak Meta — tidak bisa dikirim via WhatsApp'
-                                                                : product.review_status === 'outdated' ? 'Data berubah, perlu re-review Meta'
-                                                                : 'Belum direview Meta — tidak bisa dikirim via WhatsApp (MPM)')">
+                                                          :title="product.image_fetch_status === 'FETCHED' ? 'Image berhasil diunduh Meta — produk siap dikirim via WhatsApp MPM'
+                                                                : product.image_fetch_status === 'FETCH_FAILED' ? 'Image gagal diunduh Meta — produk TIDAK bisa dikirim via MPM. Ganti image_url ke URL berbeda untuk memicu re-fetch.'
+                                                                : product.image_fetch_status === 'OUTDATED' ? 'URL berubah, Meta akan re-fetch'
+                                                                : product.image_fetch_status === 'PARTIAL_FETCH' ? 'Image utama sukses, tapi sebagian additional images gagal'
+                                                                : 'Meta belum crawl image — tunggu sebentar atau pastikan image_url accessible'">
                                                         <i class="fas text-[8px]"
                                                            :class="{
-                                                               'fa-circle-check':       product.review_status === 'approved',
-                                                               'fa-clock':              product.review_status === 'pending',
-                                                               'fa-circle-xmark':       product.review_status === 'rejected',
-                                                               'fa-rotate':             product.review_status === 'outdated',
-                                                               'fa-circle-question':    !product.review_status || product.review_status === ''
+                                                               'fa-circle-check':    product.image_fetch_status === 'FETCHED',
+                                                               'fa-triangle-exclamation': product.image_fetch_status === 'FETCH_FAILED',
+                                                               'fa-rotate':          product.image_fetch_status === 'OUTDATED' || product.image_fetch_status === 'PARTIAL_FETCH',
+                                                               'fa-clock':           !product.image_fetch_status || product.image_fetch_status === 'NO_STATUS' || product.image_fetch_status === 'NOT_FETCHED'
                                                            }"></i>
-                                                        <span x-text="product.review_status === 'approved' ? 'Approved'
-                                                                    : product.review_status === 'pending'  ? 'Review'
-                                                                    : product.review_status === 'rejected' ? 'Ditolak'
-                                                                    : product.review_status === 'outdated' ? 'Outdated'
-                                                                    : 'Belum review'"></span>
+                                                        <span x-text="product.image_fetch_status === 'FETCHED' ? 'Siap MPM'
+                                                                    : product.image_fetch_status === 'FETCH_FAILED' ? 'Image gagal'
+                                                                    : product.image_fetch_status === 'OUTDATED' ? 'Outdated'
+                                                                    : product.image_fetch_status === 'PARTIAL_FETCH' ? 'Partial'
+                                                                    : 'Menunggu crawl'"></span>
                                                     </span>
                                                 </div>
                                                 <template x-if="product.description">
