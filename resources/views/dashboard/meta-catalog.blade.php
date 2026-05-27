@@ -476,6 +476,36 @@
                                                             <span x-text="product.category"></span>
                                                         </span>
                                                     </template>
+                                                    <!-- Review status badge (per-product approval by Meta) -->
+                                                    <span class="inline-flex w-fit items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+                                                          :class="{
+                                                              'bg-emerald-100 text-emerald-700': product.review_status === 'approved',
+                                                              'bg-amber-100 text-amber-700':    product.review_status === 'pending',
+                                                              'bg-red-100 text-red-700':        product.review_status === 'rejected',
+                                                              'bg-orange-100 text-orange-700':  product.review_status === 'outdated',
+                                                              'bg-gray-100 text-gray-600':      !product.review_status || product.review_status === ''
+                                                          }"
+                                                          :title="product.review_status === 'rejected' && Array.isArray(product.review_rejection_reasons) && product.review_rejection_reasons.length
+                                                              ? 'Alasan: ' + product.review_rejection_reasons.join(', ')
+                                                              : (product.review_status === 'approved' ? 'Produk lolos review Meta — bisa dikirim via WhatsApp'
+                                                                : product.review_status === 'pending'  ? 'Sedang direview Meta — belum bisa dikirim via WhatsApp'
+                                                                : product.review_status === 'rejected' ? 'Ditolak Meta — tidak bisa dikirim via WhatsApp'
+                                                                : product.review_status === 'outdated' ? 'Data berubah, perlu re-review Meta'
+                                                                : 'Belum direview Meta — tidak bisa dikirim via WhatsApp (MPM)')">
+                                                        <i class="fas text-[8px]"
+                                                           :class="{
+                                                               'fa-circle-check':       product.review_status === 'approved',
+                                                               'fa-clock':              product.review_status === 'pending',
+                                                               'fa-circle-xmark':       product.review_status === 'rejected',
+                                                               'fa-rotate':             product.review_status === 'outdated',
+                                                               'fa-circle-question':    !product.review_status || product.review_status === ''
+                                                           }"></i>
+                                                        <span x-text="product.review_status === 'approved' ? 'Approved'
+                                                                    : product.review_status === 'pending'  ? 'Review'
+                                                                    : product.review_status === 'rejected' ? 'Ditolak'
+                                                                    : product.review_status === 'outdated' ? 'Outdated'
+                                                                    : 'Belum review'"></span>
+                                                    </span>
                                                 </div>
                                                 <template x-if="product.description">
                                                     <p class="text-xs text-[hsl(var(--muted-foreground))] line-clamp-2" x-text="product.description"></p>

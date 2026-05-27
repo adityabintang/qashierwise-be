@@ -421,9 +421,10 @@ class CatalogService
      * Product fields fetched when listing products. Keep aligned with the
      * frontend's product card and edit modal expectations.
      */
-    // inventory/review_status/review_rejection_reasons removed — stock is self-hosted,
-    // review badges were removed from the UI.
-    protected const PRODUCT_FIELDS = 'id,retailer_id,name,description,price,sale_price,currency,image_url,additional_image_urls,availability,category,google_product_category,brand,condition,url,visibility';
+    // inventory removed — stock is self-hosted in our DB.
+    // review_status/review_rejection_reasons are required to show approval state in the UI:
+    // only products with review_status="approved" can be sent via MPM (Meta error 131009).
+    protected const PRODUCT_FIELDS = 'id,retailer_id,name,description,price,sale_price,currency,image_url,additional_image_urls,availability,category,google_product_category,brand,condition,url,visibility,review_status,review_rejection_reasons';
 
     /**
      * Get products from a specific catalog.
