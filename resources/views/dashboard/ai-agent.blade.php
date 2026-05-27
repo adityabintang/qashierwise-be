@@ -660,24 +660,8 @@
                                         </p>
                                     </div>
 
-                                    <!-- Max count + auto-cancel -->
-                                    <div x-show="form.settings.followup_enabled" x-transition class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div class="space-y-2">
-                                            <label class="block text-sm font-medium text-[hsl(var(--foreground))]">
-                                                Jumlah maksimum follow-up
-                                            </label>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                max="5"
-                                                x-model.number="form.settings.followup_max_count"
-                                                class="w-full h-10 px-3 rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--background))] text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                            />
-                                            <p class="text-xs text-[hsl(var(--muted-foreground))]">
-                                                Setelah dikirim sebanyak ini tanpa respons, aksi terminal dijalankan.
-                                            </p>
-                                        </div>
-
+                                    <!-- Auto-cancel (max follow-up count is hardcoded to 3) -->
+                                    <div x-show="form.settings.followup_enabled" x-transition>
                                         <div class="flex items-start gap-3 p-3 rounded-lg border"
                                              :class="form.settings.followup_auto_cancel ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'">
                                             <button
@@ -704,10 +688,10 @@
                                     <div x-show="form.settings.followup_enabled" x-transition class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
                                         <p>
                                             Ringkasan: pesan pengingat dikirim hingga
-                                            <span class="font-semibold" x-text="form.settings.followup_max_count"></span>×,
+                                            <span class="font-semibold">3</span>×,
                                             tiap <span class="font-semibold" x-text="form.settings.followup_interval_minutes"></span> menit.
                                             <template x-if="form.settings.followup_auto_cancel">
-                                                <span>Pesanan auto-batal di menit ke <span class="font-semibold" x-text="form.settings.followup_interval_minutes * (form.settings.followup_max_count + 1)"></span>.</span>
+                                                <span>Pesanan auto-batal di menit ke <span class="font-semibold" x-text="form.settings.followup_interval_minutes * 4"></span>.</span>
                                             </template>
                                             <template x-if="!form.settings.followup_auto_cancel">
                                                 <span>Setelah itu pengingat berhenti tanpa membatalkan pesanan.</span>

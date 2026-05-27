@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Model;
  *   drip_enabled                bool   default true
  *   followup_enabled            bool   default true
  *   followup_interval_minutes   int    default 10, clamped to [5, 60]
- *   followup_max_count          int    default 3,  clamped to [1, 5]
+ *   followup_max_count          int    hardcoded to 3 (not merchant-configurable)
  *   followup_auto_cancel        bool   default true
  *   quiet_hours_start           string|null  "HH:MM" or null
  *   quiet_hours_end             string|null  "HH:MM" or null
@@ -78,7 +78,7 @@ class AiAgentSettings implements CastsAttributes
         return match ($field) {
             'drip_enabled', 'followup_enabled', 'followup_auto_cancel' => $this->toBool($raw, (bool) $default),
             'followup_interval_minutes' => $this->clampInterval($raw, (int) $default),
-            'followup_max_count' => $this->clampInt($raw, (int) $default, 1, 5),
+            'followup_max_count' => 3,
             'max_drips_per_24h' => $this->clampInt($raw, (int) $default, 0, 10),
             'quiet_hours_start', 'quiet_hours_end' => $this->coerceTime($raw),
             default => $default,

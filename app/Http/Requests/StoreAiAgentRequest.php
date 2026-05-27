@@ -42,7 +42,6 @@ class StoreAiAgentRequest extends FormRequest
             'settings' => 'nullable|array',
             'settings.followup_enabled' => 'nullable|boolean',
             'settings.followup_interval_minutes' => 'nullable|integer|in:5,10,15,20,30,45,60',
-            'settings.followup_max_count' => 'nullable|integer|min:1|max:5',
             'settings.followup_auto_cancel' => 'nullable|boolean',
             'settings.drip_enabled' => 'nullable|boolean',
             'settings.quiet_hours_start' => ['nullable', 'string', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
@@ -64,8 +63,6 @@ class StoreAiAgentRequest extends FormRequest
             'system_prompt.required' => 'System prompt wajib diisi',
             'default_store_id.exists' => 'Toko tidak ditemukan',
             'settings.followup_interval_minutes.in' => 'Interval follow-up harus salah satu dari: 5, 10, 15, 20, 30, 45, atau 60 menit',
-            'settings.followup_max_count.min' => 'Jumlah maksimum follow-up minimal 1',
-            'settings.followup_max_count.max' => 'Jumlah maksimum follow-up maksimal 5',
             'settings.quiet_hours_start.regex' => 'Format jam tenang harus HH:MM (24-jam)',
             'settings.quiet_hours_end.regex' => 'Format jam tenang harus HH:MM (24-jam)',
         ];
