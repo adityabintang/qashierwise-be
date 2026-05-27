@@ -301,7 +301,9 @@
                                         <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))]">Pilih Katalog</label>
                                         <select
                                             x-model="form.catalog_id"
+                                            @change="catalogLinkError = false"
                                             class="w-full h-10 px-3 rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--background))] text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                                            :class="catalogLinkError ? 'border-red-400 focus:ring-red-400' : ''"
                                             :disabled="catalogsLoading"
                                         >
                                             <option value="">-- Pilih katalog --</option>
@@ -320,6 +322,28 @@
                                             <i class="fas fa-spinner fa-spin"></i>
                                             Memuat daftar katalog…
                                         </p>
+
+                                        <!-- Error: catalog already linked to another WABA -->
+                                        <div x-show="catalogLinkError" x-transition class="mt-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                                            <div class="flex items-start gap-2">
+                                                <i class="fas fa-exclamation-circle mt-0.5 text-red-500 shrink-0"></i>
+                                                <div class="space-y-1">
+                                                    <p class="font-semibold">Katalog sudah terhubung ke WhatsApp lain</p>
+                                                    <p class="text-red-700">Katalog ini sudah ditautkan ke akun WhatsApp Business lain. Meta hanya mengizinkan satu koneksi per katalog.</p>
+                                                    <p class="text-red-700">Pilih salah satu:</p>
+                                                    <ul class="list-disc list-inside space-y-1 text-red-700">
+                                                        <li>
+                                                            <a href="https://business.facebook.com/commerce" target="_blank" rel="noopener"
+                                                               class="font-medium underline hover:no-underline">
+                                                                Buka Meta Commerce Manager
+                                                            </a>
+                                                            → pilih katalog → Settings → WhatsApp Accounts → Disconnect, lalu simpan ulang.
+                                                        </li>
+                                                        <li>Atau pilih katalog lain dari dropdown di atas.</li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -882,6 +906,7 @@ function aiAgentApp() {
             qris_enabled: false,
             reservation_enabled: false,
             delivery_enabled: false,
+            catalogLinkError: false,
             catalog_enabled: false,
         },
         form: {
@@ -1083,9 +1108,12 @@ function aiAgentApp() {
                 const data = await response.json();
 
                 if (data.success) {
+                    this.catalogLinkError = false;
                     this.config.id = data.data.id;
                     this.lastSaved = new Date().toLocaleString('id-ID');
                     this.showNotification('Configuration saved successfully!', 'success');
+                } else if (data.error_code === 'CATALOG_ALREADY_LINKED_ELSEWHERE') {
+                    this.catalogLinkError = true;
                 } else {
                     this.showNotification(data.message || 'Failed to save', 'error');
                 }

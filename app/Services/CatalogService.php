@@ -223,6 +223,15 @@ class CatalogService
      * catalogs the user did not explicitly select during Embedded Signup but exist
      * under the business are still visible.
      *
+     * Only catalogs that can actually be linked to the current WABA are returned:
+     *   • Already linked to our WABA  → always included
+     *   • Not linked to any WABA      → included (free to link)
+     *   • Linked to a different WABA  → excluded (cannot link without Commerce Manager)
+     *
+     * Conflict detection uses the `connected_wabas` field returned by Meta. If Meta
+     * does not return the field (e.g. permission not granted), the catalog is included
+     * and any conflict surfaces as an error on save instead.
+     *
      * @return array{success: bool, catalogs?: array, error?: string, error_code?: string}
      */
     public function getCatalogs(WhatsAppAccount $account, ?string $overrideBusinessId = null): array
@@ -237,21 +246,24 @@ class CatalogService
             ];
         }
 
+        $wabaId   = (string) ($account->waba_id ?? $account->business_account_id ?? '');
         $cacheKey = "catalog.list.{$account->id}.{$businessId}";
 
-        return Cache::remember($cacheKey, 300, function () use ($account, $businessId) {
+        return Cache::remember($cacheKey, 300, function () use ($account, $businessId, $wabaId) {
+            $token  = $account->access_token;
+            $base   = $this->baseUrl();
             $fields = 'id,name,product_count,vertical';
             $edges  = ['owned_product_catalogs', 'client_product_catalogs', 'shared_product_catalogs'];
 
             $seen        = [];
-            $catalogs    = [];
+            $candidates  = [];
             $filteredOut = 0;
             $lastError   = null;
             $anyEdgeOk   = false;
 
             foreach ($edges as $edge) {
-                $response = Http::withToken($account->access_token)
-                    ->get("{$this->baseUrl()}/{$businessId}/{$edge}", [
+                $response = Http::withToken($token)
+                    ->get("{$base}/{$businessId}/{$edge}", [
                         'fields' => $fields,
                         'limit'  => 100,
                     ]);
@@ -259,19 +271,20 @@ class CatalogService
                 if ($response->successful()) {
                     $anyEdgeOk = true;
                     foreach ($response->json('data', []) as $catalog) {
-                        if (isset($seen[$catalog['id']])) {
+                        $catalogId = (string) ($catalog['id'] ?? '');
+
+                        if (isset($seen[$catalogId])) {
                             continue;
                         }
+                        $seen[$catalogId] = true;
 
                         $vertical = strtolower((string) ($catalog['vertical'] ?? ''));
                         if ($vertical !== 'commerce') {
-                            $seen[$catalog['id']] = true;
                             $filteredOut++;
                             continue;
                         }
 
-                        $seen[$catalog['id']] = true;
-                        $catalogs[] = $catalog;
+                        $candidates[$catalogId] = $catalog;
                     }
                 } else {
                     $error     = $response->json('error', []);
@@ -283,38 +296,123 @@ class CatalogService
                 }
             }
 
-            if ($anyEdgeOk) {
-                Log::info('CatalogService: fetched catalogs', [
-                    'business_id'  => $businessId,
-                    'count'        => count($catalogs),
-                    'filtered_out' => $filteredOut,
+            if (! $anyEdgeOk) {
+                if ($lastError && (str_contains($lastError, 'permission') || str_contains($lastError, 'catalog'))) {
+                    return [
+                        'success'    => false,
+                        'error_code' => 'PERMISSION_PENDING_REVIEW',
+                        'error'      => 'Fitur katalog Meta masih dalam proses peninjauan oleh Meta. Saat ini akses katalog hanya tersedia untuk akun penguji yang terdaftar di aplikasi developer kami.',
+                    ];
+                }
+
+                Log::error('CatalogService: failed to fetch catalogs from all edges', [
+                    'business_id' => $businessId,
+                    'last_error'  => $lastError,
                 ]);
 
                 return [
+                    'success'    => false,
+                    'error_code' => 'API_ERROR',
+                    'error'      => $lastError ?? 'Failed to fetch catalogs',
+                ];
+            }
+
+            // If no WABA ID, skip the probe and return all candidates.
+            if (! $wabaId || empty($candidates)) {
+                return [
                     'success'      => true,
-                    'catalogs'     => $catalogs,
+                    'catalogs'     => array_values($candidates),
                     'business_id'  => $businessId,
                     'filtered_out' => $filteredOut,
                 ];
             }
 
-            if ($lastError && (str_contains($lastError, 'permission') || str_contains($lastError, 'catalog'))) {
-                return [
-                    'success'    => false,
-                    'error_code' => 'PERMISSION_PENDING_REVIEW',
-                    'error'      => 'Fitur katalog Meta masih dalam proses peninjauan oleh Meta. Saat ini akses katalog hanya tersedia untuk akun penguji yang terdaftar di aplikasi developer kami.',
-                ];
+            // --- Link-probe filter ---
+            // Meta does not expose which WABA a catalog is linked to via any readable
+            // field. The only reliable way to know if a catalog CAN be linked to our
+            // WABA is to attempt the link. If Meta returns error_subcode 2388099 it is
+            // already locked to another WABA → exclude. All other outcomes → include.
+            //
+            // To avoid polluting WABA state we:
+            //   1. Record the WABA's current catalog(s) so we can restore them after.
+            //   2. Pre-clear the WABA (a prior link blocks new ones on some Meta configs).
+            //   3. Probe each candidate: POST link → check result → DELETE immediately.
+            //   4. Restore original catalog(s).
+
+            // 1. Record current WABA catalog(s).
+            $wabaCurrentIds = [];
+            $wabaResp = Http::withToken($token)->get("{$base}/{$wabaId}/product_catalogs");
+            if ($wabaResp->successful()) {
+                foreach ($wabaResp->json('data', []) as $wc) {
+                    $id = (string) ($wc['id'] ?? '');
+                    if ($id) {
+                        $wabaCurrentIds[] = $id;
+                    }
+                }
             }
 
-            Log::error('CatalogService: failed to fetch catalogs from all edges', [
-                'business_id' => $businessId,
-                'last_error'  => $lastError,
+            // 2. Pre-clear: unlink whatever is currently on the WABA.
+            foreach ($wabaCurrentIds as $currentId) {
+                Http::withToken($token)
+                    ->delete("{$base}/{$wabaId}/product_catalogs", ['catalog_id' => $currentId]);
+            }
+
+            // 3. Probe each candidate.
+            $catalogs         = [];
+            $filteredConflict = 0;
+
+            foreach ($candidates as $catalogId => $catalog) {
+                // If the catalog was already on our WABA → definitely linkable, skip probe.
+                if (in_array($catalogId, $wabaCurrentIds, true)) {
+                    $catalogs[] = $catalog;
+                    continue;
+                }
+
+                $probeResp = Http::withToken($token)
+                    ->asForm()
+                    ->post("{$base}/{$wabaId}/product_catalogs", ['catalog_id' => $catalogId]);
+
+                if ($probeResp->successful()) {
+                    $catalogs[] = $catalog;
+                    // Immediately unlink to keep WABA clean for the next probe.
+                    Http::withToken($token)
+                        ->delete("{$base}/{$wabaId}/product_catalogs", ['catalog_id' => $catalogId]);
+                } elseif ($probeResp->json('error.error_subcode') === 2388099) {
+                    $filteredConflict++;
+                    Log::debug('CatalogService: probe — catalog linked to another WABA, excluded', [
+                        'catalog_id' => $catalogId,
+                        'waba_id'    => $wabaId,
+                    ]);
+                } else {
+                    // Unknown error → include (let save surface the real problem).
+                    $catalogs[] = $catalog;
+                    Log::debug('CatalogService: probe — unexpected error, including catalog', [
+                        'catalog_id' => $catalogId,
+                        'status'     => $probeResp->status(),
+                        'error'      => $probeResp->json('error.message'),
+                    ]);
+                }
+            }
+
+            // 4. Restore original WABA catalog(s).
+            foreach ($wabaCurrentIds as $currentId) {
+                Http::withToken($token)
+                    ->asForm()
+                    ->post("{$base}/{$wabaId}/product_catalogs", ['catalog_id' => $currentId]);
+            }
+
+            Log::info('CatalogService: fetched catalogs', [
+                'business_id'       => $businessId,
+                'count'             => count($catalogs),
+                'filtered_out'      => $filteredOut,
+                'filtered_conflict' => $filteredConflict,
             ]);
 
             return [
-                'success'    => false,
-                'error_code' => 'API_ERROR',
-                'error'      => $lastError ?? 'Failed to fetch catalogs',
+                'success'      => true,
+                'catalogs'     => $catalogs,
+                'business_id'  => $businessId,
+                'filtered_out' => $filteredOut,
             ];
         });
     }
@@ -388,6 +486,17 @@ class CatalogService
     protected function productsCacheKey(string $catalogId, int $limit, ?string $after): string
     {
         return 'catalog.products.' . $catalogId . '.' . $limit . '.' . ($after ?? 'first');
+    }
+
+    public function clearCatalogsCache(WhatsAppAccount $account): void
+    {
+        $businessId = $account->catalog_business_id
+            ?? $account->waba_id
+            ?? $account->business_account_id;
+
+        if ($businessId) {
+            Cache::forget("catalog.list.{$account->id}.{$businessId}");
+        }
     }
 
     /**
@@ -566,6 +675,38 @@ class CatalogService
 
         $result = ['success' => true, 'linked' => false, 'commerce_enabled' => false];
 
+        // 0) Unlink any catalog currently linked to this WABA that is not the one we want.
+        //    Meta only allows 1 catalog per WABA, so switching requires a DELETE first.
+        //    Note: Meta docs say DELETE is unsupported, but the API actually accepts it.
+        $currentResp = Http::withToken($token)
+            ->get("{$this->baseUrl()}/{$wabaId}/product_catalogs");
+
+        if ($currentResp->successful()) {
+            foreach ($currentResp->json('data', []) as $existing) {
+                $existingId = (string) ($existing['id'] ?? '');
+                if ($existingId && $existingId !== $catalogId) {
+                    $delResp = Http::withToken($token)
+                        ->delete("{$this->baseUrl()}/{$wabaId}/product_catalogs", [
+                            'catalog_id' => $existingId,
+                        ]);
+
+                    Log::info('CatalogService: unlinked existing catalog from WABA before re-linking', [
+                        'waba_id'        => $wabaId,
+                        'unlinked_id'    => $existingId,
+                        'new_catalog_id' => $catalogId,
+                        'delete_status'  => $delResp->status(),
+                        'delete_success' => $delResp->json('success'),
+                    ]);
+                }
+            }
+        } else {
+            Log::warning('CatalogService: could not fetch current WABA catalogs before re-linking', [
+                'waba_id' => $wabaId,
+                'status'  => $currentResp->status(),
+                'error'   => $currentResp->json('error.message'),
+            ]);
+        }
+
         // 1) Associate the catalog with the WABA.
         $linkResp = Http::withToken($token)
             ->asForm()
@@ -575,6 +716,7 @@ class CatalogService
 
         if ($linkResp->successful()) {
             $result['linked'] = true;
+            $this->clearCatalogsCache($account);
             Log::info('CatalogService: linked catalog to WABA', [
                 'waba_id'    => $wabaId,
                 'catalog_id' => $catalogId,
@@ -590,8 +732,9 @@ class CatalogService
             if (str_contains(strtolower($msg), 'already') && ! $alreadyLinkedToOther) {
                 $result['linked'] = true;
             } else {
-                $result['success'] = false;
-                $result['error']   = $userMsg ?? $msg;
+                $result['success']    = false;
+                $result['error']      = $userMsg ?? $msg;
+                $result['error_code'] = $alreadyLinkedToOther ? 'CATALOG_ALREADY_LINKED_ELSEWHERE' : 'LINK_FAILED';
                 Log::warning('CatalogService: failed to link catalog to WABA', [
                     'waba_id'      => $wabaId,
                     'catalog_id'   => $catalogId,

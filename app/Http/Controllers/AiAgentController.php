@@ -189,6 +189,26 @@ class AiAgentController extends Controller
             }
             $newCatalogId = $catalogEnabled ? $request->input('catalog_id') : null;
 
+            // When the catalog changes, attempt to link it to the WABA BEFORE saving
+            // so we can abort and return an informative error without partial writes.
+            if ($newCatalogId && $newCatalogId !== $previousCatalogId) {
+                $linkResult = $this->catalogService->linkCatalogToWaba($whatsappAccount, (string) $newCatalogId);
+
+                if (($linkResult['error_code'] ?? null) === 'CATALOG_ALREADY_LINKED_ELSEWHERE') {
+                    return response()->json([
+                        'success'    => false,
+                        'error_code' => 'CATALOG_ALREADY_LINKED_ELSEWHERE',
+                        'message'    => $linkResult['error'],
+                    ], 422);
+                }
+
+                Log::info('AI Agent: catalog link attempt', [
+                    'catalog_id' => $newCatalogId,
+                    'linked'     => $linkResult['linked'] ?? false,
+                    'commerce'   => $linkResult['commerce_enabled'] ?? false,
+                ]);
+            }
+
             $aiAgent = AiAgent::updateOrCreate(
                 ['whatsapp_account_id' => $whatsappAccount->id],
                 [
@@ -207,21 +227,6 @@ class AiAgentController extends Controller
                     'settings' => $request->input('settings', []),
                 ]
             );
-
-            // When a catalog is selected (new or changed), associate it with the
-            // WABA so interactive product messages can reference it. Without this
-            // Meta returns "(#131009) Invalid catalog_id" even though the catalog
-            // exists and is owned by the same business. Idempotent — safe to call
-            // again on subsequent saves with the same catalog.
-            if ($newCatalogId && $newCatalogId !== $previousCatalogId) {
-                $linkResult = $this->catalogService->linkCatalogToWaba($whatsappAccount, (string) $newCatalogId);
-                Log::info('AI Agent: catalog link attempt', [
-                    'ai_agent_id' => $aiAgent->id,
-                    'catalog_id'  => $newCatalogId,
-                    'linked'      => $linkResult['linked'] ?? false,
-                    'commerce'    => $linkResult['commerce_enabled'] ?? false,
-                ]);
-            }
 
             return response()->json([
                 'success' => true,
