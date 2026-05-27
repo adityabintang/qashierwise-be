@@ -246,17 +246,16 @@ class CatalogService
             ];
         }
 
-        $wabaId   = (string) ($account->waba_id ?? $account->business_account_id ?? '');
         $cacheKey = "catalog.list.{$account->id}.{$businessId}";
 
-        return Cache::remember($cacheKey, 300, function () use ($account, $businessId, $wabaId) {
+        return Cache::remember($cacheKey, 300, function () use ($businessId, $account) {
             $token  = $account->access_token;
             $base   = $this->baseUrl();
             $fields = 'id,name,product_count,vertical';
             $edges  = ['owned_product_catalogs', 'client_product_catalogs', 'shared_product_catalogs'];
 
             $seen        = [];
-            $candidates  = [];
+            $catalogs    = [];
             $filteredOut = 0;
             $lastError   = null;
             $anyEdgeOk   = false;
@@ -284,7 +283,7 @@ class CatalogService
                             continue;
                         }
 
-                        $candidates[$catalogId] = $catalog;
+                        $catalogs[] = $catalog;
                     }
                 } else {
                     $error     = $response->json('error', []);
@@ -317,95 +316,10 @@ class CatalogService
                 ];
             }
 
-            // If no WABA ID, skip the probe and return all candidates.
-            if (! $wabaId || empty($candidates)) {
-                return [
-                    'success'      => true,
-                    'catalogs'     => array_values($candidates),
-                    'business_id'  => $businessId,
-                    'filtered_out' => $filteredOut,
-                ];
-            }
-
-            // --- Link-probe filter ---
-            // Meta does not expose which WABA a catalog is linked to via any readable
-            // field. The only reliable way to know if a catalog CAN be linked to our
-            // WABA is to attempt the link. If Meta returns error_subcode 2388099 it is
-            // already locked to another WABA → exclude. All other outcomes → include.
-            //
-            // To avoid polluting WABA state we:
-            //   1. Record the WABA's current catalog(s) so we can restore them after.
-            //   2. Pre-clear the WABA (a prior link blocks new ones on some Meta configs).
-            //   3. Probe each candidate: POST link → check result → DELETE immediately.
-            //   4. Restore original catalog(s).
-
-            // 1. Record current WABA catalog(s).
-            $wabaCurrentIds = [];
-            $wabaResp = Http::withToken($token)->get("{$base}/{$wabaId}/product_catalogs");
-            if ($wabaResp->successful()) {
-                foreach ($wabaResp->json('data', []) as $wc) {
-                    $id = (string) ($wc['id'] ?? '');
-                    if ($id) {
-                        $wabaCurrentIds[] = $id;
-                    }
-                }
-            }
-
-            // 2. Pre-clear: unlink whatever is currently on the WABA.
-            foreach ($wabaCurrentIds as $currentId) {
-                Http::withToken($token)
-                    ->delete("{$base}/{$wabaId}/product_catalogs", ['catalog_id' => $currentId]);
-            }
-
-            // 3. Probe each candidate.
-            $catalogs         = [];
-            $filteredConflict = 0;
-
-            foreach ($candidates as $catalogId => $catalog) {
-                // If the catalog was already on our WABA → definitely linkable, skip probe.
-                if (in_array($catalogId, $wabaCurrentIds, true)) {
-                    $catalogs[] = $catalog;
-                    continue;
-                }
-
-                $probeResp = Http::withToken($token)
-                    ->asForm()
-                    ->post("{$base}/{$wabaId}/product_catalogs", ['catalog_id' => $catalogId]);
-
-                if ($probeResp->successful()) {
-                    $catalogs[] = $catalog;
-                    // Immediately unlink to keep WABA clean for the next probe.
-                    Http::withToken($token)
-                        ->delete("{$base}/{$wabaId}/product_catalogs", ['catalog_id' => $catalogId]);
-                } elseif ($probeResp->json('error.error_subcode') === 2388099) {
-                    $filteredConflict++;
-                    Log::debug('CatalogService: probe — catalog linked to another WABA, excluded', [
-                        'catalog_id' => $catalogId,
-                        'waba_id'    => $wabaId,
-                    ]);
-                } else {
-                    // Unknown error → include (let save surface the real problem).
-                    $catalogs[] = $catalog;
-                    Log::debug('CatalogService: probe — unexpected error, including catalog', [
-                        'catalog_id' => $catalogId,
-                        'status'     => $probeResp->status(),
-                        'error'      => $probeResp->json('error.message'),
-                    ]);
-                }
-            }
-
-            // 4. Restore original WABA catalog(s).
-            foreach ($wabaCurrentIds as $currentId) {
-                Http::withToken($token)
-                    ->asForm()
-                    ->post("{$base}/{$wabaId}/product_catalogs", ['catalog_id' => $currentId]);
-            }
-
             Log::info('CatalogService: fetched catalogs', [
-                'business_id'       => $businessId,
-                'count'             => count($catalogs),
-                'filtered_out'      => $filteredOut,
-                'filtered_conflict' => $filteredConflict,
+                'business_id'  => $businessId,
+                'count'        => count($catalogs),
+                'filtered_out' => $filteredOut,
             ]);
 
             return [
