@@ -31,6 +31,7 @@ class OrderCreator
     public function __construct(
         protected QrisService $qrisService,
         protected ReplySender $replySender,
+        protected \App\Services\MerchantNotificationService $merchantNotif,
     ) {}
 
     /**
@@ -158,10 +159,27 @@ class OrderCreator
                         $catalogProduct->is_available = $catalogProduct->stock_quantity > 0;
                         $catalogProduct->save();
                     }
+
+                    // Low-stock notif — fire OUTSIDE this transaction would be
+                    // safer (notification failure shouldn't roll back the order),
+                    // but the service swallows its own errors so it's safe here.
+                    // Dedupes per (user, sku, day) so we don't spam on repeats.
+                    if ($posProduct) {
+                        $this->merchantNotif->notifyLowStockIfApplicable($posProduct);
+                    }
+                    if ($catalogProduct) {
+                        $this->merchantNotif->notifyLowStockIfApplicable($catalogProduct);
+                    }
                 }
 
                 return $order->fresh();
             });
+
+            // Merchant notification fires per-flow:
+            //   - pickup: immediately after customer is replied (in respondPickup)
+            //   - delivery / reservation: deferred to ProcessQrisPayment (after
+            //     payment settles — notifying merchant before payment would be
+            //     misleading because the order isn't "real" yet).
 
             $conversation->setCurrentOrder($order->id);
 
@@ -213,6 +231,16 @@ class OrderCreator
         $conversation->clearCatalogItems();
         $conversation->clearDeliveryContext();
         $conversation->clearFlowState();
+
+        // Pickup closes the loop without payment — notify merchant immediately.
+        try {
+            $this->merchantNotif->notifyNewOrder($order);
+        } catch (\Throwable $e) {
+            Log::warning('Merchant pickup notif failed (non-fatal)', [
+                'order_id' => $order->id,
+                'error'    => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

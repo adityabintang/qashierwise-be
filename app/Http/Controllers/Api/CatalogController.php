@@ -19,6 +19,7 @@ class CatalogController extends Controller
         protected CatalogService $catalogService,
         protected WhatsAppAccountService $whatsAppAccountService,
         protected CatalogOrderFlowService $catalogOrderFlow,
+        protected \App\Services\MerchantNotificationService $merchantNotif,
     ) {}
 
     /**
@@ -678,6 +679,18 @@ class CatalogController extends Controller
                     'availability'   => $newAvailability,
                 ]
             );
+
+            // Manual stock edit triggers the same low-stock notif as automatic
+            // decrement from orders. Dedup TTL prevents spam if user toggles
+            // back-and-forth.
+            try {
+                $this->merchantNotif->notifyLowStockIfApplicable($row);
+            } catch (\Throwable $e) {
+                Log::warning('Low-stock notif from updateStock failed (non-fatal)', [
+                    'retailer_id' => $retailerId,
+                    'error'       => $e->getMessage(),
+                ]);
+            }
 
             return response()->json([
                 'success' => true,

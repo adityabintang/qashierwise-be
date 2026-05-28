@@ -147,6 +147,30 @@ class ProcessReservationPayment implements ShouldQueue
             ]);
         }
 
+        // Notify merchant of new reservation (after order is created so the
+        // notif message can include order_number + items). Non-fatal.
+        try {
+            $this->reservation->refresh();
+            $order = $this->reservation->order_id
+                ? \App\Models\Order::find($this->reservation->order_id)
+                : null;
+            if ($order) {
+                // Tag delivery_type so MerchantNotificationService picks the
+                // reservation label. The Order row may have delivery_type set
+                // by createOrderFromReservation; if not, override locally here
+                // (not persisted) so notification reads "Reservasi".
+                if ($order->delivery_type !== 'reservasi') {
+                    $order->setAttribute('delivery_type', 'reservasi');
+                }
+                app(\App\Services\MerchantNotificationService::class)->notifyNewOrder($order);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Merchant reservation notif failed (non-fatal)', [
+                'reservation_id' => $this->reservation->id,
+                'error'          => $e->getMessage(),
+            ]);
+        }
+
         // Dispatch success notification
         SendReservationNotification::dispatch($this->reservation, 'success');
 
