@@ -528,12 +528,18 @@ class WhatsAppWebhookController extends Controller
 
             if ($type === 'interactive') {
                 $interactiveType = $message['interactive']['type'] ?? null;
-                if ($interactiveType !== 'button_reply') {
+                // Treat list_reply and button_reply the same way — both carry an
+                // id + title. Category picker uses list_reply (more than 3 options).
+                $replyId = null;
+                if ($interactiveType === 'button_reply') {
+                    $replyId = $message['interactive']['button_reply']['id'] ?? null;
+                } elseif ($interactiveType === 'list_reply') {
+                    $replyId = $message['interactive']['list_reply']['id'] ?? null;
+                } else {
                     return false;
                 }
 
-                $buttonId = $message['interactive']['button_reply']['id'] ?? null;
-                if (! $buttonId) {
+                if (! $replyId) {
                     return false;
                 }
 
@@ -542,7 +548,7 @@ class WhatsAppWebhookController extends Controller
                     $contact,
                     $conversation,
                     $aiAgent,
-                    $buttonId
+                    $replyId
                 );
             }
 

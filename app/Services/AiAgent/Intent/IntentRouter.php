@@ -92,7 +92,10 @@ class IntentRouter
 
         $conversation->addMessage('human', $messageText);
         $conversation->addMessage('ai', 'Mengirim katalog produk…');
-        $this->catalogOrderFlow->sendCatalog($account, $contact, $aiAgent);
+        // Show category picker first (falls through to direct send if the
+        // catalog has 0-1 categories). Keeps parity with the "Lihat Menu"
+        // button path so users get consistent UX no matter how they trigger.
+        $this->catalogOrderFlow->sendCategoryPicker($account, $contact, $aiAgent);
 
         return true;
     }

@@ -16,6 +16,9 @@ use Netflie\WhatsAppCloudApi\Message\ButtonReply\ButtonAction;
 use Netflie\WhatsAppCloudApi\Message\MultiProduct\Action as MultiProductAction;
 use Netflie\WhatsAppCloudApi\Message\MultiProduct\Row as MultiProductRow;
 use Netflie\WhatsAppCloudApi\Message\MultiProduct\Section as MultiProductSection;
+use Netflie\WhatsAppCloudApi\Message\OptionsList\Action as OptionsListAction;
+use Netflie\WhatsAppCloudApi\Message\OptionsList\Row as OptionsListRow;
+use Netflie\WhatsAppCloudApi\Message\OptionsList\Section as OptionsListSection;
 use Netflie\WhatsAppCloudApi\WhatsAppCloudApi;
 
 /**
@@ -78,6 +81,11 @@ class CatalogOrderFlowService
     // Drip-message CTA: resume the in-progress order after an off-context message.
     public const BTN_CONTINUE_FLOW = 'flow_continue';
 
+    // Category picker (list_reply) row IDs.
+    public const CAT_PREFIX = 'cat:';
+
+    public const CAT_ALL = 'cat:_all';
+
     // ---- Flow states --------------------------------------------------------
 
     // Items selected (catalog or POS) — awaiting Konfirmasi/Batal before fulfillment.
@@ -137,10 +145,109 @@ class CatalogOrderFlowService
      * explicit catalog_id so the WABA does NOT need a "primary" catalog linked
      * (avoiding Meta error 131009 "Check if a catalog is linked...").
      */
-    public function sendCatalog(
+    /**
+     * Show a category picker before sending the full catalog. If the catalog
+     * has 0 or 1 distinct categories, this is a no-op upgrade — fall through
+     * to direct sendCatalog so the customer doesn't wait an extra round-trip.
+     */
+    public function sendCategoryPicker(
         WhatsAppAccount $account,
         WhatsAppContact $contact,
         AiAgent $aiAgent
+    ): void {
+        $client = $this->client($account);
+        $catalogId = $aiAgent->catalog_id;
+        $botName = $aiAgent->bot_name ?? 'Pesan via WhatsApp';
+
+        if (! $catalogId) {
+            $this->sendText($client, $contact->wa_id,
+                'Katalog menu belum dikonfigurasi. Silakan hubungi admin.');
+
+            return;
+        }
+
+        $result = $this->catalogService->getCatalogProducts($account, $catalogId, self::MAX_TOTAL_ITEMS);
+        if (! ($result['success'] ?? false)) {
+            $this->sendCatalog($account, $contact, $aiAgent);
+            return;
+        }
+
+        $products = $this->filterAvailableProducts($result['products'] ?? []);
+        $categories = $this->extractCategories($products);
+
+        // 0-1 categories → no picker needed, send the catalog directly.
+        if (count($categories) < 2) {
+            $this->sendCatalog($account, $contact, $aiAgent);
+            return;
+        }
+
+        // Build list rows: one per category + "Semua Kategori" at the end.
+        // WhatsApp list-message limit: 10 rows per section. Cap categories at 9
+        // so "Semua Kategori" always fits.
+        $categories = array_slice($categories, 0, 9);
+
+        $rows = [];
+        foreach ($categories as $cat) {
+            $rows[] = new OptionsListRow(
+                self::CAT_PREFIX . rawurlencode($cat),
+                mb_substr($cat, 0, 24),
+                null
+            );
+        }
+        $rows[] = new OptionsListRow(self::CAT_ALL, 'Semua Kategori', null);
+
+        $section = new OptionsListSection('Kategori', $rows);
+        $action  = new OptionsListAction('Pilih Kategori', [$section]);
+
+        try {
+            $client->sendList(
+                $contact->wa_id,
+                mb_substr('Menu ' . $botName, 0, 60),
+                'Pilih kategori menu yang ingin dilihat:',
+                mb_substr($botName, 0, 60),
+                $action
+            );
+
+            Log::info('Catalog category picker sent', [
+                'ai_agent_id' => $aiAgent->id,
+                'catalog_id'  => $catalogId,
+                'categories'  => $categories,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to send category picker, falling back to direct catalog', [
+                'catalog_id' => $catalogId,
+                'error'      => $e->getMessage(),
+            ]);
+            $this->sendCatalog($account, $contact, $aiAgent);
+        }
+    }
+
+    /**
+     * Distinct, case-insensitive, sorted list of `category` values present in
+     * the given products. Empty/missing categories are dropped.
+     *
+     * @param  array<int, array<string, mixed>>  $products
+     * @return array<int, string>
+     */
+    private function extractCategories(array $products): array
+    {
+        $seen = [];
+        foreach ($products as $p) {
+            $cat = trim((string) ($p['category'] ?? ''));
+            if ($cat === '') continue;
+            $key = mb_strtolower($cat);
+            if (! isset($seen[$key])) $seen[$key] = $cat; // preserve original casing of first occurrence
+        }
+        $values = array_values($seen);
+        sort($values, SORT_NATURAL | SORT_FLAG_CASE);
+        return $values;
+    }
+
+    public function sendCatalog(
+        WhatsAppAccount $account,
+        WhatsAppContact $contact,
+        AiAgent $aiAgent,
+        ?string $categoryFilter = null
     ): void {
         $client = $this->client($account);
         $catalogId = $aiAgent->catalog_id;
@@ -173,9 +280,20 @@ class CatalogOrderFlowService
 
         $products = $this->filterAvailableProducts($result['products'] ?? []);
 
+        // Optional category filter (case-insensitive). Used by the category-picker
+        // flow so customers can drill into one category before seeing the catalog.
+        if ($categoryFilter !== null) {
+            $needle = mb_strtolower($categoryFilter);
+            $products = array_values(array_filter($products, function ($p) use ($needle) {
+                return mb_strtolower((string) ($p['category'] ?? '')) === $needle;
+            }));
+        }
+
         if (empty($products)) {
             $this->sendText($client, $contact->wa_id,
-                'Maaf, saat ini belum ada menu yang tersedia. Silakan coba lagi nanti.');
+                $categoryFilter !== null
+                    ? "Maaf, belum ada menu di kategori \"{$categoryFilter}\". Silakan pilih kategori lain."
+                    : 'Maaf, saat ini belum ada menu yang tersedia. Silakan coba lagi nanti.');
 
             return;
         }
@@ -589,7 +707,9 @@ class CatalogOrderFlowService
         // greeting CTA shortcut. Equivalent to user typing "menu".
         if ($buttonId === self::BTN_SHOW_MENU) {
             if ($aiAgent->isCatalogActive()) {
-                $this->sendCatalog($account, $contact, $aiAgent);
+                // Show category picker first (falls through to direct send
+                // if the catalog only has 0-1 distinct categories).
+                $this->sendCategoryPicker($account, $contact, $aiAgent);
 
                 return true;
             }
@@ -597,6 +717,23 @@ class CatalogOrderFlowService
             // Catalog inactive -> route to the standard LLM/POS-products flow.
             app(AiAgentService::class)->processMessage($account, $contact, 'menu');
 
+            return true;
+        }
+
+        // Category picker reply (list_reply id="cat:<urlencoded>" or "cat:_all").
+        if (str_starts_with($buttonId, self::CAT_PREFIX)) {
+            if (! $aiAgent->isCatalogActive()) {
+                app(AiAgentService::class)->processMessage($account, $contact, 'menu');
+                return true;
+            }
+
+            if ($buttonId === self::CAT_ALL) {
+                $this->sendCatalog($account, $contact, $aiAgent);
+                return true;
+            }
+
+            $category = rawurldecode(substr($buttonId, strlen(self::CAT_PREFIX)));
+            $this->sendCatalog($account, $contact, $aiAgent, $category);
             return true;
         }
 
