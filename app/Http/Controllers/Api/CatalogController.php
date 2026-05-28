@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Exceptions\WhatsAppNotConnectedException;
 use App\Http\Controllers\Controller;
 use App\Models\CatalogProduct;
+use App\Services\CatalogOrderFlowService;
 use App\Services\CatalogService;
 use App\Services\WhatsAppAccountService;
 use Illuminate\Http\JsonResponse;
@@ -17,7 +18,54 @@ class CatalogController extends Controller
     public function __construct(
         protected CatalogService $catalogService,
         protected WhatsAppAccountService $whatsAppAccountService,
+        protected CatalogOrderFlowService $catalogOrderFlow,
     ) {}
+
+    /**
+     * POST /api/whatsapp/catalog/test-send
+     * Merchant-triggered: try to send the chosen catalog as MPM to a phone
+     * number — pre-filtering products that aren't MPM-ready so the test
+     * mirrors what real customers will see.
+     */
+    public function testSendCatalog(Request $request): JsonResponse
+    {
+        $request->validate([
+            'catalog_id' => 'required|string',
+            'phone'      => ['required', 'string', 'regex:/^[0-9+]{8,20}$/'],
+            'bot_name'   => 'sometimes|nullable|string|max:60',
+        ]);
+
+        try {
+            $account = $this->getAccount();
+            // Normalize phone: strip non-digits except leading '+', WhatsApp wants E.164-ish.
+            $phone = preg_replace('/[^0-9]/', '', $request->input('phone'));
+
+            $result = $this->catalogOrderFlow->testSendCatalog(
+                $account,
+                (string) $request->input('catalog_id'),
+                $phone,
+                $request->input('bot_name') ?: 'Test'
+            );
+
+            $status = $result['success'] ? 200 : 422;
+
+            return response()->json([
+                'success'        => (bool) $result['success'],
+                'message'        => $result['success']
+                    ? "Permintaan terkirim ke Meta untuk +{$phone}. Meta yang memutuskan produk mana yang sampai ke WhatsApp."
+                    : ($result['error'] ?? 'Gagal mengirim katalog.'),
+                'products_sent'  => $result['products_sent']  ?? 0,
+                'products_total' => $result['products_total'] ?? 0,
+                'reason'         => $result['reason']         ?? null,
+            ], $status);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success'    => false,
+                'error_code' => $e->getErrorCode(),
+                'message'    => $e->getMessage(),
+            ], $e->getCode());
+        }
+    }
 
     /**
      * POST /api/whatsapp/catalog/catalogs

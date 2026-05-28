@@ -323,6 +323,51 @@
                                             Memuat daftar katalog…
                                         </p>
 
+                                        <!-- Test send catalog: probe MPM to a phone before customer trigger -->
+                                        <div x-show="form.catalog_id" class="mt-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)] p-3 space-y-2">
+                                            <div class="flex items-center gap-2">
+                                                <i class="fab fa-whatsapp text-emerald-600"></i>
+                                                <span class="text-xs font-medium">Test kirim katalog</span>
+                                                <span class="text-[10px] text-[hsl(var(--muted-foreground))]">— validasi MPM sebelum customer pertama</span>
+                                            </div>
+                                            <div class="flex flex-col sm:flex-row gap-2">
+                                                <input type="tel" x-model="testCatalogPhone"
+                                                       placeholder="62812xxxxxxxx (E.164, tanpa +)"
+                                                       class="input flex-1 h-9 text-xs"
+                                                       :disabled="testCatalogSending">
+                                                <button type="button" @click="testSendCatalog()"
+                                                        :disabled="!testCatalogPhone || testCatalogSending"
+                                                        class="btn btn-outline btn-sm whitespace-nowrap">
+                                                    <i class="fas" :class="testCatalogSending ? 'fa-spinner animate-spin' : 'fa-paper-plane'"></i>
+                                                    <span x-text="testCatalogSending ? 'Mengirim…' : 'Kirim Test'"></span>
+                                                </button>
+                                            </div>
+                                            <div x-show="testCatalogResult" x-transition
+                                                 class="text-xs p-2 rounded"
+                                                 :class="testCatalogResult?.success
+                                                     ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                                                     : 'bg-red-50 border border-red-200 text-red-800'">
+                                                <div class="flex items-start gap-2">
+                                                    <i class="fas mt-0.5"
+                                                       :class="testCatalogResult?.success ? 'fa-circle-check text-emerald-600' : 'fa-circle-xmark text-red-600'"></i>
+                                                    <div class="flex-1 min-w-0">
+                                                        <div class="font-medium" x-text="testCatalogResult?.message"></div>
+                                                        <div x-show="testCatalogResult && (testCatalogResult.products_total ?? 0) > 0"
+                                                             class="text-[10px] mt-0.5 opacity-80">
+                                                            Diserahkan ke Meta: <span x-text="testCatalogResult?.products_sent ?? 0"></span> /
+                                                            <span x-text="testCatalogResult?.products_total ?? 0"></span> produk
+                                                            (Meta yang memutuskan berapa sampai ke WhatsApp)
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <p class="text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                Semua produk available dikirim ke Meta; Meta yang filter berdasarkan
+                                                aturan internal-nya. Sukses = Meta menerima request, bukan jaminan
+                                                semua produk sampai. Untuk test number, nomor harus sudah di-allowlist.
+                                            </p>
+                                        </div>
+
                                         <!-- Error: catalog already linked to another WABA -->
                                         <div x-show="catalogLinkError" x-transition class="mt-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
                                             <div class="flex items-start gap-2">
@@ -882,6 +927,10 @@ function aiAgentApp() {
         stores: [],
         catalogs: [],
         catalogsLoading: false,
+        // Test send catalog state
+        testCatalogPhone: '',
+        testCatalogSending: false,
+        testCatalogResult: null,
         followupIntervalOptions: [5, 10, 15, 20, 30, 45, 60],
         config: {
             id: null,
@@ -962,6 +1011,42 @@ function aiAgentApp() {
                 console.error('Failed to load catalogs:', error);
             } finally {
                 this.catalogsLoading = false;
+            }
+        },
+
+        async testSendCatalog() {
+            if (!this.form.catalog_id || !this.testCatalogPhone) return;
+            const token = localStorage.getItem('token');
+            this.testCatalogSending = true;
+            this.testCatalogResult = null;
+            try {
+                const response = await fetch('/api/whatsapp/catalog/test-send', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        catalog_id: this.form.catalog_id,
+                        phone: this.testCatalogPhone,
+                        bot_name: this.form.bot_name || 'Test',
+                    }),
+                });
+                const data = await response.json();
+                this.testCatalogResult = {
+                    success: !!data.success,
+                    message: data.message || (data.success ? 'Terkirim.' : 'Gagal mengirim.'),
+                    products_sent: data.products_sent ?? 0,
+                    products_total: data.products_total ?? 0,
+                };
+            } catch (e) {
+                this.testCatalogResult = {
+                    success: false,
+                    message: 'Network error: ' + (e?.message || e),
+                };
+            } finally {
+                this.testCatalogSending = false;
             }
         },
 

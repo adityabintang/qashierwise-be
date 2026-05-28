@@ -289,7 +289,14 @@ class CatalogOrderFlowService
 
     /**
      * Keep only products with a usable retailer_id and (where set) availability=in stock.
-     * Meta MPM silently drops unknown SKUs; preventing them upfront keeps the message stable.
+     *
+     * NOTE: do NOT pre-filter by image_fetch_status. Empirical observation:
+     * a catalog with 6 FETCHED products sent only 4 via MPM — Meta has its
+     * own internal MPM-eligibility cache (separate from image_fetch_status)
+     * which is opaque to the API. Our pre-filter would only narrow the batch
+     * without matching Meta's actual deliverability rule. Better strategy:
+     * send everything available, let Meta drop what it can't deliver, and
+     * fall back to text menu if Meta rejects the entire batch.
      */
     private function filterAvailableProducts(array $products): array
     {
@@ -301,6 +308,81 @@ class CatalogOrderFlowService
 
             return in_array($avail, ['in stock', 'preorder', 'available for order'], true);
         }));
+    }
+
+    /**
+     * Merchant-triggered "test send" — like sendCatalog but takes a raw phone
+     * number instead of WhatsAppContact, and returns a structured result with
+     * counts so the dashboard can show what passed/got filtered.
+     *
+     * @return array{success: bool, error?: string, reason?: string, products_sent?: int, products_total?: int, products_skipped?: int}
+     */
+    public function testSendCatalog(
+        WhatsAppAccount $account,
+        string $catalogId,
+        string $phone,
+        string $botName = 'Test'
+    ): array {
+        $client = $this->client($account);
+
+        $result = $this->catalogService->getCatalogProducts($account, $catalogId, self::MAX_TOTAL_ITEMS);
+        if (! ($result['success'] ?? false)) {
+            return [
+                'success' => false,
+                'error'   => 'Gagal mengambil produk dari Meta: ' . ($result['error'] ?? 'unknown'),
+            ];
+        }
+
+        $allProducts = $result['products'] ?? [];
+        // No FETCHED pre-filter. image_fetch_status doesn't match Meta's actual
+        // MPM-eligibility (observed: 6 FETCHED → only 4 delivered). Send all
+        // available; Meta will drop what it can't deliver. If Meta rejects the
+        // whole batch we surface the error so the merchant knows.
+        $products = $this->filterAvailableProducts($allProducts);
+        $total    = count($allProducts);
+        $sent     = count($products);
+
+        if ($sent === 0) {
+            return [
+                'success'        => false,
+                'error'          => 'Tidak ada produk dengan availability=in stock di katalog ini.',
+                'products_total' => $total,
+                'products_sent'  => 0,
+            ];
+        }
+
+        try {
+            $sections = $this->buildMultiProductSections($products);
+            $header   = mb_substr('Menu ' . $botName, 0, 60);
+            $body     = $sent === 1
+                ? 'Berikut produk Anda. Tap "View" lalu "Add to cart" untuk memesan.'
+                : 'Test kirim katalog — silakan pilih menu favorit.';
+            $footer   = mb_substr($botName, 0, 60);
+
+            $client->sendMultiProduct(
+                $phone,
+                (int) $catalogId,
+                new MultiProductAction($sections),
+                $header,
+                $body,
+                $footer
+            );
+
+            return [
+                'success'        => true,
+                'products_sent'  => $sent,
+                'products_total' => $total,
+            ];
+        } catch (\Throwable $e) {
+            $msg = $e->getMessage();
+            return [
+                'success'        => false,
+                'error'          => $msg,
+                'reason'         => $this->classifyCatalogError($msg),
+                'products_total' => $total,
+                'products_sent'  => $sent,
+            ];
+        }
     }
 
     private function sendMultiProductMessage(
