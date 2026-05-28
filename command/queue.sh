@@ -17,4 +17,4 @@ echo ""
 
 cd ../
 
-php artisan queue:work --queue=ai-agent --tries=3 --timeout=60 --sleep=3
+php artisan queue:work --queue=default,ai-agent --sleep=3 --tries=3 --max-time=3600

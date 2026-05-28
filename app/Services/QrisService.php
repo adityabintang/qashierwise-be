@@ -254,9 +254,17 @@ class QrisService
             'payload_keys' => array_keys($payload),
         ]);
 
-        // Verify webhook signature using platform webhook token
-        if (! $this->xenPlatformService->verifyWebhookSignature($signature)) {
-            Log::warning('Invalid webhook signature');
+        // Sub-account context: business_id in the payload identifies which
+        // sub-account this webhook is for. Its own callback_token signs the
+        // signature header, NOT the master token. Falls back to null (master
+        // verification) when business_id is absent.
+        $subAccountId = $payload['business_id']
+            ?? ($payload['data']['business_id'] ?? null);
+
+        if (! $this->xenPlatformService->verifyWebhookSignature($signature, $subAccountId)) {
+            Log::warning('Invalid webhook signature', [
+                'sub_account_id' => $subAccountId,
+            ]);
             throw new \App\Exceptions\InvalidWebhookException('Invalid webhook signature');
         }
 

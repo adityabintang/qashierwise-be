@@ -36,6 +36,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Webhook callback URL for sub-accounts
+    |--------------------------------------------------------------------------
+    |
+    | Public HTTPS URL Xendit calls when sub-accounts receive payment events.
+    | Falls back to APP_URL + /api/webhooks/xendit when unset. XenPlatform
+    | sub-accounts do NOT inherit master callbacks — must be set per account.
+    |
+    */
+    'webhook_url' => env('XENDIT_WEBHOOK_URL', rtrim(env('APP_URL', ''), '/') . '/api/webhooks/xendit'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Platform Fee Percentage
     |--------------------------------------------------------------------------
     |

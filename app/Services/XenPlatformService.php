@@ -88,6 +88,21 @@ class XenPlatformService
                     'attempts_taken' => $attempt + 1,
                 ]);
 
+                // XenPlatform sub-accounts do NOT inherit master webhook URLs.
+                // Register the QRIS webhook on this sub-account so qr.payment
+                // events make it back to our /api/webhooks/xendit endpoint.
+                // Errors here are non-fatal — sub-account creation already
+                // succeeded, the admin can re-run via xendit:sync-webhooks.
+                try {
+                    $this->setupSubAccountWebhooks($data['id']);
+                } catch (\Throwable $e) {
+                    Log::warning('XenPlatform: webhook setup failed (non-fatal)', [
+                        'sub_merchant_id'    => $merchant->id,
+                        'xendit_account_id'  => $data['id'] ?? null,
+                        'error'              => $e->getMessage(),
+                    ]);
+                }
+
                 return [
                     'id' => $data['id'],
                     'status' => $data['status'] ?? 'ACTIVE',
@@ -148,6 +163,108 @@ class XenPlatformService
         $domain = substr($email, $atPos + 1);
 
         return "{$local}+{$padded}@{$domain}";
+    }
+
+    /**
+     * Register the public callback URL on a sub-account for every webhook type
+     * we care about, and persist the callback_token Xendit returns to
+     * sub_merchants so verifyWebhookSignature can match incoming signatures.
+     *
+     * XenPlatform sub-accounts have their OWN per-account callback config —
+     * they do not inherit master account webhook URLs. Each sub-account gets
+     * a unique callback_token from Xendit (empirically verified: same token
+     * across event types on the same sub-account; custom token in request
+     * body ignored — Xendit always auto-generates).
+     *
+     * Idempotent: re-calling returns the SAME callback_token for that account.
+     *
+     * @return array<string, array{ok: bool, token?: string}>  type => result
+     */
+    public function setupSubAccountWebhooks(string $xenditAccountId): array
+    {
+        $url = config('xendit.webhook_url');
+        if (! $url || ! str_starts_with($url, 'https://')) {
+            throw new RuntimeException(
+                'XENDIT_WEBHOOK_URL belum diset atau bukan HTTPS. Sub-account webhook tidak bisa di-register.'
+            );
+        }
+
+        // Xendit callback_urls API expects specific enum values — verified
+        // empirically with HTTP 400 API_VALIDATION_ERROR for the wrong names.
+        // Valid enums (probed 2026-05-28):
+        //   qr_code, invoice, ewallet, direct_debit, disbursement, payment_method.
+        // The critical one for our QRIS flow is `qr_code` (NOT qr_payments).
+        $types = ['qr_code', 'invoice', 'ewallet', 'direct_debit'];
+
+        $results = [];
+        $tokenForPersist = null;
+        foreach ($types as $type) {
+            $r = $results[$type] = $this->setCallbackUrl($xenditAccountId, $type, $url);
+            // qr_code is the canonical token source for our flow; otherwise
+            // take the first available (Xendit returns the same token for all
+            // event types on a sub-account).
+            if ($type === 'qr_code' && ! empty($r['token'])) {
+                $tokenForPersist = $r['token'];
+            } elseif (! $tokenForPersist && ! empty($r['token'])) {
+                $tokenForPersist = $r['token'];
+            }
+        }
+
+        if ($tokenForPersist) {
+            \App\Models\SubMerchant::where('xendit_account_id', $xenditAccountId)
+                ->update(['xendit_callback_token' => $tokenForPersist]);
+        }
+
+        Log::info('XenPlatform: sub-account webhooks registered', [
+            'xendit_account_id' => $xenditAccountId,
+            'url'               => $url,
+            'token_saved'       => $tokenForPersist ? 'yes' : 'no',
+            'results'           => array_map(fn ($r) => $r['ok'] ?? false, $results),
+        ]);
+
+        return $results;
+    }
+
+    /**
+     * Set the callback URL for one event type on a specific sub-account.
+     *
+     * Uses POST /callback_urls/{type} with `for-user-id` header (XenPlatform
+     * pattern). Returns array with ok + token from the response.
+     *
+     * @return array{ok: bool, token?: string}
+     */
+    private function setCallbackUrl(string $xenditAccountId, string $type, string $url): array
+    {
+        try {
+            $response = Http::withBasicAuth($this->apiKey, '')
+                ->withHeaders([
+                    'for-user-id'  => $xenditAccountId,
+                    'Content-Type' => 'application/json',
+                ])
+                ->timeout(15)
+                ->post("{$this->baseUrl}/callback_urls/{$type}", [
+                    'url' => $url,
+                ]);
+
+            if ($response->successful()) {
+                return ['ok' => true, 'token' => $response->json('callback_token')];
+            }
+
+            Log::warning('XenPlatform: setCallbackUrl failed', [
+                'xendit_account_id' => $xenditAccountId,
+                'type'              => $type,
+                'status'            => $response->status(),
+                'body'              => $response->body(),
+            ]);
+            return ['ok' => false];
+        } catch (\Throwable $e) {
+            Log::warning('XenPlatform: setCallbackUrl threw', [
+                'xendit_account_id' => $xenditAccountId,
+                'type'              => $type,
+                'error'             => $e->getMessage(),
+            ]);
+            return ['ok' => false];
+        }
     }
 
     /**
@@ -485,25 +602,56 @@ class XenPlatformService
 
     /**
      * Verify an incoming webhook signature.
+     *
+     * Sub-account webhooks (XenPlatform): signed with the sub-account's
+     * own callback_token, NOT the master account token. Caller must pass
+     * the sub-account id (from payload.business_id / payload.data.business_id)
+     * so we can look up the stored per-account token.
+     *
+     * Master account direct webhooks: pass $subAccountId = null. Falls back
+     * to XENDIT_WEBHOOK_TOKEN (.env) — used for non-XenPlatform integrations
+     * like the subscription billing webhook.
      */
-    public function verifyWebhookSignature(string $signature): bool
+    public function verifyWebhookSignature(string $signature, ?string $subAccountId = null): bool
     {
+        // Sub-account context: look up its callback_token from sub_merchants.
+        if ($subAccountId) {
+            $token = \App\Models\SubMerchant::where('xendit_account_id', $subAccountId)
+                ->value('xendit_callback_token');
+
+            if (! $token) {
+                Log::warning('XenPlatform: no callback_token stored for sub-account', [
+                    'xendit_account_id' => $subAccountId,
+                    'hint'              => 'Run: php artisan xendit:sync-webhooks --account=' . $subAccountId,
+                ]);
+                return false;
+            }
+
+            $result = hash_equals($token, $signature);
+            if (! $result) {
+                Log::warning('XenPlatform: sub-account signature mismatch', [
+                    'xendit_account_id' => $subAccountId,
+                    'expected_length'   => strlen($token),
+                    'received_length'   => strlen($signature),
+                ]);
+            }
+            return $result;
+        }
+
+        // Master context (legacy / direct master webhooks).
         if (empty($this->webhookToken)) {
             Log::warning('XenPlatform: Webhook token not configured');
-
             return false;
         }
 
         $result = hash_equals($this->webhookToken, $signature);
-
         if (! $result) {
-            Log::warning('XenPlatform: Webhook signature verification failed', [
+            Log::warning('XenPlatform: Webhook signature verification failed (master)', [
                 'expected_length' => strlen($this->webhookToken),
                 'received_length' => strlen($signature),
-                'received_prefix' => substr($signature, 0, 8).'...',
+                'received_prefix' => substr($signature, 0, 8) . '...',
             ]);
         }
-
         return $result;
     }
 
