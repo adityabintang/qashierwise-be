@@ -38,6 +38,7 @@ class CatalogOrderFlowService
         protected QrisService $qrisService,
         protected CatalogService $catalogService,
         protected \App\Services\AiAgent\Catalog\DeliveryInfoParser $deliveryParser,
+        protected \App\Services\AiAgent\Catalog\DeliveryInfoAiParser $deliveryAiParser,
         protected \App\Services\AiAgent\Catalog\OrderCreator $orderCreator,
         protected \App\Services\AiAgent\Catalog\CatalogMessageRenderer $renderer,
     ) {}
@@ -900,9 +901,22 @@ class CatalogOrderFlowService
             return true;
         }
 
-        // Otherwise: free-text full parse (e.g. "Budi, 0812xxxx, Jl. Mawar 12").
+        // Otherwise: free-text full parse. AI (structured outputs) is primary
+        // because it handles natural Indonesian variations far better than
+        // regex; regex parser is the safety net when AI is unavailable
+        // (API down, missing key, network error). Output schema is identical
+        // (name/phone/address/note) so downstream code is provider-agnostic.
         $conversation->setDeliveryRawInfo($clean);
-        $conversation->setDeliveryParsed($this->deliveryParser->parseFree($clean));
+
+        $parsed = $this->deliveryAiParser->parse($clean);
+        if ($parsed === null) {
+            Log::info('DeliveryInfoAiParser failed, falling back to regex', [
+                'contact_wa_id' => $contact->wa_id,
+            ]);
+            $parsed = $this->deliveryParser->parseFree($clean);
+        }
+
+        $conversation->setDeliveryParsed($parsed);
         $conversation->setFlowState(self::STATE_CONFIRMING_DELIVERY_INFO);
 
         $this->renderer->sendDeliveryInfoSummary($account, $contact, $conversation);
