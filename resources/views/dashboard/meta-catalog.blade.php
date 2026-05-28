@@ -804,7 +804,7 @@
                         </div>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Stok <span class="text-xs font-normal opacity-60">(disimpan lokal)</span></label>
+                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-1.5">Stok</label>
                         <input type="number" x-model="editForm.inventory" class="input w-full" placeholder="Kosongkan jika tak terbatas" min="0"
                                @input="onStockInput()">
                     </div>
