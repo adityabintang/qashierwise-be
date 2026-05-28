@@ -261,7 +261,185 @@
 
                 <!-- ════════ CATALOG LIST VIEW ════════ -->
                 <template x-if="!selectedCatalog && !(error && (error.code === 'WHATSAPP_NOT_CONNECTED' || error.code === 'PERMISSION_PENDING_REVIEW'))">
-                    <div>
+                    <div class="space-y-6">
+                        <!-- ════════ INTERACTIVE SUMMARY ════════ -->
+                        <template x-if="!loading && !error && catalogs.length > 0">
+                            <div class="space-y-4">
+                                <!-- Summary filter -->
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                    <div>
+                                        <h3 class="font-semibold text-base">Ringkasan Stok</h3>
+                                        <p class="text-xs text-[hsl(var(--muted-foreground))]" x-text="summaryFilter === 'all'
+                                            ? 'Menampilkan ringkasan semua katalog commerce'
+                                            : 'Filter: ' + (catalogs.find(c => c.id === summaryFilter)?.name || summaryFilter)"></p>
+                                    </div>
+                                    <select x-model="summaryFilter" @change="loadSummary()"
+                                            class="input h-9 text-sm max-w-xs">
+                                        <option value="all">Semua katalog</option>
+                                        <template x-for="c in catalogs" :key="'sf-' + c.id">
+                                            <option :value="c.id" x-text="c.name"></option>
+                                        </template>
+                                    </select>
+                                </div>
+
+                                <!-- Stat cards: total catalogs, total products, low stock, out of stock -->
+                                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                    <!-- Total catalogs -->
+                                    <div class="card p-4 hover:shadow-md transition-all">
+                                        <div class="flex items-center justify-between">
+                                            <div class="min-w-0">
+                                                <p class="text-[10px] sm:text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wider">Katalog</p>
+                                                <template x-if="!summaryLoading">
+                                                    <p class="text-2xl sm:text-3xl font-bold mt-1 tabular-nums" x-text="summary.total_catalogs ?? '–'"></p>
+                                                </template>
+                                                <template x-if="summaryLoading">
+                                                    <div class="skeleton h-8 w-12 mt-1"></div>
+                                                </template>
+                                            </div>
+                                            <div class="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                                                <i class="fas fa-store text-indigo-500"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Total products -->
+                                    <div class="card p-4 hover:shadow-md transition-all">
+                                        <div class="flex items-center justify-between">
+                                            <div class="min-w-0">
+                                                <p class="text-[10px] sm:text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wider">Total Produk</p>
+                                                <template x-if="!summaryLoading">
+                                                    <p class="text-2xl sm:text-3xl font-bold mt-1 tabular-nums" x-text="summary.total_products ?? '–'"></p>
+                                                </template>
+                                                <template x-if="summaryLoading">
+                                                    <div class="skeleton h-8 w-16 mt-1"></div>
+                                                </template>
+                                            </div>
+                                            <div class="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                                                <i class="fas fa-box text-emerald-500"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Low stock -->
+                                    <div class="card p-4 hover:shadow-md transition-all cursor-pointer"
+                                         @click="lowStockExpanded = !lowStockExpanded"
+                                         :class="(summary.low_stock_count ?? 0) > 0 ? 'border-amber-300 bg-amber-50/40' : ''">
+                                        <div class="flex items-center justify-between">
+                                            <div class="min-w-0">
+                                                <p class="text-[10px] sm:text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wider">Stok Menipis</p>
+                                                <template x-if="!summaryLoading">
+                                                    <p class="text-2xl sm:text-3xl font-bold mt-1 tabular-nums"
+                                                       :class="(summary.low_stock_count ?? 0) > 0 ? 'text-amber-600' : ''"
+                                                       x-text="summary.low_stock_count ?? '–'"></p>
+                                                </template>
+                                                <template x-if="summaryLoading">
+                                                    <div class="skeleton h-8 w-12 mt-1"></div>
+                                                </template>
+                                            </div>
+                                            <div class="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+                                                <i class="fas fa-triangle-exclamation text-amber-500"></i>
+                                            </div>
+                                        </div>
+                                        <p class="text-[10px] text-[hsl(var(--muted-foreground))] mt-2" x-show="(summary.low_stock_count ?? 0) > 0">
+                                            <i class="fas mr-0.5" :class="lowStockExpanded ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                                            Klik untuk <span x-text="lowStockExpanded ? 'sembunyikan' : 'lihat detail'"></span>
+                                        </p>
+                                    </div>
+
+                                    <!-- Out of stock -->
+                                    <div class="card p-4 hover:shadow-md transition-all"
+                                         :class="(summary.out_of_stock_count ?? 0) > 0 ? 'border-red-300 bg-red-50/40' : ''">
+                                        <div class="flex items-center justify-between">
+                                            <div class="min-w-0">
+                                                <p class="text-[10px] sm:text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wider">Stok Habis</p>
+                                                <template x-if="!summaryLoading">
+                                                    <p class="text-2xl sm:text-3xl font-bold mt-1 tabular-nums"
+                                                       :class="(summary.out_of_stock_count ?? 0) > 0 ? 'text-red-600' : ''"
+                                                       x-text="summary.out_of_stock_count ?? '–'"></p>
+                                                </template>
+                                                <template x-if="summaryLoading">
+                                                    <div class="skeleton h-8 w-12 mt-1"></div>
+                                                </template>
+                                            </div>
+                                            <div class="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
+                                                <i class="fas fa-circle-xmark text-red-500"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Expandable: low-stock details -->
+                                <div x-show="lowStockExpanded && (summary.low_stock_count ?? 0) > 0" x-transition
+                                     class="card p-5 border-amber-200 bg-amber-50/30">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <h4 class="font-semibold text-sm flex items-center gap-2">
+                                            <i class="fas fa-triangle-exclamation text-amber-500"></i>
+                                            Produk dengan stok hampir habis
+                                            <span class="text-xs font-normal text-[hsl(var(--muted-foreground))]">(≤<span x-text="summary.low_stock_threshold ?? 5"></span> unit)</span>
+                                        </h4>
+                                        <button @click="lowStockExpanded = false" class="text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <template x-for="p in (summary.low_stock_products ?? [])" :key="'low-' + p.retailer_id">
+                                            <div class="flex items-center justify-between gap-3 p-3 rounded-lg bg-white border border-amber-100">
+                                                <div class="min-w-0 flex-1">
+                                                    <p class="font-medium text-sm truncate" x-text="p.name"></p>
+                                                    <p class="text-xs text-[hsl(var(--muted-foreground))] truncate">
+                                                        SKU: <span class="font-mono" x-text="p.retailer_id"></span>
+                                                        · Katalog: <span x-text="p.catalog_name"></span>
+                                                    </p>
+                                                </div>
+                                                <div class="text-right flex-shrink-0">
+                                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700 tabular-nums">
+                                                        <span x-text="p.stock_quantity"></span>&nbsp;unit
+                                                    </span>
+                                                    <p class="text-[10px] text-[hsl(var(--muted-foreground))] mt-0.5" x-text="'Rp' + Number(p.price).toLocaleString('id-ID')"></p>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+
+                                <!-- Per-catalog mini chart bars -->
+                                <div x-show="!summaryLoading && (summary.by_catalog ?? []).length > 1 && summaryFilter === 'all'"
+                                     class="card p-5">
+                                    <h4 class="font-semibold text-sm mb-3">Distribusi produk per katalog</h4>
+                                    <div class="space-y-2.5">
+                                        <template x-for="row in (summary.by_catalog ?? [])" :key="'bc-' + row.id">
+                                            <div>
+                                                <div class="flex items-center justify-between text-xs mb-1">
+                                                    <span class="font-medium truncate flex-1" x-text="row.name"></span>
+                                                    <span class="text-[hsl(var(--muted-foreground))] tabular-nums ml-2"
+                                                          x-text="row.total_products + ' produk'"></span>
+                                                </div>
+                                                <div class="flex h-2 w-full rounded-full overflow-hidden bg-[hsl(var(--muted))]">
+                                                    <!-- max is the largest total in the dataset -->
+                                                    <div class="h-full bg-[hsl(var(--primary))] transition-all duration-500"
+                                                         :style="'width: ' + (
+                                                             Math.max(...(summary.by_catalog ?? []).map(r => r.total_products || 0), 1) > 0
+                                                                ? (row.total_products / Math.max(...(summary.by_catalog ?? []).map(r => r.total_products || 0), 1) * 100)
+                                                                : 0
+                                                         ) + '%'"></div>
+                                                </div>
+                                                <div class="flex items-center gap-3 mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                    <span x-show="row.low_stock > 0">
+                                                        <i class="fas fa-triangle-exclamation text-amber-500"></i>
+                                                        <span x-text="row.low_stock"></span> stok menipis
+                                                    </span>
+                                                    <span x-show="row.out_of_stock > 0">
+                                                        <i class="fas fa-circle-xmark text-red-500"></i>
+                                                        <span x-text="row.out_of_stock"></span> habis
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+
                         <!-- Skeleton loading -->
                         <template x-if="loading">
                             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -334,60 +512,25 @@
                             </div>
                         </template>
 
-                        <!-- ════════ COMMERCE FILTER INFO ════════ -->
+                        <!-- ════════ DOCS LINK ════════ -->
                         <template x-if="!loading && !error">
-                            <div class="card border-[hsl(var(--primary)/0.2)] bg-[hsl(var(--primary)/0.04)] p-5 mt-2">
-                                <div class="flex items-start gap-3">
-                                    <div class="h-9 w-9 rounded-lg bg-[hsl(var(--primary)/0.12)] flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <i class="fas fa-circle-info text-[hsl(var(--primary))]"></i>
-                                    </div>
-                                    <div class="flex-1 space-y-3">
-                                        <div>
-                                            <h4 class="font-semibold text-sm">Mengapa katalog saya tidak muncul di sini?</h4>
-                                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1 leading-relaxed">
-                                                Halaman ini <strong>hanya menampilkan katalog bertipe <span class="font-mono">commerce</span></strong>, karena hanya tipe inilah yang kompatibel dengan fitur produk WhatsApp Business (cart, multi-product message, dan order flow QashierWise).
-                                                <template x-if="filteredOut > 0">
-                                                    <span> Saat ini ada <strong x-text="filteredOut"></strong> katalog lain di Business Anda yang disembunyikan karena tipe-nya bukan <span class="font-mono">commerce</span>.</span>
-                                                </template>
-                                            </p>
-                                        </div>
-
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                                            <div class="rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/60 dark:bg-emerald-950/20 p-3">
-                                                <div class="flex items-center gap-1.5 font-semibold text-emerald-700 dark:text-emerald-400 mb-1.5">
-                                                    <i class="fas fa-circle-check"></i>
-                                                    <span>Pilih ini saat membuat katalog di Meta</span>
-                                                </div>
-                                                <ul class="space-y-1 text-[hsl(var(--foreground))]/85 list-disc list-inside leading-snug">
-                                                    <li><strong>Produk fisik → Produk online</strong> <span class="text-[hsl(var(--muted-foreground))]">(disarankan untuk F&B / retail)</span></li>
-                                                    <li><strong>Produk atau layanan lokal</strong> <span class="text-[hsl(var(--muted-foreground))]">(restoran, warung dengan delivery)</span></li>
-                                                    <li><strong>Layanan → Jasa profesional</strong></li>
-                                                    <li><strong>Produk atau konten digital → Aplikasi / Artikel</strong></li>
-                                                </ul>
-                                            </div>
-
-                                            <div class="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50/60 dark:bg-red-950/20 p-3">
-                                                <div class="flex items-center gap-1.5 font-semibold text-red-700 dark:text-red-400 mb-1.5">
-                                                    <i class="fas fa-circle-xmark"></i>
-                                                    <span>Hindari — tidak akan muncul di sini</span>
-                                                </div>
-                                                <ul class="space-y-1 text-[hsl(var(--foreground))]/85 list-disc list-inside leading-snug">
-                                                    <li><strong>Real estate</strong> <span class="text-[hsl(var(--muted-foreground))]">(home_listings)</span></li>
-                                                    <li><strong>Kendaraan / Kendaraan dan promo</strong> <span class="text-[hsl(var(--muted-foreground))]">(vehicles)</span></li>
-                                                    <li><strong>Hotel dan penyewaan</strong> <span class="text-[hsl(var(--muted-foreground))]">(hotels)</span></li>
-                                                    <li><strong>Penerbangan / Tujuan</strong> <span class="text-[hsl(var(--muted-foreground))]">(flights, destinations)</span></li>
-                                                    <li><strong>Media streaming</strong> <span class="text-[hsl(var(--muted-foreground))]">(media_title)</span></li>
-                                                </ul>
-                                            </div>
-                                        </div>
-
-                                        <p class="text-xs text-[hsl(var(--muted-foreground))] leading-relaxed">
-                                            <i class="fas fa-lightbulb text-amber-500 mr-1"></i>
-                                            <strong>Tip:</strong> Tipe katalog <span class="italic">tidak bisa diubah setelah dibuat</span>. Untuk menghindari kesalahan, disarankan membuat katalog langsung dari tombol <span class="font-semibold">"Buat Katalog Baru"</span> di halaman ini — tipe <span class="font-mono">commerce</span> akan otomatis diterapkan.
-                                        </p>
-                                    </div>
+                            <a href="/docs/meta-catalog" target="_blank" rel="noopener"
+                               class="card border-[hsl(var(--primary)/0.2)] bg-[hsl(var(--primary)/0.04)] hover:bg-[hsl(var(--primary)/0.08)] transition-colors p-4 mt-2 flex items-center gap-3 group">
+                                <div class="h-9 w-9 rounded-lg bg-[hsl(var(--primary)/0.12)] flex items-center justify-center flex-shrink-0">
+                                    <i class="fas fa-circle-question text-[hsl(var(--primary))]"></i>
                                 </div>
-                            </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-semibold text-sm">Katalog Anda tidak muncul di sini?</p>
+                                    <p class="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">
+                                        Hanya katalog bertipe <span class="font-mono">commerce</span> yang ditampilkan.
+                                        <template x-if="filteredOut > 0">
+                                            <span><strong x-text="filteredOut"></strong> katalog Anda disembunyikan karena tipe tidak kompatibel.</span>
+                                        </template>
+                                        <span class="text-[hsl(var(--primary))] font-medium">Lihat panduan lengkap →</span>
+                                    </p>
+                                </div>
+                                <i class="fas fa-external-link-alt text-xs text-[hsl(var(--muted-foreground))] group-hover:text-[hsl(var(--primary))] transition-colors"></i>
+                            </a>
                         </template>
                     </div>
                 </template>
@@ -977,6 +1120,12 @@ function metaCatalogApp() {
         error: null,
         toast: null,
 
+        // Stock summary (interactive cards on the catalog grid view)
+        summary: {},
+        summaryLoading: false,
+        summaryFilter: 'all',
+        lowStockExpanded: false,
+
         // Create product
         showCreateModal: false,
         creating: false,
@@ -1197,6 +1346,8 @@ function metaCatalogApp() {
                     this.catalogs = data.data.catalogs || [];
                     this.businessId = data.data.business_id || null;
                     this.filteredOut = data.data.filtered_out || 0;
+                    // Fire-and-forget: stock summary alongside catalog list. Doesn't block UI.
+                    if (this.catalogs.length > 0) this.loadSummary();
                 } else {
                     this.error = { code: data.error_code || 'UNKNOWN', message: data.message || 'Gagal memuat katalog.' };
                 }
@@ -1204,6 +1355,29 @@ function metaCatalogApp() {
                 this.error = { code: 'NETWORK_ERROR', message: 'Gagal terhubung ke server.' };
             } finally {
                 this.loading = false;
+            }
+        },
+
+        async loadSummary() {
+            this.summaryLoading = true;
+            try {
+                const token = localStorage.getItem('token');
+                const params = new URLSearchParams();
+                if (this.summaryFilter && this.summaryFilter !== 'all') {
+                    params.set('catalog_id', this.summaryFilter);
+                }
+                const url = `${this.API_BASE_URL}/catalog/summary${params.toString() ? '?' + params : ''}`;
+                const res = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.summary = data.data || {};
+                }
+            } catch (e) {
+                console.error('Failed to load summary:', e);
+            } finally {
+                this.summaryLoading = false;
             }
         },
 

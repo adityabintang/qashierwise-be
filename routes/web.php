@@ -66,6 +66,11 @@ Route::get('/refund-policy', function () {
     return view('refund-policy');
 })->name('refund-policy');
 
+// Public documentation pages
+Route::get('/docs/meta-catalog', function () {
+    return view('docs.meta-catalog');
+})->name('docs.meta-catalog');
+
 // Public QRIS Payment Page
 Route::get('/pay/qris/{orderId}', [QrisPaymentPageController::class, 'show'])
     ->name('qris.payment.page');

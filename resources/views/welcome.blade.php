@@ -411,7 +411,7 @@
                     <a href="#fitur" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.features') }}</a>
                     <a href="#pricing" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.pricing') }}</a>
                     <a href="/blog" class="text-gray-600 hover:text-primary transition">Blog</a>
-                    <a href="#about" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.about') }}</a>
+                    <a href="{{ route('docs.meta-catalog') }}" class="text-gray-600 hover:text-primary transition">Dokumentasi</a>
                     <a href="#faq" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.faq') }}</a>
                 </div>
 
@@ -462,7 +462,7 @@
                 <a href="#fitur" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.features') }}</a>
                 <a href="#pricing" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.pricing') }}</a>
                 <a href="/blog" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">Blog</a>
-                <a href="#about" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.about') }}</a>
+                <a href="{{ route('docs.meta-catalog') }}" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">Dokumentasi</a>
                 <a href="#faq" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.faq') }}</a>
 
                 <!-- Mobile CTA Buttons -->

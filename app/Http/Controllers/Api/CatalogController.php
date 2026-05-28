@@ -109,6 +109,118 @@ class CatalogController extends Controller
     }
 
     /**
+     * GET /api/whatsapp/catalog/summary?catalog_id=optional&low_stock_threshold=5
+     * Stock-focused summary across all commerce catalogs (default) or a single
+     * catalog. Local CatalogProduct rows are the source of truth for stock —
+     * Meta does not store inventory for us.
+     */
+    public function getSummary(Request $request): JsonResponse
+    {
+        try {
+            $account = $this->getAccount();
+            $userId  = auth()->user()->getEffectiveUserId();
+
+            $threshold = max(0, (int) $request->query('low_stock_threshold', 5));
+            $catalogId = $request->query('catalog_id');
+
+            // Build the set of catalog IDs we're scoping to. Default = all
+            // commerce catalogs visible to this account.
+            $catalogsResult = $this->catalogService->getCatalogs($account);
+            $allCatalogs = $catalogsResult['success']
+                ? collect($catalogsResult['catalogs'] ?? [])
+                : collect();
+
+            if ($catalogId) {
+                $allCatalogs = $allCatalogs->where('id', (string) $catalogId)->values();
+            }
+
+            $catalogIds   = $allCatalogs->pluck('id')->map(fn ($id) => (string) $id)->all();
+            $catalogNames = $allCatalogs->keyBy('id')->map(fn ($c) => $c['name'] ?? '')->all();
+
+            // Local stock rows for these catalogs.
+            $localQuery = CatalogProduct::query()
+                ->where('user_id', $userId);
+            if (! empty($catalogIds)) {
+                $localQuery->whereIn('catalog_id', $catalogIds);
+            }
+            $localProducts = $localQuery->get();
+
+            // Aggregate totals — prefer Meta's product_count for the "total"
+            // since not every product has a local row yet; fall back to local
+            // count for a scoped catalog.
+            $totalProductsMeta = (int) $allCatalogs->sum(fn ($c) => (int) ($c['product_count'] ?? 0));
+            $totalProductsLocal = $localProducts->count();
+            $totalProducts = $totalProductsMeta ?: $totalProductsLocal;
+
+            // Low-stock = has stock_quantity set, > 0 means in-stock, <= threshold means warning.
+            // Out-of-stock (0) is reported separately so merchants can distinguish.
+            $lowStockProducts = $localProducts
+                ->filter(fn ($p) => $p->stock_quantity !== null
+                    && $p->stock_quantity > 0
+                    && $p->stock_quantity <= $threshold)
+                ->sortBy('stock_quantity')
+                ->values()
+                ->map(fn ($p) => [
+                    'retailer_id'    => $p->retailer_id,
+                    'name'           => $p->name ?? $p->retailer_id,
+                    'stock_quantity' => $p->stock_quantity,
+                    'price'          => $p->price,
+                    'currency'       => $p->currency,
+                    'catalog_id'     => $p->catalog_id,
+                    'catalog_name'   => $catalogNames[$p->catalog_id] ?? '—',
+                ]);
+
+            $outOfStockProducts = $localProducts
+                ->filter(fn ($p) => $p->stock_quantity !== null && $p->stock_quantity === 0)
+                ->values()
+                ->map(fn ($p) => [
+                    'retailer_id'  => $p->retailer_id,
+                    'name'         => $p->name ?? $p->retailer_id,
+                    'catalog_id'   => $p->catalog_id,
+                    'catalog_name' => $catalogNames[$p->catalog_id] ?? '—',
+                ]);
+
+            // Per-catalog breakdown for charts.
+            $byCatalog = $allCatalogs->map(function ($c) use ($localProducts, $threshold) {
+                $cid  = (string) $c['id'];
+                $rows = $localProducts->where('catalog_id', $cid);
+
+                $tracked = $rows->filter(fn ($p) => $p->stock_quantity !== null);
+
+                return [
+                    'id'             => $cid,
+                    'name'           => $c['name'] ?? '',
+                    'total_products' => (int) ($c['product_count'] ?? $rows->count()),
+                    'tracked_stock'  => $tracked->count(),
+                    'low_stock'      => $tracked->filter(fn ($p) => $p->stock_quantity > 0 && $p->stock_quantity <= $threshold)->count(),
+                    'out_of_stock'   => $tracked->filter(fn ($p) => $p->stock_quantity === 0)->count(),
+                ];
+            })->values();
+
+            return response()->json([
+                'success' => true,
+                'data'    => [
+                    'scope'                  => $catalogId ? 'catalog' : 'all',
+                    'low_stock_threshold'    => $threshold,
+                    'total_catalogs'         => $allCatalogs->count(),
+                    'total_products'         => $totalProducts,
+                    'low_stock_count'        => $lowStockProducts->count(),
+                    'out_of_stock_count'     => $outOfStockProducts->count(),
+                    'low_stock_products'     => $lowStockProducts,
+                    'out_of_stock_products'  => $outOfStockProducts,
+                    'by_catalog'             => $byCatalog,
+                ],
+            ]);
+        } catch (WhatsAppNotConnectedException $e) {
+            return response()->json([
+                'success'    => false,
+                'error_code' => $e->getErrorCode(),
+                'message'    => $e->getMessage(),
+            ], $e->getCode());
+        }
+    }
+
+    /**
      * GET /api/whatsapp/catalog/catalogs
      * List all Meta product catalogs for the authenticated user's business.
      */
