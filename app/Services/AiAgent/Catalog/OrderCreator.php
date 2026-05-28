@@ -7,6 +7,7 @@ use App\Models\AiAgentConversation;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Payment;
+use App\Models\Product;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
 use App\Services\AiAgent\Reply\ReplySender;
@@ -99,19 +100,42 @@ class OrderCreator
                     'total' => $total,
                 ]);
 
+                // Catalog orders only carry retailer_id (SKU); to link back to
+                // the POS Product row (for stock decrement + nicer order detail),
+                // resolve by SKU once per batch.
+                $retailerIds = array_filter(array_column($items, 'product_retailer_id'));
+                $posProductsBySku = $retailerIds
+                    ? Product::whereIn('sku', $retailerIds)
+                        ->lockForUpdate()
+                        ->get()
+                        ->keyBy('sku')
+                    : collect();
+
                 foreach ($items as $item) {
+                    $sku = $item['product_retailer_id'] ?? null;
+                    // Prefer POS flow's own pos_product_id; for catalog orders,
+                    // fall back to SKU lookup so the order row links to POS.
+                    $posProduct = $sku ? ($posProductsBySku->get($sku)) : null;
+                    $productId = $item['pos_product_id'] ?? $posProduct?->id;
+
                     OrderItem::create([
                         'order_id' => $order->id,
-                        // pos_product_id is only set when the order originated
-                        // from the POS flow; catalog items don't link to a
-                        // local product row.
-                        'product_id' => $item['pos_product_id'] ?? null,
-                        'product_name' => $item['product_name'] ?: $item['product_retailer_id'],
-                        'product_retailer_id' => $item['product_retailer_id'],
+                        'product_id' => $productId,
+                        'product_name' => $item['product_name'] ?: ($posProduct?->name ?: $sku),
+                        'product_retailer_id' => $sku,
                         'quantity' => $item['quantity'],
                         'unit_price' => $item['item_price'],
                         'subtotal' => $item['item_price'] * $item['quantity'],
                     ]);
+
+                    // Decrement local stock. Stock is owned by POS, not Meta —
+                    // safe to decrement here regardless of WhatsApp catalog state.
+                    // lockForUpdate above prevents concurrent over-sell.
+                    if ($posProduct && $posProduct->stock_quantity !== null) {
+                        $newStock = max(0, $posProduct->stock_quantity - (int) $item['quantity']);
+                        $posProduct->stock_quantity = $newStock;
+                        $posProduct->save();
+                    }
                 }
 
                 return $order->fresh();
