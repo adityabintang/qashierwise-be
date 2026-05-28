@@ -47,10 +47,6 @@ class CatalogController extends Controller
                 ], 422);
             }
 
-            try {
-                $this->catalogService->linkCatalogToWaba($account, $result['id']);
-            } catch (\Throwable) {}
-
             return response()->json([
                 'success' => true,
                 'data' => ['id' => $result['id'], 'name' => $result['name']],
@@ -72,6 +68,10 @@ class CatalogController extends Controller
     {
         try {
             $account = $this->getAccount();
+
+            if ($request->boolean('refresh')) {
+                $this->catalogService->clearCatalogsCache($account);
+            }
 
             $result = $this->catalogService->getCatalogs($account, $request->query('business_id'));
 
@@ -295,10 +295,6 @@ class CatalogController extends Controller
                 ], $this->statusFromErrorCode($result['error_code']));
             }
 
-            try {
-                $this->catalogService->linkCatalogToWaba($account, $catalogId);
-            } catch (\Throwable) {}
-
             $userId       = auth()->user()->getEffectiveUserId();
             $availability = $data['availability'] ?? 'in stock';
             CatalogProduct::updateOrCreate(
@@ -315,6 +311,9 @@ class CatalogController extends Controller
             );
 
             $this->catalogService->clearProductsCache($catalogId);
+            // product_count on the catalog list changes when products are added/removed,
+            // so invalidate the catalog list cache too — otherwise the picker shows stale counts.
+            $this->catalogService->clearCatalogsCache($account);
 
             return response()->json([
                 'success' => true,
@@ -364,10 +363,6 @@ class CatalogController extends Controller
             $catalogId = $request->input('catalog_id');
 
             if ($catalogId) {
-                try {
-                    $this->catalogService->linkCatalogToWaba($account, $catalogId);
-                } catch (\Throwable) {}
-
                 $userId = auth()->user()->getEffectiveUserId();
                 $dbUpdates = [];
                 if (isset($data['name']))     $dbUpdates['name']     = $data['name'];
@@ -431,10 +426,6 @@ class CatalogController extends Controller
             }
 
             if ($catalogId = $request->query('catalog_id')) {
-                try {
-                    $this->catalogService->linkCatalogToWaba($account, $catalogId);
-                } catch (\Throwable) {}
-
                 $userId = auth()->user()->getEffectiveUserId();
                 CatalogProduct::where('user_id', $userId)
                     ->where('catalog_id', $catalogId)
@@ -443,6 +434,8 @@ class CatalogController extends Controller
 
                 $this->catalogService->clearProductsCache($catalogId);
             }
+            // product_count on the catalog list changes when products are removed.
+            $this->catalogService->clearCatalogsCache($account);
 
             return response()->json(['success' => true]);
         } catch (WhatsAppNotConnectedException $e) {
