@@ -368,16 +368,16 @@ class WhatsAppWebhookController extends Controller
 
         // Save message to database (use updateOrCreate to prevent duplicate errors)
         // Note: Bypass global scope because webhooks are not authenticated
-        $whatsappMessage = WhatsAppMessage::withoutGlobalScopes()->updateOrCreate(
-            ['message_id' => $messageId],
+        $whatsappMessage = $this->insertMessageRow(
+            $messageId,
+            $type,
+            $content,
+            $metadata,
             [
                 'user_id' => $userId,
                 'phone_number_id' => $whatsappAccount->phone_number_id,
                 'contact_id' => $contact->id,
                 'direction' => 'incoming',
-                'type' => $type,
-                'content' => $content,
-                'metadata' => $metadata,
                 'status' => 'delivered',
                 'is_read' => false,
                 'sent_at' => now()->timestamp($timestamp),
@@ -700,16 +700,16 @@ class WhatsAppWebhookController extends Controller
 
         // Save message echo to database as outgoing message
         // Use updateOrCreate to prevent duplicate errors
-        $whatsappMessage = WhatsAppMessage::withoutGlobalScopes()->updateOrCreate(
-            ['message_id' => $messageId],
+        $whatsappMessage = $this->insertMessageRow(
+            $messageId,
+            $type,
+            $content,
+            $metadata,
             [
                 'user_id' => $userId,
                 'phone_number_id' => $whatsappAccount->phone_number_id,
                 'contact_id' => $contact->id,
                 'direction' => 'outgoing',
-                'type' => $type,
-                'content' => $content,
-                'metadata' => $metadata,
                 'status' => 'sent',
                 'is_read' => true,
                 'sent_at' => now()->timestamp($timestamp),
@@ -1331,6 +1331,57 @@ class WhatsAppWebhookController extends Controller
                 'error' => $e->getMessage(),
                 'reservation_id' => $reservation->id,
             ]);
+        }
+    }
+
+    /**
+     * INSERT a whatsapp_messages row, retrying once with type='unsupported'
+     * if Postgres rejects the original type with a CHECK constraint violation.
+     *
+     * Why a catch-and-retry instead of a hard-coded type whitelist?
+     *   - DB stays the single source of truth for valid types (no PHP/DB drift)
+     *   - Future Meta-introduced types (poll, payment_*, etc.) are stored as
+     *     'unsupported' with their original_type preserved in metadata, so we
+     *     get visibility without DB migrations + don't crash the webhook,
+     *     which prevents Meta retry storms (the 500% CPU root cause)
+     *   - Currently valid types stay untouched (no semantic regression)
+     */
+    protected function insertMessageRow(
+        string $messageId,
+        string $type,
+        ?string $content,
+        $metadata,
+        array $attributes
+    ): WhatsAppMessage {
+        $row = array_merge($attributes, [
+            'type'     => $type,
+            'content'  => $content,
+            'metadata' => $metadata,
+        ]);
+
+        try {
+            return WhatsAppMessage::withoutGlobalScopes()->updateOrCreate(
+                ['message_id' => $messageId],
+                $row
+            );
+        } catch (\Illuminate\Database\QueryException $e) {
+            $isTypeCheckViolation = str_contains($e->getMessage(), 'whatsapp_messages_type_check');
+            if (! $isTypeCheckViolation) {
+                throw $e;
+            }
+
+            Log::warning('Unknown WhatsApp message type rejected by DB, storing as unsupported', [
+                'message_id'    => $messageId,
+                'original_type' => $type,
+            ]);
+
+            $row['type']     = 'unsupported';
+            $row['metadata'] = ['original_type' => $type] + (array) $metadata;
+
+            return WhatsAppMessage::withoutGlobalScopes()->updateOrCreate(
+                ['message_id' => $messageId],
+                $row
+            );
         }
     }
 }
