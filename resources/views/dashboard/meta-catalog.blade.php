@@ -321,8 +321,7 @@
                                     </div>
 
                                     <!-- Low stock -->
-                                    <div class="card p-4 hover:shadow-md transition-all cursor-pointer"
-                                         @click="lowStockExpanded = !lowStockExpanded"
+                                    <div class="card p-4 hover:shadow-md transition-all"
                                          :class="(summary.low_stock_count ?? 0) > 0 ? 'border-amber-300 bg-amber-50/40' : ''">
                                         <div class="flex items-center justify-between">
                                             <div class="min-w-0">
@@ -340,10 +339,6 @@
                                                 <i class="fas fa-triangle-exclamation text-amber-500"></i>
                                             </div>
                                         </div>
-                                        <p class="text-[10px] text-[hsl(var(--muted-foreground))] mt-2" x-show="(summary.low_stock_count ?? 0) > 0">
-                                            <i class="fas mr-0.5" :class="lowStockExpanded ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
-                                            Klik untuk <span x-text="lowStockExpanded ? 'sembunyikan' : 'lihat detail'"></span>
-                                        </p>
                                     </div>
 
                                     <!-- Out of stock -->
@@ -368,75 +363,6 @@
                                     </div>
                                 </div>
 
-                                <!-- Expandable: low-stock details -->
-                                <div x-show="lowStockExpanded && (summary.low_stock_count ?? 0) > 0" x-transition
-                                     class="card p-5 border-amber-200 bg-amber-50/30">
-                                    <div class="flex items-center justify-between mb-3">
-                                        <h4 class="font-semibold text-sm flex items-center gap-2">
-                                            <i class="fas fa-triangle-exclamation text-amber-500"></i>
-                                            Produk dengan stok hampir habis
-                                            <span class="text-xs font-normal text-[hsl(var(--muted-foreground))]">(≤<span x-text="summary.low_stock_threshold ?? 5"></span> unit)</span>
-                                        </h4>
-                                        <button @click="lowStockExpanded = false" class="text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                    <div class="space-y-2">
-                                        <template x-for="p in (summary.low_stock_products ?? [])" :key="'low-' + p.retailer_id">
-                                            <div class="flex items-center justify-between gap-3 p-3 rounded-lg bg-white border border-amber-100">
-                                                <div class="min-w-0 flex-1">
-                                                    <p class="font-medium text-sm truncate" x-text="p.name"></p>
-                                                    <p class="text-xs text-[hsl(var(--muted-foreground))] truncate">
-                                                        SKU: <span class="font-mono" x-text="p.retailer_id"></span>
-                                                        · Katalog: <span x-text="p.catalog_name"></span>
-                                                    </p>
-                                                </div>
-                                                <div class="text-right flex-shrink-0">
-                                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700 tabular-nums">
-                                                        <span x-text="p.stock_quantity"></span>&nbsp;unit
-                                                    </span>
-                                                    <p class="text-[10px] text-[hsl(var(--muted-foreground))] mt-0.5" x-text="'Rp' + Number(p.price).toLocaleString('id-ID')"></p>
-                                                </div>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </div>
-
-                                <!-- Per-catalog mini chart bars -->
-                                <div x-show="!summaryLoading && (summary.by_catalog ?? []).length > 1 && summaryFilter === 'all'"
-                                     class="card p-5">
-                                    <h4 class="font-semibold text-sm mb-3">Distribusi produk per katalog</h4>
-                                    <div class="space-y-2.5">
-                                        <template x-for="row in (summary.by_catalog ?? [])" :key="'bc-' + row.id">
-                                            <div>
-                                                <div class="flex items-center justify-between text-xs mb-1">
-                                                    <span class="font-medium truncate flex-1" x-text="row.name"></span>
-                                                    <span class="text-[hsl(var(--muted-foreground))] tabular-nums ml-2"
-                                                          x-text="row.total_products + ' produk'"></span>
-                                                </div>
-                                                <div class="flex h-2 w-full rounded-full overflow-hidden bg-[hsl(var(--muted))]">
-                                                    <!-- max is the largest total in the dataset -->
-                                                    <div class="h-full bg-[hsl(var(--primary))] transition-all duration-500"
-                                                         :style="'width: ' + (
-                                                             Math.max(...(summary.by_catalog ?? []).map(r => r.total_products || 0), 1) > 0
-                                                                ? (row.total_products / Math.max(...(summary.by_catalog ?? []).map(r => r.total_products || 0), 1) * 100)
-                                                                : 0
-                                                         ) + '%'"></div>
-                                                </div>
-                                                <div class="flex items-center gap-3 mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">
-                                                    <span x-show="row.low_stock > 0">
-                                                        <i class="fas fa-triangle-exclamation text-amber-500"></i>
-                                                        <span x-text="row.low_stock"></span> stok menipis
-                                                    </span>
-                                                    <span x-show="row.out_of_stock > 0">
-                                                        <i class="fas fa-circle-xmark text-red-500"></i>
-                                                        <span x-text="row.out_of_stock"></span> habis
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </div>
                             </div>
                         </template>
 
@@ -509,6 +435,117 @@
                                         </button>
                                     </div>
                                 </template>
+                            </div>
+                        </template>
+
+                        <!-- ════════ DISTRIBUSI + LOW STOCK (2-col, below catalog grid) ════════ -->
+                        <template x-if="!loading && !error && catalogs.length > 0">
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                <!-- Left: Per-catalog distribution -->
+                                <div class="card p-5"
+                                     x-show="summaryFilter === 'all' && (summary.by_catalog ?? []).length > 1">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <h4 class="font-semibold text-sm flex items-center gap-2">
+                                            <i class="fas fa-chart-bar text-[hsl(var(--primary))]"></i>
+                                            Distribusi produk per katalog
+                                        </h4>
+                                    </div>
+                                    <template x-if="summaryLoading">
+                                        <div class="space-y-3">
+                                            <template x-for="i in 3" :key="'bcskel-'+i">
+                                                <div class="space-y-1.5">
+                                                    <div class="skeleton h-3 w-1/2"></div>
+                                                    <div class="skeleton h-2 w-full rounded-full"></div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                    <template x-if="!summaryLoading">
+                                        <div class="space-y-2.5 max-h-80 overflow-y-auto">
+                                            <template x-for="row in (summary.by_catalog ?? [])" :key="'bc-' + row.id">
+                                                <div>
+                                                    <div class="flex items-center justify-between text-xs mb-1">
+                                                        <span class="font-medium truncate flex-1" x-text="row.name"></span>
+                                                        <span class="text-[hsl(var(--muted-foreground))] tabular-nums ml-2"
+                                                              x-text="row.total_products + ' produk'"></span>
+                                                    </div>
+                                                    <div class="flex h-2 w-full rounded-full overflow-hidden bg-[hsl(var(--muted))]">
+                                                        <div class="h-full bg-[hsl(var(--primary))] transition-all duration-500"
+                                                             :style="'width: ' + (
+                                                                 Math.max(...(summary.by_catalog ?? []).map(r => r.total_products || 0), 1) > 0
+                                                                    ? (row.total_products / Math.max(...(summary.by_catalog ?? []).map(r => r.total_products || 0), 1) * 100)
+                                                                    : 0
+                                                             ) + '%'"></div>
+                                                    </div>
+                                                    <div class="flex items-center gap-3 mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                        <span x-show="row.low_stock > 0">
+                                                            <i class="fas fa-triangle-exclamation text-amber-500"></i>
+                                                            <span x-text="row.low_stock"></span> stok menipis
+                                                        </span>
+                                                        <span x-show="row.out_of_stock > 0">
+                                                            <i class="fas fa-circle-xmark text-red-500"></i>
+                                                            <span x-text="row.out_of_stock"></span> habis
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+
+                                <!-- Right: Low stock product list -->
+                                <div class="card p-5"
+                                     :class="{ 'lg:col-span-2': summaryFilter !== 'all' || (summary.by_catalog ?? []).length <= 1 }">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <h4 class="font-semibold text-sm flex items-center gap-2">
+                                            <i class="fas fa-triangle-exclamation text-amber-500"></i>
+                                            Produk dengan stok hampir habis
+                                            <span class="text-xs font-normal text-[hsl(var(--muted-foreground))]">(≤<span x-text="summary.low_stock_threshold ?? 5"></span> unit)</span>
+                                        </h4>
+                                        <span x-show="!summaryLoading && (summary.low_stock_count ?? 0) > 0"
+                                              class="text-xs font-medium text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full tabular-nums"
+                                              x-text="summary.low_stock_count + ' produk'"></span>
+                                    </div>
+                                    <template x-if="summaryLoading">
+                                        <div class="space-y-2">
+                                            <template x-for="i in 3" :key="'lsskel-'+i">
+                                                <div class="skeleton h-14 w-full rounded-lg"></div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                    <template x-if="!summaryLoading && (summary.low_stock_count ?? 0) === 0">
+                                        <div class="text-center py-6">
+                                            <div class="h-12 w-12 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-2">
+                                                <i class="fas fa-circle-check text-emerald-500 text-xl"></i>
+                                            </div>
+                                            <p class="text-sm font-medium text-[hsl(var(--foreground))]">Semua stok aman</p>
+                                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">
+                                                Tidak ada produk yang stoknya menipis saat ini.
+                                            </p>
+                                        </div>
+                                    </template>
+                                    <template x-if="!summaryLoading && (summary.low_stock_count ?? 0) > 0">
+                                        <div class="space-y-2 max-h-80 overflow-y-auto">
+                                            <template x-for="p in (summary.low_stock_products ?? [])" :key="'low-' + p.retailer_id">
+                                                <div class="flex items-center justify-between gap-3 p-3 rounded-lg bg-amber-50/60 border border-amber-100 hover:bg-amber-50 transition-colors">
+                                                    <div class="min-w-0 flex-1">
+                                                        <p class="font-medium text-sm truncate" x-text="p.name"></p>
+                                                        <p class="text-xs text-[hsl(var(--muted-foreground))] truncate">
+                                                            SKU: <span class="font-mono" x-text="p.retailer_id"></span>
+                                                            <span x-show="summaryFilter === 'all'"> · <span x-text="p.catalog_name"></span></span>
+                                                        </p>
+                                                    </div>
+                                                    <div class="text-right flex-shrink-0">
+                                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700 tabular-nums">
+                                                            <span x-text="p.stock_quantity"></span>&nbsp;unit
+                                                        </span>
+                                                        <p class="text-[10px] text-[hsl(var(--muted-foreground))] mt-0.5" x-text="'Rp' + Number(p.price).toLocaleString('id-ID')"></p>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
                             </div>
                         </template>
 
@@ -1124,7 +1161,6 @@ function metaCatalogApp() {
         summary: {},
         summaryLoading: false,
         summaryFilter: 'all',
-        lowStockExpanded: false,
 
         // Create product
         showCreateModal: false,
