@@ -4,6 +4,7 @@ namespace App\Services\AiAgent\Catalog;
 
 use App\Models\AiAgent;
 use App\Models\AiAgentConversation;
+use App\Models\CatalogProduct;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Payment;
@@ -100,10 +101,14 @@ class OrderCreator
                     'total' => $total,
                 ]);
 
-                // Catalog orders only carry retailer_id (SKU); to link back to
-                // the POS Product row (for stock decrement + nicer order detail),
-                // resolve by SKU once per batch.
+                // Stock lives in TWO local tables depending on where the product
+                // was created:
+                //   - Product (POS Products page) — for POS-native items
+                //   - CatalogProduct (Meta Katalog page) — for catalog-native items
+                // A single product can exist in both (when synced from POS to
+                // Meta). To be safe, decrement WHEREVER the row is found.
                 $retailerIds = array_filter(array_column($items, 'product_retailer_id'));
+
                 $posProductsBySku = $retailerIds
                     ? Product::whereIn('sku', $retailerIds)
                         ->lockForUpdate()
@@ -111,30 +116,47 @@ class OrderCreator
                         ->keyBy('sku')
                     : collect();
 
+                $catalogRowsBySku = $retailerIds
+                    ? CatalogProduct::whereIn('retailer_id', $retailerIds)
+                        ->lockForUpdate()
+                        ->get()
+                        ->keyBy('retailer_id')
+                    : collect();
+
                 foreach ($items as $item) {
                     $sku = $item['product_retailer_id'] ?? null;
-                    // Prefer POS flow's own pos_product_id; for catalog orders,
-                    // fall back to SKU lookup so the order row links to POS.
-                    $posProduct = $sku ? ($posProductsBySku->get($sku)) : null;
+                    $posProduct     = $sku ? $posProductsBySku->get($sku) : null;
+                    $catalogProduct = $sku ? $catalogRowsBySku->get($sku) : null;
+                    $qty            = (int) $item['quantity'];
+
+                    // product_id links to POS Product so order detail UI can
+                    // pull from the POS relationship. CatalogProduct lives in a
+                    // separate table — no FK link, just stock mirror.
                     $productId = $item['pos_product_id'] ?? $posProduct?->id;
 
                     OrderItem::create([
-                        'order_id' => $order->id,
-                        'product_id' => $productId,
-                        'product_name' => $item['product_name'] ?: ($posProduct?->name ?: $sku),
+                        'order_id'            => $order->id,
+                        'product_id'          => $productId,
+                        'product_name'        => $item['product_name']
+                            ?: ($posProduct?->name ?: ($catalogProduct?->name ?: $sku)),
                         'product_retailer_id' => $sku,
-                        'quantity' => $item['quantity'],
-                        'unit_price' => $item['item_price'],
-                        'subtotal' => $item['item_price'] * $item['quantity'],
+                        'quantity'            => $qty,
+                        'unit_price'          => $item['item_price'],
+                        'subtotal'            => $item['item_price'] * $qty,
                     ]);
 
-                    // Decrement local stock. Stock is owned by POS, not Meta —
-                    // safe to decrement here regardless of WhatsApp catalog state.
-                    // lockForUpdate above prevents concurrent over-sell.
+                    // POS-side stock (Products table).
                     if ($posProduct && $posProduct->stock_quantity !== null) {
-                        $newStock = max(0, $posProduct->stock_quantity - (int) $item['quantity']);
-                        $posProduct->stock_quantity = $newStock;
+                        $posProduct->stock_quantity = max(0, $posProduct->stock_quantity - $qty);
                         $posProduct->save();
+                    }
+
+                    // Catalog-side stock (CatalogProduct table) — same record
+                    // shown in /dashboard/meta-catalog stock pill.
+                    if ($catalogProduct && $catalogProduct->stock_quantity !== null) {
+                        $catalogProduct->stock_quantity = max(0, $catalogProduct->stock_quantity - $qty);
+                        $catalogProduct->is_available = $catalogProduct->stock_quantity > 0;
+                        $catalogProduct->save();
                     }
                 }
 
