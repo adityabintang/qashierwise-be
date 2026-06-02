@@ -209,6 +209,12 @@ class AiAgentController extends Controller
                 ]);
             }
 
+            // Delivery is gated by the master switch on /dashboard/delivery, and
+            // ongkir is managed there (single source of truth). The agent's
+            // delivery toggle can only be ON when the master switch is active.
+            $deliveryConfig = \App\Models\DeliveryConfig::forUser(auth()->user()->getEffectiveUserId());
+            $deliveryEnabled = $request->boolean('delivery_enabled', false) && $deliveryConfig->is_active;
+
             $aiAgent = AiAgent::updateOrCreate(
                 ['whatsapp_account_id' => $whatsappAccount->id],
                 [
@@ -221,8 +227,8 @@ class AiAgentController extends Controller
                     'order_enabled' => $request->boolean('order_enabled', false),
                     'qris_enabled' => $request->boolean('qris_enabled', false),
                     'reservation_enabled' => $request->boolean('reservation_enabled', false),
-                    'delivery_enabled' => $request->boolean('delivery_enabled', false),
-                    'default_ongkir' => $request->filled('default_ongkir') ? $request->input('default_ongkir') : 0,
+                    'delivery_enabled' => $deliveryEnabled,
+                    'default_ongkir' => $deliveryConfig->default_ongkir,
                     'is_active' => $request->boolean('is_active', false),
                     'settings' => $request->input('settings', []),
                 ]
@@ -388,6 +394,16 @@ class AiAgentController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'Cannot enable delivery. Please enable order feature first.',
+                ], 422);
+            }
+
+            // Master switch gate: delivery can only be enabled when "Aktifkan
+            // Delivery" is on at /dashboard/delivery.
+            $enabling = ! $aiAgent->delivery_enabled;
+            if ($enabling && ! \App\Models\DeliveryConfig::forUser($userId)->is_active) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Aktifkan "Delivery" di halaman Delivery terlebih dahulu.',
                 ], 422);
             }
 
