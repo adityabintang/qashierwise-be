@@ -142,6 +142,10 @@ Route::middleware(['web', 'check.web.auth', 'block.author.login'])->group(functi
         return view('dashboard.delivery');
     })->name('dashboard.delivery');
 
+    Route::get('/dashboard/complain', function () {
+        return view('dashboard.complain');
+    })->name('dashboard.complain');
+
     // Reservation routes
     Route::get('/dashboard/reservations', function () {
         return view('dashboard.reservations.index');
