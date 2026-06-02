@@ -25,7 +25,10 @@ class SecurityHeaders
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
         $response->headers->set('Permissions-Policy', implode(', ', [
-            'geolocation=()',
+            // Allow the app's own pages to request the user's location (driver
+            // proof-of-delivery map, send-location feature). `()` would disable
+            // it everywhere, including same-origin.
+            'geolocation=(self)',
             'microphone=()',
             'camera=()',
             'payment=()',
