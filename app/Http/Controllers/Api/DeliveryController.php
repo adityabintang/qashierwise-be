@@ -27,7 +27,18 @@ class DeliveryController extends Controller
 
     public function getConfig(Request $request): JsonResponse
     {
-        $config = DeliveryConfig::forUser($this->uid($request));
+        $uid = $this->uid($request);
+        $config = DeliveryConfig::forUser($uid);
+
+        // First time: carry over the ongkir previously set on the AI agent so
+        // existing merchants don't lose their value (ongkir now lives here).
+        if ($config->wasRecentlyCreated) {
+            $agent = $this->agentForUser($uid);
+            if ($agent && (float) $agent->default_ongkir > 0) {
+                $config->default_ongkir = $agent->default_ongkir;
+                $config->save();
+            }
+        }
 
         return response()->json(['success' => true, 'data' => $config]);
     }
@@ -38,13 +49,48 @@ class DeliveryController extends Controller
             'is_active' => 'sometimes|boolean',
             'default_ongkir' => 'sometimes|numeric|min:0',
             'proof_required' => 'sometimes|boolean',
+            'address_required' => 'sometimes|boolean',
             'notes' => 'nullable|string|max:2000',
         ]);
 
-        $config = DeliveryConfig::forUser($this->uid($request));
+        $uid = $this->uid($request);
+        $config = DeliveryConfig::forUser($uid);
         $config->fill($validated)->save();
 
+        // Keep the AI agent in sync: ongkir is the source of truth here, and
+        // turning the master switch off must also disable the agent's delivery.
+        $agent = $this->agentForUser($uid);
+        if ($agent) {
+            $dirty = false;
+            if (array_key_exists('default_ongkir', $validated)) {
+                $agent->default_ongkir = $config->default_ongkir;
+                $dirty = true;
+            }
+            if (array_key_exists('is_active', $validated) && ! $config->is_active && $agent->delivery_enabled) {
+                $agent->delivery_enabled = false;
+                $dirty = true;
+            }
+            if ($dirty) {
+                $agent->save();
+            }
+        }
+
         return response()->json(['success' => true, 'message' => 'Konfigurasi delivery disimpan.', 'data' => $config]);
+    }
+
+    /**
+     * Resolve the AI agent for a merchant (via their WhatsApp account).
+     */
+    private function agentForUser(int $userId): ?\App\Models\AiAgent
+    {
+        $account = \App\Models\WhatsAppAccount::withoutGlobalScopes()
+            ->where('user_id', $userId)
+            ->orderByDesc('is_active')
+            ->first();
+
+        return $account
+            ? \App\Models\AiAgent::where('whatsapp_account_id', $account->id)->first()
+            : null;
     }
 
     // ---- Drivers ------------------------------------------------------------
