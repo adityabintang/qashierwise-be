@@ -23,9 +23,13 @@ Route::get('/language/{locale}', function ($locale) {
     return redirect()->back();
 })->name('language.switch');
 
-// Landing page
+// Landing page (React island, ported from Next.js)
 Route::get('/', function () {
-    return view('welcome');
+    return view('react.app', [
+        'page' => 'landing',
+        'title' => 'QashierWise — Chatbot WhatsApp untuk Restoran',
+        'description' => 'QashierWise menghadirkan Chatbot WhatsApp berbasis AI untuk restoran — Inbox, Pesanan, Reservasi, Menu, dan CRM dalam satu Console.',
+    ]);
 });
 
 // Public blog routes
@@ -54,17 +58,29 @@ Route::get('/reset-password', function () {
     return view('auth.reset-password');
 })->name('reset-password');
 
-// Legal pages
+// Legal pages (React island, ported from Next.js)
 Route::get('/privacy-policy', function () {
-    return view('privacy-policy');
+    return view('react.app', [
+        'page' => 'privacy',
+        'title' => 'Kebijakan Privasi - QashierWise',
+        'description' => 'Kebijakan Privasi QashierWise. Pelajari bagaimana kami mengumpulkan, menggunakan, dan melindungi data Anda serta kepatuhan terhadap regulasi perlindungan data.',
+    ]);
 })->name('privacy-policy');
 
 Route::get('/terms-of-service', function () {
-    return view('terms-of-service');
+    return view('react.app', [
+        'page' => 'terms',
+        'title' => 'Ketentuan Layanan - QashierWise',
+        'description' => 'Ketentuan Layanan QashierWise.',
+    ]);
 })->name('terms-of-service');
 
 Route::get('/refund-policy', function () {
-    return view('refund-policy');
+    return view('react.app', [
+        'page' => 'refund',
+        'title' => 'Kebijakan Pengembalian - QashierWise',
+        'description' => 'Kebijakan Pengembalian Dana QashierWise.',
+    ]);
 })->name('refund-policy');
 
 // Public documentation pages
