@@ -423,6 +423,19 @@ class WhatsAppWebhookController extends Controller
             'received_at' => now()->toIso8601String(),
         ]);
 
+        // Delivery confirmation (customer taps Konfirmasi/Complain, or replies
+        // TERIMA/KOMPLAIN when outside the 24h window). Handled BEFORE the AI
+        // agent block so it works regardless of ai_active — and a "Complain"
+        // is precisely what turns ai_active off.
+        if ($this->routeToDeliveryConfirmation($type, $message, $content, $userId, $contact)) {
+            Log::info('Message handled by delivery confirmation flow', [
+                'contact_id' => $contact->id,
+                'message_type' => $type,
+            ]);
+
+            return $messageData;
+        }
+
         // Check if AI Agent is active for this account
         $aiAgent = AiAgent::where('whatsapp_account_id', $whatsappAccount->id)
             ->where('is_active', true)
@@ -571,6 +584,85 @@ class WhatsAppWebhookController extends Controller
         }
 
         return false;
+    }
+
+    /**
+     * Route the customer's delivery confirmation/complaint to
+     * DeliveryFulfillmentService.
+     *
+     * Two input shapes:
+     *   1. interactive button_reply id = "dlv_ok:{orderId}" / "dlv_bad:{orderId}"
+     *      (in-window quick-reply buttons) — order id is encoded directly.
+     *   2. text "TERIMA" / "KOMPLAIN" (Fonnte fallback outside the 24h window)
+     *      — matched against the contact's latest out_for_delivery order.
+     *
+     * Returns true if consumed.
+     */
+    protected function routeToDeliveryConfirmation(
+        string $type,
+        array $message,
+        ?string $content,
+        int $userId,
+        WhatsAppContact $contact
+    ): bool {
+        try {
+            $action = null;   // 'ok' | 'bad'
+            $order = null;
+
+            if ($type === 'interactive') {
+                $id = $message['interactive']['button_reply']['id'] ?? null;
+                if (! $id || (! str_starts_with($id, 'dlv_ok:') && ! str_starts_with($id, 'dlv_bad:'))) {
+                    return false;
+                }
+                [$prefix, $orderId] = explode(':', $id, 2);
+                $action = $prefix === 'dlv_ok' ? 'ok' : 'bad';
+                $order = \App\Models\Order::find((int) $orderId);
+            } elseif ($type === 'text') {
+                $clean = mb_strtolower(trim((string) $content));
+                if (preg_match('/^(terima|diterima|sesuai|ok)\.?$/u', $clean)) {
+                    $action = 'ok';
+                } elseif (preg_match('/^(komplain|complain|tidak sesuai|tdk sesuai)\.?$/u', $clean)) {
+                    $action = 'bad';
+                } else {
+                    return false;
+                }
+
+                // Match the contact's latest order that is awaiting receipt.
+                $order = \App\Models\Order::whereHas('store', fn ($q) => $q->where('user_id', $userId))
+                    ->where('customer_phone', preg_replace('/[^0-9]/', '', $contact->wa_id))
+                    ->where('fulfillment_status', \App\Models\Order::FULFILLMENT_OUT_FOR_DELIVERY)
+                    ->latest('out_for_delivery_at')
+                    ->first();
+            } else {
+                return false;
+            }
+
+            if (! $order) {
+                return false;
+            }
+
+            // Ownership guard — order must belong to the account's user.
+            if ($order->store->user_id !== $userId) {
+                return false;
+            }
+
+            $svc = app(\App\Services\DeliveryFulfillmentService::class);
+            if ($action === 'ok') {
+                $svc->markDelivered($order);
+            } else {
+                $svc->raiseComplaint($order, $contact);
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Delivery confirmation routing error', [
+                'contact_id' => $contact->id,
+                'type' => $type,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     /**
