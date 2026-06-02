@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\PosUser;
 use App\Models\Product;
+use App\Services\DeliveryFulfillmentService;
 use App\Services\OrderService;
 use App\Services\QrisService;
 use App\Services\SubMerchantService;
@@ -24,6 +25,7 @@ class OrderController extends Controller
         protected QrisService $qrisService,
         protected SubMerchantService $subMerchantService,
         protected WhatsAppAccountService $whatsAppAccountService,
+        protected DeliveryFulfillmentService $deliveryFulfillment,
     ) {}
 
     /**
@@ -51,11 +53,12 @@ class OrderController extends Controller
             $search = str_replace('#', '', $search);
         }
 
-        $orders = Order::with(['store', 'table', 'posUser.user', 'items.product'])
+        $orders = Order::with(['store', 'table', 'posUser.user', 'items.product', 'deliveryDriver'])
             ->whereHas('store', fn ($q) => $q->where('user_id', $effectiveUserId))
             ->when($request->input('store_id'), fn ($q, $storeId) => $q->where('store_id', $storeId))
             ->when($request->input('status'), fn ($q, $status) => $q->where('status', $status))
             ->when($request->input('delivery_type'), fn ($q, $type) => $q->where('delivery_type', $type))
+            ->when($request->input('fulfillment_status'), fn ($q, $fs) => $q->where('fulfillment_status', $fs))
             ->when($search, fn ($q) => $q->where('order_number', 'like', '%'.$search.'%')
             )
             ->orderBy('created_at', 'desc')
@@ -262,8 +265,90 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $order->load(['store', 'table', 'posUser.user', 'items.product', 'payments', 'qrisTransaction']),
+            'data' => $order->load(['store', 'table', 'posUser.user', 'items.product', 'payments', 'qrisTransaction', 'deliveryDriver']),
         ]);
+    }
+
+    /**
+     * Confirm an order from the dashboard.
+     *
+     * Pickup  → notify customer "dikonfirmasi & diproses".
+     * Delivery → assign a courier (driver picked from directory OR typed
+     *            manually), then fire driver + customer messages.
+     */
+    public function confirm(Order $order, Request $request): JsonResponse
+    {
+        $effectiveUserId = $request->user()->getEffectiveUserId();
+
+        if ($order->store->user_id !== $effectiveUserId) {
+            return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
+        }
+
+        if ($order->fulfillment_status !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pesanan ini sudah dikonfirmasi sebelumnya.',
+            ], 422);
+        }
+
+        try {
+            if ($order->isPickup()) {
+                $this->deliveryFulfillment->confirmPickup($order);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Pesanan pickup dikonfirmasi. Notifikasi dikirim ke pelanggan.',
+                    'data' => $this->reloadOrder($order),
+                ]);
+            }
+
+            // Delivery: a driver is required (from directory or manual entry).
+            $validated = $request->validate([
+                'delivery_driver_id' => 'nullable|exists:delivery_drivers,id',
+                'courier_name' => 'required_without:delivery_driver_id|string|max:100',
+                'courier_phone' => 'required_without:delivery_driver_id|string|max:25',
+            ]);
+
+            $courierName = $validated['courier_name'] ?? null;
+            $courierPhone = $validated['courier_phone'] ?? null;
+            $driverId = $validated['delivery_driver_id'] ?? null;
+
+            // Resolve name/phone from the chosen directory driver when present.
+            if ($driverId) {
+                $driver = \App\Models\DeliveryDriver::where('id', $driverId)
+                    ->where('user_id', $effectiveUserId)
+                    ->first();
+
+                if (! $driver) {
+                    return response()->json(['success' => false, 'message' => 'Driver tidak ditemukan.'], 404);
+                }
+
+                $courierName = $courierName ?: $driver->name;
+                $courierPhone = $courierPhone ?: $driver->phone;
+            }
+
+            if (! $courierName || ! $courierPhone) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Nama dan nomor WhatsApp pengantar wajib diisi.',
+                ], 422);
+            }
+
+            $this->deliveryFulfillment->assignCourier($order, $courierName, $courierPhone, $driverId);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pesanan dikonfirmasi. Notifikasi dikirim ke kurir dan pelanggan.',
+                'data' => $this->reloadOrder($order),
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    private function reloadOrder(Order $order): Order
+    {
+        return $order->fresh(['store', 'table', 'posUser.user', 'items.product', 'payments', 'qrisTransaction', 'deliveryDriver']);
     }
 
     /**
