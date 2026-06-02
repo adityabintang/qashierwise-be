@@ -11,11 +11,12 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-start justify-center p-4">
-    <div class="w-full max-w-md bg-white rounded-2xl shadow-lg overflow-hidden my-4">
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden my-4 ring-1 ring-purple-100">
         <!-- Header -->
-        <div class="bg-emerald-600 text-white p-6 text-center">
+        <div class="bg-gradient-to-br from-purple-600 to-purple-700 text-white p-6 text-center">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white/15 mb-2 text-2xl">🛵</div>
             <h1 class="text-xl font-bold">Pengantaran Pesanan</h1>
-            <p class="text-emerald-100 text-sm mt-1">#{{ $order->order_number }} • {{ $order->store->name ?? 'Toko' }}</p>
+            <p class="text-purple-100 text-sm mt-1">#{{ $order->order_number }} • {{ $order->store->name ?? 'Toko' }}</p>
         </div>
 
         <div class="p-6 space-y-5">
@@ -63,7 +64,7 @@
                 @endif
                 @if($waPhone)
                     <a href="https://wa.me/{{ $waPhone }}" target="_blank" rel="noopener"
-                       class="flex items-center justify-center gap-2 h-11 rounded-lg bg-emerald-50 text-emerald-700 font-medium text-sm">
+                       class="flex items-center justify-center gap-2 h-11 rounded-lg bg-purple-50 text-purple-700 font-medium text-sm">
                         💬 Chat Pembeli
                     </a>
                 @endif
@@ -99,15 +100,15 @@
 
                     {{-- 1. Proof photo --}}
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">1. Foto Bukti Pengantaran <span class="text-red-500">*</span></label>
-                        <input type="file" name="proof" accept="image/*" capture="environment" required x-ref="proof"
-                               class="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-emerald-600 file:text-white file:text-sm file:font-medium">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">1. Foto Bukti Pengantaran @if($proofRequired)<span class="text-red-500">*</span>@else<span class="text-gray-400 text-xs font-normal">(opsional)</span>@endif</label>
+                        <input type="file" name="proof" accept="image/*" capture="environment" @if($proofRequired) required @endif x-ref="proof"
+                               class="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-purple-600 file:text-white file:text-sm file:font-medium">
                         <p class="text-xs text-gray-400 mt-1">Foto barang saat diserahkan ke pembeli. Foto otomatis dikompres sebelum dikirim.</p>
                     </div>
 
                     {{-- 2. Delivery location (interactive map) --}}
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">2. Lokasi Pengantaran <span class="text-red-500">*</span></label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">2. Lokasi Pengantaran @if($addressRequired)<span class="text-red-500">*</span>@else<span class="text-gray-400 text-xs font-normal">(opsional)</span>@endif</label>
 
                         <div class="relative mb-2">
                             <input type="text" x-model="searchQuery" @input.debounce.500ms="searchLocation()"
@@ -134,15 +135,15 @@
                         <p class="text-xs text-gray-400 mt-1">Ketuk peta atau geser pin untuk menandai titik pengantaran.</p>
                         <p x-show="lat && lng" class="text-xs text-gray-600 mt-1" x-text="address || (Number(lat).toFixed(6) + ', ' + Number(lng).toFixed(6))"></p>
                         <p x-show="geoError" class="text-xs text-amber-600 mt-1" x-text="geoError"></p>
-                        <p x-show="!lat || !lng" class="text-xs text-amber-600 mt-1">Tandai lokasi terlebih dahulu.</p>
+                        <p x-show="addressRequired && (!lat || !lng)" class="text-xs text-amber-600 mt-1">Tandai lokasi terlebih dahulu.</p>
 
                         <input type="hidden" name="latitude" :value="lat">
                         <input type="hidden" name="longitude" :value="lng">
                     </div>
 
                     {{-- 3. Confirm --}}
-                    <button type="submit" :disabled="!lat || !lng || submitting"
-                            class="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold transition-colors">
+                    <button type="submit" :disabled="submitting || (addressRequired && (!lat || !lng))"
+                            class="w-full h-12 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold transition-colors shadow-sm">
                         <span x-show="!submitting">✅ Konfirmasi Pesanan Telah Diantarkan</span>
                         <span x-show="submitting">Mengirim...</span>
                     </button>
@@ -156,6 +157,8 @@
                     return {
                         searchQuery: '', results: [], lat: '', lng: '', address: '', locating: false, geoError: '',
                         map: null, marker: null, submitting: false,
+                        proofRequired: @json($proofRequired),
+                        addressRequired: @json($addressRequired),
                         initialAddress: @json($order->alamat ?? ''),
 
                         init() {
@@ -276,16 +279,23 @@
                         async onSubmit(e) {
                             e.preventDefault();
                             if (this.submitting) return;
-                            if (!this.lat || !this.lng) { alert('Tandai lokasi pengantaran terlebih dahulu (ketuk peta atau gunakan GPS).'); return; }
+
+                            if (this.addressRequired && (!this.lat || !this.lng)) {
+                                alert('Tandai lokasi pengantaran terlebih dahulu (ketuk peta atau gunakan GPS).');
+                                return;
+                            }
 
                             const input = this.$refs.proof;
-                            if (!input.files || !input.files[0]) { alert('Pilih foto bukti pengantaran terlebih dahulu.'); return; }
+                            const hasFile = input.files && input.files[0];
+                            if (this.proofRequired && !hasFile) {
+                                alert('Unggah foto bukti pengantaran terlebih dahulu.');
+                                return;
+                            }
 
                             this.submitting = true;
-                            const original = input.files[0];
                             try {
-                                if (original.type && original.type.startsWith('image/')) {
-                                    const blob = await this.compressImage(original);
+                                if (hasFile && input.files[0].type && input.files[0].type.startsWith('image/')) {
+                                    const blob = await this.compressImage(input.files[0]);
                                     if (blob && window.DataTransfer) {
                                         const compressed = new File([blob], 'bukti-pengantaran.jpg', { type: 'image/jpeg' });
                                         const dt = new DataTransfer();
