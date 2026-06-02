@@ -591,37 +591,23 @@
                                             <span x-show="config.delivery_enabled">AI akan bertanya "Pickup atau Delivery?" sebelum checkout</span>
                                             <span x-show="!config.delivery_enabled">Pelanggan hanya bisa pickup</span>
                                         </p>
+                                        <p x-show="!deliveryMasterActive" class="text-xs text-amber-600 mt-1">
+                                            <i class="fas fa-lock mr-1"></i>Aktifkan "Delivery" di
+                                            <a href="/dashboard/delivery" class="underline font-medium">halaman Delivery</a> terlebih dahulu.
+                                        </p>
                                     </div>
                                     <button
                                         type="button"
-                                        @click="config.delivery_enabled = !config.delivery_enabled"
-                                        :class="config.delivery_enabled ? 'bg-orange-600 ring-2 ring-orange-200' : 'bg-gray-300'"
-                                        class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 flex-shrink-0 cursor-pointer"
+                                        @click="toggleDeliveryEnabled()"
+                                        :disabled="!deliveryMasterActive"
+                                        :class="[config.delivery_enabled ? 'bg-orange-600 ring-2 ring-orange-200' : 'bg-gray-300', !deliveryMasterActive ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer']"
+                                        class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 flex-shrink-0"
                                     >
                                         <span
                                             :class="config.delivery_enabled ? 'translate-x-6' : 'translate-x-1'"
                                             class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md"
                                         ></span>
                                     </button>
-                                </div>
-
-                                <!-- Default Ongkir -->
-                                <div x-show="config.delivery_enabled" x-transition class="space-y-2">
-                                    <label class="block text-sm font-medium text-[hsl(var(--foreground))]">
-                                        <i class="fas fa-money-bill-wave text-orange-400 mr-1.5"></i>
-                                        Biaya Ongkir Default (Rp)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        x-model.number="form.default_ongkir"
-                                        min="0"
-                                        step="500"
-                                        placeholder="Contoh: 10000"
-                                        class="w-full h-10 px-3 rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--background))] text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-                                    >
-                                    <p class="text-xs text-[hsl(var(--muted-foreground))]">
-                                        Ongkir akan otomatis ditambahkan ke total pesanan saat pelanggan memilih delivery
-                                    </p>
                                 </div>
 
                                 <!-- Delivery Info -->
@@ -921,6 +907,7 @@ function aiAgentApp() {
         hasSubMerchant: false,
         hasReservationConfig: false,
         catalogPlatformLocked: false,
+        deliveryMasterActive: true,
         togglingActive: false,
         togglingOrder: false,
         lastSaved: null,
@@ -984,11 +971,32 @@ function aiAgentApp() {
 
                 // Load AI Agent config
                 await this.loadConfig();
+                await this.loadDeliveryMaster();
             } catch (error) {
                 console.error('Init error:', error);
             } finally {
                 this.loading = false;
             }
+        },
+
+        // Delivery is gated by the master switch on /dashboard/delivery.
+        async loadDeliveryMaster() {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch('/api/delivery/config', { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
+                const data = await res.json();
+                if (data.success) {
+                    this.deliveryMasterActive = !!data.data.is_active;
+                    if (!this.deliveryMasterActive) this.config.delivery_enabled = false;
+                }
+            } catch (e) { /* keep default */ }
+        },
+        toggleDeliveryEnabled() {
+            if (!this.deliveryMasterActive) {
+                this.showNotification('Aktifkan "Delivery" di halaman Delivery terlebih dahulu.', 'warning');
+                return;
+            }
+            this.config.delivery_enabled = !this.config.delivery_enabled;
         },
 
         async loadCatalogs() {
