@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Complaint;
 use App\Models\Order;
 use App\Models\WhatsAppContact;
 use App\Models\WhatsAppMessage;
@@ -9,6 +10,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Netflie\WhatsAppCloudApi\Message\ButtonReply\Button;
 use Netflie\WhatsAppCloudApi\Message\ButtonReply\ButtonAction;
+use Netflie\WhatsAppCloudApi\Message\Media\LinkID;
+use Netflie\WhatsAppCloudApi\Message\Media\MediaObjectID;
 use Netflie\WhatsAppCloudApi\WhatsAppCloudApi;
 
 /**
@@ -33,6 +36,7 @@ class DeliveryFulfillmentService
     public function __construct(
         protected FonnteService $fonnte,
         protected WhatsAppAccountService $accounts,
+        protected InvoiceService $invoices,
     ) {}
 
     // ---- Customer-button IDs (carry the order id so the webhook can correlate)
@@ -54,7 +58,9 @@ class DeliveryFulfillmentService
             throw new \InvalidArgumentException('Order is not a pickup order.');
         }
 
+        // Pickup is paid at the counter — confirming it marks the order paid.
         $order->forceFill([
+            'status' => Order::STATUS_PAID,
             'fulfillment_status' => Order::FULFILLMENT_CONFIRMED,
             'confirmed_at' => now(),
         ])->save();
@@ -67,6 +73,9 @@ class DeliveryFulfillmentService
             ."🏪 Silakan ambil pesanan di toko. Tunjukkan nomor pesanan ini ke kasir.\n\n"
             .'Terima kasih! 🙏'
         );
+
+        // Invoice PDF (official WABA document).
+        $this->sendInvoiceToCustomer($order);
     }
 
     /**
@@ -98,7 +107,10 @@ class DeliveryFulfillmentService
         // 1) Message to the CUSTOMER — driver info + safety warning.
         $this->sendCourierAssignedToCustomer($order);
 
-        // 2) Message to the DRIVER — task + proof-upload link.
+        // 2) Invoice PDF to the CUSTOMER (official WABA document).
+        $this->sendInvoiceToCustomer($order);
+
+        // 3) Message to the DRIVER — task + proof-upload link.
         $this->sendDeliveryTaskToCourier($order);
     }
 
@@ -185,12 +197,24 @@ class DeliveryFulfillmentService
             $contact->forceFill(['ai_active' => false])->save();
         }
 
+        // Record the complaint for the /dashboard/complain queue.
+        if ($order->store?->user_id) {
+            Complaint::create([
+                'order_id' => $order->id,
+                'user_id' => $order->store->user_id,
+                'whatsapp_contact_id' => $contact?->id,
+                'customer_name' => $order->customer_name,
+                'customer_phone' => $order->customer_phone,
+                'status' => Complaint::STATUS_OPEN,
+            ]);
+        }
+
         // Tell the customer a human will follow up. (Sent before the bot stays
         // silent on subsequent messages.)
         $this->sendCustomerText(
             $order,
             "🙏 Mohon maaf atas ketidaknyamanannya pada pesanan *#{$order->order_number}*.\n\n"
-            .'Anda telah kami hubungkan ke tim kami terkait, Silahkan sampaikan keluhan anda'
+            .'Anda telah kami hubungkan ke tim kami, Silahkan sampaikan keluhan anda'
         );
 
         // Escalate to merchant/PIC (Fonnte / admin number).
@@ -204,9 +228,113 @@ class DeliveryFulfillmentService
         );
     }
 
+    /**
+     * Merchant/PIC resolved a complaint from /dashboard/complain. Notify the
+     * customer that it's resolved and re-activate the AI bot for their number
+     * (unless they still have another open complaint).
+     */
+    public function resolveComplaint(Complaint $complaint, string $resolutionNote): void
+    {
+        if ($complaint->status === Complaint::STATUS_RESOLVED) {
+            return; // idempotent
+        }
+
+        $complaint->forceFill([
+            'status' => Complaint::STATUS_RESOLVED,
+            'resolution_note' => $resolutionNote,
+            'resolved_at' => now(),
+        ])->save();
+
+        $order = $complaint->order;
+        $contact = $complaint->whatsappContact
+            ?? ($order ? $this->resolveCustomerContact($order) : null);
+
+        // Notify the customer that the complaint is resolved.
+        $orderRef = $order ? " *#{$order->order_number}*" : '';
+        $message = "✅ Kabar baik! Keluhan Anda terkait pesanan{$orderRef} telah *selesai ditangani*.\n\n"
+            ."📝 Penyelesaian: {$resolutionNote}\n\n"
+            .'Terima kasih atas kesabaran Anda.';
+
+        if ($order) {
+            $this->sendCustomerText($order, $message);
+        } elseif ($complaint->customer_phone) {
+            // No linked order — best-effort via Fonnte.
+            $this->sendFonnte($complaint->customer_phone, $message);
+        }
+
+        // Re-activate the AI bot — but only if this contact has no other open
+        // complaint still pending.
+        if ($contact) {
+            $stillOpen = Complaint::where('whatsapp_contact_id', $contact->id)
+                ->where('status', Complaint::STATUS_OPEN)
+                ->exists();
+
+            if (! $stillOpen) {
+                $contact->forceFill(['ai_active' => true])->save();
+            }
+        }
+    }
+
     // ====================================================================
     // Outbound message builders
     // ====================================================================
+
+    /**
+     * Generate the order invoice PDF and send it to the customer as a WhatsApp
+     * document (official WABA only — documents can't go through Fonnte here).
+     * Non-fatal: a failure is logged and never blocks order confirmation.
+     */
+    protected function sendInvoiceToCustomer(Order $order): void
+    {
+        try {
+            $client = $this->customerClient($order);
+            if (! $client) {
+                Log::warning('Invoice skipped — no official WABA account for merchant', [
+                    'order_id' => $order->id,
+                ]);
+
+                return;
+            }
+
+            $inv = $this->invoices->generate($order);
+            if (! $inv) {
+                return; // already logged
+            }
+
+            $to = $this->intlPhone($order->customer_phone);
+            $caption = "🧾 Invoice pesanan #{$order->order_number}";
+
+            try {
+                // Prefer uploading the file to WhatsApp and sending by media-id —
+                // more reliable than a link (no public-URL fetch dependency).
+                $mediaId = $client->uploadMedia($inv['tmp_path'])->decodedBody()['id'] ?? null;
+
+                if ($mediaId) {
+                    $client->sendDocument($to, new MediaObjectID($mediaId), $inv['filename'], $caption);
+                } else {
+                    $client->sendDocument($to, new LinkID($inv['url']), $inv['filename'], $caption);
+                }
+            } catch (\Throwable $e) {
+                // Upload failed — fall back to the public link.
+                Log::warning('Invoice media upload failed, falling back to link', [
+                    'order_id' => $order->id,
+                    'error' => $e->getMessage(),
+                ]);
+                $client->sendDocument($to, new LinkID($inv['url']), $inv['filename'], $caption);
+            } finally {
+                @unlink($inv['tmp_path']);
+            }
+
+            Log::info('Invoice document sent to customer', [
+                'order_id' => $order->id,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to send invoice document (non-fatal)', [
+                'order_id' => $order->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
 
     protected function sendCourierAssignedToCustomer(Order $order): void
     {
