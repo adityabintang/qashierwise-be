@@ -155,23 +155,53 @@
                 </div>
 
                 <!-- ============ CONFIG ============ -->
-                <div x-show="tab === 'config'" class="card p-5 max-w-xl space-y-4">
-                    <label class="flex items-center justify-between">
-                        <span class="text-sm font-medium">Aktifkan Delivery</span>
-                        <input type="checkbox" x-model="config.is_active" class="w-5 h-5">
-                    </label>
-                    <div>
-                        <label class="text-sm font-medium mb-1 block">Ongkir Default (Rp)</label>
-                        <input type="number" min="0" step="500" x-model.number="config.default_ongkir" class="input w-full min-h-[44px]">
+                <div x-show="tab === 'config'" class="card p-5 max-w-xl space-y-5">
+                    <!-- Toggle 1: master switch -->
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p class="text-sm font-medium">Aktifkan Delivery</p>
+                            <p class="text-xs text-[hsl(var(--muted-foreground))]">Jika nonaktif, fitur Delivery di halaman AI Agent tidak bisa diaktifkan.</p>
+                        </div>
+                        <button type="button" @click="config.is_active = !config.is_active"
+                                :class="config.is_active ? 'bg-purple-600' : 'bg-gray-300'"
+                                class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors flex-shrink-0">
+                            <span :class="config.is_active ? 'translate-x-6' : 'translate-x-1'" class="inline-block h-5 w-5 rounded-full bg-white shadow transition-transform"></span>
+                        </button>
                     </div>
-                    <label class="flex items-center justify-between">
-                        <span class="text-sm font-medium">Wajib upload bukti foto oleh driver</span>
-                        <input type="checkbox" x-model="config.proof_required" class="w-5 h-5">
-                    </label>
-                    <div>
-                        <label class="text-sm font-medium mb-1 block">Catatan</label>
-                        <textarea x-model="config.notes" rows="3" class="input w-full" placeholder="Catatan internal..."></textarea>
+
+                    <!-- Toggle 2: proof required -->
+                    <div class="flex items-start justify-between gap-4 border-t border-[hsl(var(--border))] pt-4">
+                        <div>
+                            <p class="text-sm font-medium">Driver wajib upload bukti pengiriman</p>
+                            <p class="text-xs text-[hsl(var(--muted-foreground))]">Foto bukti wajib diunggah sebelum konfirmasi pengantaran.</p>
+                        </div>
+                        <button type="button" @click="config.proof_required = !config.proof_required"
+                                :class="config.proof_required ? 'bg-purple-600' : 'bg-gray-300'"
+                                class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors flex-shrink-0">
+                            <span :class="config.proof_required ? 'translate-x-6' : 'translate-x-1'" class="inline-block h-5 w-5 rounded-full bg-white shadow transition-transform"></span>
+                        </button>
                     </div>
+
+                    <!-- Toggle 3: address required -->
+                    <div class="flex items-start justify-between gap-4 border-t border-[hsl(var(--border))] pt-4">
+                        <div>
+                            <p class="text-sm font-medium">Driver wajib input alamat penerima</p>
+                            <p class="text-xs text-[hsl(var(--muted-foreground))]">Lokasi penerima (peta) wajib ditandai sebelum konfirmasi.</p>
+                        </div>
+                        <button type="button" @click="config.address_required = !config.address_required"
+                                :class="config.address_required ? 'bg-purple-600' : 'bg-gray-300'"
+                                class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors flex-shrink-0">
+                            <span :class="config.address_required ? 'translate-x-6' : 'translate-x-1'" class="inline-block h-5 w-5 rounded-full bg-white shadow transition-transform"></span>
+                        </button>
+                    </div>
+
+                    <!-- Input: ongkir -->
+                    <div class="border-t border-[hsl(var(--border))] pt-4">
+                        <label class="text-sm font-medium mb-1 block">Ongkos Kirim (Rp)</label>
+                        <input type="number" min="0" step="500" x-model.number="config.default_ongkir" class="input w-full min-h-[44px]" placeholder="Contoh: 10000">
+                        <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Ongkir diatur di sini dan otomatis dipakai AI Agent saat pelanggan memilih delivery.</p>
+                    </div>
+
                     <button @click="saveConfig()" :disabled="saving" class="btn btn-primary">Simpan Konfigurasi</button>
                 </div>
 
@@ -183,16 +213,49 @@
 <script>
 function deliveryApp() {
     return {
+        // Shared dashboard shell state (required by sidebar + header)
+        sidebarOpen: window.innerWidth >= 1024,
+        isMobile: window.innerWidth < 768,
+        user: null,
+        notifications: [],
+
         API: window.location.origin + '/api/delivery',
         tab: 'drivers',
         saving: false,
         toasts: [],
-        config: { is_active: true, default_ongkir: 0, proof_required: true, notes: '' },
+        config: { is_active: true, default_ongkir: 0, proof_required: true, address_required: true, notes: '' },
         drivers: [],
         driverForm: { id: null, name: '', phone: '', vehicle: '', plate_number: '' },
         proofs: [],
         proofFilterDriver: '',
         proofFilterStatus: '',
+
+        initSidebar() {
+            this.isMobile = window.innerWidth < 768;
+            if (this.isMobile) {
+                this.sidebarOpen = false;
+            } else {
+                const saved = localStorage.getItem('sidebarOpen');
+                if (saved !== null) this.sidebarOpen = JSON.parse(saved);
+            }
+            this.$watch('sidebarOpen', v => { if (!this.isMobile) localStorage.setItem('sidebarOpen', JSON.stringify(v)); });
+            let t;
+            window.addEventListener('resize', () => {
+                clearTimeout(t);
+                t = setTimeout(() => {
+                    const wasMobile = this.isMobile;
+                    this.isMobile = window.innerWidth < 768;
+                    if (wasMobile && !this.isMobile) {
+                        const saved = localStorage.getItem('sidebarOpen');
+                        this.sidebarOpen = saved !== null ? JSON.parse(saved) : true;
+                    } else if (!wasMobile && this.isMobile) {
+                        this.sidebarOpen = false;
+                    }
+                }, 150);
+            });
+            const u = localStorage.getItem('user');
+            if (u) { try { this.user = JSON.parse(u); } catch (e) { this.user = { name: 'User' }; } }
+        },
 
         token() { return localStorage.getItem('token'); },
         headers(json = false) {
@@ -202,6 +265,7 @@ function deliveryApp() {
         },
 
         async init() {
+            this.initSidebar();
             await this.loadConfig();
             await this.loadDrivers();
         },
