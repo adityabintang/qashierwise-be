@@ -1656,17 +1656,33 @@ class WhatsAppController extends Controller
             // Verify contact belongs to user (RLS will handle this)
             $contact = WhatsAppContact::findOrFail($contactId);
 
-            $perPage = $request->get('per_page', 100);
+            // WhatsApp-like windowed loading: fetch the latest N messages, or
+            // (when `before_id` is supplied) the N messages older than that
+            // cursor. Fetch one extra row to detect whether older history still
+            // exists, then return the page in ascending (chat) order.
+            $perPage = max(1, min((int) $request->get('per_page', 10), 50));
+            $beforeId = $request->get('before_id');
 
-            // RLS in model automatically filters by user_id
-            $messages = WhatsAppMessage::with(['contact'])
+            $rows = WhatsAppMessage::with(['contact'])
                 ->where('contact_id', $contactId)
-                ->orderBy('created_at', 'asc')
+                ->when($beforeId, fn ($q) => $q->where('id', '<', (int) $beforeId))
+                ->orderBy('id', 'desc')
+                ->limit($perPage + 1)
                 ->get();
+
+            $hasMore = $rows->count() > $perPage;
+            if ($hasMore) {
+                $rows = $rows->slice(0, $perPage);
+            }
+
+            // Ascending order for rendering (oldest → newest).
+            $messages = $rows->reverse()->values();
 
             return response()->json([
                 'success' => true,
                 'data' => $messages,
+                'has_more' => $hasMore,
+                'oldest_id' => $messages->first()->id ?? null,
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
