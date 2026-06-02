@@ -116,6 +116,10 @@
             <i class="fas fa-motorcycle w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>Delivery</span>
         </a>
+        <a href="/dashboard/complain" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'complain' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('pos.orders')">
+            <i class="fas fa-triangle-exclamation w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Complain</span>
+        </a>
 
         <!-- POS Inventory Section -->
         <template x-if="$store.permissions.hasPermission('pos.products') || $store.permissions.hasPermission('pos.categories')">
