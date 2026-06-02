@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\BalanceController;
 use App\Http\Controllers\Api\BankAccountController;
 use App\Http\Controllers\Api\BroadcastAuthController;
 use App\Http\Controllers\Api\CatalogController;
+use App\Http\Controllers\Api\ComplaintController;
 use App\Http\Controllers\Api\ContactTagController;
 use App\Http\Controllers\Api\DeliveryController;
 use App\Http\Controllers\Api\EmbeddedSignupController;
@@ -258,6 +259,12 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::delete('/drivers/{driver}', [DeliveryController::class, 'destroyDriver']);
 
         Route::get('/proofs', [DeliveryController::class, 'listProofs']);
+    });
+
+    // Complaint queue (raised from the WhatsApp "Complain" button)
+    Route::prefix('complaints')->group(function () {
+        Route::get('/', [ComplaintController::class, 'index']);
+        Route::post('/{complaint}/resolve', [ComplaintController::class, 'resolve']);
     });
 
     // POS (Point of Sale) API routes
