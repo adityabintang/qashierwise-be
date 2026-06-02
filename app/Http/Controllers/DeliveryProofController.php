@@ -28,9 +28,13 @@ class DeliveryProofController extends Controller
             ->where('delivery_token', $token)
             ->firstOrFail();
 
+        $config = \App\Models\DeliveryConfig::forUser($order->store->user_id);
+
         return view('delivery.proof', [
             'order' => $order,
             'token' => $token,
+            'proofRequired' => (bool) $config->proof_required,
+            'addressRequired' => (bool) $config->address_required,
             'done' => in_array($order->fulfillment_status, [
                 Order::FULFILLMENT_DELIVERED,
                 Order::FULFILLMENT_COMPLAINT,
@@ -52,31 +56,39 @@ class DeliveryProofController extends Controller
                 ->with('error', 'Pesanan ini sudah tidak dapat diproses.');
         }
 
+        // Required fields are driven by the merchant's delivery config.
+        $config = \App\Models\DeliveryConfig::forUser($order->store->user_id);
+        $proofRule = $config->proof_required ? 'required' : 'nullable';
+        $coordRule = $config->address_required ? 'required' : 'nullable';
+
         $validated = $request->validate([
-            'proof' => 'required|image|max:5120', // 5 MB
-            'latitude' => 'required|numeric|between:-90,90',
-            'longitude' => 'required|numeric|between:-180,180',
+            'proof' => $proofRule.'|image|max:5120', // 5 MB
+            'latitude' => $coordRule.'|numeric|between:-90,90',
+            'longitude' => $coordRule.'|numeric|between:-180,180',
         ]);
 
         $proofUrl = null;
-        try {
-            $result = $this->media->store($request->file('proof'), 'image');
-            $proofUrl = $result['url'] ?? null;
-        } catch (\Throwable $e) {
-            Log::error('Delivery proof upload failed', [
-                'order_id' => $order->id,
-                'error' => $e->getMessage(),
-            ]);
+        if ($request->hasFile('proof')) {
+            try {
+                $result = $this->media->store($request->file('proof'), 'image');
+                $proofUrl = $result['url'] ?? null;
+            } catch (\Throwable $e) {
+                Log::error('Delivery proof upload failed', [
+                    'order_id' => $order->id,
+                    'error' => $e->getMessage(),
+                ]);
 
-            return redirect()->route('delivery.proof', $token)
-                ->with('error', 'Gagal mengunggah foto. Silakan coba lagi.');
+                return redirect()->route('delivery.proof', $token)
+                    ->with('error', 'Gagal mengunggah foto. Silakan coba lagi.');
+            }
         }
 
+        $location = (isset($validated['latitude'], $validated['longitude']) && $validated['latitude'] !== null)
+            ? ['lat' => $validated['latitude'], 'lng' => $validated['longitude']]
+            : null;
+
         // Store proof + delivery location, then trigger the "received?" question.
-        $this->fulfillment->submitProof($order, $proofUrl, [
-            'lat' => $validated['latitude'],
-            'lng' => $validated['longitude'],
-        ]);
+        $this->fulfillment->submitProof($order, $proofUrl, $location);
 
         return redirect()->route('delivery.proof', $token)
             ->with('success', 'Bukti terkirim. Menunggu konfirmasi dari pembeli.');
