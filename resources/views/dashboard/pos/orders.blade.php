@@ -474,7 +474,7 @@
                         <div class="space-y-2">
                             <template x-for="item in selectedOrder?.items" :key="item.id">
                                 <div class="flex justify-between text-sm">
-                                    <span><span x-text="item.quantity"></span>x <span x-text="item.product?.name || 'Product'"></span></span>
+                                    <span><span x-text="item.quantity"></span>x <span x-text="item.product?.name || item.product_name || item.product_retailer_id || 'Product'"></span></span>
                                     <span x-text="formatCurrency(item.subtotal)"></span>
                                 </div>
                             </template>

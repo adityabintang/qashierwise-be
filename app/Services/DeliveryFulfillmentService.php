@@ -68,10 +68,8 @@ class DeliveryFulfillmentService
         $name = $order->customer_name ?: 'Pelanggan';
         $this->sendCustomerText(
             $order,
-            "✅ Halo {$name}, pesanan *#{$order->order_number}* sudah *dikonfirmasi* "
-            ."dan sedang kami proses.\n\n"
-            ."🏪 Silakan ambil pesanan di toko. Tunjukkan nomor pesanan ini ke kasir.\n\n"
-            .'Terima kasih! 🙏'
+            "Halo {$name}, pesanan *#{$order->order_number}* sudah *dikonfirmasi* "
+            ."Terimakasih, berikut invoice pembelian nya.\n\n"
         );
 
         // Invoice PDF (official WABA document).
