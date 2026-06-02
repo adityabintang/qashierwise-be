@@ -112,6 +112,10 @@
             <i class="fas fa-credit-card w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_payment') }}</span>
         </a>
+        <a href="/dashboard/delivery" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'delivery' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('pos.orders')">
+            <i class="fas fa-motorcycle w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Delivery</span>
+        </a>
 
         <!-- POS Inventory Section -->
         <template x-if="$store.permissions.hasPermission('pos.products') || $store.permissions.hasPermission('pos.categories')">
