@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\BlogController;
+use App\Http\Controllers\DeliveryProofController;
 use App\Http\Controllers\MonitoringDashboardController;
 use App\Http\Controllers\QrisPaymentPageController;
 use App\Http\Controllers\ReservationFormController;
@@ -75,6 +76,12 @@ Route::get('/docs/meta-catalog', function () {
 Route::get('/pay/qris/{orderId}', [QrisPaymentPageController::class, 'show'])
     ->name('qris.payment.page');
 
+// Public Driver Proof-of-Delivery Page (token-protected, no auth)
+Route::get('/delivery/{token}', [DeliveryProofController::class, 'show'])
+    ->name('delivery.proof');
+Route::post('/delivery/{token}', [DeliveryProofController::class, 'submit'])
+    ->name('delivery.proof.submit');
+
 // Public Reservation Form Routes
 Route::prefix('reservations')->name('reservation.')->group(function () {
     Route::get('/form', [ReservationFormController::class, 'show'])
@@ -130,6 +137,10 @@ Route::middleware(['web', 'check.web.auth', 'block.author.login'])->group(functi
     Route::get('/dashboard/customer-tags', function () {
         return view('dashboard.customer-tags');
     })->name('dashboard.customer-tags');
+
+    Route::get('/dashboard/delivery', function () {
+        return view('dashboard.delivery');
+    })->name('dashboard.delivery');
 
     // Reservation routes
     Route::get('/dashboard/reservations', function () {
