@@ -112,6 +112,12 @@
 <script>
 function complaintApp() {
     return {
+        // Shared dashboard shell state (required by sidebar + header)
+        sidebarOpen: window.innerWidth >= 1024,
+        isMobile: window.innerWidth < 768,
+        user: null,
+        notifications: [],
+
         API: window.location.origin + '/api/complaints',
         complaints: [],
         filter: 'open',
@@ -120,6 +126,33 @@ function complaintApp() {
         active: null,
         resolutionNote: '',
         saving: false,
+
+        initSidebar() {
+            this.isMobile = window.innerWidth < 768;
+            if (this.isMobile) {
+                this.sidebarOpen = false;
+            } else {
+                const saved = localStorage.getItem('sidebarOpen');
+                if (saved !== null) this.sidebarOpen = JSON.parse(saved);
+            }
+            this.$watch('sidebarOpen', v => { if (!this.isMobile) localStorage.setItem('sidebarOpen', JSON.stringify(v)); });
+            let t;
+            window.addEventListener('resize', () => {
+                clearTimeout(t);
+                t = setTimeout(() => {
+                    const wasMobile = this.isMobile;
+                    this.isMobile = window.innerWidth < 768;
+                    if (wasMobile && !this.isMobile) {
+                        const saved = localStorage.getItem('sidebarOpen');
+                        this.sidebarOpen = saved !== null ? JSON.parse(saved) : true;
+                    } else if (!wasMobile && this.isMobile) {
+                        this.sidebarOpen = false;
+                    }
+                }, 150);
+            });
+            const u = localStorage.getItem('user');
+            if (u) { try { this.user = JSON.parse(u); } catch (e) { this.user = { name: 'User' }; } }
+        },
 
         token() { return localStorage.getItem('token'); },
         headers(json = false) {
@@ -134,7 +167,7 @@ function complaintApp() {
         },
         formatDate(s) { return s ? new Date(s).toLocaleString('id-ID') : ''; },
 
-        async init() { await this.load(); },
+        async init() { this.initSidebar(); await this.load(); },
 
         async load() {
             const params = new URLSearchParams();
