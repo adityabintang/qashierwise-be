@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\BankAccountController;
 use App\Http\Controllers\Api\BroadcastAuthController;
 use App\Http\Controllers\Api\CatalogController;
 use App\Http\Controllers\Api\ContactTagController;
+use App\Http\Controllers\Api\DeliveryController;
 use App\Http\Controllers\Api\EmbeddedSignupController;
 use App\Http\Controllers\Api\Internal\ReservationReminderController;
 use App\Http\Controllers\Api\MidtransWebhookController;
@@ -246,6 +247,19 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::delete('/{id}', [ReservationConfigController::class, 'destroy']);
     });
 
+    // Delivery management (config, driver directory, proof gallery)
+    Route::prefix('delivery')->group(function () {
+        Route::get('/config', [DeliveryController::class, 'getConfig']);
+        Route::put('/config', [DeliveryController::class, 'updateConfig']);
+
+        Route::get('/drivers', [DeliveryController::class, 'listDrivers']);
+        Route::post('/drivers', [DeliveryController::class, 'storeDriver']);
+        Route::put('/drivers/{driver}', [DeliveryController::class, 'updateDriver']);
+        Route::delete('/drivers/{driver}', [DeliveryController::class, 'destroyDriver']);
+
+        Route::get('/proofs', [DeliveryController::class, 'listProofs']);
+    });
+
     // POS (Point of Sale) API routes
     Route::prefix('pos')->group(function () {
         // Products - index/show accepts view_products OR manage_products
@@ -268,6 +282,7 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::delete('/orders/{order}/items/{item}', [OrderController::class, 'removeItem'])->middleware('pos.permission:manage_orders');
         Route::post('/orders/{order}/discount', [OrderController::class, 'applyDiscount'])->middleware('pos.permission:manage_orders');
         Route::post('/orders/{order}/cancel', [OrderController::class, 'cancel'])->middleware('pos.permission:manage_orders');
+        Route::post('/orders/{order}/confirm', [OrderController::class, 'confirm'])->middleware('pos.permission:manage_orders');
         Route::post('/orders/{order}/resend-qris', [OrderController::class, 'resendQrisLink'])->middleware('pos.permission:manage_orders');
         Route::get('/orders', [OrderController::class, 'index'])->middleware('pos.permission:view_orders|manage_orders');
         Route::post('/orders', [OrderController::class, 'store'])->middleware('pos.permission:manage_orders');
