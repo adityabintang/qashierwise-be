@@ -18,6 +18,7 @@ class DeliveryConfig extends Model
         'is_active',
         'default_ongkir',
         'proof_required',
+        'address_required',
         'notes',
     ];
 
@@ -26,6 +27,7 @@ class DeliveryConfig extends Model
         return [
             'is_active' => 'boolean',
             'proof_required' => 'boolean',
+            'address_required' => 'boolean',
             'default_ongkir' => 'decimal:2',
         ];
     }
@@ -42,7 +44,7 @@ class DeliveryConfig extends Model
     {
         return static::firstOrCreate(
             ['user_id' => $userId],
-            ['is_active' => true, 'default_ongkir' => 0, 'proof_required' => true]
+            ['is_active' => true, 'default_ongkir' => 0, 'proof_required' => true, 'address_required' => true]
         );
     }
 }
