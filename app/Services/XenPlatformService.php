@@ -615,30 +615,38 @@ class XenPlatformService
     public function verifyWebhookSignature(string $signature, ?string $subAccountId = null): bool
     {
         // Sub-account context: look up its callback_token from sub_merchants.
+        // When a token IS found, verify strictly against it — real QRIS payments
+        // use this path.
+        // When NO token is found (e.g. Xendit dashboard "Test Webhook" button
+        // which sends fake business_ids), fall through to master token so
+        // connectivity tests pass without requiring a matching sub-account row.
         if ($subAccountId) {
             $token = \App\Models\SubMerchant::where('xendit_account_id', $subAccountId)
                 ->value('xendit_callback_token');
 
-            if (! $token) {
-                Log::warning('XenPlatform: no callback_token stored for sub-account', [
-                    'xendit_account_id' => $subAccountId,
-                    'hint'              => 'Run: php artisan xendit:sync-webhooks --account=' . $subAccountId,
-                ]);
-                return false;
+            if ($token) {
+                $result = hash_equals($token, $signature);
+                if (! $result) {
+                    Log::warning('XenPlatform: sub-account signature mismatch', [
+                        'xendit_account_id' => $subAccountId,
+                        'expected_length'   => strlen($token),
+                        'received_length'   => strlen($signature),
+                    ]);
+                }
+                return $result;
             }
 
-            $result = hash_equals($token, $signature);
-            if (! $result) {
-                Log::warning('XenPlatform: sub-account signature mismatch', [
-                    'xendit_account_id' => $subAccountId,
-                    'expected_length'   => strlen($token),
-                    'received_length'   => strlen($signature),
-                ]);
-            }
-            return $result;
+            // No stored token for this sub-account ID — the business_id in the
+            // payload is likely Xendit's hardcoded test value (not a real
+            // sub-merchant). Fall through to master token verification.
+            Log::info('XenPlatform: sub-account not found, trying master token fallback', [
+                'xendit_account_id' => $subAccountId,
+            ]);
         }
 
-        // Master context (legacy / direct master webhooks).
+        // Master context: used for master-account webhooks and as a fallback
+        // when the sub-account from the payload doesn't match any stored row
+        // (Xendit dashboard test events use fake business_ids + master token).
         if (empty($this->webhookToken)) {
             Log::warning('XenPlatform: Webhook token not configured');
             return false;
