@@ -1,7 +1,14 @@
 <?php
 
+use App\Http\Controllers\Admin\AuthController as AdminAuthController;
+use App\Http\Controllers\Admin\BlogCategoryController as AdminBlogCategoryController;
+use App\Http\Controllers\Admin\BlogPostController as AdminBlogPostController;
+use App\Http\Controllers\Admin\BlogTagController as AdminBlogTagController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\UploadController as AdminUploadController;
 use App\Http\Controllers\AiAgentController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Middleware\EnsureCanAccessAdmin;
 use App\Http\Controllers\Api\BalanceController;
 use App\Http\Controllers\Api\BankAccountController;
 use App\Http\Controllers\Api\BroadcastAuthController;
@@ -87,6 +94,30 @@ Route::get('/health/subscription', [MonitoringDashboardController::class, 'statu
 // Broadcast authentication - Custom controller for Sanctum token auth
 Route::post('/broadcasting/auth', [BroadcastAuthController::class, 'authenticate'])
     ->middleware(['auth:sanctum', LogBroadcastingAuth::class]);
+
+// ---------------------------------------------------------------------------
+// Admin (Blog CMS) — React SPA backend, replaces the old Filament panel.
+// Session (Sanctum SPA cookie) auth + EnsureCanAccessAdmin gate.
+// ---------------------------------------------------------------------------
+Route::prefix('admin')->name('admin.')->group(function () {
+    Route::post('/auth/login', [AdminAuthController::class, 'login'])
+        ->middleware('throttle:10,1')
+        ->name('auth.login');
+
+    Route::middleware(['auth:sanctum', EnsureCanAccessAdmin::class])->group(function () {
+        Route::get('/auth/me', [AdminAuthController::class, 'me'])->name('auth.me');
+        Route::post('/auth/logout', [AdminAuthController::class, 'logout'])->name('auth.logout');
+
+        Route::get('/dashboard/stats', [AdminDashboardController::class, 'stats'])->name('dashboard.stats');
+
+        Route::post('/uploads', [AdminUploadController::class, 'store'])->name('uploads.store');
+
+        Route::delete('/posts/bulk', [AdminBlogPostController::class, 'bulkDestroy'])->name('posts.bulk');
+        Route::apiResource('posts', AdminBlogPostController::class);
+        Route::apiResource('categories', AdminBlogCategoryController::class);
+        Route::apiResource('tags', AdminBlogTagController::class);
+    });
+});
 
 // Protected routes
 Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function () {
