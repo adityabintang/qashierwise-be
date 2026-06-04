@@ -17,8 +17,12 @@
         }
     </style>
 
-    {{-- Which React page to mount (landing | privacy | terms | refund) --}}
+    {{-- Which React page to mount (landing | privacy | terms | refund | docs) --}}
     <script>window.__PAGE__ = @json($page ?? 'landing');</script>
+
+    {{-- Subscription plans (from config) so the React pricing section shows real
+         prices and can start the Xendit checkout. --}}
+    <script>window.__SUBSCRIPTION_PLANS__ = @json(config('subscription.plans'));</script>
 
     @vite('resources/js/next.js/main.tsx')
 </head>

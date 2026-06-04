@@ -88,6 +88,17 @@ Route::get('/docs/meta-catalog', function () {
     return view('docs.meta-catalog');
 })->name('docs.meta-catalog');
 
+// User-facing documentation (React island; sidebar + markdown from resources/docs).
+// Registered AFTER /docs/meta-catalog so that specific route still wins. The React
+// app reads the path after /docs to pick which markdown page to render.
+Route::get('/docs/{path?}', function () {
+    return view('react.app', [
+        'page' => 'docs',
+        'title' => 'Dokumentasi QashierWise — Panduan Penggunaan',
+        'description' => 'Panduan lengkap penggunaan QashierWise: WhatsApp, AI Agent, Katalog, POS Kasir, Reservasi, Delivery, Pembayaran, dan langganan.',
+    ]);
+})->where('path', '.*')->name('docs');
+
 // Public QRIS Payment Page
 Route::get('/pay/qris/{orderId}', [QrisPaymentPageController::class, 'show'])
     ->name('qris.payment.page');
