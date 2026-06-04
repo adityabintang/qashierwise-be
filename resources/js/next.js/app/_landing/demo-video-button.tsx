@@ -7,7 +7,7 @@ import { XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PlayIcon } from "./icons";
 
-const VIDEO_SRC = "https://www.youtube.com/embed/vv2j4apjqQc?si=kpmyx80UUIlwgGvQ";
+const VIDEO_SRC = "https://www.youtube.com/embed/T3GZ8YVRRKs?si=5Yh9X0q7BnojdX-b";
 
 function VideoOverlay({ onClose }: { onClose: () => void }) {
   useEffect(() => {
