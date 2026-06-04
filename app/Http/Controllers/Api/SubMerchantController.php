@@ -75,6 +75,10 @@ class SubMerchantController extends Controller
     {
         $user = $request->user();
 
+        // Verify XenPlatform account is valid and clean up any orphaned accounts.
+        // This prevents duplicate email errors when retrying failed registrations.
+        $this->subMerchantService->verifyAndCleanupInvalidAccount($user);
+
         // Check if user can become a sub-merchant
         if (! $this->subMerchantService->canBecomeSubMerchant($user)) {
             return response()->json([

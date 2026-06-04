@@ -117,6 +117,22 @@ class ProcessQrisPayment implements ShouldQueue
             // Send WhatsApp notification to customer (outside DB transaction)
             $this->sendPaymentNotification($aiAgentService);
 
+            // Notify merchant for delivery orders (pickup notified in OrderCreator
+            // immediately, reservation notified in ProcessReservationPayment).
+            // Wrapped in try/catch so notif failure can't fail the payment job.
+            try {
+                $payment = Payment::where('qris_transaction_id', $this->transaction->id)->first();
+                $order   = $payment?->order;
+                if ($order && $order->delivery_type === \App\Models\Order::DELIVERY_TYPE_DELIVERY) {
+                    app(\App\Services\MerchantNotificationService::class)->notifyNewOrder($order);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Merchant delivery notif failed (non-fatal)', [
+                    'order_id' => $this->transaction->order_id,
+                    'error'    => $e->getMessage(),
+                ]);
+            }
+
             Log::info('ProcessQrisPayment job completed successfully', [
                 'order_id' => $this->transaction->order_id,
             ]);

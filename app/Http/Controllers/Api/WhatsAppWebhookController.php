@@ -7,12 +7,16 @@ use App\Events\NewWhatsAppMessage;
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessAiAgentMessage;
 use App\Models\AiAgent;
+use App\Models\AiAgentConversation;
 use App\Models\Reservation;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
 use App\Models\WhatsAppMessage;
 use App\Models\WhatsAppTemplate;
+use App\Services\AiAgentService;
+use App\Services\CatalogOrderFlowService;
 use App\Services\MediaStorageService;
+use App\Services\WebhookForwardingService;
 use App\Services\WhatsAppAccountService;
 use App\Services\WhatsAppFlowService;
 use Illuminate\Http\Request;
@@ -175,6 +179,25 @@ class WhatsAppWebhookController extends Controller
         $timestamp = $message['timestamp'];
         $type = $message['type'];
 
+        // Global idempotency guard. Meta retries delivery on any non-2xx
+        // response (and sometimes on slow 2xx). Without this, the AI agent
+        // can reply twice to the same customer message, and media downloads
+        // get re-attempted needlessly. The catalog-order branch had its own
+        // dedup; this one covers every type.
+        if ($messageId && WhatsAppMessage::withoutGlobalScopes()->where('message_id', $messageId)->exists()) {
+            Log::info('Duplicate webhook ignored', [
+                'message_id' => $messageId,
+                'type' => $type,
+                'user_id' => $userId,
+            ]);
+
+            return [
+                'message_id' => $messageId,
+                'from' => $from,
+                'duplicate' => true,
+            ];
+        }
+
         Log::info("Incoming $type message from $from", [
             'message_id' => $messageId,
             'user_id' => $userId,
@@ -329,6 +352,14 @@ class WhatsAppWebhookController extends Controller
                 }
                 break;
 
+            case 'order':
+                // WhatsApp catalog cart submission. Payload contains product_items.
+                $orderPayload = $message['order'] ?? [];
+                $itemCount = count($orderPayload['product_items'] ?? []);
+                $content = "Catalog order received ({$itemCount} items)";
+                $metadata = $orderPayload;
+                break;
+
             default:
                 $content = "Unsupported message type: $type";
                 $metadata = $message;
@@ -337,16 +368,16 @@ class WhatsAppWebhookController extends Controller
 
         // Save message to database (use updateOrCreate to prevent duplicate errors)
         // Note: Bypass global scope because webhooks are not authenticated
-        $whatsappMessage = WhatsAppMessage::withoutGlobalScopes()->updateOrCreate(
-            ['message_id' => $messageId],
+        $whatsappMessage = $this->insertMessageRow(
+            $messageId,
+            $type,
+            $content,
+            $metadata,
             [
                 'user_id' => $userId,
                 'phone_number_id' => $whatsappAccount->phone_number_id,
                 'contact_id' => $contact->id,
                 'direction' => 'incoming',
-                'type' => $type,
-                'content' => $content,
-                'metadata' => $metadata,
                 'status' => 'delivered',
                 'is_read' => false,
                 'sent_at' => now()->timestamp($timestamp),
@@ -361,6 +392,18 @@ class WhatsAppWebhookController extends Controller
             'unread_count' => $contact->unread_count + 1,
         ]);
 
+        // Customer is active again — wipe the follow-up counter on any open
+        // conversation so the scheduler restarts from zero when (and if) the
+        // next state transition fires. Pending SendFollowupJob jobs become
+        // stale on the next tick because followup_state_started_at is now null.
+        $openConversation = \App\Models\AiAgentConversation::where('whatsapp_contact_id', $contact->id)
+            ->whereNotNull('order_context')
+            ->latest('id')
+            ->first();
+        if ($openConversation) {
+            $openConversation->markActivity();
+        }
+
         // Broadcast event to frontend
         broadcast(new NewWhatsAppMessage($whatsappMessage, $contact));
 
@@ -369,12 +412,36 @@ class WhatsAppWebhookController extends Controller
             'contact_id' => $contact->id,
         ]);
 
+        // Forward to user-registered developer webhooks
+        app(WebhookForwardingService::class)->dispatch($userId, 'whatsapp.message.received', [
+            'message_id' => $messageId,
+            'from' => $from,
+            'contact_name' => $contact->name,
+            'type' => $type,
+            'content' => $content,
+            'phone_number_id' => $whatsappAccount->phone_number_id,
+            'received_at' => now()->toIso8601String(),
+        ]);
+
+        // Delivery confirmation (customer taps Konfirmasi/Complain, or replies
+        // TERIMA/KOMPLAIN when outside the 24h window). Handled BEFORE the AI
+        // agent block so it works regardless of ai_active — and a "Complain"
+        // is precisely what turns ai_active off.
+        if ($this->routeToDeliveryConfirmation($type, $message, $content, $userId, $contact)) {
+            Log::info('Message handled by delivery confirmation flow', [
+                'contact_id' => $contact->id,
+                'message_type' => $type,
+            ]);
+
+            return $messageData;
+        }
+
         // Check if AI Agent is active for this account
         $aiAgent = AiAgent::where('whatsapp_account_id', $whatsappAccount->id)
             ->where('is_active', true)
             ->first();
 
-        if ($aiAgent && $type === 'text') {
+        if ($aiAgent) {
             $contact->refresh();
             if (! $contact->ai_active) {
                 Log::info('AI disabled for this contact, skipping', [
@@ -384,20 +451,218 @@ class WhatsAppWebhookController extends Controller
                 return $messageData;
             }
 
-            // Dispatch AI Agent processing to queue
-            ProcessAiAgentMessage::dispatch(
+            // Catalog flow handles order webhook + button replies synchronously
+            // because they're state-machine transitions, not LLM calls.
+            $handledByCatalogFlow = $this->routeToCatalogFlow(
+                $type,
+                $message,
+                $metadata,
+                $content,
                 $whatsappAccount,
                 $contact,
-                $content
-            )->onQueue('ai-agent');
+                $aiAgent
+            );
 
-            Log::info('AI Agent message dispatched to queue', [
-                'contact_id' => $contact->id,
-                'ai_agent_id' => $aiAgent->id,
-            ]);
+            if ($handledByCatalogFlow) {
+                Log::info('Message handled by catalog order flow', [
+                    'contact_id' => $contact->id,
+                    'message_type' => $type,
+                ]);
+
+                return $messageData;
+            }
+
+            if ($type === 'text') {
+                // Dispatch AI Agent processing to queue
+                ProcessAiAgentMessage::dispatch(
+                    $whatsappAccount,
+                    $contact,
+                    $content
+                )->onQueue('ai-agent');
+
+                Log::info('AI Agent message dispatched to queue', [
+                    'contact_id' => $contact->id,
+                    'ai_agent_id' => $aiAgent->id,
+                ]);
+            }
         }
 
         return $messageData;
+    }
+
+    /**
+     * Route catalog-driven flow messages (order webhook, button replies, and
+     * free-text delivery info) to CatalogOrderFlowService. Returns true if the
+     * message was consumed by the catalog flow.
+     */
+    protected function routeToCatalogFlow(
+        string $type,
+        array $message,
+        array $metadata,
+        ?string $content,
+        WhatsAppAccount $whatsappAccount,
+        WhatsAppContact $contact,
+        AiAgent $aiAgent
+    ): bool {
+        try {
+            $service = app(CatalogOrderFlowService::class);
+
+            if ($type === 'order') {
+                if (! $aiAgent->hasCatalog()) {
+                    Log::warning('Received catalog order webhook but AI agent has no catalog_id configured', [
+                        'ai_agent_id' => $aiAgent->id,
+                    ]);
+
+                    return false;
+                }
+
+                // Dedup is handled globally at the top of handleIncomingMessage()
+                // — duplicates never reach this branch.
+
+                $conversation = app(AiAgentService::class)->getOrCreateConversation($aiAgent->id, $contact->id);
+                $service->handleCatalogOrderReceived(
+                    $whatsappAccount,
+                    $contact,
+                    $conversation,
+                    $aiAgent,
+                    $message['order'] ?? []
+                );
+
+                return true;
+            }
+
+            $conversation = AiAgentConversation::where('ai_agent_id', $aiAgent->id)
+                ->where('whatsapp_contact_id', $contact->id)
+                ->first();
+
+            if (! $conversation) {
+                return false;
+            }
+
+            if ($type === 'interactive') {
+                $interactiveType = $message['interactive']['type'] ?? null;
+                // Treat list_reply and button_reply the same way — both carry an
+                // id + title. Category picker uses list_reply (more than 3 options).
+                $replyId = null;
+                if ($interactiveType === 'button_reply') {
+                    $replyId = $message['interactive']['button_reply']['id'] ?? null;
+                } elseif ($interactiveType === 'list_reply') {
+                    $replyId = $message['interactive']['list_reply']['id'] ?? null;
+                } else {
+                    return false;
+                }
+
+                if (! $replyId) {
+                    return false;
+                }
+
+                return $service->handleButtonReply(
+                    $whatsappAccount,
+                    $contact,
+                    $conversation,
+                    $aiAgent,
+                    $replyId
+                );
+            }
+
+            if ($type === 'text' && $conversation->getFlowState() === CatalogOrderFlowService::STATE_AWAITING_DELIVERY_INFO) {
+                return $service->handleDeliveryInfoText(
+                    $whatsappAccount,
+                    $contact,
+                    $conversation,
+                    $aiAgent,
+                    $content ?? ''
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::error('Catalog flow routing error', [
+                'error' => $e->getMessage(),
+                'contact_id' => $contact->id,
+                'type' => $type,
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
+
+        return false;
+    }
+
+    /**
+     * Route the customer's delivery confirmation/complaint to
+     * DeliveryFulfillmentService.
+     *
+     * Two input shapes:
+     *   1. interactive button_reply id = "dlv_ok:{orderId}" / "dlv_bad:{orderId}"
+     *      (in-window quick-reply buttons) — order id is encoded directly.
+     *   2. text "TERIMA" / "KOMPLAIN" (Fonnte fallback outside the 24h window)
+     *      — matched against the contact's latest out_for_delivery order.
+     *
+     * Returns true if consumed.
+     */
+    protected function routeToDeliveryConfirmation(
+        string $type,
+        array $message,
+        ?string $content,
+        int $userId,
+        WhatsAppContact $contact
+    ): bool {
+        try {
+            $action = null;   // 'ok' | 'bad'
+            $order = null;
+
+            if ($type === 'interactive') {
+                $id = $message['interactive']['button_reply']['id'] ?? null;
+                if (! $id || (! str_starts_with($id, 'dlv_ok:') && ! str_starts_with($id, 'dlv_bad:'))) {
+                    return false;
+                }
+                [$prefix, $orderId] = explode(':', $id, 2);
+                $action = $prefix === 'dlv_ok' ? 'ok' : 'bad';
+                $order = \App\Models\Order::find((int) $orderId);
+            } elseif ($type === 'text') {
+                $clean = mb_strtolower(trim((string) $content));
+                if (preg_match('/^(terima|diterima|sesuai|ok)\.?$/u', $clean)) {
+                    $action = 'ok';
+                } elseif (preg_match('/^(komplain|complain|tidak sesuai|tdk sesuai)\.?$/u', $clean)) {
+                    $action = 'bad';
+                } else {
+                    return false;
+                }
+
+                // Match the contact's latest order that is awaiting receipt.
+                $order = \App\Models\Order::whereHas('store', fn ($q) => $q->where('user_id', $userId))
+                    ->where('customer_phone', preg_replace('/[^0-9]/', '', $contact->wa_id))
+                    ->where('fulfillment_status', \App\Models\Order::FULFILLMENT_OUT_FOR_DELIVERY)
+                    ->latest('out_for_delivery_at')
+                    ->first();
+            } else {
+                return false;
+            }
+
+            if (! $order) {
+                return false;
+            }
+
+            // Ownership guard — order must belong to the account's user.
+            if ($order->store->user_id !== $userId) {
+                return false;
+            }
+
+            $svc = app(\App\Services\DeliveryFulfillmentService::class);
+            if ($action === 'ok') {
+                $svc->markDelivered($order);
+            } else {
+                $svc->raiseComplaint($order, $contact);
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Delivery confirmation routing error', [
+                'contact_id' => $contact->id,
+                'type' => $type,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     /**
@@ -527,16 +792,16 @@ class WhatsAppWebhookController extends Controller
 
         // Save message echo to database as outgoing message
         // Use updateOrCreate to prevent duplicate errors
-        $whatsappMessage = WhatsAppMessage::withoutGlobalScopes()->updateOrCreate(
-            ['message_id' => $messageId],
+        $whatsappMessage = $this->insertMessageRow(
+            $messageId,
+            $type,
+            $content,
+            $metadata,
             [
                 'user_id' => $userId,
                 'phone_number_id' => $whatsappAccount->phone_number_id,
                 'contact_id' => $contact->id,
                 'direction' => 'outgoing',
-                'type' => $type,
-                'content' => $content,
-                'metadata' => $metadata,
                 'status' => 'sent',
                 'is_read' => true,
                 'sent_at' => now()->timestamp($timestamp),
@@ -1158,6 +1423,57 @@ class WhatsAppWebhookController extends Controller
                 'error' => $e->getMessage(),
                 'reservation_id' => $reservation->id,
             ]);
+        }
+    }
+
+    /**
+     * INSERT a whatsapp_messages row, retrying once with type='unsupported'
+     * if Postgres rejects the original type with a CHECK constraint violation.
+     *
+     * Why a catch-and-retry instead of a hard-coded type whitelist?
+     *   - DB stays the single source of truth for valid types (no PHP/DB drift)
+     *   - Future Meta-introduced types (poll, payment_*, etc.) are stored as
+     *     'unsupported' with their original_type preserved in metadata, so we
+     *     get visibility without DB migrations + don't crash the webhook,
+     *     which prevents Meta retry storms (the 500% CPU root cause)
+     *   - Currently valid types stay untouched (no semantic regression)
+     */
+    protected function insertMessageRow(
+        string $messageId,
+        string $type,
+        ?string $content,
+        $metadata,
+        array $attributes
+    ): WhatsAppMessage {
+        $row = array_merge($attributes, [
+            'type'     => $type,
+            'content'  => $content,
+            'metadata' => $metadata,
+        ]);
+
+        try {
+            return WhatsAppMessage::withoutGlobalScopes()->updateOrCreate(
+                ['message_id' => $messageId],
+                $row
+            );
+        } catch (\Illuminate\Database\QueryException $e) {
+            $isTypeCheckViolation = str_contains($e->getMessage(), 'whatsapp_messages_type_check');
+            if (! $isTypeCheckViolation) {
+                throw $e;
+            }
+
+            Log::warning('Unknown WhatsApp message type rejected by DB, storing as unsupported', [
+                'message_id'    => $messageId,
+                'original_type' => $type,
+            ]);
+
+            $row['type']     = 'unsupported';
+            $row['metadata'] = ['original_type' => $type] + (array) $metadata;
+
+            return WhatsAppMessage::withoutGlobalScopes()->updateOrCreate(
+                ['message_id' => $messageId],
+                $row
+            );
         }
     }
 }

@@ -438,19 +438,15 @@ class AiAgentPromptBuilder
         ]);
     }
 
+    /**
+     * Product list is no longer injected into the system prompt — that was
+     * the root cause of "AI hallucinates a product that doesn't exist".
+     * The LLM now learns about products exclusively through the
+     * `get_all_products` tool, which always returns ground truth from the DB.
+     */
     private function shouldIncludeProductSamples(): bool
     {
-        // Only include for menu viewing, searching, or ordering
-        if ($this->intent === null) {
-            return true;
-        }
-
-        return in_array($this->intent, [
-            UserIntent::VIEW_MENU,
-            UserIntent::SEARCH_PRODUCT,
-            UserIntent::ORDER,
-            UserIntent::UNKNOWN,
-        ]);
+        return false;
     }
 
     private function shouldIncludeOrderingWorkflow(): bool

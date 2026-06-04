@@ -80,18 +80,15 @@ class MenuPaginationTest extends TestCase
         $this->assertSame(UserIntent::VIEW_MENU, UserIntent::detect('lihat menu'));
     }
 
-    public function test_is_next_menu_page_service_method(): void
+    public function test_next_menu_page_intent_detection(): void
     {
-        $method = new \ReflectionMethod($this->service, 'isNextMenuPageIntent');
-        $method->setAccessible(true);
+        $this->assertSame(UserIntent::NEXT_MENU_PAGE, UserIntent::detect('menu lainnya'));
+        $this->assertSame(UserIntent::NEXT_MENU_PAGE, UserIntent::detect('MENU LAINNYA'));
+        $this->assertSame(UserIntent::NEXT_MENU_PAGE, UserIntent::detect('Lihat Lagi'));
 
-        $this->assertTrue($method->invoke($this->service, 'menu lainnya'));
-        $this->assertTrue($method->invoke($this->service, 'MENU LAINNYA'));
-        $this->assertTrue($method->invoke($this->service, 'Lihat Lagi'));
-
-        $this->assertFalse($method->invoke($this->service, 'lihat menu'));
-        $this->assertFalse($method->invoke($this->service, 'pesan nasi goreng'));
-        $this->assertFalse($method->invoke($this->service, 'halo'));
+        $this->assertNotSame(UserIntent::NEXT_MENU_PAGE, UserIntent::detect('lihat menu'));
+        $this->assertNotSame(UserIntent::NEXT_MENU_PAGE, UserIntent::detect('pesan nasi goreng'));
+        $this->assertNotSame(UserIntent::NEXT_MENU_PAGE, UserIntent::detect('halo'));
     }
 
     public function test_conversation_page_tracking(): void
@@ -248,11 +245,9 @@ class MenuPaginationTest extends TestCase
         }
         $cart = $this->conversation->getCart();
         $page = $this->conversation->getCurrentMenuPage();
-        $pending = $this->conversation->getPendingOrder();
         dump('--- STATE ---');
         dump('Menu Page: '.$page);
         dump('Cart: '.(empty($cart) ? '(empty)' : json_encode($cart)));
-        dump('Pending Order: '.($pending ? json_encode($pending) : '(none)'));
         dump('Messages Count: '.count($messages));
     }
 
@@ -318,8 +313,7 @@ class MenuPaginationTest extends TestCase
         $intent = UserIntent::detect($userMsg);
         $this->assertSame(UserIntent::NEXT_MENU_PAGE, $intent);
 
-        $isNext = $this->invokeProtected('isNextMenuPageIntent', $userMsg);
-        $this->assertTrue($isNext);
+        $this->assertSame(UserIntent::NEXT_MENU_PAGE, UserIntent::detect($userMsg));
 
         $currentPage = $this->conversation->getCurrentMenuPage();
         $nextPage = $currentPage + 1;
@@ -517,13 +511,11 @@ class MenuPaginationTest extends TestCase
 
         $this->conversation->addMessage('human', $userMsg);
         $this->conversation->addMessage('ai', $confirmResult);
-        $this->assertNotNull($this->conversation->getPendingOrder());
 
         dump('┌─────────────────────────────────────');
         dump('│ STEP 9: User konfirmasi pesanan');
         dump('│       → Intent: CHECKOUT');
-        dump('│       → LLM calls tool: confirm_order()');
-        dump('│       → Sets pending_order in conversation');
+        dump('│       → State machine takes over (catalog-order flow)');
         dump('├─────────────────────────────────────');
         dump("│ 👤 USER: \"{$userMsg}\"");
         dump('│');
@@ -532,8 +524,6 @@ class MenuPaginationTest extends TestCase
         dump('│');
         dump('│ 🤖 BOT:');
         dump('│ '.str_replace("\n", "\n│ ", $confirmResult));
-        dump('│');
-        dump('│ ⏳ Pending order set. Waiting for user confirmation...');
         dump('└─────────────────────────────────────');
         dump('');
 
@@ -544,9 +534,6 @@ class MenuPaginationTest extends TestCase
 
         $this->conversation->addMessage('human', $userMsg);
 
-        $pendingOrder = $this->conversation->getPendingOrder();
-        $this->assertNotNull($pendingOrder);
-
         $cart = $this->conversation->getCart();
         $total = 0;
         foreach ($cart as $item) {
@@ -555,16 +542,12 @@ class MenuPaginationTest extends TestCase
         $tax = round($total * 0.11, 2);
         $grandTotal = round($total + $tax, 2);
 
-        $this->conversation->clearPendingOrder();
         $botReply = "✅ Pesanan berhasil dibuat!\n\n📝 Order #ORD-".now()->format('Ymd')."-001\n💰 Total: Rp ".number_format($grandTotal, 0, ',', '.')."\n\nTerima kasih telah memesan! Pesanan Anda sedang diproses. 🎉";
         $this->conversation->addMessage('ai', $botReply);
 
         dump('┌─────────────────────────────────────');
         dump('│ STEP 10: User konfirmasi "ya"');
         dump('│       → isConfirmation("ya") = true');
-        dump('│       → confirmAndCreateOrder() called');
-        dump('│       → Order created in database');
-        dump('│       → clearPendingOrder()');
         dump('├─────────────────────────────────────');
         dump("│ 👤 USER: \"{$userMsg}\"");
         dump('│');
@@ -580,7 +563,6 @@ class MenuPaginationTest extends TestCase
 
         // Final assertions
         $this->assertSame(10, $this->conversation->getMessageCount());
-        $this->assertNull($this->conversation->getPendingOrder());
     }
 
     public function test_simulated_conversation_cancel_and_remove(): void
@@ -698,107 +680,5 @@ class MenuPaginationTest extends TestCase
 
         $this->assertSame(1, $this->conversation->getCurrentMenuPage());
         $this->assertEmpty($this->conversation->getCart());
-        $this->assertNull($this->conversation->getPendingOrder());
-    }
-
-    public function test_simulated_conversation_pending_order_rejection(): void
-    {
-        $this->createProducts(5);
-
-        dump('');
-        dump('╔══════════════════════════════════════════════════════════════╗');
-        dump('║  SIMULASI: Checkout → User Rejects → Re-order             ║');
-        dump('╚══════════════════════════════════════════════════════════════╝');
-        dump('');
-
-        // Setup: Add items
-        $this->invokeProtected('addItemsByName', $this->conversation, $this->user->id, [
-            ['product_name' => 'Product 1', 'quantity' => 1],
-            ['product_name' => 'Product 2', 'quantity' => 2],
-        ]);
-
-        // Step 1: Checkout
-        $confirmResult = $this->invokeProtected('prepareOrderConfirmation', $this->conversation, $this->user->id);
-        $this->conversation->addMessage('human', 'checkout');
-        $this->conversation->addMessage('ai', $confirmResult);
-        $this->assertNotNull($this->conversation->getPendingOrder());
-
-        dump('┌─────────────────────────────────────');
-        dump('│ STEP 1: User checkout');
-        dump('│       → prepareOrderConfirmation() sets pending_order');
-        dump('├─────────────────────────────────────');
-        dump('│ 👤 USER: "checkout"');
-        dump('│');
-        dump('│ 🤖 BOT:');
-        dump('│ '.str_replace("\n", "\n│ ", $confirmResult));
-        dump('│');
-        dump('│ ⏳ pending_order is set. Waiting for ya/tidak...');
-        dump('└─────────────────────────────────────');
-        dump('');
-
-        // Step 2: User rejects
-        $userMsg = 'tidak';
-        $isRejection = $this->invokeProtected('isRejection', $userMsg);
-        $this->assertTrue($isRejection);
-
-        $this->conversation->clearPendingOrder();
-        $botReply = 'Baik, pesanan dibatalkan. Ketik *menu* kapan saja jika mau pesan lagi! 😊';
-        $this->conversation->addMessage('human', $userMsg);
-        $this->conversation->addMessage('ai', $botReply);
-
-        dump('┌─────────────────────────────────────');
-        dump('│ STEP 2: User rejects with "tidak"');
-        dump('│       → isRejection("tidak") = true');
-        dump('│       → clearPendingOrder() called');
-        dump('│       → Cart TETAP ADA (bisa order ulang tanpa add ulang)');
-        dump('├─────────────────────────────────────');
-        dump("│ 👤 USER: \"{$userMsg}\"");
-        dump('│');
-        dump('│ 🤖 BOT:');
-        dump('│ '.str_replace("\n", "\n│ ", $botReply));
-        dump('│');
-        dump('│ 📊 pending_order: cleared');
-        dump('│ 📊 cart: still has items → '.json_encode($this->conversation->getCart()));
-        dump('└─────────────────────────────────────');
-        dump('');
-
-        // Step 3: User checkout lagi
-        $confirmResult2 = $this->invokeProtected('prepareOrderConfirmation', $this->conversation, $this->user->id);
-        $this->conversation->addMessage('human', 'konfirmasi');
-        $this->conversation->addMessage('ai', $confirmResult2);
-        $this->assertNotNull($this->conversation->getPendingOrder());
-
-        dump('┌─────────────────────────────────────');
-        dump('│ STEP 3: User checkout lagi');
-        dump('│       → Same cart, new pending_order');
-        dump('├─────────────────────────────────────');
-        dump('│ 👤 USER: "konfirmasi"');
-        dump('│');
-        dump('│ 🤖 BOT:');
-        dump('│ '.str_replace("\n", "\n│ ", $confirmResult2));
-        dump('└─────────────────────────────────────');
-        dump('');
-
-        // Step 4: User confirms this time
-        $this->conversation->addMessage('human', 'ya');
-        $isConfirmation = $this->invokeProtected('isConfirmation', 'ya');
-        $this->assertTrue($isConfirmation);
-        $this->conversation->clearPendingOrder();
-        $this->conversation->addMessage('ai', '✅ Pesanan berhasil dibuat! Terima kasih! 🎉');
-
-        dump('┌─────────────────────────────────────');
-        dump('│ STEP 4: User confirms "ya"');
-        dump('│       → Order created!');
-        dump('├─────────────────────────────────────');
-        dump('│ 👤 USER: "ya"');
-        dump('│');
-        dump('│ 🤖 BOT: ✅ Pesanan berhasil dibuat! Terima kasih! 🎉');
-        dump('└─────────────────────────────────────');
-        dump('');
-
-        $this->printConversationLog();
-
-        $this->assertNull($this->conversation->getPendingOrder());
-        $this->assertNotEmpty($this->conversation->getCart());
     }
 }

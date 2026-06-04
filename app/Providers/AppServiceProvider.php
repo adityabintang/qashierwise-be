@@ -76,6 +76,10 @@ class AppServiceProvider extends ServiceProvider
             \Illuminate\Support\Facades\URL::forceScheme('https');
         }
 
+        // Cache invalidators for AiAgent dependency checks
+        \App\Models\SubMerchant::observe(\App\Observers\SubMerchantObserver::class);
+        \App\Models\ReservationConfig::observe(\App\Observers\ReservationConfigObserver::class);
+
         // Handle missing translation keys in development
         if ($this->app->isLocal()) {
             \Illuminate\Support\Facades\Lang::handleMissingKeysUsing(function ($key) {

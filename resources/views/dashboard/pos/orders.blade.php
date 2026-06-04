@@ -474,7 +474,7 @@
                         <div class="space-y-2">
                             <template x-for="item in selectedOrder?.items" :key="item.id">
                                 <div class="flex justify-between text-sm">
-                                    <span><span x-text="item.quantity"></span>x <span x-text="item.product?.name || 'Product'"></span></span>
+                                    <span><span x-text="item.quantity"></span>x <span x-text="item.product?.name || item.product_name || item.product_retailer_id || 'Product'"></span></span>
                                     <span x-text="formatCurrency(item.subtotal)"></span>
                                 </div>
                             </template>
@@ -558,6 +558,86 @@
                             </div>
                         </div>
                     </template>
+
+                    <!-- Delivery / Fulfillment Section -->
+                    <div class="border-t border-[hsl(var(--border))] pt-4">
+                        <h5 class="font-medium mb-3 flex items-center gap-2">
+                            <i class="fas fa-motorcycle text-emerald-600"></i> Pengantaran
+                            <template x-if="selectedOrder?.fulfillment_status">
+                                <span class="text-xs px-2 py-0.5 rounded-full font-normal"
+                                      :class="fulfillClass(selectedOrder.fulfillment_status)"
+                                      x-text="fulfillLabel(selectedOrder.fulfillment_status)"></span>
+                            </template>
+                        </h5>
+
+                        <!-- Confirm action (not yet confirmed) -->
+                        <template x-if="canConfirm(selectedOrder)">
+                            <div class="space-y-3">
+                                <!-- Pickup: simple confirm -->
+                                <template x-if="selectedOrder?.delivery_type !== 'delivery'">
+                                    <button @click="confirmOrder(selectedOrder)" :disabled="confirming"
+                                            class="btn btn-primary w-full flex items-center justify-center gap-2">
+                                        <i class="fas fa-check"></i>
+                                        <span>Konfirmasi Pesanan (Pickup)</span>
+                                    </button>
+                                </template>
+
+                                <!-- Delivery: choose driver + confirm -->
+                                <template x-if="selectedOrder?.delivery_type === 'delivery'">
+                                    <div class="space-y-3 bg-[hsl(var(--muted)/0.5)] rounded-lg p-4">
+                                        <p class="text-sm font-medium">Tugaskan Kurir</p>
+                                        <div>
+                                            <label class="text-xs text-[hsl(var(--muted-foreground))] mb-1 block">Pilih Driver</label>
+                                            <select x-model="confirmForm.delivery_driver_id" @change="onDriverSelected()" class="input w-full min-h-[44px]">
+                                                <option value="">— Input manual —</option>
+                                                <template x-for="d in drivers" :key="d.id">
+                                                    <option :value="d.id" x-text="d.name + ' (' + d.phone + ')'"></option>
+                                                </template>
+                                            </select>
+                                            <a href="/dashboard/delivery" class="text-xs text-emerald-600 hover:underline mt-1 inline-block">+ Kelola driver</a>
+                                        </div>
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <div>
+                                                <label class="text-xs text-[hsl(var(--muted-foreground))] mb-1 block">Nama Pengantar <span class="text-red-500">*</span></label>
+                                                <input type="text" x-model="confirmForm.courier_name" class="input w-full min-h-[44px]" placeholder="Nama driver">
+                                            </div>
+                                            <div>
+                                                <label class="text-xs text-[hsl(var(--muted-foreground))] mb-1 block">WhatsApp Pengantar <span class="text-red-500">*</span></label>
+                                                <input type="text" x-model="confirmForm.courier_phone" class="input w-full min-h-[44px]" placeholder="08xxxxxxxxxx">
+                                            </div>
+                                        </div>
+                                        <button @click="confirmOrder(selectedOrder)" :disabled="confirming"
+                                                class="btn btn-primary w-full flex items-center justify-center gap-2">
+                                            <i class="fas fa-paper-plane"></i>
+                                            <span x-text="confirming ? 'Memproses...' : 'Konfirmasi & Kirim ke Kurir'"></span>
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+
+                        <!-- Already confirmed: show courier + proof -->
+                        <template x-if="selectedOrder?.fulfillment_status">
+                            <div class="space-y-2 text-sm">
+                                <template x-if="selectedOrder?.courier_name">
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <div><span class="text-[hsl(var(--muted-foreground))]">Kurir:</span><p class="font-medium" x-text="selectedOrder.courier_name"></p></div>
+                                        <div><span class="text-[hsl(var(--muted-foreground))]">WA Kurir:</span><p class="font-medium" x-text="selectedOrder.courier_phone"></p></div>
+                                    </div>
+                                </template>
+                                <div x-show="selectedOrder?.delivered_at" class="text-[hsl(var(--muted-foreground))]">
+                                    Diterima: <span x-text="formatDate(selectedOrder?.delivered_at)"></span>
+                                </div>
+                                <div x-show="selectedOrder?.complaint_note" class="bg-red-50 text-red-700 p-3 rounded-lg" x-text="selectedOrder?.complaint_note"></div>
+                                <template x-if="selectedOrder?.proof_image_url">
+                                    <div>
+                                        <p class="text-[hsl(var(--muted-foreground))] mb-1">Bukti Pengiriman:</p>
+                                        <img :src="selectedOrder.proof_image_url" alt="Bukti" class="rounded-lg w-full max-h-64 object-cover cursor-pointer" @click="window.open(selectedOrder.proof_image_url,'_blank')">
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
                 </div>
             </div>
         </div>
@@ -582,11 +662,43 @@ function ordersApp() {
         userPermissions: [], isAdmin: true,
         // Sub-merchant QRIS availability
         subMerchantActive: null,
+        // Delivery fulfillment
+        drivers: [],
+        confirming: false,
+        confirmForm: { delivery_driver_id: '', courier_name: '', courier_phone: '' },
 
         async init() {
             this.initDashboard();
             await this.fetchUserPermissions();
-            await Promise.all([this.fetchOrders(), this.fetchStores(), this.fetchProducts(), this.fetchSubMerchantStatus()]);
+            await Promise.all([this.fetchOrders(), this.fetchStores(), this.fetchProducts(), this.fetchSubMerchantStatus(), this.fetchDrivers()]);
+            this.openDeepLinkedOrder();
+        },
+
+        async fetchDrivers() {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${window.location.origin}/api/delivery/drivers?active_only=1`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
+                const data = await res.json();
+                if (data.success) this.drivers = data.data || [];
+            } catch (e) { /* non-fatal */ }
+        },
+
+        // Notif link from Fonnte deep-links to ?order=ORDER_NUMBER — auto-open detail.
+        async openDeepLinkedOrder() {
+            const num = new URLSearchParams(window.location.search).get('order');
+            if (!num) return;
+            let found = (this.orders || []).find(o => o.order_number === num);
+            if (!found) {
+                // Search the backend by order number, then open.
+                try {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch(`${this.API_BASE_URL}/orders?search=${encodeURIComponent(num)}`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
+                    const data = await res.json();
+                    const list = data?.data?.data || data?.data || [];
+                    found = list.find(o => o.order_number === num) || list[0];
+                } catch (e) { /* ignore */ }
+            }
+            if (found) this.viewOrder(found);
         },
 
         async fetchSubMerchantStatus() {
@@ -762,7 +874,63 @@ function ordersApp() {
                 }
             } catch (e) { console.error('Error:', e); alert('Failed to load order'); }
         },
-        closeViewModal() { this.showViewModal = false; this.selectedOrder = null; },
+        closeViewModal() { this.showViewModal = false; this.selectedOrder = null; this.resetConfirmForm(); },
+
+        resetConfirmForm() { this.confirmForm = { delivery_driver_id: '', courier_name: '', courier_phone: '' }; },
+
+        // When a directory driver is selected, prefill name/phone (still editable).
+        onDriverSelected() {
+            const d = this.drivers.find(x => String(x.id) === String(this.confirmForm.delivery_driver_id));
+            if (d) { this.confirmForm.courier_name = d.name; this.confirmForm.courier_phone = d.phone; }
+            else { this.confirmForm.courier_name = ''; this.confirmForm.courier_phone = ''; }
+        },
+
+        canConfirm(order) {
+            if (!order || order.fulfillment_status) return false;
+            if (order.delivery_type === 'delivery') return order.status === 'paid';
+            return ['pending', 'paid'].includes(order.status); // pickup
+        },
+
+        async confirmOrder(order) {
+            if (!this.hasPermission('manage_orders')) { alert('Anda tidak punya izin.'); return; }
+            const isDelivery = order.delivery_type === 'delivery';
+            if (isDelivery && (!this.confirmForm.courier_name || !this.confirmForm.courier_phone)) {
+                alert('Pilih driver atau isi nama & WhatsApp pengantar.');
+                return;
+            }
+            if (!confirm(isDelivery ? 'Konfirmasi pesanan & tugaskan kurir?' : 'Konfirmasi pesanan pickup ini?')) return;
+            this.confirming = true;
+            try {
+                const token = localStorage.getItem('token');
+                const body = isDelivery ? {
+                    delivery_driver_id: this.confirmForm.delivery_driver_id || null,
+                    courier_name: this.confirmForm.courier_name,
+                    courier_phone: this.confirmForm.courier_phone,
+                } : {};
+                const res = await fetch(`${this.API_BASE_URL}/orders/${order.id}/confirm`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.selectedOrder = data.data;
+                    this.resetConfirmForm();
+                    await this.fetchOrders();
+                    alert(data.message || 'Pesanan dikonfirmasi.');
+                } else {
+                    alert(data.message || 'Gagal konfirmasi.');
+                }
+            } catch (e) { console.error(e); alert('Gagal konfirmasi.'); }
+            this.confirming = false;
+        },
+
+        fulfillLabel(s) {
+            return ({ out_for_delivery: 'Sedang Diantar', delivered: 'Diterima', complaint: 'Komplain', confirmed: 'Dikonfirmasi', awaiting_confirmation: 'Menunggu Konfirmasi' })[s] || s;
+        },
+        fulfillClass(s) {
+            return ({ out_for_delivery: 'bg-amber-100 text-amber-700', delivered: 'bg-emerald-100 text-emerald-700', complaint: 'bg-red-100 text-red-700', confirmed: 'bg-blue-100 text-blue-700' })[s] || 'bg-gray-100 text-gray-600';
+        },
 
         async resendQrisLink(order) {
             if (!order?.customer_phone || !order?.qris_transaction?.shareable_link) return;

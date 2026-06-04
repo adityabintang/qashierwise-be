@@ -13,6 +13,7 @@ use App\Services\OtpService;
 use App\Services\PasswordResetService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -258,29 +259,19 @@ class AuthController extends Controller
      */
     public function getUserPermissions(Request $request)
     {
-        // CRITICAL: Force reload user from database to prevent permission cache leakage
-        // This ensures fresh permission data for each request
-        $user = User::find($request->user()->id);
+        $user = $request->user();
 
-        // Clear any Spatie permission cache
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
-
-        \Log::info('=== getUserPermissions DEBUG ===');
-        \Log::info('User ID: '.$user->id);
-        \Log::info('User Email: '.$user->email);
-        \Log::info('Is Super Admin: '.($user->isSuperAdmin() ? 'true' : 'false'));
-        \Log::info('Is Master Admin: '.($user->isMasterAdmin() ? 'true' : 'false'));
-
-        // Get all available permissions from database
-        $allPermissions = \Spatie\Permission\Models\Permission::where('guard_name', 'sanctum')
-            ->pluck('name')
-            ->sort()
-            ->values()
-            ->toArray();
+        // All permission names rarely change — cache for 10 min to avoid repeated DB hits.
+        $allPermissions = Cache::remember('permissions.all.sanctum', 600, fn () =>
+            \Spatie\Permission\Models\Permission::where('guard_name', 'sanctum')
+                ->pluck('name')
+                ->sort()
+                ->values()
+                ->toArray()
+        );
 
         // Super admin has full system access
         if ($user->isSuperAdmin()) {
-            \Log::info('Super admin - granting all permissions');
             $response = ApiResponse::success([
                 'is_super_admin' => true,
                 'is_master_admin' => false,
@@ -299,7 +290,6 @@ class AuthController extends Controller
 
         // Master admin has full access to their merchant
         if ($user->isMasterAdmin()) {
-            \Log::info('Master admin - granting all permissions');
             $response = ApiResponse::success([
                 'is_super_admin' => false,
                 'is_master_admin' => true,
@@ -321,7 +311,6 @@ class AuthController extends Controller
 
         // If no POS user and not master admin, return minimal permissions
         if (! $posUser) {
-            \Log::info('No POS user found - returning empty permissions');
             $response = ApiResponse::success([
                 'is_super_admin' => false,
                 'is_master_admin' => false,
@@ -341,12 +330,7 @@ class AuthController extends Controller
         // Get user roles and permissions using User model methods
         // These methods bypass JSON column conflict in roles table
         $roles = $user->getRoleNamesViaDirectQuery();
-        \Log::info('User roles: '.json_encode($roles));
-
         $permissions = $user->getPermissionsViaDirectQuery();
-
-        \Log::info('Final permissions array: '.json_encode($permissions));
-        \Log::info('Final roles: '.json_encode($roles));
 
         $response = ApiResponse::success([
             'is_super_admin' => false,

@@ -31,76 +31,262 @@ class XenPlatformService
         $this->baseUrl = config('xendit.base_url', 'https://api.xendit.co');
     }
 
+    /** Maximum email-alias retries when the base email is already registered. */
+    private const MAX_EMAIL_ALIAS_ATTEMPTS = 10;
+
     /**
      * Create an OWNED sub-account on XenPlatform.
      *
+     * When the user's email already exists on Xendit (BUSINESS_DUPLICATE_EMAIL_ERROR,
+     * 409) we transparently retry with `name+01@domain` → `name+10@domain` aliases
+     * before giving up. Most providers route `+suffix` aliases to the same inbox,
+     * so the merchant still receives Xendit notifications.
+     *
      * @return array{id: string, status: string} The created account data
      *
-     * @throws RuntimeException If API call fails
+     * @throws RuntimeException If API call fails or all alias attempts exhausted
      */
     public function createSubAccount(SubMerchant $merchant): array
     {
         $this->ensureApiKey();
 
         $businessName = $merchant->business_name ?? $merchant->user->name ?? 'Merchant';
-        $email = $merchant->user->email ?? null;
+        $originalEmail = $merchant->user->email ?? null;
 
-        Log::info('XenPlatform: Creating sub-account', [
-            'sub_merchant_id' => $merchant->id,
-            'business_name' => $businessName,
-            'email' => $email,
-        ]);
+        // 1 attempt with the raw email, plus N alias retries on duplicate.
+        $maxAttempts = $originalEmail ? self::MAX_EMAIL_ALIAS_ATTEMPTS + 1 : 1;
 
-        try {
-            $payload = [
-                'type' => 'OWNED',
-                'public_profile' => [
-                    'business_name' => $businessName,
-                ],
-            ];
+        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+            $email = $attempt === 0
+                ? $originalEmail
+                : $this->aliasEmail($originalEmail, $attempt);
 
-            if ($email) {
-                $payload['email'] = $email;
+            Log::info('XenPlatform: Creating sub-account', [
+                'sub_merchant_id' => $merchant->id,
+                'business_name' => $businessName,
+                'email' => $email,
+                'attempt' => $attempt,
+            ]);
+
+            try {
+                $response = $this->postCreateAccount($businessName, $email);
+            } catch (\Exception $e) {
+                Log::error('XenPlatform: Unexpected error creating sub-account', [
+                    'sub_merchant_id' => $merchant->id,
+                    'attempt' => $attempt,
+                    'error' => $e->getMessage(),
+                ]);
+                throw new RuntimeException("Failed to create XenPlatform sub-account: {$e->getMessage()}");
             }
 
-            $response = Http::withBasicAuth($this->apiKey, '')
-                ->withHeaders(['Content-Type' => 'application/json'])
-                ->timeout(30)
-                ->post("{$this->baseUrl}/v2/accounts", $payload);
+            if ($response->successful()) {
+                $data = $response->json();
+                Log::info('XenPlatform: Sub-account created', [
+                    'sub_merchant_id' => $merchant->id,
+                    'xendit_account_id' => $data['id'] ?? null,
+                    'email_used' => $email,
+                    'attempts_taken' => $attempt + 1,
+                ]);
 
-            if (! $response->successful()) {
+                // XenPlatform sub-accounts do NOT inherit master webhook URLs.
+                // Register the QRIS webhook on this sub-account so qr.payment
+                // events make it back to our /api/webhooks/xendit endpoint.
+                // Errors here are non-fatal — sub-account creation already
+                // succeeded, the admin can re-run via xendit:sync-webhooks.
+                try {
+                    $this->setupSubAccountWebhooks($data['id']);
+                } catch (\Throwable $e) {
+                    Log::warning('XenPlatform: webhook setup failed (non-fatal)', [
+                        'sub_merchant_id'    => $merchant->id,
+                        'xendit_account_id'  => $data['id'] ?? null,
+                        'error'              => $e->getMessage(),
+                    ]);
+                }
+
+                return [
+                    'id' => $data['id'],
+                    'status' => $data['status'] ?? 'ACTIVE',
+                ];
+            }
+
+            $isDuplicateEmail = $response->status() === 409
+                && $response->json('error_code') === 'BUSINESS_DUPLICATE_EMAIL_ERROR';
+
+            // Non-retryable error OR we have no email to alias — surface immediately.
+            if (! $isDuplicateEmail || ! $originalEmail) {
                 $errorMessage = $response->json('message') ?? $response->json('error_code') ?? 'Failed to create sub-account';
 
                 Log::error('XenPlatform: Failed to create sub-account', [
                     'sub_merchant_id' => $merchant->id,
                     'status_code' => $response->status(),
                     'error' => $errorMessage,
+                    'response_body' => $response->body(),
                 ]);
 
                 throw new RuntimeException("XenPlatform API error: {$errorMessage}");
             }
 
-            $data = $response->json();
-
-            Log::info('XenPlatform: Sub-account created', [
+            Log::warning('XenPlatform: Email already registered, trying next alias', [
                 'sub_merchant_id' => $merchant->id,
-                'xendit_account_id' => $data['id'] ?? null,
+                'attempted_email' => $email,
+                'next_attempt' => $attempt + 1,
             ]);
-
-            return [
-                'id' => $data['id'],
-                'status' => $data['status'] ?? 'ACTIVE',
-            ];
-        } catch (RuntimeException $e) {
-            throw $e;
-        } catch (\Exception $e) {
-            Log::error('XenPlatform: Unexpected error creating sub-account', [
-                'sub_merchant_id' => $merchant->id,
-                'error' => $e->getMessage(),
-            ]);
-
-            throw new RuntimeException("Failed to create XenPlatform sub-account: {$e->getMessage()}");
         }
+
+        // All alias attempts exhausted.
+        Log::error('XenPlatform: All email aliases exhausted', [
+            'sub_merchant_id' => $merchant->id,
+            'original_email' => $originalEmail,
+            'aliases_tried' => self::MAX_EMAIL_ALIAS_ATTEMPTS,
+        ]);
+
+        throw new RuntimeException(
+            "Email {$originalEmail} dan 10 variasi alias (+01 sampai +10) semuanya sudah terdaftar di Xendit. ".
+            'Silakan gunakan akun dengan email berbeda atau hubungi support.'
+        );
+    }
+
+    /**
+     * Build a `localpart+NN@domain` alias from the merchant's email.
+     * Pads the index to 2 digits so the aliases sort naturally (+01..+10).
+     */
+    private function aliasEmail(string $email, int $index): string
+    {
+        $padded = str_pad((string) $index, 2, '0', STR_PAD_LEFT);
+        $atPos = strrpos($email, '@');
+        if ($atPos === false) {
+            // No @ — give up gracefully; caller will see a duplicate error.
+            return $email;
+        }
+
+        $local = substr($email, 0, $atPos);
+        $domain = substr($email, $atPos + 1);
+
+        return "{$local}+{$padded}@{$domain}";
+    }
+
+    /**
+     * Register the public callback URL on a sub-account for every webhook type
+     * we care about, and persist the callback_token Xendit returns to
+     * sub_merchants so verifyWebhookSignature can match incoming signatures.
+     *
+     * XenPlatform sub-accounts have their OWN per-account callback config —
+     * they do not inherit master account webhook URLs. Each sub-account gets
+     * a unique callback_token from Xendit (empirically verified: same token
+     * across event types on the same sub-account; custom token in request
+     * body ignored — Xendit always auto-generates).
+     *
+     * Idempotent: re-calling returns the SAME callback_token for that account.
+     *
+     * @return array<string, array{ok: bool, token?: string}>  type => result
+     */
+    public function setupSubAccountWebhooks(string $xenditAccountId): array
+    {
+        $url = config('xendit.webhook_url');
+        if (! $url || ! str_starts_with($url, 'https://')) {
+            throw new RuntimeException(
+                'XENDIT_WEBHOOK_URL belum diset atau bukan HTTPS. Sub-account webhook tidak bisa di-register.'
+            );
+        }
+
+        // Xendit callback_urls API expects specific enum values — verified
+        // empirically with HTTP 400 API_VALIDATION_ERROR for the wrong names.
+        // Valid enums (probed 2026-05-28):
+        //   qr_code, invoice, ewallet, direct_debit, disbursement, payment_method.
+        // The critical one for our QRIS flow is `qr_code` (NOT qr_payments).
+        $types = ['qr_code', 'invoice', 'ewallet', 'direct_debit'];
+
+        $results = [];
+        $tokenForPersist = null;
+        foreach ($types as $type) {
+            $r = $results[$type] = $this->setCallbackUrl($xenditAccountId, $type, $url);
+            // qr_code is the canonical token source for our flow; otherwise
+            // take the first available (Xendit returns the same token for all
+            // event types on a sub-account).
+            if ($type === 'qr_code' && ! empty($r['token'])) {
+                $tokenForPersist = $r['token'];
+            } elseif (! $tokenForPersist && ! empty($r['token'])) {
+                $tokenForPersist = $r['token'];
+            }
+        }
+
+        if ($tokenForPersist) {
+            \App\Models\SubMerchant::where('xendit_account_id', $xenditAccountId)
+                ->update(['xendit_callback_token' => $tokenForPersist]);
+        }
+
+        Log::info('XenPlatform: sub-account webhooks registered', [
+            'xendit_account_id' => $xenditAccountId,
+            'url'               => $url,
+            'token_saved'       => $tokenForPersist ? 'yes' : 'no',
+            'results'           => array_map(fn ($r) => $r['ok'] ?? false, $results),
+        ]);
+
+        return $results;
+    }
+
+    /**
+     * Set the callback URL for one event type on a specific sub-account.
+     *
+     * Uses POST /callback_urls/{type} with `for-user-id` header (XenPlatform
+     * pattern). Returns array with ok + token from the response.
+     *
+     * @return array{ok: bool, token?: string}
+     */
+    private function setCallbackUrl(string $xenditAccountId, string $type, string $url): array
+    {
+        try {
+            $response = Http::withBasicAuth($this->apiKey, '')
+                ->withHeaders([
+                    'for-user-id'  => $xenditAccountId,
+                    'Content-Type' => 'application/json',
+                ])
+                ->timeout(15)
+                ->post("{$this->baseUrl}/callback_urls/{$type}", [
+                    'url' => $url,
+                ]);
+
+            if ($response->successful()) {
+                return ['ok' => true, 'token' => $response->json('callback_token')];
+            }
+
+            Log::warning('XenPlatform: setCallbackUrl failed', [
+                'xendit_account_id' => $xenditAccountId,
+                'type'              => $type,
+                'status'            => $response->status(),
+                'body'              => $response->body(),
+            ]);
+            return ['ok' => false];
+        } catch (\Throwable $e) {
+            Log::warning('XenPlatform: setCallbackUrl threw', [
+                'xendit_account_id' => $xenditAccountId,
+                'type'              => $type,
+                'error'             => $e->getMessage(),
+            ]);
+            return ['ok' => false];
+        }
+    }
+
+    /**
+     * Single HTTP call to the create-account endpoint. Extracted so the retry
+     * loop in createSubAccount() stays focused on retry logic, not payload build.
+     */
+    private function postCreateAccount(string $businessName, ?string $email): \Illuminate\Http\Client\Response
+    {
+        $payload = [
+            'type' => 'MANAGED',
+            'country' => 'ID',
+            'public_profile' => ['business_name' => $businessName],
+        ];
+
+        if ($email) {
+            $payload['email'] = $email;
+        }
+
+        return Http::withBasicAuth($this->apiKey, '')
+            ->withHeaders(['Content-Type' => 'application/json'])
+            ->timeout(30)
+            ->post("{$this->baseUrl}/v2/accounts", $payload);
     }
 
     /**
@@ -416,25 +602,64 @@ class XenPlatformService
 
     /**
      * Verify an incoming webhook signature.
+     *
+     * Sub-account webhooks (XenPlatform): signed with the sub-account's
+     * own callback_token, NOT the master account token. Caller must pass
+     * the sub-account id (from payload.business_id / payload.data.business_id)
+     * so we can look up the stored per-account token.
+     *
+     * Master account direct webhooks: pass $subAccountId = null. Falls back
+     * to XENDIT_WEBHOOK_TOKEN (.env) — used for non-XenPlatform integrations
+     * like the subscription billing webhook.
      */
-    public function verifyWebhookSignature(string $signature): bool
+    public function verifyWebhookSignature(string $signature, ?string $subAccountId = null): bool
     {
+        // Sub-account context: look up its callback_token from sub_merchants.
+        // When a token IS found, verify strictly against it — real QRIS payments
+        // use this path.
+        // When NO token is found (e.g. Xendit dashboard "Test Webhook" button
+        // which sends fake business_ids), fall through to master token so
+        // connectivity tests pass without requiring a matching sub-account row.
+        if ($subAccountId) {
+            $token = \App\Models\SubMerchant::where('xendit_account_id', $subAccountId)
+                ->value('xendit_callback_token');
+
+            if ($token) {
+                $result = hash_equals($token, $signature);
+                if (! $result) {
+                    Log::warning('XenPlatform: sub-account signature mismatch', [
+                        'xendit_account_id' => $subAccountId,
+                        'expected_length'   => strlen($token),
+                        'received_length'   => strlen($signature),
+                    ]);
+                }
+                return $result;
+            }
+
+            // No stored token for this sub-account ID — the business_id in the
+            // payload is likely Xendit's hardcoded test value (not a real
+            // sub-merchant). Fall through to master token verification.
+            Log::info('XenPlatform: sub-account not found, trying master token fallback', [
+                'xendit_account_id' => $subAccountId,
+            ]);
+        }
+
+        // Master context: used for master-account webhooks and as a fallback
+        // when the sub-account from the payload doesn't match any stored row
+        // (Xendit dashboard test events use fake business_ids + master token).
         if (empty($this->webhookToken)) {
             Log::warning('XenPlatform: Webhook token not configured');
-
             return false;
         }
 
         $result = hash_equals($this->webhookToken, $signature);
-
         if (! $result) {
-            Log::warning('XenPlatform: Webhook signature verification failed', [
+            Log::warning('XenPlatform: Webhook signature verification failed (master)', [
                 'expected_length' => strlen($this->webhookToken),
                 'received_length' => strlen($signature),
-                'received_prefix' => substr($signature, 0, 8).'...',
+                'received_prefix' => substr($signature, 0, 8) . '...',
             ]);
         }
-
         return $result;
     }
 

@@ -10,6 +10,8 @@ RETRY_COUNT=0
 echo "Building Docker image: $IMAGE_NAME"
 echo "Max retries: $MAX_RETRIES"
 
+cd ../
+
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     echo ""
     echo "Build attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES..."

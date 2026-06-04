@@ -15,6 +15,7 @@ use App\Models\SubMerchant;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
 use App\Services\AiAgentService;
+use App\Services\CatalogService;
 use App\Services\OrderService;
 use App\Services\QrisService;
 use App\Services\SubMerchantService;
@@ -34,12 +35,15 @@ class AiAgentController extends Controller
 
     protected SubMerchantService $subMerchantService;
 
-    public function __construct(AiAgentService $aiAgentService, QrisService $qrisService, OrderService $orderService, SubMerchantService $subMerchantService)
+    protected CatalogService $catalogService;
+
+    public function __construct(AiAgentService $aiAgentService, QrisService $qrisService, OrderService $orderService, SubMerchantService $subMerchantService, CatalogService $catalogService)
     {
         $this->aiAgentService = $aiAgentService;
         $this->qrisService = $qrisService;
         $this->orderService = $orderService;
         $this->subMerchantService = $subMerchantService;
+        $this->catalogService = $catalogService;
     }
 
     /**
@@ -66,6 +70,9 @@ class AiAgentController extends Controller
             $aiAgent = AiAgent::where('whatsapp_account_id', $whatsappAccount->id)->first();
 
             $hasSubMerchant = SubMerchant::where('user_id', $userId)->exists();
+            $hasReservationConfig = \App\Models\ReservationConfig::where('user_id', $userId)
+                ->where('is_active', true)
+                ->exists();
 
             if (! $aiAgent) {
                 return response()->json([
@@ -73,6 +80,8 @@ class AiAgentController extends Controller
                     'message' => 'AI Agent not configured yet',
                     'data' => null,
                     'has_sub_merchant' => $hasSubMerchant,
+                    'has_reservation_config' => $hasReservationConfig,
+                    'catalog_platform_locked' => ! (bool) config('catalog.meta_enabled', true),
                 ], 200);
             }
 
@@ -85,6 +94,8 @@ class AiAgentController extends Controller
                     'system_prompt' => $aiAgent->system_prompt,
                     'business_info' => $aiAgent->business_info,
                     'default_store_id' => $aiAgent->default_store_id,
+                    'catalog_id' => $aiAgent->catalog_id,
+                    'catalog_enabled' => $aiAgent->catalog_enabled,
                     'order_enabled' => $aiAgent->order_enabled,
                     'qris_enabled' => $aiAgent->qris_enabled,
                     'reservation_enabled' => $aiAgent->reservation_enabled,
@@ -92,10 +103,13 @@ class AiAgentController extends Controller
                     'default_ongkir' => $aiAgent->default_ongkir,
                     'is_active' => $aiAgent->is_active,
                     'settings' => $aiAgent->settings,
+                    'feature_status' => $aiAgent->getFeatureStatus(),
                     'created_at' => $aiAgent->created_at,
                     'updated_at' => $aiAgent->updated_at,
                 ],
                 'has_sub_merchant' => $hasSubMerchant,
+                'has_reservation_config' => $hasReservationConfig,
+                'catalog_platform_locked' => $aiAgent->isCatalogPlatformLocked(),
             ], 200);
 
         } catch (\Exception $e) {
@@ -149,6 +163,58 @@ class AiAgentController extends Controller
                 }
             }
 
+            // Validate reservation config exists before enabling reservation
+            if ($request->boolean('reservation_enabled', false)) {
+                $hasReservationConfig = \App\Models\ReservationConfig::where('user_id', $userId)
+                    ->where('is_active', true)
+                    ->exists();
+                if (! $hasReservationConfig) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Reservasi tidak bisa diaktifkan. Silakan atur konfigurasi reservasi terlebih dahulu di halaman Reservasi.',
+                    ], 422);
+                }
+            }
+
+            $previousCatalogId = AiAgent::where('whatsapp_account_id', $whatsappAccount->id)->value('catalog_id');
+
+            // Catalog toggle is the source of truth: when OFF, force catalog_id
+            // to null so the dashboard's "hidden dropdown" never leaves a stale
+            // ID behind that would mysteriously re-enable catalog mode later.
+            // Platform-level kill switch wins over everything.
+            $catalogEnabled = $request->boolean('catalog_enabled', false);
+            $platformLocked = ! (bool) config('catalog.meta_enabled', true);
+            if ($platformLocked) {
+                $catalogEnabled = false;
+            }
+            $newCatalogId = $catalogEnabled ? $request->input('catalog_id') : null;
+
+            // When the catalog changes, attempt to link it to the WABA BEFORE saving
+            // so we can abort and return an informative error without partial writes.
+            if ($newCatalogId && $newCatalogId !== $previousCatalogId) {
+                $linkResult = $this->catalogService->linkCatalogToWaba($whatsappAccount, (string) $newCatalogId);
+
+                if (($linkResult['error_code'] ?? null) === 'CATALOG_ALREADY_LINKED_ELSEWHERE') {
+                    return response()->json([
+                        'success'    => false,
+                        'error_code' => 'CATALOG_ALREADY_LINKED_ELSEWHERE',
+                        'message'    => $linkResult['error'],
+                    ], 422);
+                }
+
+                Log::info('AI Agent: catalog link attempt', [
+                    'catalog_id' => $newCatalogId,
+                    'linked'     => $linkResult['linked'] ?? false,
+                    'commerce'   => $linkResult['commerce_enabled'] ?? false,
+                ]);
+            }
+
+            // Delivery is gated by the master switch on /dashboard/delivery, and
+            // ongkir is managed there (single source of truth). The agent's
+            // delivery toggle can only be ON when the master switch is active.
+            $deliveryConfig = \App\Models\DeliveryConfig::forUser(auth()->user()->getEffectiveUserId());
+            $deliveryEnabled = $request->boolean('delivery_enabled', false) && $deliveryConfig->is_active;
+
             $aiAgent = AiAgent::updateOrCreate(
                 ['whatsapp_account_id' => $whatsappAccount->id],
                 [
@@ -156,13 +222,15 @@ class AiAgentController extends Controller
                     'system_prompt' => $request->system_prompt,
                     'business_info' => $request->business_info,
                     'default_store_id' => $request->default_store_id,
+                    'catalog_id' => $newCatalogId,
+                    'catalog_enabled' => $catalogEnabled,
                     'order_enabled' => $request->boolean('order_enabled', false),
                     'qris_enabled' => $request->boolean('qris_enabled', false),
                     'reservation_enabled' => $request->boolean('reservation_enabled', false),
-                    'delivery_enabled' => $request->boolean('delivery_enabled', false),
-                    'default_ongkir' => $request->filled('default_ongkir') ? $request->input('default_ongkir') : 0,
+                    'delivery_enabled' => $deliveryEnabled,
+                    'default_ongkir' => $deliveryConfig->default_ongkir,
                     'is_active' => $request->boolean('is_active', false),
-                    'settings' => $request->settings,
+                    'settings' => $request->input('settings', []),
                 ]
             );
 
@@ -175,6 +243,8 @@ class AiAgentController extends Controller
                     'system_prompt' => $aiAgent->system_prompt,
                     'business_info' => $aiAgent->business_info,
                     'default_store_id' => $aiAgent->default_store_id,
+                    'catalog_id' => $aiAgent->catalog_id,
+                    'catalog_enabled' => $aiAgent->catalog_enabled,
                     'order_enabled' => $aiAgent->order_enabled,
                     'qris_enabled' => $aiAgent->qris_enabled,
                     'reservation_enabled' => $aiAgent->reservation_enabled,
@@ -182,6 +252,7 @@ class AiAgentController extends Controller
                     'default_ongkir' => $aiAgent->default_ongkir,
                     'is_active' => $aiAgent->is_active,
                     'settings' => $aiAgent->settings,
+                    'feature_status' => $aiAgent->getFeatureStatus(),
                 ],
             ], 200);
 
@@ -326,6 +397,16 @@ class AiAgentController extends Controller
                 ], 422);
             }
 
+            // Master switch gate: delivery can only be enabled when "Aktifkan
+            // Delivery" is on at /dashboard/delivery.
+            $enabling = ! $aiAgent->delivery_enabled;
+            if ($enabling && ! \App\Models\DeliveryConfig::forUser($userId)->is_active) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Aktifkan "Delivery" di halaman Delivery terlebih dahulu.',
+                ], 422);
+            }
+
             $aiAgent->delivery_enabled = ! $aiAgent->delivery_enabled;
             $aiAgent->save();
 
@@ -463,11 +544,10 @@ class AiAgentController extends Controller
             $conversation->addMessage('human', $request->message);
 
             // Hard guard for test endpoint: block menu/order flow when ordering is disabled
-            if (! $aiAgent->isOrderEnabled() && $this->aiAgentService->isOrderMenuIntent($request->message)) {
-                Log::info('Test AI Agent blocked before LLM (order disabled)', [
+            if (! $aiAgent->isOrderEnabled() && UserIntent::detect($request->message)->isOrderOrMenuRelated()) {
+                Log::info('Test AI agent blocked before LLM (order disabled)', [
                     'agent_id' => $aiAgent->id,
                     'user_id' => $userId,
-                    'message' => $request->message,
                     'reservation_enabled' => $aiAgent->isReservationEnabled(),
                 ]);
 
@@ -615,7 +695,7 @@ class AiAgentController extends Controller
             $conversation->addMessage('human', $request->message);
 
             // Hard guard: block order flow when ordering is disabled
-            if (! $aiAgent->isOrderEnabled() && $this->aiAgentService->isOrderMenuIntent($request->message)) {
+            if (! $aiAgent->isOrderEnabled() && UserIntent::detect($request->message)->isOrderOrMenuRelated()) {
                 $responseContent = $this->aiAgentService->getOrderDisabledMessage($aiAgent);
                 $conversation->addMessage('ai', $responseContent);
 

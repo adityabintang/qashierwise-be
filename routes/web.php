@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\BlogController;
+use App\Http\Controllers\DeliveryProofController;
 use App\Http\Controllers\MonitoringDashboardController;
 use App\Http\Controllers\QrisPaymentPageController;
 use App\Http\Controllers\ReservationFormController;
@@ -22,9 +23,13 @@ Route::get('/language/{locale}', function ($locale) {
     return redirect()->back();
 })->name('language.switch');
 
-// Landing page
+// Landing page (React island, ported from Next.js)
 Route::get('/', function () {
-    return view('welcome');
+    return view('react.app', [
+        'page' => 'landing',
+        'title' => 'QashierWise — Chatbot WhatsApp untuk Restoran',
+        'description' => 'QashierWise menghadirkan Chatbot WhatsApp berbasis AI untuk restoran — Inbox, Pesanan, Reservasi, Menu, dan CRM dalam satu Console.',
+    ]);
 });
 
 // Public blog routes
@@ -53,22 +58,45 @@ Route::get('/reset-password', function () {
     return view('auth.reset-password');
 })->name('reset-password');
 
-// Legal pages
+// Legal pages (React island, ported from Next.js)
 Route::get('/privacy-policy', function () {
-    return view('privacy-policy');
+    return view('react.app', [
+        'page' => 'privacy',
+        'title' => 'Kebijakan Privasi - QashierWise',
+        'description' => 'Kebijakan Privasi QashierWise. Pelajari bagaimana kami mengumpulkan, menggunakan, dan melindungi data Anda serta kepatuhan terhadap regulasi perlindungan data.',
+    ]);
 })->name('privacy-policy');
 
 Route::get('/terms-of-service', function () {
-    return view('terms-of-service');
+    return view('react.app', [
+        'page' => 'terms',
+        'title' => 'Ketentuan Layanan - QashierWise',
+        'description' => 'Ketentuan Layanan QashierWise.',
+    ]);
 })->name('terms-of-service');
 
 Route::get('/refund-policy', function () {
-    return view('refund-policy');
+    return view('react.app', [
+        'page' => 'refund',
+        'title' => 'Kebijakan Pengembalian - QashierWise',
+        'description' => 'Kebijakan Pengembalian Dana QashierWise.',
+    ]);
 })->name('refund-policy');
+
+// Public documentation pages
+Route::get('/docs/meta-catalog', function () {
+    return view('docs.meta-catalog');
+})->name('docs.meta-catalog');
 
 // Public QRIS Payment Page
 Route::get('/pay/qris/{orderId}', [QrisPaymentPageController::class, 'show'])
     ->name('qris.payment.page');
+
+// Public Driver Proof-of-Delivery Page (token-protected, no auth)
+Route::get('/delivery/{token}', [DeliveryProofController::class, 'show'])
+    ->name('delivery.proof');
+Route::post('/delivery/{token}', [DeliveryProofController::class, 'submit'])
+    ->name('delivery.proof.submit');
 
 // Public Reservation Form Routes
 Route::prefix('reservations')->name('reservation.')->group(function () {
@@ -126,6 +154,14 @@ Route::middleware(['web', 'check.web.auth', 'block.author.login'])->group(functi
         return view('dashboard.customer-tags');
     })->name('dashboard.customer-tags');
 
+    Route::get('/dashboard/delivery', function () {
+        return view('dashboard.delivery');
+    })->name('dashboard.delivery');
+
+    Route::get('/dashboard/complain', function () {
+        return view('dashboard.complain');
+    })->name('dashboard.complain');
+
     // Reservation routes
     Route::get('/dashboard/reservations', function () {
         return view('dashboard.reservations.index');
@@ -138,6 +174,11 @@ Route::middleware(['web', 'check.web.auth', 'block.author.login'])->group(functi
     Route::get('/dashboard/reservations/config', function () {
         return view('dashboard.reservations.config');
     })->name('dashboard.reservations.config');
+
+    // Developer Webhook UI
+    Route::get('/dashboard/developer/webhooks', function () {
+        return view('dashboard.developer-webhooks');
+    })->name('dashboard.developer-webhooks');
 
     // Subscription routes
     Route::prefix('subscription')->name('subscription.')->group(function () {

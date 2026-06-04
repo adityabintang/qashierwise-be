@@ -31,6 +31,8 @@ class StoreAiAgentRequest extends FormRequest
             'business_info.description' => 'nullable|string',
             'business_info.phone' => 'nullable|string',
             'default_store_id' => 'nullable|exists:stores,id',
+            'catalog_id' => 'nullable|string|max:255',
+            'catalog_enabled' => 'nullable|boolean',
             'order_enabled' => 'nullable|boolean',
             'qris_enabled' => 'nullable|boolean',
             'reservation_enabled' => 'nullable|boolean',
@@ -38,6 +40,13 @@ class StoreAiAgentRequest extends FormRequest
             'default_ongkir' => 'nullable|numeric|min:0',
             'is_active' => 'nullable|boolean',
             'settings' => 'nullable|array',
+            'settings.followup_enabled' => 'nullable|boolean',
+            'settings.followup_interval_minutes' => 'nullable|integer|in:5,10,15,20,30,45,60',
+            'settings.followup_auto_cancel' => 'nullable|boolean',
+            'settings.drip_enabled' => 'nullable|boolean',
+            'settings.quiet_hours_start' => ['nullable', 'string', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
+            'settings.quiet_hours_end' => ['nullable', 'string', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
+            'settings.max_drips_per_24h' => 'nullable|integer|min:0|max:10',
         ];
     }
 
@@ -53,6 +62,9 @@ class StoreAiAgentRequest extends FormRequest
             'bot_name.max' => 'Nama bot maksimal 255 karakter',
             'system_prompt.required' => 'System prompt wajib diisi',
             'default_store_id.exists' => 'Toko tidak ditemukan',
+            'settings.followup_interval_minutes.in' => 'Interval follow-up harus salah satu dari: 5, 10, 15, 20, 30, 45, atau 60 menit',
+            'settings.quiet_hours_start.regex' => 'Format jam tenang harus HH:MM (24-jam)',
+            'settings.quiet_hours_end.regex' => 'Format jam tenang harus HH:MM (24-jam)',
         ];
     }
 }

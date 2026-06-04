@@ -72,6 +72,11 @@
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_customer_tags') }}</span>
         </a>
 
+        <a href="/dashboard/developer/webhooks" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'developer-webhooks' ? 'active' : '' }}">
+            <i class="fas fa-code w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Developer</span>
+        </a>
+
         <!-- Reservation Section -->
         <div x-show="sidebarOpen || isMobile" x-transition class="pt-4">
             <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
@@ -107,6 +112,14 @@
             <i class="fas fa-credit-card w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_payment') }}</span>
         </a>
+        <a href="/dashboard/delivery" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'delivery' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('pos.orders')">
+            <i class="fas fa-motorcycle w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Delivery</span>
+        </a>
+        <a href="/dashboard/complain" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'complain' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('pos.orders')">
+            <i class="fas fa-triangle-exclamation w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Complain</span>
+        </a>
 
         <!-- POS Inventory Section -->
         <template x-if="$store.permissions.hasPermission('pos.products') || $store.permissions.hasPermission('pos.categories')">
@@ -120,10 +133,19 @@
             <i class="fas fa-box w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_products') }}</span>
         </a>
+        @if(config('catalog.meta_enabled'))
         <a href="/dashboard/meta-catalog" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'meta-catalog' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('pos.products')">
             <i class="fab fa-facebook w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_meta_catalog') }}</span>
         </a>
+        @else
+        <div class="sidebar-nav-item opacity-50 cursor-not-allowed select-none" x-show="$store.permissions.hasPermission('pos.products')"
+             title="Fitur Meta Catalog sedang dinonaktifkan">
+            <i class="fab fa-facebook w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition class="flex-1">{{ __('dashboard.menu_meta_catalog') }}</span>
+            <i x-show="sidebarOpen || isMobile" x-transition class="fas fa-lock text-xs ml-auto"></i>
+        </div>
+        @endif
         <a href="/dashboard/pos/categories" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-categories' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('pos.categories')">
             <i class="fas fa-tags w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_categories') }}</span>

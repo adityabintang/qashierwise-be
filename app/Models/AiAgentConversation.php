@@ -22,6 +22,11 @@ class AiAgentConversation extends Model
         'cache_response_id',
         'cache_expires_at',
         'expires_at',
+        'last_activity_at',
+        'followup_count',
+        'followup_state_started_at',
+        'pending_followup_job_id',
+        'last_drip_at',
     ];
 
     /**
@@ -36,7 +41,66 @@ class AiAgentConversation extends Model
             'order_context' => 'array',
             'expires_at' => 'datetime',
             'cache_expires_at' => 'datetime',
+            'last_activity_at' => 'datetime',
+            'followup_count' => 'integer',
+            'followup_state_started_at' => 'datetime',
+            'last_drip_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Mark conversation as active right now. Called whenever the customer
+     * sends a message. Resets the follow-up counter AND invalidates the
+     * cycle-id so any in-flight SendFollowupJob exits at re-validation
+     * instead of pinging an already-engaged customer.
+     */
+    public function markActivity(): void
+    {
+        $this->last_activity_at = now();
+        $this->followup_count = 0;
+        $this->followup_state_started_at = null;
+        $this->pending_followup_job_id = null;
+        $this->save();
+
+        app(\App\Services\AiAgent\Drip\DripScheduler::class)->onConversationResumed($this);
+    }
+
+    /**
+     * Start a new follow-up cycle for the state the conversation just entered.
+     * Counter goes back to zero and the clock that the scheduler reads from
+     * is reset to now.
+     */
+    public function startFollowupCycle(): void
+    {
+        $this->followup_count = 0;
+        $this->followup_state_started_at = now();
+        $this->pending_followup_job_id = null;
+        $this->save();
+    }
+
+    /**
+     * Record that one follow-up was just sent. Returns the new count so the
+     * caller can decide whether the cap has been reached.
+     */
+    public function recordFollowupSent(): int
+    {
+        $this->followup_count = ($this->followup_count ?? 0) + 1;
+        $this->last_drip_at = now();
+        $this->save();
+
+        return $this->followup_count;
+    }
+
+    /**
+     * Drop all follow-up tracking, e.g. when the conversation exits the state
+     * machine entirely or is auto-cancelled.
+     */
+    public function resetFollowup(): void
+    {
+        $this->followup_count = 0;
+        $this->followup_state_started_at = null;
+        $this->pending_followup_job_id = null;
+        $this->save();
     }
 
     /**
@@ -92,34 +156,18 @@ class AiAgentConversation extends Model
     }
 
     /**
-     * Get pending order from context.
-     */
-    public function getPendingOrder(): ?array
-    {
-        return $this->order_context['pending_order'] ?? null;
-    }
-
-    /**
-     * Set pending order in context.
-     */
-    public function setPendingOrder(array $items): void
-    {
-        $orderContext = $this->order_context ?? [];
-        $orderContext['pending_order'] = [
-            'items' => $items,
-            'created_at' => now()->toIso8601String(),
-        ];
-
-        $this->order_context = $orderContext;
-        $this->save();
-    }
-
-    /**
-     * Clear pending order from context.
+     * Strip the legacy `pending_order` key from order_context. The old
+     * pre-state-machine flow stored a draft order here before user
+     * confirmation; today the state machine owns that handoff, but rows from
+     * before the cutover may still carry stale data, so the existing call
+     * sites are kept as defensive cleanup.
      */
     public function clearPendingOrder(): void
     {
         $orderContext = $this->order_context ?? [];
+        if (! array_key_exists('pending_order', $orderContext)) {
+            return;
+        }
         unset($orderContext['pending_order']);
 
         $this->order_context = $orderContext;
@@ -144,6 +192,8 @@ class AiAgentConversation extends Model
 
         $this->order_context = $orderContext;
         $this->save();
+
+        app(\App\Services\AiAgent\Drip\DripScheduler::class)->onCartUpdated($this);
     }
 
     /**
@@ -156,6 +206,8 @@ class AiAgentConversation extends Model
 
         $this->order_context = $orderContext;
         $this->save();
+
+        app(\App\Services\AiAgent\Drip\DripScheduler::class)->onCartUpdated($this);
     }
 
     /**
@@ -413,7 +465,111 @@ class AiAgentConversation extends Model
         unset($orderContext['delivery_type']);
         unset($orderContext['delivery_address']);
         unset($orderContext['delivery_notes']);
+        unset($orderContext['delivery_raw_info']);
         unset($orderContext['ongkir']);
+        $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    /**
+     * Catalog order flow state machine.
+     * Possible values: null | awaiting_fulfillment_choice | awaiting_delivery_info
+     *                  | confirming_delivery_info | confirming_order_summary
+     */
+    public function getFlowState(): ?string
+    {
+        return $this->order_context['flow_state'] ?? null;
+    }
+
+    public function setFlowState(?string $state): void
+    {
+        $previous = $this->order_context['flow_state'] ?? null;
+
+        $orderContext = $this->order_context ?? [];
+        if ($state === null) {
+            unset($orderContext['flow_state']);
+        } else {
+            $orderContext['flow_state'] = $state;
+        }
+        $this->order_context = $orderContext;
+        $this->save();
+
+        if ($state === $previous) {
+            return;
+        }
+
+        // Single integration point for the follow-up scheduler: when a state
+        // transition lands on a non-null state, start a fresh follow-up cycle
+        // and dispatch the first SendFollowupJob. When state clears, any
+        // pending job becomes stale via resetFollowup() and exits on its own.
+        $scheduler = app(\App\Services\AiAgent\Followup\FollowupScheduler::class);
+        if ($state === null) {
+            $scheduler->cancel($this);
+        } else {
+            $scheduler->schedule($this);
+        }
+    }
+
+    public function clearFlowState(): void
+    {
+        $this->setFlowState(null);
+    }
+
+    /**
+     * Free-text delivery info supplied by the user.
+     */
+    public function getDeliveryRawInfo(): ?string
+    {
+        return $this->order_context['delivery_raw_info'] ?? null;
+    }
+
+    public function setDeliveryRawInfo(string $info): void
+    {
+        $orderContext = $this->order_context ?? [];
+        $orderContext['delivery_raw_info'] = $info;
+        $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    /**
+     * Structured delivery fields parsed from the customer's free-text input.
+     * Shape: ['name' => ?string, 'phone' => ?string, 'address' => ?string, 'note' => ?string]
+     */
+    public function getDeliveryParsed(): ?array
+    {
+        return $this->order_context['delivery_parsed'] ?? null;
+    }
+
+    public function setDeliveryParsed(array $parsed): void
+    {
+        $orderContext = $this->order_context ?? [];
+        $orderContext['delivery_parsed'] = $parsed;
+        $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    /**
+     * Catalog order items (raw payload from WhatsApp `order` webhook).
+     * Each item: ['product_retailer_id' => string, 'product_name' => string,
+     *             'quantity' => int, 'item_price' => float, 'currency' => string]
+     */
+    public function getCatalogItems(): array
+    {
+        return $this->order_context['catalog_items'] ?? [];
+    }
+
+    public function setCatalogItems(array $items): void
+    {
+        $orderContext = $this->order_context ?? [];
+        $orderContext['catalog_items'] = $items;
+        $this->order_context = $orderContext;
+        $this->save();
+    }
+
+    public function clearCatalogItems(): void
+    {
+        $orderContext = $this->order_context ?? [];
+        unset($orderContext['catalog_items']);
         $this->order_context = $orderContext;
         $this->save();
     }

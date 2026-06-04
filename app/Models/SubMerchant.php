@@ -22,6 +22,7 @@ class SubMerchant extends Model
         'business_name',
         'xendit_account_id',
         'xendit_account_status',
+        'xendit_callback_token',
         'bank_code',
         'bank_account_number',
         'bank_account_name',

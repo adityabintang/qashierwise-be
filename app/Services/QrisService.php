@@ -254,9 +254,47 @@ class QrisService
             'payload_keys' => array_keys($payload),
         ]);
 
-        // Verify webhook signature using platform webhook token
-        if (! $this->xenPlatformService->verifyWebhookSignature($signature)) {
-            Log::warning('Invalid webhook signature');
+        // Resolve which sub-account's callback_token should validate this webhook.
+        //
+        // Strategy (in priority order):
+        //   1. Match by reference_id / qr_id → look up the QRIS transaction →
+        //      get sub_merchant → use its xendit_account_id.
+        //      This is the most reliable path because it is independent of the
+        //      business_id Xendit sends (which is a platform-level ID, not the
+        //      sub-account ID stored in sub_merchants.xendit_account_id).
+        //   2. Fall back to business_id from the payload (useful for non-QR
+        //      webhooks where no transaction is in the DB yet).
+        //   3. Fall back to null → master token verification (legacy / direct).
+        // `reference_id` is how we generate the order_id when creating a Xendit QRIS
+        // (see QrisService::generateQris — order_id = "QRIS-{timestamp}-{token}").
+        $referenceId = $payload['reference_id'] ?? null;
+        $subAccountId = null;
+
+        if ($referenceId) {
+            $txn = \App\Models\QrisTransaction::where('order_id', $referenceId)
+                ->orWhere('reference_id', $referenceId)
+                ->latest('id')
+                ->first();
+
+            if ($txn?->subMerchant) {
+                $subAccountId = $txn->subMerchant->xendit_account_id;
+                Log::info('Webhook: resolved sub-account via transaction', [
+                    'reference_id' => $referenceId,
+                    'xendit_account_id' => $subAccountId,
+                ]);
+            }
+        }
+
+        // Fallback: use business_id from the payload.
+        if (! $subAccountId) {
+            $subAccountId = $payload['business_id'] ?? ($payload['data']['business_id'] ?? null);
+        }
+
+        if (! $this->xenPlatformService->verifyWebhookSignature($signature, $subAccountId)) {
+            Log::warning('Invalid webhook signature', [
+                'sub_account_id' => $subAccountId,
+                'reference_id' => $referenceId,
+            ]);
             throw new \App\Exceptions\InvalidWebhookException('Invalid webhook signature');
         }
 

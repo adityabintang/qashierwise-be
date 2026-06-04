@@ -306,8 +306,23 @@ class ConversationGuard
         }
 
         if (! $transaction->canBeUsed()) {
+            if ($transaction->isExpired()) {
+                $transaction->markAsExpired();
+                $transaction->save();
+            }
+
+            $conversation->clearFlowState();
+            $conversation->clearPaymentContext();
+            $conversation->clearPendingOrder();
+            $conversation->clearCart();
+
+            $orderContext = $conversation->order_context ?? [];
+            unset($orderContext['last_qris_transaction_id']);
+            $conversation->order_context = $orderContext;
+            $conversation->save();
+
             return "⏰ Kode pembayaran sudah kadaluarsa.\n\n".
-                "Ketik 'bayar' untuk mendapatkan link pembayaran baru.";
+                'Pesanan otomatis dibatalkan.';
         }
 
         $remainingMinutes = max(1, (int) ceil($transaction->getRemainingTimeInSeconds() / 60));

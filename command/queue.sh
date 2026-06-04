@@ -15,4 +15,6 @@ echo ""
 echo "Press Ctrl+C to stop the worker"
 echo ""
 
-php artisan queue:work --queue=ai-agent --tries=3 --timeout=60 --sleep=3
+cd ../
+
+php artisan queue:work --queue=default,ai-agent --sleep=3 --tries=3 --max-time=3600

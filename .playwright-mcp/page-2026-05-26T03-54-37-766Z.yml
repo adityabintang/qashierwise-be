@@ -1,0 +1,41 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - img "Logo" [ref=e4]
+      - generic [ref=e5]: QashierWise
+    - generic [ref=e7]:
+      - link "Daftar" [ref=e8] [cursor=pointer]:
+        - /url: /register
+      - button "Masuk" [ref=e9]
+    - generic [ref=e10]:
+      - generic [ref=e11]:
+        - heading "Selamat Datang Kembali" [level=2] [ref=e12]
+        - paragraph [ref=e13]: Masuk ke akun QashierWise Anda
+      - generic [ref=e14]:
+        - generic [ref=e15]:
+          - generic [ref=e16]: Email
+          - textbox "Email" [ref=e17]:
+            - /placeholder: nama@email.com
+        - generic [ref=e18]:
+          - generic [ref=e19]: Password
+          - generic [ref=e20]:
+            - textbox "Password" [ref=e21]:
+              - /placeholder: Masukkan password
+            - button [ref=e22]
+          - link "Lupa Password?" [ref=e25] [cursor=pointer]:
+            - /url: /forgot-password
+        - button "Masuk" [ref=e26] [cursor=pointer]:
+          - generic [ref=e27]: Masuk
+        - link "Masuk sebagai Editor" [ref=e29] [cursor=pointer]:
+          - /url: /admin
+    - link "Kembali ke beranda" [ref=e30] [cursor=pointer]:
+      - /url: /
+      - text: Kembali ke beranda
+  - generic [ref=e34]:
+    - generic [ref=e35]:
+      - paragraph [ref=e36]: Kami menggunakan cookies untuk meningkatkan pengalaman Anda dan menganalisis trafik. Dengan melanjutkan, Anda menyetujui penggunaan cookies kami.
+      - link "Baca Kebijakan Privasi" [ref=e37] [cursor=pointer]:
+        - /url: http://localhost:8000/privacy-policy
+    - generic [ref=e38]:
+      - button "Tolak" [ref=e39]
+      - button "Terima Semua" [ref=e40]

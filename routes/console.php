@@ -18,3 +18,10 @@ Schedule::command('reservations:cleanup-expired-slots')
 Schedule::command('blog:publish-scheduled')
     ->everyMinute()
     ->withoutOverlapping();
+
+// Drip dispatcher — scans ai_agent_drip_schedules for due rows and queues
+// SendDripJob for each. Cheap query (indexed on status + fire_at).
+Schedule::job(new \App\Jobs\DispatchDueDrips)
+    ->everyMinute()
+    ->name('ai-agent-drip-dispatch')
+    ->withoutOverlapping();

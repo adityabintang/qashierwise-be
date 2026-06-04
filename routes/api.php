@@ -6,8 +6,9 @@ use App\Http\Controllers\Api\BalanceController;
 use App\Http\Controllers\Api\BankAccountController;
 use App\Http\Controllers\Api\BroadcastAuthController;
 use App\Http\Controllers\Api\CatalogController;
-use App\Http\Controllers\Api\CatalogEmbeddedSignupController;
+use App\Http\Controllers\Api\ComplaintController;
 use App\Http\Controllers\Api\ContactTagController;
+use App\Http\Controllers\Api\DeliveryController;
 use App\Http\Controllers\Api\EmbeddedSignupController;
 use App\Http\Controllers\Api\Internal\ReservationReminderController;
 use App\Http\Controllers\Api\MidtransWebhookController;
@@ -30,6 +31,7 @@ use App\Http\Controllers\Api\SubMerchantController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\WhatsAppController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
+use App\Http\Controllers\Api\UserWebhookController;
 use App\Http\Controllers\Api\WithdrawalController;
 use App\Http\Controllers\Api\XenditWebhookController;
 use App\Http\Controllers\MonitoringDashboardController;
@@ -133,10 +135,6 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::post('/embedded-signup/callback', [EmbeddedSignupController::class, 'handleCallback']);
         Route::get('/embedded-signup/config', [EmbeddedSignupController::class, 'getConfig']);
 
-        // Catalog Embedded Signup routes
-        Route::post('/catalog/embedded-signup/callback', [CatalogEmbeddedSignupController::class, 'handleCallback']);
-        Route::get('/catalog/embedded-signup/config', [CatalogEmbeddedSignupController::class, 'getConfig']);
-
         // Account management routes
         Route::delete('/account', [EmbeddedSignupController::class, 'disconnect']);
         Route::get('/account', [EmbeddedSignupController::class, 'getAccountStatus']);
@@ -206,12 +204,14 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         // Meta Product Catalog
         Route::get('/catalog/catalogs', [CatalogController::class, 'getCatalogs']);
         Route::post('/catalog/catalogs', [CatalogController::class, 'createCatalog']);
-        Route::delete('/catalog/disconnect', [CatalogController::class, 'disconnect']);
+        Route::get('/catalog/summary', [CatalogController::class, 'getSummary']);
+        Route::post('/catalog/test-send', [CatalogController::class, 'testSendCatalog']);
         Route::get('/catalog/{catalogId}/products', [CatalogController::class, 'getCatalogProducts']);
         Route::post('/catalog/{catalogId}/products', [CatalogController::class, 'createProduct']);
         Route::post('/catalog/{catalogId}/upload-image', [CatalogController::class, 'uploadImage']);
         Route::put('/catalog/products/{productId}', [CatalogController::class, 'updateProduct']);
         Route::delete('/catalog/products/{productId}', [CatalogController::class, 'deleteProduct']);
+        Route::put('/catalog/{catalogId}/products/{retailerId}/stock', [CatalogController::class, 'updateStock']);
     });
 
     // AI Agent routes
@@ -248,6 +248,25 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::delete('/{id}', [ReservationConfigController::class, 'destroy']);
     });
 
+    // Delivery management (config, driver directory, proof gallery)
+    Route::prefix('delivery')->group(function () {
+        Route::get('/config', [DeliveryController::class, 'getConfig']);
+        Route::put('/config', [DeliveryController::class, 'updateConfig']);
+
+        Route::get('/drivers', [DeliveryController::class, 'listDrivers']);
+        Route::post('/drivers', [DeliveryController::class, 'storeDriver']);
+        Route::put('/drivers/{driver}', [DeliveryController::class, 'updateDriver']);
+        Route::delete('/drivers/{driver}', [DeliveryController::class, 'destroyDriver']);
+
+        Route::get('/proofs', [DeliveryController::class, 'listProofs']);
+    });
+
+    // Complaint queue (raised from the WhatsApp "Complain" button)
+    Route::prefix('complaints')->group(function () {
+        Route::get('/', [ComplaintController::class, 'index']);
+        Route::post('/{complaint}/resolve', [ComplaintController::class, 'resolve']);
+    });
+
     // POS (Point of Sale) API routes
     Route::prefix('pos')->group(function () {
         // Products - index/show accepts view_products OR manage_products
@@ -270,6 +289,7 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::delete('/orders/{order}/items/{item}', [OrderController::class, 'removeItem'])->middleware('pos.permission:manage_orders');
         Route::post('/orders/{order}/discount', [OrderController::class, 'applyDiscount'])->middleware('pos.permission:manage_orders');
         Route::post('/orders/{order}/cancel', [OrderController::class, 'cancel'])->middleware('pos.permission:manage_orders');
+        Route::post('/orders/{order}/confirm', [OrderController::class, 'confirm'])->middleware('pos.permission:manage_orders');
         Route::post('/orders/{order}/resend-qris', [OrderController::class, 'resendQrisLink'])->middleware('pos.permission:manage_orders');
         Route::get('/orders', [OrderController::class, 'index'])->middleware('pos.permission:view_orders|manage_orders');
         Route::post('/orders', [OrderController::class, 'store'])->middleware('pos.permission:manage_orders');
@@ -333,6 +353,19 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         Route::get('/transactions/filter-by-date-range', [TransactionController::class, 'filterByDateRange'])->middleware('pos.permission:view_transactions|manage_transactions');
         Route::get('/transactions', [TransactionController::class, 'index'])->middleware('pos.permission:view_transactions|manage_transactions');
         Route::get('/transactions/{id}', [TransactionController::class, 'show'])->middleware('pos.permission:view_transactions|manage_transactions');
+    });
+
+    // Developer Webhook routes
+    Route::prefix('developer/webhooks')->group(function () {
+        Route::get('/', [UserWebhookController::class, 'index']);
+        Route::post('/', [UserWebhookController::class, 'store']);
+        Route::get('/{id}', [UserWebhookController::class, 'show']);
+        Route::put('/{id}', [UserWebhookController::class, 'update']);
+        Route::delete('/{id}', [UserWebhookController::class, 'destroy']);
+        Route::post('/{id}/toggle', [UserWebhookController::class, 'toggle']);
+        Route::post('/{id}/regenerate-secret', [UserWebhookController::class, 'regenerateSecret']);
+        Route::get('/{id}/deliveries', [UserWebhookController::class, 'deliveries']);
+        Route::post('/{id}/test', [UserWebhookController::class, 'test']);
     });
 
     // Sub-Merchant QRIS routes

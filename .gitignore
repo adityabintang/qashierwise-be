@@ -22,4 +22,6 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
-command/
+command/credential.json
+.playwright-mcp/
+.env.prod

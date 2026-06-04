@@ -290,7 +290,11 @@
                             </div>
                         </div>
                         <!-- Messages -->
-                        <div class="flex-1 overflow-y-auto scroll-area p-4 space-y-3 bg-[hsl(var(--muted)/0.2)]" x-ref="messagesContainer">
+                        <div class="flex-1 overflow-y-auto scroll-area p-4 space-y-3 bg-[hsl(var(--muted)/0.2)]" x-ref="messagesContainer" @scroll="onMessagesScroll($event)">
+                            <!-- Load-older spinner (top) -->
+                            <div x-show="loadingOlder" class="flex justify-center py-2">
+                                <i class="fas fa-circle-notch fa-spin text-[hsl(var(--muted-foreground))]"></i>
+                            </div>
                             <!-- Loading -->
                             <template x-if="loadingMessages">
                                 <div class="space-y-3">
@@ -1067,6 +1071,8 @@ function messagesManager() {
     return {
         API_BASE_URL: window.location.origin + '/api',
         contacts: [], filteredContactList: [], selectedContact: null, messages: [], templates: [],
+        // Windowed (WhatsApp-like) message loading + browser cache
+        messagesPerPage: 10, hasMoreOlder: false, loadingOlder: false, oldestId: null,
         newMessage: '', contactSearch: '', loadingContacts: true, loadingMessages: false, sending: false,
         mediaPreview: null, mediaFile: null,
         showTemplateModal: false, showImageModal: false, showVideoModal: false, showDocumentModal: false,
@@ -1130,6 +1136,7 @@ function messagesManager() {
                     const exists = this.messages.some(m => m.id === newMessage.id || m.message_id === newMessage.message_id);
                     if (!exists) {
                         this.messages.push(newMessage);
+                        this.cacheMessages(this.selectedContact.id);
                         // Scroll to bottom with smooth animation for new messages
                         this.$nextTick(() => setTimeout(() => this.scrollToBottom(true), 50));
                         // Mark incoming message as read since user is viewing
@@ -1195,12 +1202,25 @@ function messagesManager() {
             }
         },
         async selectContact(contact) {
-            this.messages = [];
             this.selectedContact = contact;
+            this.hasMoreOlder = false; this.oldestId = null;
             // Switch to chat view on mobile (Requirements 4.2, 4.4)
             if (this.isMobileMessages) {
                 this.mobileView = 'chat';
             }
+
+            // WhatsApp-like instant render from browser cache, then refresh.
+            const cached = this.loadCachedMessages(contact.id);
+            if (cached.length) {
+                this.messages = cached;
+                this.oldestId = cached[0].id;
+                this.hasMoreOlder = true; // assume older exist until proven otherwise
+                await this.$nextTick();
+                setTimeout(() => this.scrollToBottom(), 30);
+            } else {
+                this.messages = [];
+            }
+
             await this.fetchMessages();
             // Mark messages as read when opening conversation
             if (contact.unread_count > 0) {
@@ -1211,23 +1231,81 @@ function messagesManager() {
         backToContacts() {
             this.mobileView = 'contacts';
         },
+        // Fetch the latest page (10) and merge into the view.
         async fetchMessages() {
             if (!this.selectedContact?.id) return;
-            this.loadingMessages = true; this.messages = [];
+            const hadCache = this.messages.length > 0;
+            if (!hadCache) this.loadingMessages = true;
             try {
                 const token = localStorage.getItem('token');
                 const contactId = this.selectedContact.id;
-                // Use the correct endpoint that filters by contact_id
-                const res = await fetch(`${this.API_BASE_URL}/whatsapp/contacts/${contactId}/messages`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/contacts/${contactId}/messages?per_page=${this.messagesPerPage}`, { headers: { 'Authorization': `Bearer ${token}` } });
                 const data = await res.json();
-                if (this.selectedContact?.id === contactId) {
-                    this.messages = data.data || [];
-                    // Wait for DOM to render then scroll to bottom (latest messages)
-                    await this.$nextTick();
-                    setTimeout(() => this.scrollToBottom(), 100);
-                }
+                if (this.selectedContact?.id !== contactId) return;
+
+                const latest = data.data || [];
+                this.upsertMessages(latest);
+                // If we had no cache, the server's has_more is authoritative.
+                if (!hadCache) this.hasMoreOlder = !!data.has_more;
+                if (this.messages.length) this.oldestId = this.messages[0].id;
+                this.cacheMessages(contactId);
+
+                await this.$nextTick();
+                setTimeout(() => this.scrollToBottom(), 100);
             } catch (e) { console.error('Error:', e); }
             finally { this.loadingMessages = false; }
+        },
+        // Load the previous page (older messages) when scrolling to the top.
+        async loadOlderMessages() {
+            if (this.loadingOlder || !this.hasMoreOlder || !this.selectedContact?.id || !this.oldestId) return;
+            this.loadingOlder = true;
+            const container = this.$refs.messagesContainer;
+            const prevHeight = container ? container.scrollHeight : 0;
+            try {
+                const token = localStorage.getItem('token');
+                const contactId = this.selectedContact.id;
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/contacts/${contactId}/messages?per_page=${this.messagesPerPage}&before_id=${this.oldestId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const data = await res.json();
+                if (this.selectedContact?.id !== contactId) return;
+
+                const older = data.data || [];
+                if (older.length) {
+                    this.upsertMessages(older);
+                    this.oldestId = this.messages[0].id;
+                    this.cacheMessages(contactId);
+                }
+                this.hasMoreOlder = !!data.has_more;
+
+                // Preserve scroll position so the view doesn't jump.
+                await this.$nextTick();
+                if (container) container.scrollTop = container.scrollHeight - prevHeight;
+            } catch (e) { console.error('Error:', e); }
+            finally { this.loadingOlder = false; }
+        },
+        onMessagesScroll(e) {
+            if (e.target.scrollTop <= 60 && this.hasMoreOlder && !this.loadingOlder) {
+                this.loadOlderMessages();
+            }
+        },
+        // Merge incoming messages into this.messages (dedupe by id), keep ascending.
+        upsertMessages(incoming) {
+            if (!incoming || !incoming.length) return;
+            const byId = new Map(this.messages.map(m => [String(m.id), m]));
+            for (const m of incoming) byId.set(String(m.id), m);
+            this.messages = Array.from(byId.values()).sort((a, b) => Number(a.id) - Number(b.id));
+        },
+        // ---- browser cache (WhatsApp-like instant open) ----
+        cacheKey(contactId) { return `wa_msgs_v1_${contactId}`; },
+        loadCachedMessages(contactId) {
+            try { return JSON.parse(localStorage.getItem(this.cacheKey(contactId))) || []; }
+            catch (e) { return []; }
+        },
+        cacheMessages(contactId) {
+            try {
+                // Keep only the most recent 40 to bound storage.
+                const tail = this.messages.slice(-40);
+                localStorage.setItem(this.cacheKey(contactId), JSON.stringify(tail));
+            } catch (e) { /* quota / disabled — ignore */ }
         },
         async refreshMessages() { await this.fetchMessages(); },
 
