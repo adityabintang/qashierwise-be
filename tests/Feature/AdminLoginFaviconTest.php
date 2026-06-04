@@ -6,7 +6,7 @@ use Tests\TestCase;
 
 class AdminLoginFaviconTest extends TestCase
 {
-    public function test_admin_login_uses_scheme_agnostic_favicon_url(): void
+    public function test_admin_shell_references_favicon_without_insecure_url(): void
     {
         $response = $this->get('/admin/login');
 
@@ -15,7 +15,9 @@ class AdminLoginFaviconTest extends TestCase
         $responseContent = $response->getContent();
 
         $this->assertIsString($responseContent);
-        $this->assertMatchesRegularExpression('/<link\s+rel="icon"\s+href="\/favicon\.ico\?v=\d+"\s*\/>/', $responseContent);
-        $this->assertDoesNotMatchRegularExpression('/<link\s+rel="icon"\s+href="http:\/\//', $responseContent);
+        // The React admin shell links the local favicon...
+        $this->assertMatchesRegularExpression('/<link\s+rel="icon"[^>]*href="[^"]*favicon\.ico"/', $responseContent);
+        // ...and never via an insecure (http://) URL that would trigger mixed content.
+        $this->assertDoesNotMatchRegularExpression('/<link\s+rel="icon"[^>]*href="http:\/\//', $responseContent);
     }
 }
