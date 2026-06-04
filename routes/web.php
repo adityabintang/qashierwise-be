@@ -32,6 +32,13 @@ Route::get('/', function () {
     ]);
 });
 
+// Admin CMS (React SPA, replaces the Filament panel). The SPA handles its own
+// client-side routing + auth gating; all data goes through /api/admin/* which is
+// protected by Sanctum + EnsureCanAccessAdmin. The shell itself carries no data.
+Route::get('/admin/{any?}', function () {
+    return view('react.admin');
+})->where('any', '.*')->name('admin');
+
 // Public blog routes
 Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
 Route::get('/blog/load-more', [BlogController::class, 'loadMore'])->name('blog.load-more');
