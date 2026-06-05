@@ -2,13 +2,14 @@
 
 namespace App\Jobs;
 
+use App\Models\CatalogProduct;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Payment;
-use App\Models\Product;
 use App\Models\QrisTransaction;
 use App\Models\Reservation;
 use App\Services\OrderService;
+use App\Services\ReservationFulfillmentService;
 use App\Services\ReservationService;
 use Exception;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -72,7 +73,7 @@ class ProcessReservationPayment implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(ReservationService $reservationService, OrderService $orderService): void
+    public function handle(ReservationService $reservationService, OrderService $orderService, ReservationFulfillmentService $fulfillment): void
     {
         Log::info('ProcessReservationPayment job started', [
             'reservation_id' => $this->reservation->id,
@@ -86,7 +87,7 @@ class ProcessReservationPayment implements ShouldQueue
 
             // Process based on payment status
             if ($this->paymentStatus === 'success') {
-                $this->handleSuccessfulPayment($reservationService, $orderService);
+                $this->handleSuccessfulPayment($reservationService, $orderService, $fulfillment);
             } else {
                 $this->handleFailedPayment($reservationService);
             }
@@ -110,7 +111,7 @@ class ProcessReservationPayment implements ShouldQueue
     /**
      * Handle successful payment.
      */
-    protected function handleSuccessfulPayment(ReservationService $reservationService, OrderService $orderService): void
+    protected function handleSuccessfulPayment(ReservationService $reservationService, OrderService $orderService, ReservationFulfillmentService $fulfillment): void
     {
         // Skip if already confirmed
         if ($this->reservation->status === Reservation::STATUS_CONFIRMED) {
@@ -132,14 +133,18 @@ class ProcessReservationPayment implements ShouldQueue
             'remaining_amount' => $this->reservation->total_amount - $paidAmount,
         ]);
 
-        // Confirm reservation (creates calendar, updates table)
+        // Confirm reservation (creates Google Calendar event on merchant's calendar,
+        // schedules WA reminders, updates table status).
         $reservationService->confirmReservation($this->reservation);
 
-        // Create order from reservation for stakeholder visibility
+        // Create POS Order for dashboard/reporting visibility and invoice generation.
+        $posOrder = null;
         try {
-            $this->createOrderFromReservation($orderService);
+            $posOrder = $this->createOrderFromReservation($orderService);
+            if ($posOrder) {
+                $this->reservation->update(['pos_order_id' => $posOrder->id]);
+            }
         } catch (Exception $e) {
-            // Log error but don't fail the entire job
             Log::error('Failed to create order from reservation', [
                 'reservation_id' => $this->reservation->id,
                 'error' => $e->getMessage(),
@@ -147,22 +152,14 @@ class ProcessReservationPayment implements ShouldQueue
             ]);
         }
 
-        // Notify merchant of new reservation (after order is created so the
-        // notif message can include order_number + items). Non-fatal.
+        // Notify merchant via their own channel (Fonnte / WABA depending on setup).
         try {
             $this->reservation->refresh();
-            $order = $this->reservation->order_id
-                ? \App\Models\Order::find($this->reservation->order_id)
-                : null;
-            if ($order) {
-                // Tag delivery_type so MerchantNotificationService picks the
-                // reservation label. The Order row may have delivery_type set
-                // by createOrderFromReservation; if not, override locally here
-                // (not persisted) so notification reads "Reservasi".
-                if ($order->delivery_type !== 'reservasi') {
-                    $order->setAttribute('delivery_type', 'reservasi');
+            if ($posOrder) {
+                if ($posOrder->delivery_type !== 'reservasi') {
+                    $posOrder->setAttribute('delivery_type', 'reservasi');
                 }
-                app(\App\Services\MerchantNotificationService::class)->notifyNewOrder($order);
+                app(\App\Services\MerchantNotificationService::class)->notifyNewOrder($posOrder);
             }
         } catch (\Throwable $e) {
             Log::warning('Merchant reservation notif failed (non-fatal)', [
@@ -171,8 +168,17 @@ class ProcessReservationPayment implements ShouldQueue
             ]);
         }
 
-        // Dispatch success notification
-        SendReservationNotification::dispatch($this->reservation, 'success');
+        // Send customer: confirmation message + invoice PDF via ReservationFulfillmentService.
+        // This replaces the old SendReservationNotification job.
+        try {
+            $this->reservation->refresh();
+            $fulfillment->onPaymentConfirmed($this->reservation);
+        } catch (\Throwable $e) {
+            Log::warning('Reservation customer notification failed (non-fatal)', [
+                'reservation_id' => $this->reservation->id,
+                'error'          => $e->getMessage(),
+            ]);
+        }
 
         Log::info('Reservation payment processed successfully', [
             'reservation_id' => $this->reservation->id,
@@ -202,14 +208,21 @@ class ProcessReservationPayment implements ShouldQueue
     }
 
     /**
-     * Create an Order record from the reservation for POS visibility.
-     *
-     * This creates an order with status='paid' so it appears in reports
-     * and dashboards for stakeholder visibility and prep planning.
+     * Create a POS Order from the reservation for visibility, reporting, and
+     * invoice generation. Returns the created Order (or the pre-existing one),
+     * or null if creation fails.
      */
-    protected function createOrderFromReservation(OrderService $orderService): void
+    protected function createOrderFromReservation(OrderService $orderService): ?Order
     {
-        // Check if order was already created for this reservation payment
+        // Idempotency: if the reservation already has a linked POS Order, return it.
+        if ($this->reservation->pos_order_id) {
+            $existing = Order::find($this->reservation->pos_order_id);
+            if ($existing) {
+                return $existing;
+            }
+        }
+
+        // Also check by QRIS transaction to guard against duplicate job runs.
         if ($this->qrisTransaction) {
             $existingOrder = Order::where('source', 'reservation')
                 ->whereHas('payments', fn ($q) => $q->where('qris_transaction_id', $this->qrisTransaction->id))
@@ -221,22 +234,24 @@ class ProcessReservationPayment implements ShouldQueue
                     'order_id' => $existingOrder->id,
                 ]);
 
-                return;
+                return $existingOrder;
             }
         }
 
-        // Create order with paid status
+        // Create POS order. delivery_type='reservasi' so the invoice and merchant
+        // notification service show the correct label.
         $order = Order::create([
-            'store_id' => $this->reservation->store_id,
-            'order_number' => $this->generateOrderNumber($this->reservation->store_id),
-            'status' => Order::STATUS_PAID,
-            'source' => 'reservation',
-            'customer_name' => $this->reservation->customer_name,
+            'store_id'       => $this->reservation->store_id,
+            'order_number'   => $this->generateOrderNumber($this->reservation->store_id),
+            'status'         => Order::STATUS_PAID,
+            'source'         => 'reservation',
+            'delivery_type'  => 'reservasi',
+            'customer_name'  => $this->reservation->customer_name,
             'customer_phone' => $this->reservation->phone,
-            'subtotal' => 0,
-            'tax_amount' => 0,
-            'discount_amount' => 0,
-            'total' => 0,
+            'subtotal'       => 0,
+            'tax_amount'     => 0,
+            'discount_amount'=> 0,
+            'total'          => 0,
         ]);
 
         // Add items from selected products
@@ -246,7 +261,7 @@ class ProcessReservationPayment implements ShouldQueue
         foreach ($selectedProducts as $productData) {
             $product = $this->resolveProduct($productData);
             if (! $product) {
-                Log::warning('Could not resolve product from reservation', [
+                Log::warning('Could not resolve catalog product from reservation', [
                     'reservation_id' => $this->reservation->id,
                     'product_data' => $productData,
                 ]);
@@ -258,9 +273,14 @@ class ProcessReservationPayment implements ShouldQueue
             $unitPrice = $this->getProductPrice($productData, $product);
             $itemSubtotal = $quantity * $unitPrice;
 
+            // Reservation products come from the Meta Catalog mirror, which has
+            // no master Product row. Snapshot name + retailer_id instead and
+            // leave product_id null (column is nullable).
             OrderItem::create([
                 'order_id' => $order->id,
-                'product_id' => $product->id,
+                'product_id' => null,
+                'product_name' => $product->name,
+                'product_retailer_id' => $product->retailer_id,
                 'quantity' => $quantity,
                 'unit_price' => $unitPrice,
                 'subtotal' => $itemSubtotal,
@@ -295,22 +315,26 @@ class ProcessReservationPayment implements ShouldQueue
 
         Log::info('Order created from reservation', [
             'reservation_id' => $this->reservation->id,
-            'order_id' => $order->id,
-            'order_number' => $order->order_number,
-            'subtotal' => $subtotal,
-            'total' => $total,
+            'order_id'       => $order->id,
+            'order_number'   => $order->order_number,
+            'subtotal'       => $subtotal,
+            'total'          => $total,
         ]);
+
+        return $order;
     }
 
     /**
-     * Resolve a product from various formats in selected_products.
+     * Resolve a catalog product from various formats in selected_products.
      *
      * Handles:
      * - Array with 'id' key: ['id' => 1, 'name' => '...']
      * - Array with 'product_id' key: ['product_id' => 1, ...]
      * - Integer: 1
+     *
+     * The id refers to a `catalog_products` row scoped to the reservation owner.
      */
-    protected function resolveProduct(mixed $productData): ?Product
+    protected function resolveProduct(mixed $productData): ?CatalogProduct
     {
         $productId = null;
 
@@ -324,7 +348,12 @@ class ProcessReservationPayment implements ShouldQueue
             return null;
         }
 
-        return Product::find($productId);
+        $boundCatalogId = app(\App\Services\CatalogService::class)
+            ->getBoundCatalogId($this->reservation->user_id);
+
+        return CatalogProduct::where('user_id', $this->reservation->user_id)
+            ->when($boundCatalogId, fn ($q) => $q->where('catalog_id', $boundCatalogId))
+            ->find($productId);
     }
 
     /**
@@ -342,9 +371,9 @@ class ProcessReservationPayment implements ShouldQueue
     }
 
     /**
-     * Get product price from product data or use product's actual price.
+     * Get product price from product data or use the catalog product's price.
      */
-    protected function getProductPrice(mixed $productData, Product $product): float
+    protected function getProductPrice(mixed $productData, CatalogProduct $product): float
     {
         if (is_array($productData)) {
             if (isset($productData['price'])) {
