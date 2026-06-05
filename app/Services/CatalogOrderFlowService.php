@@ -1084,10 +1084,10 @@ class CatalogOrderFlowService
         AiAgentConversation $conversation,
         AiAgent $aiAgent
     ): void {
-        // Reservation flow consumes the catalog cart; leave catalog items in
-        // place in case the user wants to come back, but exit our state.
+        // Pass the conversation so the renderer can embed cart items + phone
+        // into the pre-filled short reservation link.
         $conversation->clearFlowState();
-        $this->renderer->sendReservationHandoff($account, $contact, $aiAgent);
+        $this->renderer->sendReservationHandoff($account, $contact, $aiAgent, $conversation);
     }
 
 
