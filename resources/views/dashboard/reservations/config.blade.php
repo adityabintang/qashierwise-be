@@ -626,6 +626,46 @@
                                 </div>
                                 <!-- /Row 3 -->
 
+                                <!-- Row 4: Google Calendar (full width) -->
+                                <div class="rounded-xl border border-border/70 bg-card shadow-sm overflow-hidden">
+                                    <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-blue-500 text-white shadow-sm">
+                                                <i class="fas fa-calendar-alt text-lg"></i>
+                                            </div>
+                                            <div>
+                                                <p class="text-base font-semibold leading-tight">Google Calendar</p>
+                                                <p class="text-xs text-muted-foreground mt-0.5">
+                                                    Hubungkan agar reservasi yang sudah dibayar otomatis masuk ke kalender Anda, dan pembeli diundang via email.
+                                                </p>
+                                                <p class="text-xs mt-1 font-medium" x-show="googleCalendar.connected" x-cloak>
+                                                    <i class="fas fa-check-circle text-emerald-500"></i>
+                                                    Terhubung<span x-show="googleCalendar.email" x-text="': ' + googleCalendar.email"></span>
+                                                </p>
+                                                <p class="text-xs mt-1 font-medium text-muted-foreground" x-show="!googleCalendar.connected" x-cloak>
+                                                    <i class="fas fa-circle text-muted-foreground/50"></i>
+                                                    Belum terhubung
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-2.5 flex-shrink-0">
+                                            <button type="button" x-show="!googleCalendar.connected" x-cloak
+                                                    @click="connectGoogleCalendar()" :disabled="googleCalendar.loading"
+                                                    class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow disabled:opacity-50">
+                                                <i class="fab fa-google text-xs"></i>
+                                                Hubungkan
+                                            </button>
+                                            <button type="button" x-show="googleCalendar.connected" x-cloak
+                                                    @click="disconnectGoogleCalendar()" :disabled="googleCalendar.loading"
+                                                    class="inline-flex items-center gap-2 rounded-lg border border-border/70 bg-background px-4 py-2 text-sm font-medium shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow disabled:opacity-50">
+                                                <i class="fas fa-unlink text-xs"></i>
+                                                Putuskan
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- /Row 4 -->
+
                                 <!-- Save Bar -->
                                 <div class="flex items-center justify-between gap-4 rounded-xl border border-border/70 bg-card px-5 py-4 shadow-sm">
                                     <p class="text-xs text-muted-foreground hidden sm:block">Pastikan slot dan menu sesuai kapasitas operasional.</p>
@@ -886,6 +926,11 @@ function configApp() {
         reservationStats: {
             booked_capacity: 0,
         },
+        googleCalendar: {
+            connected: false,
+            email: null,
+            loading: false,
+        },
         form: {
             is_active: true,
             available_slots: [],
@@ -970,6 +1015,7 @@ function configApp() {
             await this.loadUserSlug();
             await this.loadTables();
             await this.loadProducts();
+            await this.loadGoogleCalendarStatus();
             this.syncReservationFeeDisplay();
 
             // Watch for store selection changes and load config automatically
@@ -1100,28 +1146,98 @@ function configApp() {
         },
 
         async loadProducts() {
-            if (!this.selectedStoreId) return;
-
             this.loadingProducts = true;
             try {
                 const token = localStorage.getItem('token');
-                const response = await fetch(`/api/pos/products?store_id=${this.selectedStoreId}`, {
+                // Reservation menu products are sourced from the merchant's Meta
+                // Catalog mirror (user-scoped), not the deprecated master Product
+                // catalog. catalog_products are not store-scoped.
+                const response = await fetch(`/api/reservation-config/catalog-products`, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Accept': 'application/json'
                     }
                 });
 
-                if (!response.ok) throw new Error('Failed to load products');
+                if (!response.ok) throw new Error('Failed to load catalog products');
 
                 const data = await response.json();
                 if (data.success) {
                     this.products = data.data.data || data.data || [];
                 }
             } catch (error) {
-                console.error('Error loading products:', error);
+                console.error('Error loading catalog products:', error);
             } finally {
                 this.loadingProducts = false;
+            }
+        },
+
+        async loadGoogleCalendarStatus() {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`/api/reservation-config/google-calendar-status`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json'
+                    }
+                });
+                if (!response.ok) throw new Error('Failed to load calendar status');
+                const data = await response.json();
+                if (data.success && data.data) {
+                    this.googleCalendar.connected = !!data.data.connected;
+                    this.googleCalendar.email = data.data.email || null;
+                }
+            } catch (error) {
+                console.error('Error loading Google Calendar status:', error);
+            }
+        },
+
+        async connectGoogleCalendar() {
+            this.googleCalendar.loading = true;
+            try {
+                const token = localStorage.getItem('token');
+                // Fetch the consent URL (carries an encrypted state identifying
+                // this merchant) then navigate the browser to Google.
+                const response = await fetch(`/api/reservation-config/google-calendar/connect-url`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                if (data.success && data.url) {
+                    window.location.href = data.url;
+                } else {
+                    console.error('Failed to get Google connect URL:', data.message);
+                    this.googleCalendar.loading = false;
+                }
+            } catch (error) {
+                console.error('Error starting Google Calendar connect:', error);
+                this.googleCalendar.loading = false;
+            }
+        },
+
+        async disconnectGoogleCalendar() {
+            if (!confirm('Putuskan koneksi Google Calendar?')) return;
+            this.googleCalendar.loading = true;
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`/api/reservation-config/google-calendar`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    this.googleCalendar.connected = false;
+                    this.googleCalendar.email = null;
+                }
+            } catch (error) {
+                console.error('Error disconnecting Google Calendar:', error);
+            } finally {
+                this.googleCalendar.loading = false;
             }
         },
 
