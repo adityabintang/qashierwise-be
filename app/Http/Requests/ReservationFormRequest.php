@@ -30,7 +30,7 @@ class ReservationFormRequest extends FormRequest
             'table_id' => ['required', 'integer', 'exists:tables,id'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'selected_products' => ['nullable', 'array'],
-            'selected_products.*.id' => ['required', 'integer', 'exists:products,id'],
+            'selected_products.*.id' => ['required', 'integer', 'exists:catalog_products,id'],
             'selected_products.*.quantity' => ['nullable', 'integer', 'min:1', 'max:50'],
             'payment_type' => ['required', 'in:dp,full'],
             'store_id' => ['nullable', 'integer', 'exists:stores,id'],
