@@ -98,6 +98,14 @@ export const nav: DocNode[] = [
   },
   {
     type: "group",
+    label: "Merchant",
+    icon: "store",
+    items: [
+      { slug: "merchant/registrasi-sub-merchant", label: "Registrasi Sub-Merchant" },
+    ],
+  },
+  {
+    type: "group",
     label: "Pembayaran",
     icon: "wallet",
     items: [
