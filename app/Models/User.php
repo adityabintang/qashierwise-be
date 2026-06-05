@@ -50,6 +50,8 @@ class User extends Authenticatable
         'language_preference',
         'is_master_admin',
         'slug',
+        'google_calendar_refresh_token',
+        'google_calendar_email',
     ];
 
     /**
