@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AiAgent;
 use App\Models\WhatsAppAccount;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,31 @@ class CatalogService
     protected function baseUrl(): string
     {
         return "https://graph.facebook.com/{$this->apiVersion}";
+    }
+
+    /**
+     * Resolve the catalog currently bound to a merchant for messaging/commerce.
+     *
+     * The binding lives on the AiAgent attached to the merchant's active
+     * WhatsApp account (`ai_agents.catalog_id`). This is the single source of
+     * truth used elsewhere (e.g. CatalogOrderFlowService) and what reservation
+     * menus must read from — NOT the full per-user catalog_products set, which
+     * may span several catalogs the merchant has synced.
+     */
+    public function getBoundCatalogId(int $userId): ?string
+    {
+        $account = WhatsAppAccount::withoutGlobalScope('userAccounts')
+            ->where('user_id', $userId)
+            ->where('is_active', true)
+            ->first();
+
+        if (! $account) {
+            return null;
+        }
+
+        $catalogId = AiAgent::where('whatsapp_account_id', $account->id)->value('catalog_id');
+
+        return $catalogId ? (string) $catalogId : null;
     }
 
     /**
