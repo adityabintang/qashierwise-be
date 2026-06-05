@@ -111,12 +111,6 @@ class ReservationFulfillmentService
             $msg .= $this->buildCalendarConnectSection($reservation);
         }
 
-        // If merchant has Google Calendar connected, buyer also gets an email invite
-        // (via sendUpdates=all in GoogleCalendarService::createEvent()).
-        if ($reservation->user?->google_calendar_refresh_token) {
-            $msg .= "\n📧 Undangan kalender juga telah dikirim ke email Anda.\n";
-        }
-
         $msg .= "\nBerikut kami kirimkan invoice reservasi Anda.\nTerima kasih! 🙏";
 
         $this->sendCustomerText($reservation, $msg);
