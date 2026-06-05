@@ -1,7 +1,10 @@
 import { GlobeIcon } from "./icons";
 import { DemoVideoButton } from "./demo-video-button";
+import { locale, otherLocale, t } from "../../lib/i18n";
 
 export function Nav() {
+  const langLabel = locale === "id" ? "ID" : "EN";
+
   return (
     <nav className="sticky top-0 z-50 bg-white/70 backdrop-blur-2xl backdrop-saturate-150 border-b border-[rgba(20,12,50,0.06)]">
       <div className="max-w-[1200px] mx-auto px-5 sm:px-7">
@@ -15,13 +18,13 @@ export function Nav() {
 
           <div className="hidden lg:flex gap-1 items-center">
             {[
-              { href: "/#how", label: "Cara Kerja" },
-              { href: "/#features", label: "Fitur" },
-              { href: "/#pricing", label: "Harga" },
-              { href: "/docs", label: "Docs" },
-              { href: "/blog", label: "Blog" },
-              { href: "/#about", label: "Tentang" },
-              { href: "/#faq", label: "FAQ" },
+              { href: "/#how", label: t.nav.how },
+              { href: "/#features", label: t.nav.features },
+              { href: "/#pricing", label: t.nav.pricing },
+              { href: "/docs", label: t.nav.docs },
+              { href: "/blog", label: t.nav.blog },
+              { href: "/#about", label: t.nav.about },
+              { href: "/#faq", label: t.nav.faq },
             ].map((l) => (
               <a
                 key={l.href}
@@ -34,15 +37,19 @@ export function Nav() {
           </div>
 
           <div className="flex gap-2 items-center">
-            <span className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-ink-50 text-[13px] font-semibold text-ink-700">
-              <GlobeIcon /> ID
-            </span>
+            <a
+              href={`/language/${otherLocale}`}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-ink-50 text-[13px] font-semibold text-ink-700 hover:bg-ink-100 transition-colors"
+              title={locale === "id" ? "Switch to English" : "Ganti ke Bahasa Indonesia"}
+            >
+              <GlobeIcon /> {langLabel}
+            </a>
             <DemoVideoButton variant="sm" className="hidden sm:inline-flex" />
             <a
               href="/login"
               className="inline-flex items-center justify-center gap-2 h-[38px] px-4 rounded-full font-semibold text-sm bg-purple-600 text-white shadow-purple hover:bg-purple-700 hover:-translate-y-px transition-all"
             >
-              Coba Gratis 14 Hari
+              {t.nav.cta}
             </a>
           </div>
         </div>
