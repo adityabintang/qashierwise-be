@@ -8,7 +8,8 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="bg-gray-50">
-    <div class="min-h-screen py-12 px-4 sm:px-6 lg:px-8" x-data="reservationForm()">
+    <div class="min-h-screen py-12 px-4 sm:px-6 lg:px-8" x-data="reservationForm()"
+         x-init="applyPrefill(); $nextTick(() => { if (_pendingPrefillItems?.length) loadProducts(true); })">
         <div class="max-w-2xl mx-auto">
             <!-- Header -->
             <div class="text-center mb-8">
@@ -370,6 +371,56 @@
                 timeRemaining: 1800,
                 statusInterval: null,
                 timerInterval: null,
+                prefillApplied: false,
+
+                // Read ?prefill= query param (base64 JSON set by /r/{code} short link).
+                // Pre-fills phone number and product selections from the buyer's WA catalog cart.
+                applyPrefill() {
+                    if (this.prefillApplied) return;
+                    this.prefillApplied = true;
+                    const raw = new URLSearchParams(window.location.search).get('prefill');
+                    if (!raw) return;
+                    try {
+                        const data = JSON.parse(atob(decodeURIComponent(raw)));
+
+                        // Pre-fill phone (WA number, e.g. 62812xxx → 0812xxx)
+                        if (data.phone) {
+                            let phone = String(data.phone).replace(/\D/g, '');
+                            if (phone.startsWith('62')) phone = '0' + phone.slice(2);
+                            this.formData.phone = phone;
+                        }
+
+                        // Pre-fill selected products from catalog items.
+                        // items = [{product_retailer_id, product_name, quantity, item_price}]
+                        // Match against availableProducts by retailer_id to get local catalog_products.id.
+                        if (Array.isArray(data.items) && data.items.length > 0) {
+                            this._pendingPrefillItems = data.items;
+                        }
+                    } catch (e) {
+                        console.warn('prefill parse failed:', e);
+                    }
+                },
+
+                // Called after availableProducts loads — matches catalog items by retailer_id.
+                applyPrefillProducts() {
+                    if (!this._pendingPrefillItems || this._pendingPrefillItems.length === 0) return;
+                    const items = this._pendingPrefillItems;
+                    this._pendingPrefillItems = null;
+
+                    items.forEach(item => {
+                        const product = this.availableProducts.find(
+                            p => p.retailer_id && p.retailer_id === item.product_retailer_id
+                        );
+                        if (product) {
+                            const existing = this.formData.selected_products.findIndex(s => s.id === product.id);
+                            if (existing >= 0) {
+                                this.formData.selected_products[existing].quantity = item.quantity || 1;
+                            } else {
+                                this.formData.selected_products.push({ id: product.id, quantity: item.quantity || 1 });
+                            }
+                        }
+                    });
+                },
 
                 async loadAvailableTables() {
                     if (!this.formData.reservation_date || !this.formData.store_id) return;
@@ -398,9 +449,12 @@
                     }
                 },
 
-                async loadProducts() {
-                    this.showProductList = !this.showProductList;
-                    if (this.availableProducts.length > 0) return;
+                async loadProducts(fromPrefill = false) {
+                    if (!fromPrefill) this.showProductList = !this.showProductList;
+                    if (this.availableProducts.length > 0) {
+                        if (fromPrefill) this.applyPrefillProducts();
+                        return;
+                    }
 
                     try {
                         const params = new URLSearchParams({
@@ -413,6 +467,9 @@
                         const response = await fetch(`/reservations/products?${params.toString()}`);
                         const data = await response.json();
                         this.availableProducts = data.success ? (data.data || []) : [];
+
+                        // Apply prefill product selections now that the catalog is loaded.
+                        if (fromPrefill) this.applyPrefillProducts();
                     } catch (error) {
                         console.error('Failed to load products:', error);
                     }
