@@ -111,6 +111,12 @@
                                         <i class="fas" :class="generating ? 'fa-spinner animate-spin' : 'fa-qrcode'"></i>
                                         <span x-text="generating ? 'Generating...' : 'Generate QRIS'"></span>
                                     </button>
+
+                                    <div class="text-center pt-1">
+                                        <a href="/docs/merchant/registrasi-sub-merchant" target="_blank" class="text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] hover:underline">
+                                            Gagal membuat QRIS? Lihat panduan →
+                                        </a>
+                                    </div>
                                 </form>
                             </div>
                         </div>
