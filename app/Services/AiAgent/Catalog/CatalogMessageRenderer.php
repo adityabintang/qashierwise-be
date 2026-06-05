@@ -571,7 +571,7 @@ class CatalogMessageRenderer
             }
         } while (\Illuminate\Support\Facades\Cache::has("rsv_link:{$code}"));
 
-        \Illuminate\Support\Facades\Cache::put("rsv_link:{$code}", $payload, now()->addHours(24));
+        \Illuminate\Support\Facades\Cache::put("rsv_link:{$code}", $payload, now()->addHours(5));
 
         return rtrim(config('app.url'), '/').'/r/'.$code;
     }
