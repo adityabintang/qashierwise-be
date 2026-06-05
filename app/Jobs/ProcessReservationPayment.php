@@ -348,11 +348,7 @@ class ProcessReservationPayment implements ShouldQueue
             return null;
         }
 
-        $boundCatalogId = app(\App\Services\CatalogService::class)
-            ->getBoundCatalogId($this->reservation->user_id);
-
         return CatalogProduct::where('user_id', $this->reservation->user_id)
-            ->when($boundCatalogId, fn ($q) => $q->where('catalog_id', $boundCatalogId))
             ->find($productId);
     }
 
