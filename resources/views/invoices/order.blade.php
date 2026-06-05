@@ -5,7 +5,11 @@
         'pending' => 'BELUM BAYAR',
         'cancelled' => 'DIBATALKAN',
     ][$order->status] ?? strtoupper($order->status);
-    $deliveryLabel = $order->delivery_type === 'delivery' ? 'Pengantaran (Delivery)' : 'Ambil di Toko (Pickup)';
+    $deliveryLabel = match($order->delivery_type) {
+        'delivery'  => 'Pengantaran (Delivery)',
+        'reservasi' => 'Reservasi',
+        default     => 'Ambil di Toko (Pickup)',
+    };
 @endphp
 <!DOCTYPE html>
 <html lang="id">
