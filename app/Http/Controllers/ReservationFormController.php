@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ReservationFormRequest;
-use App\Models\Product;
+use App\Models\CatalogProduct;
 use App\Models\Reservation;
 use App\Models\ReservationConfig;
 use App\Models\Store;
@@ -278,9 +278,6 @@ class ReservationFormController extends Controller
                 ]);
             }
 
-            $query = Product::where('user_id', $merchant->id)
-                ->where('is_active', true);
-
             $configuredProductIds = collect($config->available_products ?? [])
                 ->filter()
                 ->map(fn ($productId) => (int) $productId)
@@ -293,9 +290,24 @@ class ReservationFormController extends Controller
                 ]);
             }
 
-            $query->whereIn('id', $configuredProductIds->all());
+            // Reservation menu is sourced from the merchant's BOUND Meta Catalog
+            // (catalog_products scoped to ai_agents.catalog_id). Master Product
+            // and any other synced catalogs are never used here.
+            $boundCatalogId = app(\App\Services\CatalogService::class)
+                ->getBoundCatalogId($merchant->id);
 
-            $products = $query->get();
+            if (! $boundCatalogId) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [],
+                ]);
+            }
+
+            $products = CatalogProduct::where('user_id', $merchant->id)
+                ->where('catalog_id', $boundCatalogId)
+                ->where('is_available', true)
+                ->whereIn('id', $configuredProductIds->all())
+                ->get();
 
             return response()->json([
                 'success' => true,
@@ -303,7 +315,7 @@ class ReservationFormController extends Controller
                     'id' => $product->id,
                     'name' => $product->name,
                     'price' => $product->price,
-                    'label' => "{$product->name} - Rp ".number_format($product->price, 0, ',', '.'),
+                    'label' => "{$product->name} - Rp ".number_format((float) $product->price, 0, ',', '.'),
                 ])->values(),
             ]);
 
