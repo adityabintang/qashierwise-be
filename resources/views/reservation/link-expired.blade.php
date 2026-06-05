@@ -31,7 +31,7 @@
 <div class="card">
   <div class="icon">⏰</div>
   <h1>Tautan Kadaluarsa</h1>
-  <p>Link reservasi ini sudah tidak aktif (berlaku 24 jam).<br><br>Silakan kirim pesan kembali ke kami melalui WhatsApp untuk mendapatkan link baru.</p>
+  <p>Link reservasi ini sudah tidak aktif (berlaku 5 jam).<br><br>Silakan kirim pesan kembali ke kami melalui WhatsApp untuk mendapatkan link baru.</p>
 </div>
 </body>
 </html>
