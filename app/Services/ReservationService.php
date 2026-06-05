@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\Product;
+use App\Models\CatalogProduct;
 use App\Models\Reservation;
 use App\Models\ReservationConfig;
 use App\Models\Store;
@@ -299,7 +299,15 @@ class ReservationService
         $selectedProducts = $this->normalizeSelectedProducts($data['selected_products'] ?? null);
 
         if ($selectedProducts !== []) {
-            $productMap = Product::whereIn('id', collect($selectedProducts)->pluck('id'))
+            // Products are sourced from the merchant's BOUND Meta Catalog
+            // (catalog_products scoped to ai_agents.catalog_id), preventing both
+            // cross-tenant price tampering and pulling from an unbound catalog.
+            // Master Product is no longer used for reservations.
+            $boundCatalogId = app(CatalogService::class)->getBoundCatalogId($config->user_id);
+
+            $productMap = CatalogProduct::whereIn('id', collect($selectedProducts)->pluck('id'))
+                ->where('user_id', $config->user_id)
+                ->when($boundCatalogId, fn ($q) => $q->where('catalog_id', $boundCatalogId))
                 ->get()
                 ->keyBy('id');
 
