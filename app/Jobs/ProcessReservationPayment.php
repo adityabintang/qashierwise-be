@@ -8,6 +8,7 @@ use App\Models\OrderItem;
 use App\Models\Payment;
 use App\Models\QrisTransaction;
 use App\Models\Reservation;
+use App\Services\MerchantNotificationService;
 use App\Services\OrderService;
 use App\Services\ReservationFulfillmentService;
 use App\Services\ReservationService;
@@ -73,7 +74,7 @@ class ProcessReservationPayment implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(ReservationService $reservationService, OrderService $orderService, ReservationFulfillmentService $fulfillment): void
+    public function handle(ReservationService $reservationService, OrderService $orderService, ReservationFulfillmentService $fulfillment, MerchantNotificationService $merchantNotif): void
     {
         Log::info('ProcessReservationPayment job started', [
             'reservation_id' => $this->reservation->id,
@@ -87,7 +88,7 @@ class ProcessReservationPayment implements ShouldQueue
 
             // Process based on payment status
             if ($this->paymentStatus === 'success') {
-                $this->handleSuccessfulPayment($reservationService, $orderService, $fulfillment);
+                $this->handleSuccessfulPayment($reservationService, $orderService, $fulfillment, $merchantNotif);
             } else {
                 $this->handleFailedPayment($reservationService);
             }
@@ -111,7 +112,7 @@ class ProcessReservationPayment implements ShouldQueue
     /**
      * Handle successful payment.
      */
-    protected function handleSuccessfulPayment(ReservationService $reservationService, OrderService $orderService, ReservationFulfillmentService $fulfillment): void
+    protected function handleSuccessfulPayment(ReservationService $reservationService, OrderService $orderService, ReservationFulfillmentService $fulfillment, MerchantNotificationService $merchantNotif): void
     {
         // Skip if already confirmed
         if ($this->reservation->status === Reservation::STATUS_CONFIRMED) {
@@ -140,7 +141,7 @@ class ProcessReservationPayment implements ShouldQueue
         // Create POS Order for dashboard/reporting visibility and invoice generation.
         $posOrder = null;
         try {
-            $posOrder = $this->createOrderFromReservation($orderService);
+            $posOrder = $this->createOrderFromReservation($orderService, $merchantNotif);
             if ($posOrder) {
                 $this->reservation->update(['pos_order_id' => $posOrder->id]);
             }
@@ -212,7 +213,7 @@ class ProcessReservationPayment implements ShouldQueue
      * invoice generation. Returns the created Order (or the pre-existing one),
      * or null if creation fails.
      */
-    protected function createOrderFromReservation(OrderService $orderService): ?Order
+    protected function createOrderFromReservation(OrderService $orderService, MerchantNotificationService $merchantNotif): ?Order
     {
         // Idempotency: if the reservation already has a linked POS Order, return it.
         if ($this->reservation->pos_order_id) {
@@ -285,6 +286,23 @@ class ProcessReservationPayment implements ShouldQueue
                 'unit_price' => $unitPrice,
                 'subtotal' => $itemSubtotal,
             ]);
+
+            // Decrement local catalog stock (same pattern as OrderCreator).
+            if ($product->stock_quantity !== null) {
+                $product->stock_quantity = max(0, $product->stock_quantity - $quantity);
+                $product->is_available   = $product->stock_quantity > 0;
+                $product->save();
+
+                try {
+                    $merchantNotif->notifyLowStockIfApplicable($product);
+                } catch (\Throwable $e) {
+                    Log::warning('Low-stock notif from reservation payment failed (non-fatal)', [
+                        'reservation_id' => $this->reservation->id,
+                        'product_id'     => $product->id,
+                        'error'          => $e->getMessage(),
+                    ]);
+                }
+            }
 
             $subtotal += $itemSubtotal;
         }
