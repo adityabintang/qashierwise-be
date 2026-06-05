@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\BuyerCalendarToken;
 use App\Models\Order;
 use App\Models\Reservation;
 use App\Models\WhatsAppContact;
 use App\Models\WhatsAppMessage;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Netflie\WhatsAppCloudApi\Message\Media\LinkID;
 use Netflie\WhatsAppCloudApi\Message\Media\MediaObjectID;
@@ -80,18 +82,37 @@ class ReservationFulfillmentService
             $msg .= "\n⚠️ Pelunasan sisa tagihan dilakukan di tempat pada hari H.\n";
         }
 
-        // Calendar link — buyer can save the date without OAuth.
-        try {
-            $calUrl = $this->calendar->buildAddToCalendarUrl($reservation);
-            $msg .= "\n📅 *Tambahkan ke Google Calendar Anda:*\n{$calUrl}\n";
-        } catch (\Throwable $e) {
-            Log::warning('ReservationFulfillmentService: calendar link build failed', [
-                'reservation_id' => $reservation->id,
-                'error' => $e->getMessage(),
-            ]);
+        // Calendar: check if the buyer has already connected their Google Calendar.
+        $buyerEmail = strtolower(trim((string) $reservation->email));
+        $buyerToken = $buyerEmail ? BuyerCalendarToken::findByEmail($buyerEmail) : null;
+
+        if ($buyerToken) {
+            // Buyer already connected → create the event on their calendar silently.
+            try {
+                $eventId = $this->calendar->createEventForBuyer($reservation);
+                if ($eventId) {
+                    $msg .= "\n📅 *Reservasi ini telah ditambahkan ke Google Calendar Anda secara otomatis.*\n";
+                    Log::info('ReservationFulfillmentService: buyer calendar event created', [
+                        'reservation_id' => $reservation->id,
+                        'event_id'       => $eventId,
+                        'buyer_email'    => $buyerEmail,
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('ReservationFulfillmentService: buyer calendar auto-create failed', [
+                    'reservation_id' => $reservation->id,
+                    'error'          => $e->getMessage(),
+                ]);
+                // Fall through to send the manual link as fallback.
+                $msg .= $this->buildCalendarFallbackSection($reservation);
+            }
+        } else {
+            // Buyer has NOT connected → send connect link + manual template link as backup.
+            $msg .= $this->buildCalendarConnectSection($reservation);
         }
 
-        // If the merchant has Google Calendar connected, mention the email invite.
+        // If merchant has Google Calendar connected, buyer also gets an email invite
+        // (via sendUpdates=all in GoogleCalendarService::createEvent()).
         if ($reservation->user?->google_calendar_refresh_token) {
             $msg .= "\n📧 Undangan kalender juga telah dikirim ke email Anda.\n";
         }
@@ -134,22 +155,97 @@ class ReservationFulfillmentService
             $msg .= "Meja   : {$reservation->table->number}\n";
         }
 
-        $msg .= "\n📅 *Tandai tanggal di kalender Anda:*\n";
+        // Calendar: auto-create if buyer is connected, else send connect link.
+        $buyerEmail = strtolower(trim((string) $reservation->email));
+        $buyerToken = $buyerEmail ? BuyerCalendarToken::findByEmail($buyerEmail) : null;
 
-        try {
-            $calUrl = $this->calendar->buildAddToCalendarUrl($reservation);
-            $msg .= "{$calUrl}\n";
-        } catch (\Throwable $e) {
-            Log::warning('ReservationFulfillmentService: calendar link build failed (complete)', [
-                'reservation_id' => $reservation->id,
-                'error' => $e->getMessage(),
-            ]);
-            $msg .= "(link kalender tidak tersedia)\n";
+        if ($buyerToken) {
+            try {
+                $this->calendar->createEventForBuyer($reservation);
+                $msg .= "\n📅 Reservasi ini telah ditambahkan ke Google Calendar Anda.\n";
+            } catch (\Throwable $e) {
+                Log::warning('ReservationFulfillmentService: buyer calendar auto-create failed (complete)', [
+                    'reservation_id' => $reservation->id,
+                    'error'          => $e->getMessage(),
+                ]);
+                $msg .= $this->buildCalendarFallbackSection($reservation);
+            }
+        } else {
+            $msg .= $this->buildCalendarConnectSection($reservation);
         }
 
         $msg .= "\nSampai jumpa dan kami tunggu kedatangan Anda! 🙏";
 
         $this->sendCustomerText($reservation, $msg);
+    }
+
+    // =====================================================================
+    // Calendar section builders
+    // =====================================================================
+
+    /**
+     * Section for buyers who have NOT yet connected Google Calendar.
+     * Only the short connect link — no manual "add to calendar" fallback.
+     */
+    protected function buildCalendarConnectSection(Reservation $reservation): string
+    {
+        $connectUrl = $this->buildBuyerConnectUrl($reservation);
+
+        $section  = "\n📅 *Hubungkan Google Calendar Anda*\n";
+        $section .= "Tap sekali untuk terhubung — semua reservasi mendatang otomatis masuk kalender Anda:\n";
+        $section .= "{$connectUrl}\n";
+
+        return $section;
+    }
+
+    /**
+     * Fallback when auto-create failed despite a stored token.
+     * No manual link — just a short re-connect prompt.
+     */
+    protected function buildCalendarFallbackSection(Reservation $reservation): string
+    {
+        $connectUrl = $this->buildBuyerConnectUrl($reservation);
+
+        return "\n📅 Hubungkan ulang Google Calendar Anda:\n{$connectUrl}\n";
+    }
+
+    /**
+     * Build a short alias connect URL stored in cache.
+     * Returns a clean URL like https://app.../c/Ab3xY9kZ instead of the raw
+     * encrypted token (which would be 200+ characters in a WhatsApp message).
+     */
+    protected function buildBuyerConnectUrl(Reservation $reservation): string
+    {
+        $email         = strtolower(trim((string) $reservation->email));
+        $reservationId = $reservation->id;
+        $fullToken     = Crypt::encryptString("{$email}|{$reservationId}|".time());
+
+        // Generate a short random code and cache the full token under it.
+        // TTL: 24 hours (generous — buyer may open the link hours later).
+        $code = $this->generateShortCode();
+        \Illuminate\Support\Facades\Cache::put(
+            "cal_connect:{$code}",
+            $fullToken,
+            now()->addHours(24)
+        );
+
+        return rtrim(config('app.url'), '/').'/c/'.$code;
+    }
+
+    /**
+     * Generate a unique 8-character alphanumeric short code.
+     */
+    protected function generateShortCode(): string
+    {
+        $chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
+        do {
+            $code = '';
+            for ($i = 0; $i < 8; $i++) {
+                $code .= $chars[random_int(0, strlen($chars) - 1)];
+            }
+        } while (\Illuminate\Support\Facades\Cache::has("cal_connect:{$code}"));
+
+        return $code;
     }
 
     // =====================================================================
