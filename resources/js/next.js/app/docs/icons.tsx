@@ -14,6 +14,7 @@ const paths: Record<string, JSX.Element> = {
   wallet: <path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v0H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2M17 13h.01" />,
   star: <path d="m12 3 2.7 5.5 6 .9-4.3 4.2 1 6-5.4-2.8L6.6 19.6l1-6L3.3 9.4l6-.9L12 3Z" />,
   code: <path d="m8 8-4 4 4 4m8-8 4 4-4 4m-2-11-4 14" />,
+  store: <path d="M3 6h18l-2 9H5L3 6Zm0 0-1-3M10 3h4M8 15v6m8-6v6M5 21h14" />,
 };
 
 export function Icon({ name, className }: { name?: string; className?: string }) {
