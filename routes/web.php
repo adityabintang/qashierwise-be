@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\GoogleOAuthController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\DeliveryProofController;
 use App\Http\Controllers\MonitoringDashboardController;
@@ -129,6 +130,12 @@ Route::prefix('reservations')->name('reservation.')->group(function () {
     Route::get('/products', [ReservationFormController::class, 'getAvailableProducts'])
         ->name('products');
 });
+
+// Google Calendar OAuth callback. Google redirects the browser here after
+// consent; the merchant is identified by the encrypted `state` param (this app
+// has no server session), so it must sit outside the localStorage-token guard.
+Route::get('/auth/google/callback', [GoogleOAuthController::class, 'handleGoogleCallback'])
+    ->name('google.callback');
 
 // Dashboard routes (protected by authentication middleware)
 Route::middleware(['web', 'check.web.auth', 'block.author.login'])->group(function () {
