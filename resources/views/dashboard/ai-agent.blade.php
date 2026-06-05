@@ -914,6 +914,7 @@ function aiAgentApp() {
         stores: [],
         catalogs: [],
         catalogsLoading: false,
+        catalogLinkError: false,
         // Test send catalog state
         testCatalogPhone: '',
         testCatalogSending: false,
@@ -926,7 +927,6 @@ function aiAgentApp() {
             qris_enabled: false,
             reservation_enabled: false,
             delivery_enabled: false,
-            catalogLinkError: false,
             catalog_enabled: false,
         },
         form: {
