@@ -1,5 +1,6 @@
 import { QrIcon, SparkleIcon, WhatsAppIcon } from "./icons";
 import { Container, Eyebrow } from "./section-shared";
+import { t } from "../../lib/i18n";
 
 type Logo = {
   name: string;
@@ -20,9 +21,9 @@ export function Integrations() {
     <section className="text-center pt-5 pb-24">
       <Container>
         <div className="reveal">
-          <Eyebrow className="mb-3.5">Integrasi</Eyebrow>
-          <h3 className="text-2xl font-bold -tracking-[0.02em]">Integrasi yang didukung</h3>
-          <p className="text-ink-500 mt-2.5">Sambungkan QashierWise untuk bisnis Anda — tanpa ribet.</p>
+          <Eyebrow className="mb-3.5">{t.integrations.eyebrow}</Eyebrow>
+          <h3 className="text-2xl font-bold -tracking-[0.02em]">{t.integrations.title}</h3>
+          <p className="text-ink-500 mt-2.5">{t.integrations.subtitle}</p>
         </div>
         <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {logos.map((l, i) => (
