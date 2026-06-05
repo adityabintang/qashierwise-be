@@ -290,21 +290,11 @@ class ReservationFormController extends Controller
                 ]);
             }
 
-            // Reservation menu is sourced from the merchant's BOUND Meta Catalog
-            // (catalog_products scoped to ai_agents.catalog_id). Master Product
-            // and any other synced catalogs are never used here.
-            $boundCatalogId = app(\App\Services\CatalogService::class)
-                ->getBoundCatalogId($merchant->id);
-
-            if (! $boundCatalogId) {
-                return response()->json([
-                    'success' => true,
-                    'data' => [],
-                ]);
-            }
-
+            // Products are scoped by user_id + the IDs the merchant explicitly
+            // configured in available_products. No bound-catalog filter here —
+            // the merchant chose these IDs regardless of which WA catalog is
+            // currently active, so they should always be shown if available.
             $products = CatalogProduct::where('user_id', $merchant->id)
-                ->where('catalog_id', $boundCatalogId)
                 ->where('is_available', true)
                 ->whereIn('id', $configuredProductIds->all())
                 ->get();
@@ -312,10 +302,11 @@ class ReservationFormController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $products->map(fn ($product) => [
-                    'id' => $product->id,
-                    'name' => $product->name,
-                    'price' => $product->price,
-                    'label' => "{$product->name} - Rp ".number_format((float) $product->price, 0, ',', '.'),
+                    'id'          => $product->id,
+                    'name'        => $product->name,
+                    'price'       => $product->price,
+                    'retailer_id' => $product->retailer_id,
+                    'label'       => "{$product->name} - Rp ".number_format((float) $product->price, 0, ',', '.'),
                 ])->values(),
             ]);
 
