@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AiAgent;
+use App\Models\CatalogProduct;
 use App\Models\WhatsAppAccount;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -417,6 +418,131 @@ class CatalogService
                 'error'      => $translated['message'],
             ];
         });
+    }
+
+    /**
+     * Pull products for a specific catalog from Meta and upsert them into the
+     * local catalog_products mirror. Uses firstOrCreate so that existing rows
+     * with correct prices (created via our catalog manager) are not overwritten.
+     *
+     * Price note: Meta returns `price` as a string in the currency's major-unit
+     * display format (e.g. "35000" for IDR 35,000). We store this value directly
+     * so it matches the display value used throughout the reservation flow.
+     *
+     * @return int Number of products synced (created or already existing)
+     */
+    public function syncCatalogProducts(WhatsAppAccount $account, string $catalogId, int $userId): int
+    {
+        $synced = 0;
+        $after  = null;
+
+        do {
+            $result = $this->getCatalogProducts($account, $catalogId, 100, $after);
+
+            if (! $result['success']) {
+                Log::warning('CatalogService: syncCatalogProducts fetch failed', [
+                    'catalog_id' => $catalogId,
+                    'error'      => $result['error'] ?? 'unknown',
+                ]);
+                break;
+            }
+
+            foreach ($result['products'] as $p) {
+                $retailerId = $p['retailer_id'] ?? null;
+                if (! $retailerId) {
+                    continue;
+                }
+
+                $availability = $p['availability'] ?? 'in stock';
+
+                // Meta returns price as a string display value ("35000" for IDR 35,000).
+                // Numeric payloads (from our own catalog manager which sends minor units)
+                // are already in the DB — firstOrCreate leaves those rows untouched.
+                $price = $this->parseMetaSyncPrice($p['price'] ?? 0, $p['currency'] ?? 'IDR');
+
+                CatalogProduct::firstOrCreate(
+                    [
+                        'user_id'     => $userId,
+                        'catalog_id'  => $catalogId,
+                        'retailer_id' => $retailerId,
+                    ],
+                    [
+                        'meta_product_id' => $p['id'] ?? null,
+                        'name'            => $p['name'] ?? '',
+                        'price'           => $price,
+                        'currency'        => $p['currency'] ?? 'IDR',
+                        'category'        => $p['category'] ?? null,
+                        'availability'    => $availability,
+                        'is_available'    => CatalogProduct::isAvailableFromStatus($availability),
+                    ]
+                );
+
+                $synced++;
+            }
+
+            $after   = $result['paging']['cursors']['after'] ?? null;
+            $hasNext = isset($result['paging']['next']) && $after;
+        } while ($hasNext);
+
+        Log::info('CatalogService: synced catalog products from Meta', [
+            'catalog_id' => $catalogId,
+            'synced'     => $synced,
+        ]);
+
+        return $synced;
+    }
+
+    /**
+     * Parse a Meta price field into a float suitable for catalog_products.price.
+     *
+     * Meta returns price as a STRING in major-unit display format (e.g. "35000"
+     * for IDR 35,000, "9.99" for USD 9.99). Numeric values (rare) are treated
+     * as minor units (×100 basis) and divided by 100, consistent with how our
+     * catalog manager stores prices after sending minor units to Meta.
+     */
+    protected function parseMetaSyncPrice(mixed $raw, string $currency = 'IDR'): float
+    {
+        if (is_int($raw) || is_float($raw)) {
+            // Numeric → minor units; divide by 100 to get major units.
+            return max(0.0, (float) $raw / 100.0);
+        }
+
+        $str = trim((string) $raw);
+
+        // Strip currency symbols and codes; keep digits, dots, commas.
+        $num = preg_replace('/[^0-9.,]/', '', $str);
+        if ($num === '') {
+            return 0.0;
+        }
+
+        $lastDot   = strrpos($num, '.');
+        $lastComma = strrpos($num, ',');
+
+        if ($lastDot !== false && $lastComma !== false) {
+            // Both separators — whichever comes last is the decimal point.
+            if ($lastComma > $lastDot) {
+                $num = str_replace('.', '', $num);
+                $num = str_replace(',', '.', $num);
+            } else {
+                $num = str_replace(',', '', $num);
+            }
+        } elseif ($lastDot !== false) {
+            $afterDot = substr($num, $lastDot + 1);
+            if (strlen($afterDot) === 3) {
+                // Dot is a thousand separator (e.g. "35.000").
+                $num = str_replace('.', '', $num);
+            }
+            // else dot is the decimal point — leave as-is
+        } elseif ($lastComma !== false) {
+            $afterComma = substr($num, $lastComma + 1);
+            if (strlen($afterComma) === 3) {
+                $num = str_replace(',', '', $num);
+            } else {
+                $num = str_replace(',', '.', $num);
+            }
+        }
+
+        return max(0.0, (float) $num);
     }
 
     public function clearProductsCache(string $catalogId, int $limit = 30, ?string $after = null): void
