@@ -17,6 +17,9 @@
         }
     </style>
 
+    {{-- Active locale (from LocalizationMiddleware / session) --}}
+    <script>window.__LOCALE__ = @json(app()->getLocale());</script>
+
     {{-- Which React page to mount (landing | privacy | terms | refund | docs) --}}
     <script>window.__PAGE__ = @json($page ?? 'landing');</script>
 
