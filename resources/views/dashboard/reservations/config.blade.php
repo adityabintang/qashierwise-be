@@ -50,7 +50,7 @@
         @include('components.dashboard-header', ['title' => 'Konfigurasi Reservasi', 'description' => 'Atur pengaturan reservasi untuk setiap toko'])
 
         <!-- Page Content -->
-        <main class="flex-1 p-4 md:p-6 lg:p-8">
+        <main class="p-4 md:p-6 lg:p-8">
             <div class="mx-auto max-w-7xl space-y-6">
 
                 <!-- Top bar: breadcrumb + status -->
@@ -573,8 +573,11 @@
                                             </div>
                                         </div>
 
-                                        <!-- Col 3: Message Preview (phone mockup) -->
-                                        <div class="p-6 flex flex-col bg-card">
+                                        <!-- Col 3: Message Preview (phone mockup).
+                                             self-start prevents the grid from stretching this cell
+                                             to match Col 2's height (which grows when params appear),
+                                             eliminating the white empty area below the phone mockup. -->
+                                        <div class="p-6 flex flex-col bg-card self-start w-full">
                                             <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-4">Pratinjau Pesan</p>
                                             <!-- Phone frame -->
                                             <div class="w-full rounded-[32px] border-[7px] border-slate-800 bg-slate-800 shadow-2xl overflow-hidden">
@@ -1018,6 +1021,16 @@ function configApp() {
             await this.loadGoogleCalendarStatus();
             this.syncReservationFeeDisplay();
 
+            // If returning from Google OAuth callback, clean up URL and
+            // show a success toast so the user knows it worked.
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('calendarConnected') === '1') {
+                window.history.replaceState({}, '', '/dashboard/reservations/config');
+                if (this.googleCalendar.connected) {
+                    this.$dispatch('toast', { message: '✅ Google Calendar berhasil terhubung!', type: 'success' });
+                }
+            }
+
             // Watch for store selection changes and load config automatically
             this.$watch('selectedStoreId', (value) => {
                 console.log('Store changed to:', value);
@@ -1282,14 +1295,15 @@ function configApp() {
 
                 const data = await response.json();
                 if (data.success) {
-                    // Get all templates first for debugging
                     const allTemplates = data.data || [];
-                    console.log('All templates:', allTemplates.map(t => ({ name: t.name, body_examples: t.body_examples })));
 
-                    // Only show templates that have body parameters
-                    this.templates = allTemplates.filter(t => t.body_examples && t.body_examples.length > 0);
-                    console.log('Filtered templates:', this.templates.map(t => t.name));
-                    console.log('Looking for template:', this.form.reminder_template);
+                    // Show templates whose body text contains at least one {{N}} parameter
+                    // placeholder. The `body_examples` field is often null even for
+                    // parametric templates, so we check the body text directly.
+                    this.templates = allTemplates.filter(t => /\{\{\d+\}\}/.test(t.body || ''));
+
+                    console.log('All templates:', allTemplates.map(t => t.name));
+                    console.log('Filtered (with params):', this.templates.map(t => t.name));
 
                     // If a template is already selected, extract its params
                     if (this.form.reminder_template) {
@@ -1780,7 +1794,8 @@ function configApp() {
                 const payload = {
                     to: this.testMessagePhone,
                     template_name: this.form.reminder_template,
-                    language: this.form.reminder_template_language || 'id',
+                    // Use the template's actual registered language, not the form default.
+                    language: template.language || this.form.reminder_template_language || 'en',
                 };
 
                 // Build body_params using the configured parameter mapping with sample data.
