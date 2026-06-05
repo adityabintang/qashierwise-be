@@ -121,7 +121,10 @@ class GoogleCalendarService
                 'location' => $reservation->store->address ?? '',
             ]);
 
-            $createdEvent = $service->events->insert('primary', $event);
+            // sendUpdates=all so the customer (added as an attendee) receives the
+            // Google Calendar invitation email — this is how the buyer's calendar
+            // gets marked without them going through OAuth.
+            $createdEvent = $service->events->insert('primary', $event, ['sendUpdates' => 'all']);
 
             Log::info('Calendar event created successfully', [
                 'reservation_id' => $reservation->id,
@@ -143,6 +146,51 @@ class GoogleCalendarService
             // Return a fallback ID so the reservation can still proceed
             return 'fallback_'.$reservation->id.'_'.time();
         }
+    }
+
+    /**
+     * Build a "Add to Google Calendar" template URL for the customer.
+     *
+     * This requires NO OAuth: the buyer simply opens the link and Google's
+     * "Save event" screen is pre-filled. It is the no-OAuth counterpart to the
+     * merchant's attendee-invite flow, and is delivered to the buyer over
+     * WhatsApp after a paid reservation.
+     *
+     * @see https://calendar.google.com/calendar/render?action=TEMPLATE
+     */
+    public function buildAddToCalendarUrl(Reservation $reservation): string
+    {
+        $timezone = $reservation->store->timezone ?? 'Asia/Jakarta';
+
+        // Mirror createEvent()'s time handling so the link matches the real event.
+        $start = $reservation->reservation_date instanceof \Carbon\Carbon
+            ? $reservation->reservation_date->copy()
+            : \Carbon\Carbon::parse((string) $reservation->reservation_date);
+        $start->setTimezone($timezone);
+
+        if ($reservation->reservation_time) {
+            $timeParts = explode(':', (string) $reservation->reservation_time);
+            $start->setTime((int) ($timeParts[0] ?? 12), (int) ($timeParts[1] ?? 0));
+        } else {
+            $start->setTime(12, 0);
+        }
+
+        $end = $start->copy()->addHours(2);
+
+        // Local wall-clock time + an explicit ctz param (Google reads dates as
+        // the calendar's timezone when ctz is supplied).
+        $dates = $start->format('Ymd\THis').'/'.$end->format('Ymd\THis');
+
+        $params = [
+            'action' => 'TEMPLATE',
+            'text' => 'Reservasi - '.$reservation->customer_name,
+            'dates' => $dates,
+            'ctz' => $timezone,
+            'details' => $this->buildEventDescription($reservation),
+            'location' => $reservation->store->address ?? '',
+        ];
+
+        return 'https://calendar.google.com/calendar/render?'.http_build_query($params);
     }
 
     /**
@@ -238,10 +286,20 @@ class GoogleCalendarService
 
     /**
      * Get OAuth authorization URL.
+     *
+     * @param  string|null  $state  Opaque value echoed back on the callback.
+     *                              Used to carry the merchant identity since
+     *                              this app is Bearer-token (not session) based.
      */
-    public function getAuthorizationUrl(): string
+    public function getAuthorizationUrl(?string $state = null): string
     {
-        return $this->getClient()->createAuthUrl();
+        $client = $this->getClient();
+
+        if ($state !== null) {
+            $client->setState($state);
+        }
+
+        return $client->createAuthUrl();
     }
 
     /**
