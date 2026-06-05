@@ -273,6 +273,11 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
     Route::prefix('reservation-config')->group(function () {
         Route::get('/', [ReservationConfigController::class, 'index']);
         Route::post('/generate-slots', [ReservationConfigController::class, 'generateSlots']);
+        // Static segments must precede the /{id} wildcard below.
+        Route::get('/catalog-products', [ReservationConfigController::class, 'catalogProducts']);
+        Route::get('/google-calendar-status', [ReservationConfigController::class, 'googleCalendarStatus']);
+        Route::get('/google-calendar/connect-url', [\App\Http\Controllers\Auth\GoogleOAuthController::class, 'connectUrl']);
+        Route::delete('/google-calendar', [\App\Http\Controllers\Auth\GoogleOAuthController::class, 'disconnectCalendar']);
         Route::post('/', [ReservationConfigController::class, 'store']);
         Route::get('/{id}', [ReservationConfigController::class, 'show']);
         Route::put('/{id}', [ReservationConfigController::class, 'update']);
