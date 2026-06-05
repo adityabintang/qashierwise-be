@@ -27,6 +27,15 @@
                     </div>
                 </template>
 
+                <!-- Docs Banner -->
+                <div class="flex items-center gap-3 p-4 mb-4 rounded-xl bg-blue-50 border border-blue-200 text-sm text-blue-800">
+                    <i class="fas fa-book-open text-blue-500 flex-shrink-0"></i>
+                    <span>Setelah mendaftar, Anda akan menerima email dari Xendit untuk menyelesaikan verifikasi akun.</span>
+                    <a href="/docs/merchant/registrasi-sub-merchant" target="_blank" class="ml-auto flex-shrink-0 font-medium underline hover:no-underline whitespace-nowrap">
+                        Panduan Lengkap →
+                    </a>
+                </div>
+
                 <!-- Registration Form -->
                 <template x-if="!alreadyRegistered">
                     <div class="card">
