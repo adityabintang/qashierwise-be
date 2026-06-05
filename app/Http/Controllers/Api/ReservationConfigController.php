@@ -10,6 +10,7 @@ use App\Models\ReservationConfig;
 use App\Models\Store;
 use App\Services\CatalogService;
 use App\Services\ReservationSlotGenerator;
+use App\Services\WhatsAppAccountService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -315,8 +316,11 @@ class ReservationConfigController extends Controller
      * from the locally-synced `catalog_products` mirror, scoped to that one
      * catalog — master Product and other (unbound) catalogs are never used.
      */
-    public function catalogProducts(Request $request, CatalogService $catalogService): JsonResponse
-    {
+    public function catalogProducts(
+        Request $request,
+        CatalogService $catalogService,
+        WhatsAppAccountService $waAccountService,
+    ): JsonResponse {
         $user = $request->user();
 
         if (! $user) {
@@ -327,35 +331,51 @@ class ReservationConfigController extends Controller
         }
 
         $effectiveUserId = $user->getEffectiveUserId();
-        $boundCatalogId = $catalogService->getBoundCatalogId($effectiveUserId);
+        $boundCatalogId  = $catalogService->getBoundCatalogId($effectiveUserId);
 
-        if (! $boundCatalogId) {
-            // No catalog is bound to this merchant yet — nothing to offer.
-            return response()->json([
-                'success' => true,
-                'data' => [],
-                'catalog_id' => null,
-            ]);
+        if ($boundCatalogId) {
+            $localCount = CatalogProduct::where('user_id', $effectiveUserId)
+                ->where('catalog_id', $boundCatalogId)
+                ->count();
+
+            // Bound catalog has never been synced locally — pull from Meta now
+            // so the reservation menu reflects the correct catalog immediately.
+            if ($localCount === 0) {
+                $account = $waAccountService->getActiveAccount($effectiveUserId);
+                if ($account) {
+                    try {
+                        $catalogService->syncCatalogProducts($account, $boundCatalogId, $effectiveUserId);
+                    } catch (\Throwable $e) {
+                        Log::warning('catalogProducts: auto-sync from Meta failed (non-fatal)', [
+                            'user_id'    => $effectiveUserId,
+                            'catalog_id' => $boundCatalogId,
+                            'error'      => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
         }
 
-        $products = CatalogProduct::where('user_id', $effectiveUserId)
-            ->where('catalog_id', $boundCatalogId)
+        $query = CatalogProduct::where('user_id', $effectiveUserId)
             ->where('is_available', true)
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+
+        $products = $boundCatalogId
+            ? (clone $query)->where('catalog_id', $boundCatalogId)->get()
+            : $query->get();
 
         return response()->json([
-            'success' => true,
+            'success'    => true,
             'catalog_id' => $boundCatalogId,
-            'data' => $products->map(fn ($product) => [
-                'id' => $product->id,
-                'name' => $product->name,
-                'price' => (float) $product->price,
-                'currency' => $product->currency,
+            'data'       => $products->map(fn ($product) => [
+                'id'          => $product->id,
+                'name'        => $product->name,
+                'price'       => (float) $product->price,
+                'currency'    => $product->currency,
                 'retailer_id' => $product->retailer_id,
-                'category' => $product->category,
-                'catalog_id' => $product->catalog_id,
-                'label' => "{$product->name} - Rp ".number_format((float) $product->price, 0, ',', '.'),
+                'category'    => $product->category,
+                'catalog_id'  => $product->catalog_id,
+                'label'       => "{$product->name} - Rp ".number_format((float) $product->price, 0, ',', '.'),
             ])->values(),
         ]);
     }
