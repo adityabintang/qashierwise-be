@@ -7,9 +7,11 @@ if (file_exists(__DIR__ . '/../../vendor/google/apiclient/src/aliases.php')) {
     require_once __DIR__ . '/../../vendor/google/apiclient/src/aliases.php';
 }
 
+use App\Models\BuyerCalendarToken;
 use App\Models\Reservation;
 use App\Models\User;
 use Exception;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 
 class GoogleCalendarService
@@ -83,11 +85,13 @@ class GoogleCalendarService
 
             $service = new \Google_Service_Calendar($client);
 
-            // Set event time with proper timezone handling
             $timezone = $reservation->store->timezone ?? 'Asia/Jakarta';
-            $startDateTime = $reservation->reservation_date->copy();
+            // reservation_date is cast as 'date' → UTC midnight in Carbon.
+            // Switch to the store's timezone BEFORE calling setTime() so that
+            // "18:00" means 18:00 WIB, not 18:00 UTC (which would be 01:00 WIB
+            // the following day when displayed in Google Calendar).
+            $startDateTime = $reservation->reservation_date->copy()->setTimezone($timezone);
 
-            // If reservation has specific time, use it; otherwise use 12:00
             if ($reservation->reservation_time) {
                 $timeParts = explode(':', $reservation->reservation_time);
                 $startDateTime->setTime((int) $timeParts[0], (int) $timeParts[1]);
@@ -193,6 +197,200 @@ class GoogleCalendarService
         return 'https://calendar.google.com/calendar/render?'.http_build_query($params);
     }
 
+    // ===========================================================
+    // Buyer calendar (customer-side OAuth)
+    // ===========================================================
+
+    /**
+     * TTL (seconds) for the signed state used in the buyer OAuth flow.
+     */
+    private const BUYER_STATE_TTL = 900;
+
+    /**
+     * Build the Google OAuth consent URL for a BUYER.
+     *
+     * The signed `state` carries the buyer's email + the reservation that
+     * triggered the connect request, so the callback can:
+     *   1. Store the token keyed by email.
+     *   2. Immediately create the calendar event for that reservation.
+     *
+     * Uses the narrower `calendar.events` scope — asks only for event
+     * creation/editing, not full calendar management.
+     */
+    public function getBuyerAuthUrl(string $buyerEmail, int $reservationId): string
+    {
+        $client = new \Google_Client;
+        $client->setClientId(config('services.google.client_id'));
+        $client->setClientSecret(config('services.google.client_secret'));
+        $client->setRedirectUri(config('services.google.buyer_redirect_uri'));
+        $client->addScope(\Google_Service_Calendar::CALENDAR_EVENTS);
+        $client->setAccessType('offline');
+        $client->setPrompt('consent');
+
+        $state = Crypt::encryptString(
+            implode('|', [$buyerEmail, $reservationId, time()])
+        );
+        $client->setState($state);
+
+        return $client->createAuthUrl();
+    }
+
+    /**
+     * Exchange the buyer's OAuth code for tokens and persist them.
+     * Returns the stored BuyerCalendarToken.
+     */
+    public function authenticateBuyer(string $code, string $state): BuyerCalendarToken
+    {
+        // Validate + decrypt state.
+        try {
+            $parts = explode('|', Crypt::decryptString($state), 3);
+        } catch (Exception $e) {
+            throw new Exception('Invalid or tampered OAuth state.');
+        }
+
+        [$email, $reservationId, $issuedAt] = array_pad($parts, 3, null);
+
+        if (! $email || (time() - (int) $issuedAt) > self::BUYER_STATE_TTL) {
+            throw new Exception('OAuth state expired or invalid.');
+        }
+
+        $client = new \Google_Client;
+        $client->setClientId(config('services.google.client_id'));
+        $client->setClientSecret(config('services.google.client_secret'));
+        $client->setRedirectUri(config('services.google.buyer_redirect_uri'));
+
+        $token = $client->fetchAccessTokenWithAuthCode($code);
+
+        if (isset($token['error'])) {
+            throw new Exception('Google OAuth failed: '.($token['error_description'] ?? $token['error']));
+        }
+
+        $stored = BuyerCalendarToken::updateOrCreate(
+            ['email' => strtolower(trim($email))],
+            [
+                'access_token' => json_encode($token),
+                'calendar_id'  => 'primary',
+            ]
+        );
+
+        Log::info('Buyer Google Calendar connected', [
+            'email'          => $email,
+            'reservation_id' => $reservationId,
+        ]);
+
+        return $stored;
+    }
+
+    /**
+     * Resolve the pending reservation_id from a buyer OAuth state string.
+     * Used by the callback to create the calendar event after storing the token.
+     */
+    public function reservationIdFromBuyerState(string $state): ?int
+    {
+        try {
+            $parts = explode('|', Crypt::decryptString($state), 3);
+            $id = $parts[1] ?? null;
+            return $id !== null ? (int) $id : null;
+        } catch (Exception) {
+            return null;
+        }
+    }
+
+    /**
+     * Create a Google Calendar event on the BUYER's calendar using their
+     * stored OAuth token. Returns the event ID, or null on failure.
+     */
+    public function createEventForBuyer(Reservation $reservation): ?string
+    {
+        $email = strtolower(trim((string) $reservation->email));
+        if (! $email) {
+            return null;
+        }
+
+        $stored = BuyerCalendarToken::findByEmail($email);
+        if (! $stored) {
+            return null;
+        }
+
+        try {
+            $client = new \Google_Client;
+            $client->setClientId(config('services.google.client_id'));
+            $client->setClientSecret(config('services.google.client_secret'));
+            $client->setRedirectUri(config('services.google.buyer_redirect_uri'));
+            $client->setAccessToken($stored->access_token);
+
+            if ($client->isAccessTokenExpired()) {
+                $refreshToken = $client->getRefreshToken();
+                if (! $refreshToken) {
+                    Log::warning('Buyer calendar token expired and no refresh token', [
+                        'email' => $email,
+                    ]);
+                    return null;
+                }
+                $newToken = $client->fetchAccessTokenWithRefreshToken($refreshToken);
+                $client->setAccessToken($newToken);
+                // Persist the refreshed token.
+                $stored->update(['access_token' => json_encode($newToken)]);
+            }
+
+            $service  = new \Google_Service_Calendar($client);
+            $timezone = $reservation->store->timezone ?? 'Asia/Jakarta';
+
+            $start = $reservation->reservation_date instanceof \Carbon\Carbon
+                ? $reservation->reservation_date->copy()
+                : \Carbon\Carbon::parse((string) $reservation->reservation_date);
+            $start->setTimezone($timezone);
+
+            if ($reservation->reservation_time) {
+                $timeParts = explode(':', (string) $reservation->reservation_time);
+                $start->setTime((int) ($timeParts[0] ?? 12), (int) ($timeParts[1] ?? 0));
+            } else {
+                $start->setTime(12, 0);
+            }
+
+            $end = $start->copy()->addHours(2);
+
+            $event = new \Google_Service_Calendar_Event([
+                'summary'     => 'Reservasi - '.($reservation->store?->name ?? 'Qashierwise'),
+                'description' => $this->buildEventDescription($reservation),
+                'start'       => [
+                    'dateTime' => $start->toRfc3339String(),
+                    'timeZone' => $timezone,
+                ],
+                'end' => [
+                    'dateTime' => $end->toRfc3339String(),
+                    'timeZone' => $timezone,
+                ],
+                'location'  => $reservation->store?->address ?? '',
+                'reminders' => [
+                    'useDefault' => false,
+                    'overrides'  => [
+                        ['method' => 'popup', 'minutes' => 60],
+                        ['method' => 'email', 'minutes' => 24 * 60],
+                    ],
+                ],
+            ]);
+
+            $created = $service->events->insert($stored->calendar_id, $event);
+
+            Log::info('Calendar event created on buyer calendar', [
+                'reservation_id' => $reservation->id,
+                'event_id'       => $created->getId(),
+                'buyer_email'    => $email,
+            ]);
+
+            return $created->getId();
+
+        } catch (Exception $e) {
+            Log::error('Failed to create calendar event on buyer calendar', [
+                'reservation_id' => $reservation->id,
+                'buyer_email'    => $email,
+                'error'          => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
     /**
      * Update an existing calendar event.
      */
@@ -220,9 +418,14 @@ class GoogleCalendarService
             $event->setSummary('Reservasi - '.$reservation->customer_name);
             $event->setDescription($this->buildEventDescription($reservation));
 
-            // Update time if changed
             $timezone = $reservation->store->timezone ?? 'Asia/Jakarta';
-            $startDateTime = $reservation->reservation_date->copy();
+            $startDateTime = $reservation->reservation_date->copy()->setTimezone($timezone);
+            if ($reservation->reservation_time) {
+                $tp = explode(':', $reservation->reservation_time);
+                $startDateTime->setTime((int) $tp[0], (int) ($tp[1] ?? 0));
+            } else {
+                $startDateTime->setTime(12, 0);
+            }
 
             $endDateTime = $startDateTime->copy()->addHours(2);
 
