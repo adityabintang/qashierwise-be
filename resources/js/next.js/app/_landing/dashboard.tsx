@@ -10,6 +10,7 @@ import {
   TruckIcon,
   UsersIcon,
 } from "./icons";
+import { t } from "../../lib/i18n";
 
 type TabKey = "inbox" | "orders" | "reservations";
 
@@ -72,13 +73,13 @@ export function Dashboard() {
     <section className="reveal mx-4 sm:mx-7 mb-24 rounded-[28px] sm:rounded-[36px] bg-gradient-to-b from-[#FAF8FE] to-[#F2EBFF] pt-14 sm:pt-20 px-5 sm:px-10 overflow-hidden relative">
       <div className="text-center max-w-[640px] mx-auto">
         <div className="inline-flex items-center gap-2 text-[13px] font-semibold tracking-wider text-purple-700 px-3 py-1.5 rounded-full border border-[rgba(124,58,237,0.18)] bg-white/60">
-          <SparkleIcon /> Console
+          <SparkleIcon /> {t.dashboard.eyebrow}
         </div>
         <h2 className="mt-4 font-extrabold leading-[1.05] -tracking-[0.03em] text-[clamp(32px,4vw,52px)]">
-          Satu dashboard untuk semua
+          {t.dashboard.title}
         </h2>
         <p className="mt-3 text-ink-500 font-medium leading-[1.5] text-[clamp(16px,1.4vw,19px)]">
-          Kelola chat, pesanan, reservasi, dan laporan dalam satu tampilan yang tenang.
+          {t.dashboard.subtitle}
         </p>
       </div>
 
