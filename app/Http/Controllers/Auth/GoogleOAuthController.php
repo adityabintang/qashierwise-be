@@ -72,7 +72,9 @@ class GoogleOAuthController extends Controller
      */
     public function handleGoogleCallback(Request $request): RedirectResponse
     {
-        $redirectTo = redirect('/dashboard/reservations/config');
+        // The ?calendarConnected=1 query param signals the Alpine component to
+        // re-fetch the calendar status and update its UI without a full reload.
+        $redirectTo = redirect('/dashboard/reservations/config?calendarConnected=1');
 
         if ($request->has('error')) {
             Log::warning('Google OAuth authorization denied', [
