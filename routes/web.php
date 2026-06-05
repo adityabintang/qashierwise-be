@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\GoogleOAuthController;
 use App\Http\Controllers\BlogController;
+use App\Http\Controllers\BuyerCalendarOAuthController;
 use App\Http\Controllers\DeliveryProofController;
 use App\Http\Controllers\MonitoringDashboardController;
 use App\Http\Controllers\QrisPaymentPageController;
@@ -131,11 +132,22 @@ Route::prefix('reservations')->name('reservation.')->group(function () {
         ->name('products');
 });
 
-// Google Calendar OAuth callback. Google redirects the browser here after
-// consent; the merchant is identified by the encrypted `state` param (this app
-// has no server session), so it must sit outside the localStorage-token guard.
+// Google Calendar OAuth callback — MERCHANT (identified via encrypted state).
 Route::get('/auth/google/callback', [GoogleOAuthController::class, 'handleGoogleCallback'])
     ->name('google.callback');
+
+// Google Calendar OAuth — BUYER (customer side, no auth required).
+// Buyer taps the link in their WhatsApp, connects once, future events auto-added.
+Route::get('/calendar/buyer/connect', [BuyerCalendarOAuthController::class, 'connect'])
+    ->name('buyer.calendar.connect');
+Route::get('/calendar/buyer/callback', [BuyerCalendarOAuthController::class, 'callback'])
+    ->name('buyer.calendar.callback');
+
+// Short alias for the buyer calendar connect URL.
+// /c/{code} → resolves to /calendar/buyer/connect using a cached token.
+Route::get('/c/{code}', [BuyerCalendarOAuthController::class, 'connectShort'])
+    ->name('buyer.calendar.connect.short')
+    ->where('code', '[a-zA-Z0-9]{6,12}');
 
 // Dashboard routes (protected by authentication middleware)
 Route::middleware(['web', 'check.web.auth', 'block.author.login'])->group(function () {
