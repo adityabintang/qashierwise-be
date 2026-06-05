@@ -149,6 +149,12 @@ Route::get('/c/{code}', [BuyerCalendarOAuthController::class, 'connectShort'])
     ->name('buyer.calendar.connect.short')
     ->where('code', '[a-zA-Z0-9]{6,12}');
 
+// Short alias for the reservation form pre-filled with catalog cart items + phone.
+// /r/{code} → resolves to /reservations/form?merchantName=...&prefill={...}
+Route::get('/r/{code}', [\App\Http\Controllers\ReservationShortLinkController::class, 'resolve'])
+    ->name('reservation.short')
+    ->where('code', '[a-zA-Z0-9]{6,12}');
+
 // Dashboard routes (protected by authentication middleware)
 Route::middleware(['web', 'check.web.auth', 'block.author.login'])->group(function () {
     Route::get('/dashboard', function () {
