@@ -84,4 +84,46 @@ class SendReservationNotificationTest extends TestCase
         $this->assertSame('reservation_notification', $message->metadata['source'] ?? null);
         $this->assertSame($reservation->id, $message->metadata['reservation_id'] ?? null);
     }
+
+    public function test_success_message_includes_add_to_google_calendar_link(): void
+    {
+        $reservation = Reservation::factory()->create([
+            'phone' => '081234567890',
+            'customer_name' => 'Siti',
+            'status' => Reservation::STATUS_CONFIRMED,
+        ]);
+
+        $account = WhatsAppAccount::factory()->create([
+            'user_id' => $reservation->user_id,
+            'phone_number_id' => '1234567890',
+            'is_active' => true,
+        ]);
+
+        $accountService = $this->createMock(WhatsAppAccountService::class);
+        $accountService->method('getActiveAccount')->willReturn($account);
+
+        $captured = null;
+        $apiResponse = new class
+        {
+            public function decodedBody(): array
+            {
+                return ['messages' => [['id' => 'wamid.cal.link.1']]];
+            }
+        };
+
+        $whatsAppMock = Mockery::mock('overload:Netflie\\WhatsAppCloudApi\\WhatsAppCloudApi');
+        $whatsAppMock->shouldReceive('sendTextMessage')
+            ->once()
+            ->andReturnUsing(function ($to, $message, $preview) use (&$captured, $apiResponse) {
+                $captured = $message;
+
+                return $apiResponse;
+            });
+
+        (new SendReservationNotification($reservation, 'success'))->handle($accountService);
+
+        $this->assertNotNull($captured);
+        $this->assertStringContainsString('Tambahkan ke Google Calendar', $captured);
+        $this->assertStringContainsString('https://calendar.google.com/calendar/render?', $captured);
+    }
 }
