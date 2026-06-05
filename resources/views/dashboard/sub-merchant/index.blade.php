@@ -63,6 +63,12 @@
                                 <i class="fas fa-user-plus mr-2"></i>
                                 {{ __('submerchant.register_now') }}
                             </a>
+                            <div class="mt-4">
+                                <a href="/docs/merchant/registrasi-sub-merchant" target="_blank" class="inline-flex items-center gap-2 text-sm text-[hsl(var(--primary))] hover:underline">
+                                    <i class="fas fa-book-open"></i>
+                                    Baca panduan registrasi sub-merchant
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </template>
@@ -129,6 +135,15 @@
                                     {{ __('submerchant.transaction_history') }} →
                                 </a>
                             </div>
+                        </div>
+
+                        <!-- Docs Banner -->
+                        <div class="flex items-center gap-3 p-4 rounded-xl bg-blue-50 border border-blue-200 text-sm text-blue-800">
+                            <i class="fas fa-book-open text-blue-500 flex-shrink-0"></i>
+                            <span>Belum selesai verifikasi Xendit? Ikuti panduan lengkap registrasi sub-merchant.</span>
+                            <a href="/docs/merchant/registrasi-sub-merchant" target="_blank" class="ml-auto flex-shrink-0 font-medium underline hover:no-underline whitespace-nowrap">
+                                Lihat Panduan →
+                            </a>
                         </div>
 
                         <!-- Quick Actions & Status -->
