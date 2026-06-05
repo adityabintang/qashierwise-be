@@ -393,26 +393,29 @@
                                 </div>
 
                                 <!-- Order Toggle - AFTER store selection -->
-                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl" :class="config.order_enabled && form.default_store_id ? 'bg-emerald-100 border border-emerald-400 shadow-sm shadow-emerald-100' : (form.default_store_id ? 'bg-emerald-50 border border-emerald-200' : 'bg-gray-50 border border-gray-200')">
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl"
+                                    :class="orderCatalogLocked || !form.default_store_id ? 'bg-gray-50 border border-gray-200 opacity-70' : (config.order_enabled ? 'bg-emerald-100 border border-emerald-400 shadow-sm shadow-emerald-100' : 'bg-emerald-50 border border-emerald-200')">
                                     <div class="flex-1">
-                                        <p class="font-medium" :class="config.order_enabled && form.default_store_id ? 'text-emerald-950' : (form.default_store_id ? 'text-emerald-900' : 'text-gray-600')">Enable Order via Chat</p>
-                                        <p class="text-sm" :class="config.order_enabled && form.default_store_id ? 'text-emerald-800' : (form.default_store_id ? 'text-emerald-700' : 'text-gray-500')">
-                                            <span x-show="form.default_store_id">Pelanggan bisa melihat produk, menambah ke keranjang, dan order langsung via chat</span>
+                                        <p class="font-medium" :class="config.order_enabled && !orderCatalogLocked && form.default_store_id ? 'text-emerald-950' : (orderCatalogLocked ? 'text-gray-600' : (form.default_store_id ? 'text-emerald-900' : 'text-gray-600'))">Enable Order via Chat</p>
+                                        <p class="text-sm" :class="config.order_enabled && !orderCatalogLocked && form.default_store_id ? 'text-emerald-800' : 'text-gray-500'">
                                             <span x-show="!form.default_store_id"><i class="fas fa-info-circle mr-1"></i>Pilih store terlebih dahulu untuk mengaktifkan fitur ini</span>
+                                            <span x-show="form.default_store_id && catalogs.length === 0"><i class="fas fa-lock mr-1"></i>Buat katalog terlebih dahulu untuk mengaktifkan fitur ini</span>
+                                            <span x-show="form.default_store_id && catalogs.length > 0 && orderCatalogLocked"><i class="fas fa-lock mr-1"></i>Katalog belum memiliki produk — tambahkan produk terlebih dahulu</span>
+                                            <span x-show="form.default_store_id && !orderCatalogLocked">Pelanggan bisa melihat produk, menambah ke keranjang, dan order langsung via chat</span>
                                         </p>
                                     </div>
                                     <button
                                         type="button"
-                                        @click="if(form.default_store_id) config.order_enabled = !config.order_enabled"
-                                        :disabled="!form.default_store_id"
+                                        @click="if(form.default_store_id && !orderCatalogLocked) config.order_enabled = !config.order_enabled"
+                                        :disabled="!form.default_store_id || orderCatalogLocked"
                                         :class="[
-                                            config.order_enabled && form.default_store_id ? 'bg-emerald-600 ring-2 ring-emerald-200' : 'bg-gray-300',
-                                            !form.default_store_id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                                            config.order_enabled && form.default_store_id && !orderCatalogLocked ? 'bg-emerald-600 ring-2 ring-emerald-200' : 'bg-gray-300',
+                                            (!form.default_store_id || orderCatalogLocked) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
                                         ]"
                                         class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 flex-shrink-0"
                                     >
                                         <span
-                                            :class="config.order_enabled && form.default_store_id ? 'translate-x-6' : 'translate-x-1'"
+                                            :class="config.order_enabled && form.default_store_id && !orderCatalogLocked ? 'translate-x-6' : 'translate-x-1'"
                                             class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md"
                                         ></span>
                                     </button>
@@ -907,6 +910,11 @@ function aiAgentApp() {
         hasSubMerchant: false,
         hasReservationConfig: false,
         catalogPlatformLocked: false,
+        get orderCatalogLocked() {
+            if (this.catalogs.length === 0) return true;
+            const selected = this.catalogs.find(c => String(c.id) === String(this.form.catalog_id));
+            return !selected || (selected.product_count || 0) === 0;
+        },
         deliveryMasterActive: true,
         togglingActive: false,
         togglingOrder: false,
@@ -914,6 +922,7 @@ function aiAgentApp() {
         stores: [],
         catalogs: [],
         catalogsLoading: false,
+        catalogLinkError: false,
         // Test send catalog state
         testCatalogPhone: '',
         testCatalogSending: false,
@@ -926,7 +935,6 @@ function aiAgentApp() {
             qris_enabled: false,
             reservation_enabled: false,
             delivery_enabled: false,
-            catalogLinkError: false,
             catalog_enabled: false,
         },
         form: {

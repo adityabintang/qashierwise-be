@@ -6,8 +6,9 @@ import { AnimatePresence, motion } from "motion/react";
 import { XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PlayIcon } from "./icons";
+import { t } from "../../lib/i18n";
 
-const VIDEO_SRC = "https://www.youtube.com/embed/vv2j4apjqQc?si=kpmyx80UUIlwgGvQ";
+const VIDEO_SRC = "https://www.youtube.com/embed/T3GZ8YVRRKs?si=5Yh9X0q7BnojdX-b";
 
 function VideoOverlay({ onClose }: { onClose: () => void }) {
   useEffect(() => {
@@ -36,7 +37,7 @@ function VideoOverlay({ onClose }: { onClose: () => void }) {
           type="button"
           onClick={onClose}
           className="absolute -top-14 right-0 rounded-full bg-neutral-900/50 p-2 text-white ring-1 ring-white/20 backdrop-blur-md hover:bg-neutral-900/80 transition-colors"
-          aria-label="Tutup video"
+          aria-label={t.demo.close}
         >
           <XIcon className="size-5" />
         </button>
@@ -78,7 +79,7 @@ export function DemoVideoButton({
         onClick={() => setIsOpen(true)}
         className={cn(base, variants[variant], className)}
       >
-        <PlayIcon /> Lihat Demo
+        <PlayIcon /> {t.demo.watch}
       </button>
 
       <AnimatePresence>

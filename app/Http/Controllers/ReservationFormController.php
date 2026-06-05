@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ReservationFormRequest;
-use App\Models\Product;
+use App\Models\CatalogProduct;
 use App\Models\Reservation;
 use App\Models\ReservationConfig;
 use App\Models\Store;
@@ -278,9 +278,6 @@ class ReservationFormController extends Controller
                 ]);
             }
 
-            $query = Product::where('user_id', $merchant->id)
-                ->where('is_active', true);
-
             $configuredProductIds = collect($config->available_products ?? [])
                 ->filter()
                 ->map(fn ($productId) => (int) $productId)
@@ -293,17 +290,23 @@ class ReservationFormController extends Controller
                 ]);
             }
 
-            $query->whereIn('id', $configuredProductIds->all());
-
-            $products = $query->get();
+            // Products are scoped by user_id + the IDs the merchant explicitly
+            // configured in available_products. No bound-catalog filter here —
+            // the merchant chose these IDs regardless of which WA catalog is
+            // currently active, so they should always be shown if available.
+            $products = CatalogProduct::where('user_id', $merchant->id)
+                ->where('is_available', true)
+                ->whereIn('id', $configuredProductIds->all())
+                ->get();
 
             return response()->json([
                 'success' => true,
                 'data' => $products->map(fn ($product) => [
-                    'id' => $product->id,
-                    'name' => $product->name,
-                    'price' => $product->price,
-                    'label' => "{$product->name} - Rp ".number_format($product->price, 0, ',', '.'),
+                    'id'          => $product->id,
+                    'name'        => $product->name,
+                    'price'       => $product->price,
+                    'retailer_id' => $product->retailer_id,
+                    'label'       => "{$product->name} - Rp ".number_format((float) $product->price, 0, ',', '.'),
                 ])->values(),
             ]);
 

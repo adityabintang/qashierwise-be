@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\Auth\GoogleOAuthController;
 use App\Http\Controllers\BlogController;
+use App\Http\Controllers\BuyerCalendarOAuthController;
 use App\Http\Controllers\DeliveryProofController;
 use App\Http\Controllers\MonitoringDashboardController;
 use App\Http\Controllers\QrisPaymentPageController;
@@ -31,6 +33,13 @@ Route::get('/', function () {
         'description' => 'QashierWise menghadirkan Chatbot WhatsApp berbasis AI untuk restoran — Inbox, Pesanan, Reservasi, Menu, dan CRM dalam satu Console.',
     ]);
 });
+
+// Admin CMS (React SPA, replaces the Filament panel). The SPA handles its own
+// client-side routing + auth gating; all data goes through /api/admin/* which is
+// protected by Sanctum + EnsureCanAccessAdmin. The shell itself carries no data.
+Route::get('/admin/{any?}', function () {
+    return view('react.admin');
+})->where('any', '.*')->name('admin');
 
 // Public blog routes
 Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
@@ -122,6 +131,29 @@ Route::prefix('reservations')->name('reservation.')->group(function () {
     Route::get('/products', [ReservationFormController::class, 'getAvailableProducts'])
         ->name('products');
 });
+
+// Google Calendar OAuth callback — MERCHANT (identified via encrypted state).
+Route::get('/auth/google/callback', [GoogleOAuthController::class, 'handleGoogleCallback'])
+    ->name('google.callback');
+
+// Google Calendar OAuth — BUYER (customer side, no auth required).
+// Buyer taps the link in their WhatsApp, connects once, future events auto-added.
+Route::get('/calendar/buyer/connect', [BuyerCalendarOAuthController::class, 'connect'])
+    ->name('buyer.calendar.connect');
+Route::get('/calendar/buyer/callback', [BuyerCalendarOAuthController::class, 'callback'])
+    ->name('buyer.calendar.callback');
+
+// Short alias for the buyer calendar connect URL.
+// /c/{code} → resolves to /calendar/buyer/connect using a cached token.
+Route::get('/c/{code}', [BuyerCalendarOAuthController::class, 'connectShort'])
+    ->name('buyer.calendar.connect.short')
+    ->where('code', '[a-zA-Z0-9]{6,12}');
+
+// Short alias for the reservation form pre-filled with catalog cart items + phone.
+// /r/{code} → resolves to /reservations/form?merchantName=...&prefill={...}
+Route::get('/r/{code}', [\App\Http\Controllers\ReservationShortLinkController::class, 'resolve'])
+    ->name('reservation.short')
+    ->where('code', '[a-zA-Z0-9]{6,12}');
 
 // Dashboard routes (protected by authentication middleware)
 Route::middleware(['web', 'check.web.auth', 'block.author.login'])->group(function () {

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ReservationResource;
 use App\Models\Reservation;
+use App\Services\ReservationFulfillmentService;
 use App\Services\ReservationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -14,7 +15,8 @@ use Illuminate\Support\Facades\Log;
 class ReservationController extends Controller
 {
     public function __construct(
-        protected ReservationService $reservationService
+        protected ReservationService $reservationService,
+        protected ReservationFulfillmentService $fulfillment,
     ) {}
 
     /**
@@ -126,6 +128,17 @@ class ReservationController extends Controller
 
         try {
             $this->reservationService->completeReservation($reservation);
+
+            // Send customer: "merchant confirmed" message + Google Calendar link.
+            // Non-fatal — a notification failure must not block the status update.
+            try {
+                $this->fulfillment->onMerchantComplete($reservation->fresh(['store', 'table', 'user']));
+            } catch (\Throwable $e) {
+                Log::warning('Failed to send reservation completion notification (non-fatal)', [
+                    'reservation_id' => $reservation->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             return response()->json([
                 'success' => true,

@@ -62,6 +62,7 @@ class Reservation extends Model
         'status',
         'order_id',
         'calendar_event_id',
+        'pos_order_id',
         'notified_at',
         'cancelled_reason',
         'scheduled_reminder_jobs',
@@ -116,6 +117,14 @@ class Reservation extends Model
     public function qrisTransaction(): BelongsTo
     {
         return $this->belongsTo(QrisTransaction::class);
+    }
+
+    /**
+     * The POS Order created for visibility/invoicing after payment is confirmed.
+     */
+    public function posOrder(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Order::class, 'pos_order_id');
     }
 
     /**

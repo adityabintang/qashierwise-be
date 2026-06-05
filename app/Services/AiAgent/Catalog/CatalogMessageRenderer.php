@@ -518,6 +518,7 @@ class CatalogMessageRenderer
         WhatsAppAccount $account,
         WhatsAppContact $contact,
         AiAgent $aiAgent,
+        ?AiAgentConversation $conversation = null,
     ): void {
         $client = $this->client($account);
 
@@ -528,15 +529,51 @@ class CatalogMessageRenderer
             return;
         }
 
-        $url = $aiAgent->getReservationFormUrl();
-        if ($url) {
-            $this->sendText($client, $contact->wa_id,
-                "📅 *Reservasi*\n\nSilakan isi form reservasi di link berikut:\n{$url}\n\n"
-                .'Tim kami akan menghubungi Anda untuk konfirmasi.');
-        } else {
+        $baseUrl = $aiAgent->getReservationFormUrl();
+        if (! $baseUrl) {
             $this->sendText($client, $contact->wa_id,
                 '📅 Untuk reservasi, silakan hubungi kami langsung. Tim kami akan membantu.');
+
+            return;
         }
+
+        // Build a short link that pre-fills the form with the buyer's cart items
+        // and phone number so they don't have to re-enter what they already chose.
+        $catalogItems = $conversation ? $conversation->getCatalogItems() : [];
+        $phone        = $contact->wa_id ?? '';
+        $url          = $this->buildReservationShortLink($baseUrl, $catalogItems, $phone);
+
+        $this->sendText($client, $contact->wa_id,
+            "📅 *Reservasi*\n\nSilakan isi form reservasi di link berikut:\n{$url}\n\n"
+            .'Tim kami akan menghubungi Anda untuk konfirmasi.');
+    }
+
+    /**
+     * Generate a short /r/{8-char} link that caches:
+     *   - The reservation form base URL (with merchantName)
+     *   - The buyer's cart items from the catalog (retailer_id, name, qty, price)
+     *   - The buyer's phone number (wa_id)
+     * When opened, the form auto-fills phone + product selection.
+     */
+    protected function buildReservationShortLink(string $baseUrl, array $catalogItems, string $phone): string
+    {
+        $payload = [
+            'base_url' => $baseUrl,
+            'phone'    => $phone,
+            'items'    => $catalogItems,
+        ];
+
+        $chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
+        do {
+            $code = '';
+            for ($i = 0; $i < 8; $i++) {
+                $code .= $chars[random_int(0, strlen($chars) - 1)];
+            }
+        } while (\Illuminate\Support\Facades\Cache::has("rsv_link:{$code}"));
+
+        \Illuminate\Support\Facades\Cache::put("rsv_link:{$code}", $payload, now()->addHours(5));
+
+        return rtrim(config('app.url'), '/').'/r/'.$code;
     }
 
     /**

@@ -184,7 +184,24 @@ class SendReservationNotification implements ShouldQueue
             $message .= "\n⚠️ *Pelunasan di tempat pada hari H*\n";
         }
 
-        $message .= "\n📧 Undangan kalender telah dikirim ke email Anda.\n";
+        // Buyer calendar marking (no OAuth needed): a tap-to-save Google Calendar
+        // link. If the merchant has connected their Google Calendar, the buyer
+        // also receives a formal email invitation (attendee + sendUpdates=all).
+        try {
+            $calendarUrl = app(\App\Services\GoogleCalendarService::class)
+                ->buildAddToCalendarUrl($this->reservation);
+            $message .= "\n📅 *Tambahkan ke Google Calendar Anda:*\n{$calendarUrl}\n";
+        } catch (\Throwable $e) {
+            Log::warning('Failed to build add-to-calendar link for reservation', [
+                'reservation_id' => $this->reservation->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        if ($this->reservation->user?->google_calendar_refresh_token) {
+            $message .= "\n📧 Undangan kalender juga telah dikirim ke email Anda.\n";
+        }
+
         $message .= "\nTerima kasih! 🙏";
 
         return $message;

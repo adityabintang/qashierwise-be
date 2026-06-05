@@ -3,14 +3,7 @@
 import { useState } from "react";
 import { ChevIcon } from "./icons";
 import { Container, SectionHead } from "./section-shared";
-
-const items = [
-  { q: "Apa itu QashierWise?", a: "QashierWise adalah platform Chatbot WhatsApp berbasis AI + sistem reservasi & pembayaran QRIS, dirancang khusus untuk restoran di Indonesia." },
-  { q: "Apakah perlu aplikasi terpisah untuk pelanggan?", a: "Tidak. Pelanggan cukup chat via WhatsApp — tanpa download app baru. Staff Anda menggunakan satu Console berbasis web." },
-  { q: "Bagaimana pembayaran dilakukan?", a: "Pembayaran via QRIS yang terintegrasi dengan Midtrans, Xendit, atau OkeOce. Anda juga bisa terima 'bayar di tempat' tanpa biaya." },
-  { q: "Apakah bisa multi-outlet atau multi-nomor?", a: "Bisa pada paket Pro+. Satu Console bisa menangani beberapa outlet, masing-masing dengan nomor WhatsApp dan menu yang terpisah." },
-  { q: "Apakah ada masa percobaan?", a: "Ya. Anda bisa mencoba semua fitur Pro selama 14 hari — tanpa kartu kredit. Setelah trial, downgrade ke Basic atau lanjut ke Pro." },
-];
+import { t } from "../../lib/i18n";
 
 export function FAQ() {
   const [open, setOpen] = useState<number>(0);
@@ -18,9 +11,9 @@ export function FAQ() {
   return (
     <section id="faq" className="pt-10 pb-24">
       <Container>
-        <SectionHead eyebrowText="FAQ" title="Pertanyaan yang sering diajukan" subtitle="Semua dalam Bahasa Indonesia." />
+        <SectionHead eyebrowText={t.faq.eyebrow} title={t.faq.title} subtitle={t.faq.subtitle} />
         <div className="max-w-[720px] mx-auto reveal">
-          {items.map((it, i) => {
+          {t.faq.items.map((it, i) => {
             const isOpen = open === i;
             return (
               <div

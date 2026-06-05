@@ -101,9 +101,11 @@
                     {{-- 1. Proof photo --}}
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">1. Foto Bukti Pengantaran @if($proofRequired)<span class="text-red-500">*</span>@else<span class="text-gray-400 text-xs font-normal">(opsional)</span>@endif</label>
-                        <input type="file" name="proof" accept="image/*" capture="environment" @if($proofRequired) required @endif x-ref="proof"
+                        {{-- No `capture` attribute: on mobile this lets the driver choose camera OR gallery
+                             (with `capture` the OS forces the camera and hides the gallery). Desktop ignores it. --}}
+                        <input type="file" name="proof" accept="image/*" @if($proofRequired) required @endif x-ref="proof"
                                class="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-purple-600 file:text-white file:text-sm file:font-medium">
-                        <p class="text-xs text-gray-400 mt-1">Foto barang saat diserahkan ke pembeli. Foto otomatis dikompres sebelum dikirim.</p>
+                        <p class="text-xs text-gray-400 mt-1">Foto barang saat diserahkan ke pembeli — bisa ambil foto langsung atau pilih dari galeri. Foto otomatis dikompres sebelum dikirim.</p>
                     </div>
 
                     {{-- 2. Delivery location (interactive map) --}}

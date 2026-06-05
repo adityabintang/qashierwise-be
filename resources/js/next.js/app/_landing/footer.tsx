@@ -1,24 +1,10 @@
 import { IgIcon, TtIcon, YtIcon } from "./icons";
 import { Container } from "./section-shared";
+import { t } from "../../lib/i18n";
 
-const navLinks = [
-  { href: "/#features", label: "Fitur" },
-  { href: "/#pricing", label: "Harga" },
-  { href: "/#about", label: "Tentang Kami" },
-  { href: "/#faq", label: "FAQ" },
-];
-
-const legalLinks = [
-  { href: "/privacy-policy", label: "Kebijakan Privasi" },
-  { href: "/terms-of-service", label: "Ketentuan Layanan" },
-  { href: "/refund-policy", label: "Kebijakan Pengembalian" },
-];
-
-const productLinks = [
-  { href: "#", label: "QashierWise Console" },
-  { href: "#", label: "Chatbot WhatsApp" },
-  { href: "#", label: "QRIS Integration" },
-];
+const navHrefs = ["/#features", "/#pricing", "/#about", "/#faq"];
+const legalHrefs = ["/privacy-policy", "/terms-of-service", "/refund-policy"];
+const productHrefs = ["#", "#", "#"];
 
 export function Footer() {
   return (
@@ -33,10 +19,10 @@ export function Footer() {
               <span>QashierWise</span>
             </div>
             <p className="mt-3.5 text-ink-500 text-sm leading-[1.55] max-w-[280px]">
-              Cara gratis 14 hari. QashierWise membantu restoran menerima reservasi & order via WhatsApp dengan mudah.
+              {t.footer.tagline}
             </p>
             <div className="mt-4 text-[13px] text-ink-500">
-              <div className="font-bold text-ink-700 mb-1">Alamat</div>
+              <div className="font-bold text-ink-700 mb-1">{t.footer.addressLabel}</div>
               Jl. Widosari No. 55, Tegalrejo Raya
               <br />
               Salatiga, Jawa Tengah, Indonesia 50733
@@ -44,17 +30,17 @@ export function Footer() {
           </div>
 
           {[
-            { title: "Navigasi", links: navLinks },
-            { title: "Legal", links: legalLinks },
-            { title: "Produk", links: productLinks },
+            { title: t.footer.colNav, labels: t.footer.navLinks, hrefs: navHrefs },
+            { title: t.footer.colLegal, labels: t.footer.legalLinks, hrefs: legalHrefs },
+            { title: t.footer.colProduct, labels: t.footer.productLinks, hrefs: productHrefs },
           ].map((col) => (
             <div key={col.title}>
               <h4 className="text-[13px] font-bold mb-3.5 tracking-[0.04em] uppercase text-ink-400">{col.title}</h4>
               <ul className="list-none p-0 m-0 grid gap-2.5">
-                {col.links.map((l) => (
-                  <li key={l.label}>
-                    <a href={l.href} className="text-[14.5px] text-ink-700 hover:text-purple-700 transition-colors">
-                      {l.label}
+                {col.labels.map((label, i) => (
+                  <li key={label}>
+                    <a href={col.hrefs[i]} className="text-[14.5px] text-ink-700 hover:text-purple-700 transition-colors">
+                      {label}
                     </a>
                   </li>
                 ))}
@@ -64,7 +50,7 @@ export function Footer() {
         </div>
 
         <div className="mt-12 pt-6 border-t border-ink-100 flex justify-between items-center text-[13px] text-ink-400 flex-wrap gap-3">
-          <div>© 2026 QashierWise by Aditya Bintang Fadila. All Rights Reserved.</div>
+          <div>{t.footer.rights}</div>
           <div className="flex gap-2">
             {[IgIcon, TtIcon, YtIcon].map((Icon, i) => (
               <a

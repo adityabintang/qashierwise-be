@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\Product;
+use App\Models\CatalogProduct;
 use App\Models\Reservation;
 use App\Models\ReservationConfig;
 use App\Models\Store;
@@ -299,7 +299,12 @@ class ReservationService
         $selectedProducts = $this->normalizeSelectedProducts($data['selected_products'] ?? null);
 
         if ($selectedProducts !== []) {
-            $productMap = Product::whereIn('id', collect($selectedProducts)->pluck('id'))
+            // Products are scoped by user_id only — the merchant explicitly
+            // configured which IDs to allow in available_products config.
+            // No bound-catalog filter: price comes from the merchant's own
+            // catalog_products, and the submitted IDs are validated on entry.
+            $productMap = CatalogProduct::whereIn('id', collect($selectedProducts)->pluck('id'))
+                ->where('user_id', $config->user_id)
                 ->get()
                 ->keyBy('id');
 

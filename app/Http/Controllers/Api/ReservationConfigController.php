@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\BulkTimeSlotGenerateRequest;
 use App\Http\Resources\ReservationConfigResource;
+use App\Models\CatalogProduct;
 use App\Models\ReservationConfig;
 use App\Models\Store;
+use App\Services\CatalogService;
 use App\Services\ReservationSlotGenerator;
+use App\Services\WhatsAppAccountService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -107,7 +110,7 @@ class ReservationConfigController extends Controller
             'available_tables' => 'nullable|array',
             'available_tables.*' => 'nullable|integer',
             'available_products' => 'nullable|array',
-            'available_products.*' => 'nullable|integer',
+            'available_products.*' => 'nullable|integer|exists:catalog_products,id',
             'enable_menu_selection' => 'boolean',
             'require_menu_selection' => 'boolean',
             // Reminder fields
@@ -219,7 +222,7 @@ class ReservationConfigController extends Controller
             'available_tables' => 'nullable|array',
             'available_tables.*' => 'nullable|integer',
             'available_products' => 'nullable|array',
-            'available_products.*' => 'nullable|integer',
+            'available_products.*' => 'nullable|integer|exists:catalog_products,id',
             'enable_menu_selection' => 'boolean',
             'require_menu_selection' => 'boolean',
             // Reminder fields
@@ -305,6 +308,105 @@ class ReservationConfigController extends Controller
                 'message' => __('dashboard.reservation.config_delete_failed'),
             ], 500);
         }
+    }
+
+    /**
+     * List products from the merchant's BOUND Meta Catalog (the catalog linked
+     * to their AiAgent) so they can be attached to a reservation menu. Sourced
+     * from the locally-synced `catalog_products` mirror, scoped to that one
+     * catalog — master Product and other (unbound) catalogs are never used.
+     */
+    public function catalogProducts(
+        Request $request,
+        CatalogService $catalogService,
+        WhatsAppAccountService $waAccountService,
+    ): JsonResponse {
+        $user = $request->user();
+
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
+        $effectiveUserId = $user->getEffectiveUserId();
+        $boundCatalogId  = $catalogService->getBoundCatalogId($effectiveUserId);
+
+        if ($boundCatalogId) {
+            $localCount = CatalogProduct::where('user_id', $effectiveUserId)
+                ->where('catalog_id', $boundCatalogId)
+                ->count();
+
+            // Bound catalog has never been synced locally — pull from Meta now
+            // so the reservation menu reflects the correct catalog immediately.
+            if ($localCount === 0) {
+                $account = $waAccountService->getActiveAccount($effectiveUserId);
+                if ($account) {
+                    try {
+                        $catalogService->syncCatalogProducts($account, $boundCatalogId, $effectiveUserId);
+                    } catch (\Throwable $e) {
+                        Log::warning('catalogProducts: auto-sync from Meta failed (non-fatal)', [
+                            'user_id'    => $effectiveUserId,
+                            'catalog_id' => $boundCatalogId,
+                            'error'      => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+        }
+
+        $query = CatalogProduct::where('user_id', $effectiveUserId)
+            ->where('is_available', true)
+            ->orderBy('name');
+
+        $products = $boundCatalogId
+            ? (clone $query)->where('catalog_id', $boundCatalogId)->get()
+            : $query->get();
+
+        return response()->json([
+            'success'    => true,
+            'catalog_id' => $boundCatalogId,
+            'data'       => $products->map(fn ($product) => [
+                'id'          => $product->id,
+                'name'        => $product->name,
+                'price'       => (float) $product->price,
+                'currency'    => $product->currency,
+                'retailer_id' => $product->retailer_id,
+                'category'    => $product->category,
+                'catalog_id'  => $product->catalog_id,
+                'label'       => "{$product->name} - Rp ".number_format((float) $product->price, 0, ',', '.'),
+            ])->values(),
+        ]);
+    }
+
+    /**
+     * Report whether the merchant has connected Google Calendar (used by the
+     * reservation config UI to show connect/disconnect state).
+     */
+    public function googleCalendarStatus(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
+        // Calendar is connected per master account (effective user).
+        $owner = $user->getEffectiveUserId() === $user->id
+            ? $user
+            : \App\Models\User::find($user->getEffectiveUserId());
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'connected' => ! empty($owner?->google_calendar_refresh_token),
+                'email' => $owner?->google_calendar_email,
+            ],
+        ]);
     }
 
     /**

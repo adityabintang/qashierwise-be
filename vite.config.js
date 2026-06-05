@@ -17,6 +17,8 @@ export default defineConfig({
                 'resources/js/apexcharts.js',
                 // React island: public landing + legal pages (ported from Next.js)
                 'resources/js/next.js/main.tsx',
+                // React admin (blog CMS) — replaces the Filament panel
+                'resources/js/next.js/admin.tsx',
             ],
             refresh: true,
         }),
