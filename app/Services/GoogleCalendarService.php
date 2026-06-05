@@ -102,9 +102,9 @@ class GoogleCalendarService
             $endDateTime = $startDateTime->copy()->addHours(2);
 
             $event = new \Google_Service_Calendar_Event([
-                'summary' => 'Reservasi - '.$reservation->customer_name,
+                'summary'     => 'Reservasi - '.$reservation->store->name,
                 'description' => $this->buildEventDescription($reservation),
-                'start' => [
+                'start'       => [
                     'dateTime' => $startDateTime->toRfc3339String(),
                     'timeZone' => $timezone,
                 ],
@@ -112,23 +112,19 @@ class GoogleCalendarService
                     'dateTime' => $endDateTime->toRfc3339String(),
                     'timeZone' => $timezone,
                 ],
-                'attendees' => [
-                    ['email' => $reservation->email],
-                ],
                 'reminders' => [
                     'useDefault' => false,
-                    'overrides' => [
+                    'overrides'  => [
                         ['method' => 'email', 'minutes' => 24 * 60],
-                        ['method' => 'popup', 'minutes' => 60],
+                        ['method' => 'popup',  'minutes' => 60],
                     ],
                 ],
                 'location' => $reservation->store->address ?? '',
             ]);
 
-            // sendUpdates=all so the customer (added as an attendee) receives the
-            // Google Calendar invitation email — this is how the buyer's calendar
-            // gets marked without them going through OAuth.
-            $createdEvent = $service->events->insert('primary', $event, ['sendUpdates' => 'all']);
+            // No attendees, no sendUpdates — buyer calendar is handled exclusively
+            // via OAuth (createEventForBuyer). Email invites caused duplicate events.
+            $createdEvent = $service->events->insert('primary', $event, ['sendUpdates' => 'none']);
 
             Log::info('Calendar event created successfully', [
                 'reservation_id' => $reservation->id,
