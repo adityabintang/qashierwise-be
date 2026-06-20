@@ -67,6 +67,11 @@ COPY docker/nginx.conf /etc/nginx/sites-available/default
 # Copy supervisor config
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
+# Configure PHP for large file uploads
+RUN echo "post_max_size = 50M" >> /usr/local/etc/php/conf.d/uploads.ini && \
+    echo "upload_max_filesize = 50M" >> /usr/local/etc/php/conf.d/uploads.ini && \
+    echo "memory_limit = 256M" >> /usr/local/etc/php/conf.d/uploads.ini
+
 # Build assets
 RUN npm run build && rm -rf node_modules
 
