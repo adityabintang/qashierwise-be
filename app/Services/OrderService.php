@@ -40,6 +40,7 @@ class OrderService
         $data['tax_amount'] = 0;
         $data['discount_amount'] = 0;
         $data['total'] = 0;
+        $data['ongkir'] = $data['ongkir'] ?? 0;
 
         $order = Order::create($data);
 
@@ -146,7 +147,7 @@ class OrderService
         $taxAmount = round($taxableAmount * self::DEFAULT_TAX_RATE, 2);
 
         // Calculate total
-        $total = $subtotal + $taxAmount - $order->discount_amount;
+        $total = $subtotal + $taxAmount - $order->discount_amount + $order->ongkir;
 
         // Update order
         $order->subtotal = $subtotal;

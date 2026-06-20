@@ -1,4 +1,5 @@
 @extends('layouts.app')
+@include('components.dashboard-scripts')
 
 @section('title', __('submerchant.dashboard_title'))
 
@@ -62,6 +63,12 @@
                                 <i class="fas fa-user-plus mr-2"></i>
                                 {{ __('submerchant.register_now') }}
                             </a>
+                            <div class="mt-4">
+                                <a href="/docs/merchant/registrasi-sub-merchant" target="_blank" class="inline-flex items-center gap-2 text-sm text-[hsl(var(--primary))] hover:underline">
+                                    <i class="fas fa-book-open"></i>
+                                    Baca panduan registrasi sub-merchant
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </template>
@@ -130,6 +137,15 @@
                             </div>
                         </div>
 
+                        <!-- Docs Banner -->
+                        <div class="flex items-center gap-3 p-4 rounded-xl bg-blue-50 border border-blue-200 text-sm text-blue-800">
+                            <i class="fas fa-book-open text-blue-500 flex-shrink-0"></i>
+                            <span>Belum selesai verifikasi Xendit? Ikuti panduan lengkap registrasi sub-merchant.</span>
+                            <a href="/docs/merchant/registrasi-sub-merchant" target="_blank" class="ml-auto flex-shrink-0 font-medium underline hover:no-underline whitespace-nowrap">
+                                Lihat Panduan →
+                            </a>
+                        </div>
+
                         <!-- Quick Actions & Status -->
                         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <!-- Quick Actions -->
@@ -140,7 +156,8 @@
                                 </div>
                                 <div class="card-content">
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <a href="/dashboard/sub-merchant/provider-settings" class="flex items-center gap-4 p-4 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors">
+                                        <!-- Provider Settings - Temporarily Hidden -->
+                                        <a href="/dashboard/sub-merchant/provider-settings" class="hidden flex items-center gap-4 p-4 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors">
                                             <div class="h-12 w-12 rounded-xl bg-purple-500 flex items-center justify-center">
                                                 <i class="fas fa-cogs text-xl text-white"></i>
                                             </div>

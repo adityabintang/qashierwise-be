@@ -14,7 +14,7 @@ return new class extends Migration
         if (Schema::hasTable('whatsapp_accounts')) {
             return;
         }
-        
+
         Schema::create('whatsapp_accounts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');

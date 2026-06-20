@@ -20,7 +20,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (Schema::hasTable('roles')) { return; }
+        if (Schema::hasTable('roles')) {
+            return;
+        }
         // Check if old roles table exists
         if (Schema::hasTable('roles')) {
             // First, drop foreign key constraints that depend on roles table

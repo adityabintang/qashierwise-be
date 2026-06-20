@@ -289,16 +289,48 @@ class WhatsAppFlowService
     /**
      * Send a reservation flow message to a customer
      */
-    public function sendReservationFlow(int $userId, string $phoneNumber, string $flowId): array
-    {
+    public function sendReservationFlow(
+        int $userId,
+        string $phoneNumber,
+        ?string $flowId = null,
+        ?string $flowName = null,
+        string $flowMode = 'published',
+        string $flowCta = 'Buat Reservasi',
+        string $flowAction = 'data_exchange',
+        array $flowActionPayload = []
+    ): array {
         $account = $this->accountService->getActiveAccount($userId);
 
         if (! $account) {
             throw new \Exception('No active WhatsApp account found');
         }
 
+        if (empty($flowId) && empty($flowName)) {
+            throw new \InvalidArgumentException('Flow ID atau Flow Name wajib diisi');
+        }
+
         // Flow token format: {user_id}_{uuid} for extracting user context in endpoint
         $flowToken = $userId.'_'.Str::uuid()->toString();
+
+        $flowParameters = [
+            'flow_message_version' => '3',
+            'flow_token' => $flowToken,
+            'flow_cta' => $flowCta,
+            'flow_action' => $flowAction,
+            'flow_action_payload' => $flowActionPayload,
+        ];
+
+        if (! empty($flowId)) {
+            $flowParameters['flow_id'] = $flowId;
+        }
+
+        if (! empty($flowName)) {
+            $flowParameters['flow_name'] = $flowName;
+        }
+
+        if ($flowMode === 'draft') {
+            $flowParameters['flow_mode'] = 'draft';
+        }
 
         $response = Http::withToken($account->access_token)
             ->post("https://graph.facebook.com/v21.0/{$account->phone_number_id}/messages", [
@@ -320,13 +352,7 @@ class WhatsAppFlowService
                     ],
                     'action' => [
                         'name' => 'flow',
-                        'parameters' => [
-                            'flow_message_version' => '3',
-                            'flow_token' => $flowToken,
-                            'flow_id' => $flowId,
-                            'flow_cta' => 'Buat Reservasi',
-                            'flow_action' => 'data_exchange',
-                        ],
+                        'parameters' => $flowParameters,
                     ],
                 ],
             ]);
@@ -520,7 +546,7 @@ class WhatsAppFlowService
             "Reservasi atas nama %s untuk %d tamu pada %s jam %s telah diterima.\n\nStatus: Menunggu konfirmasi\nKode: #RES%06d",
             $reservation->customer_name,
             $reservation->guest_count,
-            $reservation->reservation_date->format('d M Y'),
+            $reservation->reservation_time->format('d M Y'),
             $reservation->reservation_time->format('H:i'),
             $reservation->id
         );
@@ -795,7 +821,7 @@ class WhatsAppFlowService
 
         // Get booked times for this date
         $bookedTimes = Reservation::where('user_id', $userId)
-            ->whereDate('reservation_date', $date)
+            ->whereDate('reservation_time', $date)
             ->whereIn('status', ['pending', 'confirmed'])
             ->pluck('reservation_time')
             ->map(fn ($time) => Carbon::parse($time)->format('H:i'))

@@ -28,11 +28,11 @@ class FixSubscriptionPeriods extends Command
     public function handle(): int
     {
         $dryRun = $this->option('dry-run');
-        
+
         if ($dryRun) {
             $this->info('🔍 Running in DRY RUN mode - no changes will be made');
         }
-        
+
         $this->info('=== Fixing Subscription Period Dates ===');
         $this->newLine();
 
@@ -56,16 +56,16 @@ class FixSubscriptionPeriods extends Command
             try {
                 $start = Carbon::parse($subscription->current_period_start);
                 $end = Carbon::parse($subscription->current_period_end);
-                
+
                 // Hitung berapa bulan seharusnya dari metadata
                 $metadata = $subscription->metadata ? json_decode($subscription->metadata, true) : [];
                 $months = $metadata['months'] ?? 1;
-                
+
                 // Hitung period_end yang benar menggunakan addMonthsNoOverflow
                 $correctEnd = $start->copy()->addMonthsNoOverflow($months);
-                
+
                 // Cek apakah ada perbedaan
-                if (!$end->isSameDay($correctEnd)) {
+                if (! $end->isSameDay($correctEnd)) {
                     $this->newLine();
                     $this->warn("Subscription ID: {$subscription->id}");
                     $this->line("  User ID: {$subscription->user_id}");
@@ -73,16 +73,16 @@ class FixSubscriptionPeriods extends Command
                     $this->line("  Start: {$start->format('Y-m-d')}");
                     $this->line("  End (incorrect): {$end->format('Y-m-d')}");
                     $this->line("  End (correct): {$correctEnd->format('Y-m-d')}");
-                    
-                    if (!$dryRun) {
+
+                    if (! $dryRun) {
                         // Update ke database
                         $subscription->current_period_end = $correctEnd;
                         $subscription->save();
-                        $this->info("  ✓ Fixed!");
+                        $this->info('  ✓ Fixed!');
                     } else {
-                        $this->comment("  → Would be fixed (dry-run mode)");
+                        $this->comment('  → Would be fixed (dry-run mode)');
                     }
-                    
+
                     $this->newLine();
                     $fixed++;
                 } else {
@@ -93,7 +93,7 @@ class FixSubscriptionPeriods extends Command
                 $this->error("Error processing subscription {$subscription->id}: {$e->getMessage()}");
                 $errors++;
             }
-            
+
             $progressBar->advance();
         }
 
@@ -101,15 +101,15 @@ class FixSubscriptionPeriods extends Command
         $this->newLine(2);
 
         $this->info('=== Summary ===');
-        
+
         if ($dryRun) {
             $this->comment("Would fix: {$fixed} subscriptions");
         } else {
             $this->info("Fixed: {$fixed} subscriptions");
         }
-        
+
         $this->line("Already correct: {$skipped} subscriptions");
-        
+
         if ($errors > 0) {
             $this->error("Errors: {$errors}");
         }

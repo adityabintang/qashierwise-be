@@ -46,7 +46,8 @@ class WhatsAppAccountService
      */
     public function getActiveAccount(int $userId): ?WhatsAppAccount
     {
-        return WhatsAppAccount::where('user_id', $userId)
+        return WhatsAppAccount::withoutGlobalScope('userAccounts')
+            ->where('user_id', $userId)
             ->where('is_active', true)
             ->first();
     }
@@ -58,7 +59,8 @@ class WhatsAppAccountService
      */
     public function hasConnectedAccount(int $userId): bool
     {
-        return WhatsAppAccount::where('user_id', $userId)
+        return WhatsAppAccount::withoutGlobalScope('userAccounts')
+            ->where('user_id', $userId)
             ->where('is_active', true)
             ->exists();
     }
@@ -109,7 +111,9 @@ class WhatsAppAccountService
      */
     public function getAccountStatus(int $userId): ?array
     {
-        $account = WhatsAppAccount::where('user_id', $userId)->first();
+        $account = WhatsAppAccount::withoutGlobalScope('userAccounts')
+            ->where('user_id', $userId)
+            ->first();
 
         if (! $account) {
             return null;

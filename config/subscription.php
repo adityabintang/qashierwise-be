@@ -7,48 +7,23 @@ return [
     |--------------------------------------------------------------------------
     |
     | The subscription provider to use for subscriptions.
-    | Currently supports: "midtrans"
+    | Currently supports: "xendit"
     |
     */
-    'provider' => 'midtrans',
+    'provider' => 'xendit',
 
     /*
     |--------------------------------------------------------------------------
-    | Midtrans Configuration
+    | Xendit Configuration
     |--------------------------------------------------------------------------
     |
-    | Configuration for Midtrans subscription integration.
+    | Configuration for Xendit Recurring/Subscriptions integration.
     |
     */
-    'midtrans' => [
-        'server_key' => env('MIDTRANS_SERVER_KEY'),
-        'client_key' => env('MIDTRANS_CLIENT_KEY'),
-        'is_production' => env('MIDTRANS_IS_PRODUCTION', false),
-        'base_url' => env('MIDTRANS_IS_PRODUCTION', false)
-            ? 'https://api.midtrans.com/v1'
-            : 'https://api.sandbox.midtrans.com/v1',
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Invoice Configuration
-    |--------------------------------------------------------------------------
-    |
-    | Configuration for Midtrans Invoice API.
-    | Invoices are automatically sent to user's email after successful payment.
-    |
-    */
-    'invoice' => [
-        'enabled' => env('MIDTRANS_INVOICE_ENABLED', true),
-        'due_days' => env('MIDTRANS_INVOICE_DUE_DAYS', 7),
-        'payment_methods' => [
-            'bca_va',
-            'bni_va',
-            'bri_va',
-            'permata_va',
-            'gopay',
-            'shopeepay',
-        ],
+    'xendit' => [
+        'api_key' => env('XENDIT_API_KEY'),
+        'webhook_token' => env('XENDIT_WEBHOOK_TOKEN'),
+        'base_url' => env('XENDIT_BASE_URL', 'https://api.xendit.co'),
     ],
 
     /*
@@ -60,9 +35,9 @@ return [
     |
     */
     'urls' => [
-        'success' => env('MIDTRANS_SUBSCRIPTION_SUCCESS_URL', env('APP_URL').'/subscription/success'),
-        'cancel' => env('MIDTRANS_SUBSCRIPTION_CANCEL_URL', env('APP_URL').'/subscription/cancel'),
-        'error' => env('MIDTRANS_SUBSCRIPTION_ERROR_URL', env('APP_URL').'/subscription/error'),
+        'success' => env('XENDIT_SUBSCRIPTION_SUCCESS_URL', env('APP_URL').'/subscription/success'),
+        'cancel' => env('XENDIT_SUBSCRIPTION_CANCEL_URL', env('APP_URL').'/subscription/cancelled'),
+        'error' => env('XENDIT_SUBSCRIPTION_ERROR_URL', env('APP_URL').'/subscription/error'),
     ],
 
     /*
@@ -85,11 +60,25 @@ return [
     */
 
     'plans' => [
+        'free_trial' => [
+            'id' => 'free_trial',
+            'name' => 'Free Trial',
+            'price_monthly' => 0,
+            'currency' => 'IDR',
+            'tier' => 'basic',
+            'features' => [
+                'POS Kasir',
+                'Menu Management',
+                'Laporan Dasar',
+                'Hingga 1 outlet',
+            ],
+        ],
         'pro' => [
             'id' => 'pro',
             'name' => 'Pro',
             'price_monthly' => 350000,
             'currency' => 'IDR',
+            'tier' => 'pro',
             'features' => [
                 'Semua fitur Basic',
                 'Delivery + antrean & biaya',

@@ -30,11 +30,21 @@ return [
     'password' => 'Password',
     'password_placeholder' => 'Masukkan password',
     'sign_in' => 'Masuk',
+    'login_as_editor' => 'Masuk sebagai Editor',
     'remember_me' => 'Ingat Saya',
     'forgot_password' => 'Lupa Password?',
     'login_button' => 'Masuk',
     'processing' => 'Memproses...',
     'back_to_home' => 'Kembali ke beranda',
+
+    // Admin Login Page
+    'admin_login_heading' => 'Masuk ke akun Anda',
+    'admin_login_email' => 'Alamat email',
+    'admin_login_password' => 'Kata sandi',
+    'admin_login_remember' => 'Ingat saya',
+    'admin_login_button' => 'Masuk',
+    'admin_login_forgot' => 'Lupa kata sandi?',
+    'admin_login_back_home' => 'Beranda',
 
     // Register Page
     'free_trial' => 'Coba Gratis 14 Hari',
@@ -74,6 +84,7 @@ return [
     'token_expired' => 'Sesi Anda telah berakhir. Silakan login kembali.',
     'token_invalid' => 'Token autentikasi tidak valid.',
     'email_not_registered' => 'Email yang disebutkan atau diinputkan tidak terdaftar di aplikasi',
+    'author_must_use_admin_panel' => 'Author harus menggunakan panel Editor di /admin/login',
 
     // Validation Messages (Auth-specific)
     'name_required' => 'Nama bisnis wajib diisi',
@@ -94,6 +105,9 @@ return [
     'confirm_new_password' => 'Konfirmasi Password Baru',
     'reset_password_button' => 'Reset Password',
     'password_reset_success' => 'Password berhasil direset',
+    'reset_link_expired' => 'Link reset password ini sudah kedaluwarsa.',
+    'reset_link_expired_description' => 'Demi keamanan, link reset password hanya berlaku selama 60 menit. Silakan minta link baru untuk mereset password Anda.',
+    'request_new_link' => 'Minta Link Baru',
 
     // Email Verification
     'verify_email' => 'Verifikasi Email',

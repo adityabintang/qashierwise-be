@@ -79,10 +79,18 @@ class RoleController extends Controller
 
     /**
      * Get available permissions.
+     * Only returns POS-related permissions (excludes blog permissions).
      */
     public function permissions(): JsonResponse
     {
         $permissions = Permission::where('guard_name', 'sanctum')
+            ->where(function ($query) {
+                // Only include POS permissions (exclude blog permissions)
+                $query->where('name', 'like', 'view_%')
+                      ->orWhere('name', 'like', 'manage_%')
+                      ->orWhere('name', 'like', 'process_%');
+            })
+            ->where('name', 'not like', '%_blog_%')
             ->orderBy('name', 'asc')
             ->get()
             ->mapWithKeys(function ($permission) {
@@ -104,7 +112,7 @@ class RoleController extends Controller
         $effectiveUserId = $currentUser->getEffectiveUserId();
 
         // Only master admin or super admin can create roles
-        if (!$currentUser->isMasterAdmin() && !$currentUser->isSuperAdmin()) {
+        if (! $currentUser->isMasterAdmin() && ! $currentUser->isSuperAdmin()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Only master admin can create roles',
@@ -143,7 +151,7 @@ class RoleController extends Controller
         $role = Role::find($roleId);
 
         // Add permissions if provided using direct database manipulation
-        if (!empty($validated['permissions']) && is_array($validated['permissions'])) {
+        if (! empty($validated['permissions']) && is_array($validated['permissions'])) {
             foreach ($validated['permissions'] as $permissionName) {
                 $permission = \Spatie\Permission\Models\Permission::where('name', $permissionName)
                     ->where('guard_name', 'sanctum')
@@ -242,9 +250,9 @@ class RoleController extends Controller
         $currentUser = $request->user();
 
         // Super admin can update any role
-        if (!$currentUser->isSuperAdmin()) {
+        if (! $currentUser->isSuperAdmin()) {
             // Only master admin can update roles (for their merchant)
-            if (!$currentUser->isMasterAdmin()) {
+            if (! $currentUser->isMasterAdmin()) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Only master admin can update roles',
@@ -259,7 +267,7 @@ class RoleController extends Controller
                 ->where('role_id', $role->id)
                 ->exists();
 
-            if ($role->guard_name !== 'sanctum' || !$roleAssignedToStore) {
+            if ($role->guard_name !== 'sanctum' || ! $roleAssignedToStore) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Role not found',
@@ -298,7 +306,7 @@ class RoleController extends Controller
                 ->delete();
 
             // Add new permissions if provided using direct database insertion
-            if (!empty($validated['permissions']) && is_array($validated['permissions'])) {
+            if (! empty($validated['permissions']) && is_array($validated['permissions'])) {
                 foreach ($validated['permissions'] as $permissionName) {
                     $permission = \Spatie\Permission\Models\Permission::where('name', $permissionName)
                         ->where('guard_name', 'sanctum')
@@ -364,9 +372,9 @@ class RoleController extends Controller
         $currentUser = $request->user();
 
         // Super admin can delete any role
-        if (!$currentUser->isSuperAdmin()) {
+        if (! $currentUser->isSuperAdmin()) {
             // Only master admin can delete roles (for their merchant)
-            if (!$currentUser->isMasterAdmin()) {
+            if (! $currentUser->isMasterAdmin()) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Only master admin can delete roles',

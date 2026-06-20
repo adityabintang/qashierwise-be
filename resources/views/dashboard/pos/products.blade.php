@@ -1,4 +1,5 @@
 @extends('layouts.app')
+@include('components.dashboard-scripts')
 
 @section('title', __('pos.products.title') . ' - QashierWise POS')
 
@@ -17,12 +18,20 @@
                         <h2 class="text-lg font-semibold">Product Inventory</h2>
                         <p class="text-sm text-[hsl(var(--muted-foreground))] hidden sm:block">Manage products, pricing, and stock levels</p>
                     </div>
-                    <template x-if="hasPermission('create_products') || hasPermission('manage_products')">
-                        <button @click="openCreateModal()" class="btn btn-primary btn-md">
-                            <i class="fas fa-plus"></i>
-                            <span>Add Product</span>
-                        </button>
-                    </template>
+                    <div class="flex flex-wrap gap-2">
+                        <template x-if="hasPermission('view_products') || hasPermission('manage_products')">
+                            <button @click="openSyncModal()" class="btn btn-outline btn-md">
+                                <i class="fab fa-whatsapp text-emerald-600"></i>
+                                <span>Sync Meta Katalog</span>
+                            </button>
+                        </template>
+                        <template x-if="hasPermission('create_products') || hasPermission('manage_products')">
+                            <button @click="openCreateModal()" class="btn btn-primary btn-md">
+                                <i class="fas fa-plus"></i>
+                                <span>Add Product</span>
+                            </button>
+                        </template>
+                    </div>
                 </div>
 
                 <!-- Search and Filters -->
@@ -280,6 +289,171 @@
             </div>
         </div>
     </div>
+
+    <!-- APP_URL (HTTPS public URL for Meta crawler) — comes from .env, not browser location -->
+    <meta name="app-public-url" content="{{ rtrim(config('app.url'), '/') }}">
+
+    <!-- Sync Meta Catalog: catalog picker modal -->
+    <div x-show="showSyncModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="showSyncModal" x-transition class="fixed inset-0 bg-black/50" @click="closeSyncModal()"></div>
+        <div x-show="showSyncModal" x-transition class="card relative w-full max-w-lg p-6">
+            <div class="flex items-start justify-between mb-4">
+                <div class="flex-1 min-w-0">
+                    <h3 class="text-lg font-semibold flex items-center gap-2">
+                        <i class="fab fa-whatsapp text-emerald-600"></i>
+                        Sinkron ke Meta Katalog
+                    </h3>
+                    <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                        Setiap produk POS yang belum ada di katalog Meta akan dibuat. Produk dengan SKU yang sama akan dilewati.
+                    </p>
+                </div>
+                <div class="flex items-center gap-1">
+                    <button @click="refreshMetaCatalogs()" :disabled="syncCatalogsLoading"
+                            class="btn btn-ghost btn-icon min-h-[36px] min-w-[36px]"
+                            title="Muat ulang daftar katalog">
+                        <i class="fas" :class="syncCatalogsLoading ? 'fa-spinner animate-spin' : 'fa-rotate'"></i>
+                    </button>
+                    <button @click="closeSyncModal()" class="btn btn-ghost btn-icon min-h-[36px] min-w-[36px]">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <template x-if="!(document.querySelector('meta[name=&quot;app-public-url&quot;]')?.content || '').startsWith('https://') && !window.location.origin.startsWith('https://')">
+                <div class="card p-3 mb-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+                    <i class="fas fa-triangle-exclamation mr-1"></i>
+                    <strong>APP_URL belum HTTPS:</strong> produk akan dibuat dengan placeholder
+                    <code>placehold.co</code>. Set <code>APP_URL</code> di <code>.env</code> ke
+                    domain HTTPS publik (ngrok / production) supaya Meta bisa fetch
+                    <code>/catalog.webp</code>.
+                </div>
+            </template>
+
+            <template x-if="syncCatalogsLoading">
+                <div class="py-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
+                    <i class="fas fa-spinner animate-spin mr-2"></i>Memuat daftar katalog...
+                </div>
+            </template>
+
+            <template x-if="!syncCatalogsLoading && syncCatalogsError">
+                <div class="card p-4 bg-red-50 border border-red-200 text-red-700 text-sm" x-text="syncCatalogsError"></div>
+            </template>
+
+            <template x-if="!syncCatalogsLoading && !syncCatalogsError && metaCatalogs.length === 0">
+                <div class="card p-4 bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+                    Tidak ada katalog Commerce yang tersedia. Buat katalog dulu di
+                    <a href="/dashboard/meta-catalog" class="font-medium underline">Meta Katalog</a>.
+                </div>
+            </template>
+
+            <template x-if="!syncCatalogsLoading && metaCatalogs.length > 0">
+                <div class="space-y-2 max-h-72 overflow-y-auto">
+                    <template x-for="cat in metaCatalogs" :key="cat.id">
+                        <label class="flex items-center gap-3 p-3 rounded-lg border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted)/0.5)] cursor-pointer"
+                               :class="syncTargetCatalogId === cat.id ? 'ring-2 ring-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.05)]' : ''">
+                            <input type="radio" name="sync-target-catalog"
+                                   :value="cat.id"
+                                   x-model="syncTargetCatalogId"
+                                   class="text-[hsl(var(--primary))]">
+                            <div class="flex-1 min-w-0">
+                                <div class="font-medium text-sm truncate" x-text="cat.name"></div>
+                                <div class="text-xs text-[hsl(var(--muted-foreground))] font-mono" x-text="'ID: ' + cat.id"></div>
+                            </div>
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-[hsl(var(--muted))] tabular-nums"
+                                  x-text="(cat.product_count ?? 0) + ' produk'"></span>
+                        </label>
+                    </template>
+                </div>
+            </template>
+
+            <div class="flex gap-3 mt-6 pt-4 border-t border-[hsl(var(--border))]">
+                <button @click="closeSyncModal()" class="btn btn-outline btn-md flex-1">Batal</button>
+                <button @click="startSync()" :disabled="!syncTargetCatalogId || syncCatalogsLoading"
+                        class="btn btn-primary btn-md flex-1">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <span>Mulai Sync</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sync progress modal -->
+    <div x-show="showSyncProgressModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="showSyncProgressModal" class="fixed inset-0 bg-black/60"></div>
+        <div x-show="showSyncProgressModal" x-transition class="card relative w-full max-w-xl p-6">
+            <div class="mb-4">
+                <h3 class="text-lg font-semibold" x-text="syncProgress.completed ? 'Sinkronisasi selesai' : 'Menyinkronkan produk...'"></h3>
+                <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1"
+                   x-text="'Target: ' + (syncTargetCatalogName || '-')"></p>
+            </div>
+
+            <!-- Progress bar -->
+            <div class="mb-4">
+                <div class="flex items-center justify-between text-sm mb-1.5">
+                    <span class="font-medium tabular-nums">
+                        <span x-text="syncProgress.done"></span> / <span x-text="syncProgress.total"></span>
+                    </span>
+                    <span class="text-xs text-[hsl(var(--muted-foreground))] tabular-nums"
+                          x-text="syncProgress.total > 0 ? Math.round(syncProgress.done / syncProgress.total * 100) + '%' : '0%'"></span>
+                </div>
+                <div class="h-2 w-full bg-[hsl(var(--muted))] rounded-full overflow-hidden">
+                    <div class="h-full bg-[hsl(var(--primary))] transition-all duration-200"
+                         :style="'width: ' + (syncProgress.total > 0 ? (syncProgress.done / syncProgress.total * 100) : 0) + '%'"></div>
+                </div>
+                <div class="flex items-center gap-4 mt-2 text-xs">
+                    <span class="text-emerald-600">
+                        <i class="fas fa-check-circle"></i>
+                        Berhasil: <span class="font-medium tabular-nums" x-text="syncProgress.success"></span>
+                    </span>
+                    <span class="text-amber-600">
+                        <i class="fas fa-exclamation-circle"></i>
+                        Dilewati: <span class="font-medium tabular-nums" x-text="syncProgress.skipped"></span>
+                    </span>
+                    <span class="text-red-600">
+                        <i class="fas fa-times-circle"></i>
+                        Gagal: <span class="font-medium tabular-nums" x-text="syncProgress.failed"></span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Activity log -->
+            <div class="border border-[hsl(var(--border))] rounded-lg max-h-64 overflow-y-auto bg-[hsl(var(--muted)/0.3)]">
+                <template x-if="syncProgress.log.length === 0">
+                    <div class="p-4 text-center text-sm text-[hsl(var(--muted-foreground))]">
+                        <i class="fas fa-spinner animate-spin mr-2"></i>Menyiapkan daftar produk...
+                    </div>
+                </template>
+                <template x-for="(entry, idx) in syncProgress.log" :key="idx">
+                    <div class="px-3 py-2 text-xs border-b border-[hsl(var(--border))] last:border-b-0 flex items-start gap-2">
+                        <i class="fas mt-0.5 flex-shrink-0"
+                           :class="entry.status === 'ok' ? 'fa-check-circle text-emerald-600' :
+                                   entry.status === 'skip' ? 'fa-minus-circle text-amber-600' :
+                                   'fa-times-circle text-red-600'"></i>
+                        <div class="flex-1 min-w-0">
+                            <div class="font-medium truncate" x-text="entry.name"></div>
+                            <div class="text-[hsl(var(--muted-foreground))] truncate"
+                                 x-show="entry.detail" x-text="entry.detail"></div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <div class="flex gap-3 mt-6 pt-4 border-t border-[hsl(var(--border))]">
+                <template x-if="!syncProgress.completed">
+                    <button @click="cancelSync()" class="btn btn-outline btn-md flex-1">
+                        <i class="fas fa-stop"></i>
+                        <span>Batalkan</span>
+                    </button>
+                </template>
+                <template x-if="syncProgress.completed">
+                    <button @click="closeSyncProgressModal()" class="btn btn-primary btn-md flex-1">
+                        <i class="fas fa-check"></i>
+                        <span>Selesai</span>
+                    </button>
+                </template>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -311,6 +485,17 @@ function productsApp() {
             stock_quantity: '',
             description: '',
             is_active: true
+        },
+        // === Meta Catalog sync state ===
+        showSyncModal: false,
+        showSyncProgressModal: false,
+        metaCatalogs: [],
+        syncCatalogsLoading: false,
+        syncCatalogsError: '',
+        syncTargetCatalogId: '',
+        syncProgress: {
+            total: 0, done: 0, success: 0, skipped: 0, failed: 0,
+            log: [], completed: false, cancelled: false,
         },
         sidebarOpen: window.innerWidth >= 1024,
         isMobile: window.innerWidth < 768,
@@ -611,6 +796,202 @@ function productsApp() {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             window.location.href = '/login';
+        },
+
+        // === Meta Catalog sync ===
+        get syncTargetCatalogName() {
+            const c = this.metaCatalogs.find(x => x.id === this.syncTargetCatalogId);
+            return c ? c.name : '';
+        },
+
+        async openSyncModal() {
+            this.syncTargetCatalogId = '';
+            this.syncCatalogsError = '';
+            this.metaCatalogs = [];
+            this.showSyncModal = true;
+            await this.fetchMetaCatalogs(false);
+        },
+
+        async refreshMetaCatalogs() {
+            this.syncTargetCatalogId = '';
+            await this.fetchMetaCatalogs(true);
+        },
+
+        async fetchMetaCatalogs(forceRefresh) {
+            this.syncCatalogsLoading = true;
+            this.syncCatalogsError = '';
+            try {
+                const token = localStorage.getItem('token');
+                const url = `${window.location.origin}/api/whatsapp/catalog/catalogs` + (forceRefresh ? '?refresh=1' : '');
+                const res = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.metaCatalogs = data.data?.catalogs || data.catalogs || [];
+                } else {
+                    this.syncCatalogsError = data.message || data.error || 'Gagal memuat daftar katalog.';
+                }
+            } catch (e) {
+                this.syncCatalogsError = 'Gagal menghubungi server. Coba lagi.';
+            } finally {
+                this.syncCatalogsLoading = false;
+            }
+        },
+
+        closeSyncModal() {
+            this.showSyncModal = false;
+        },
+
+        closeSyncProgressModal() {
+            this.showSyncProgressModal = false;
+        },
+
+        async startSync() {
+            if (!this.syncTargetCatalogId) return;
+            const catalogId = this.syncTargetCatalogId;
+
+            this.showSyncModal = false;
+            this.showSyncProgressModal = true;
+            this.syncProgress = {
+                total: 0, done: 0, success: 0, skipped: 0, failed: 0,
+                log: [], completed: false, cancelled: false,
+            };
+
+            const token = localStorage.getItem('token');
+
+            // 1) Fetch all POS products (large per_page; chunked safety up to 5000)
+            let posProducts = [];
+            try {
+                const res = await fetch(`${this.API_BASE_URL}/products?per_page=5000`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    posProducts = data.data?.data || data.data || [];
+                }
+            } catch (e) {
+                this.syncProgress.log.push({ status: 'fail', name: '(fetch produk POS)', detail: e.message });
+                this.syncProgress.completed = true;
+                return;
+            }
+
+            // 2) Fetch existing retailer_ids in target Meta catalog to skip duplicates
+            const existingRetailerIds = new Set();
+            try {
+                const res = await fetch(`${window.location.origin}/api/whatsapp/catalog/${catalogId}/products?limit=200`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const products = data.data?.products || data.products || [];
+                    for (const p of products) {
+                        if (p.retailer_id) existingRetailerIds.add(String(p.retailer_id));
+                    }
+                }
+            } catch (e) { /* non-fatal, just attempt */ }
+
+            this.syncProgress.total = posProducts.length;
+
+            // 3) Loop and POST each new product to Meta
+            for (const product of posProducts) {
+                if (this.syncProgress.cancelled) break;
+
+                const retailerId = product.sku || `POS-${product.id}`;
+
+                if (existingRetailerIds.has(retailerId)) {
+                    this.syncProgress.skipped++;
+                    this.syncProgress.done++;
+                    this.syncProgress.log.unshift({
+                        status: 'skip',
+                        name: product.name,
+                        detail: `SKU ${retailerId} sudah ada di katalog Meta`,
+                    });
+                    continue;
+                }
+
+                // Meta requires HTTPS for image_url & url. Prefer the server-configured
+                // APP_URL (set in .env, e.g. ngrok HTTPS) over window.location.origin
+                // (which is whatever browser tab the user opened — often http://localhost).
+                // Fall back to public HTTPS placeholder service only if APP_URL is also HTTP.
+                const appUrl = (document.querySelector('meta[name="app-public-url"]')?.content || '').replace(/\/$/, '');
+                const baseUrl = appUrl.startsWith('https://')
+                    ? appUrl
+                    : (window.location.origin.startsWith('https://') ? window.location.origin : null);
+
+                const imageUrl = baseUrl
+                    ? `${baseUrl}/catalog.webp?p=${encodeURIComponent(retailerId)}`
+                    : `https://placehold.co/600x600.webp?text=${encodeURIComponent(retailerId)}`;
+                const productUrl = baseUrl
+                    ? `${baseUrl}/dashboard/pos/products`
+                    : 'https://qashierwise.com/menu';
+
+                const availability = (Number(product.stock_quantity) > 0) ? 'in stock' : 'out of stock';
+                const priceMinor = Math.round(parseFloat(product.price || 0) * 100);
+
+                const payload = {
+                    retailer_id: retailerId,
+                    name: product.name,
+                    description: product.description || product.name,
+                    price: priceMinor,
+                    currency: 'IDR',
+                    image_url: imageUrl,
+                    url: productUrl,
+                    availability: availability,
+                    condition: 'new',
+                    brand: (this.user && this.user.business_name) || 'Toko Kami',
+                };
+
+                try {
+                    const res = await fetch(`${window.location.origin}/api/whatsapp/catalog/${catalogId}/products`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify(payload),
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        this.syncProgress.success++;
+                        this.syncProgress.log.unshift({
+                            status: 'ok',
+                            name: product.name,
+                            detail: `Dibuat di Meta (id: ${data.data?.id || '-'})`,
+                        });
+                    } else if (data.error_code === 'DUPLICATE_SKU') {
+                        this.syncProgress.skipped++;
+                        this.syncProgress.log.unshift({
+                            status: 'skip',
+                            name: product.name,
+                            detail: 'SKU sudah ada di katalog Meta',
+                        });
+                    } else {
+                        this.syncProgress.failed++;
+                        this.syncProgress.log.unshift({
+                            status: 'fail',
+                            name: product.name,
+                            detail: data.message || data.error || 'Gagal',
+                        });
+                    }
+                } catch (e) {
+                    this.syncProgress.failed++;
+                    this.syncProgress.log.unshift({
+                        status: 'fail',
+                        name: product.name,
+                        detail: e.message,
+                    });
+                }
+
+                this.syncProgress.done++;
+            }
+
+            this.syncProgress.completed = true;
+        },
+
+        cancelSync() {
+            this.syncProgress.cancelled = true;
         },
 
         addNotification() {},

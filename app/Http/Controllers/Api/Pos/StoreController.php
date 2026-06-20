@@ -21,7 +21,7 @@ class StoreController extends Controller
     {
         $user = $request->user();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
                 'message' => 'Authentication required',
@@ -33,7 +33,7 @@ class StoreController extends Controller
 
         $stores = Store::withCount(['orders', 'tables', 'posUsers'])
             ->where('user_id', $effectiveUserId)
-            ->when($request->boolean('active_only', false), fn($q) => $q->where('is_active', true))
+            ->when($request->boolean('active_only', false), fn ($q) => $q->where('is_active', true))
             ->orderBy('name')
             ->get();
 
@@ -52,7 +52,7 @@ class StoreController extends Controller
     {
         $userId = auth()->id();
 
-        if (!$userId) {
+        if (! $userId) {
             return response()->json([
                 'success' => false,
                 'message' => 'Authentication required',
@@ -116,7 +116,7 @@ class StoreController extends Controller
 
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
-            'code' => 'sometimes|string|max:50|unique:stores,code,' . $store->id,
+            'code' => 'sometimes|string|max:50|unique:stores,code,'.$store->id,
             'address' => 'nullable|string',
             'phone' => 'nullable|string|max:20',
             'is_active' => 'sometimes|boolean',

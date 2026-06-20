@@ -1,5 +1,13 @@
 <?php
 
+use App\Http\Controllers\Auth\GoogleOAuthController;
+use App\Http\Controllers\BlogController;
+use App\Http\Controllers\BuyerCalendarOAuthController;
+use App\Http\Controllers\DeliveryProofController;
+use App\Http\Controllers\MonitoringDashboardController;
+use App\Http\Controllers\QrisPaymentPageController;
+use App\Http\Controllers\ReservationFormController;
+use App\Http\Controllers\SubscriptionController;
 use Illuminate\Support\Facades\Route;
 
 // Language switching route
@@ -17,10 +25,26 @@ Route::get('/language/{locale}', function ($locale) {
     return redirect()->back();
 })->name('language.switch');
 
-// Landing page
+// Landing page (React island, ported from Next.js)
 Route::get('/', function () {
-    return view('welcome');
+    return view('react.app', [
+        'page' => 'landing',
+        'title' => 'QashierWise — Chatbot WhatsApp untuk Restoran',
+        'description' => 'QashierWise menghadirkan Chatbot WhatsApp berbasis AI untuk restoran — Inbox, Pesanan, Reservasi, Menu, dan CRM dalam satu Console.',
+    ]);
 });
+
+// Admin CMS (React SPA, replaces the Filament panel). The SPA handles its own
+// client-side routing + auth gating; all data goes through /api/admin/* which is
+// protected by Sanctum + EnsureCanAccessAdmin. The shell itself carries no data.
+Route::get('/admin/{any?}', function () {
+    return view('react.admin');
+})->where('any', '.*')->name('admin');
+
+// Public blog routes
+Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
+Route::get('/blog/load-more', [BlogController::class, 'loadMore'])->name('blog.load-more');
+Route::get('/blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
 
 // Authentication routes
 Route::get('/login', function () {
@@ -43,25 +67,96 @@ Route::get('/reset-password', function () {
     return view('auth.reset-password');
 })->name('reset-password');
 
-// Legal pages
+// Legal pages (React island, ported from Next.js)
 Route::get('/privacy-policy', function () {
-    return view('privacy-policy');
+    return view('react.app', [
+        'page' => 'privacy',
+        'title' => 'Kebijakan Privasi - QashierWise',
+        'description' => 'Kebijakan Privasi QashierWise. Pelajari bagaimana kami mengumpulkan, menggunakan, dan melindungi data Anda serta kepatuhan terhadap regulasi perlindungan data.',
+    ]);
 })->name('privacy-policy');
 
 Route::get('/terms-of-service', function () {
-    return view('terms-of-service');
+    return view('react.app', [
+        'page' => 'terms',
+        'title' => 'Ketentuan Layanan - QashierWise',
+        'description' => 'Ketentuan Layanan QashierWise.',
+    ]);
 })->name('terms-of-service');
 
 Route::get('/refund-policy', function () {
-    return view('refund-policy');
+    return view('react.app', [
+        'page' => 'refund',
+        'title' => 'Kebijakan Pengembalian - QashierWise',
+        'description' => 'Kebijakan Pengembalian Dana QashierWise.',
+    ]);
 })->name('refund-policy');
 
+// Public documentation pages
+Route::get('/docs/meta-catalog', function () {
+    return view('docs.meta-catalog');
+})->name('docs.meta-catalog');
+
+// User-facing documentation (React island; sidebar + markdown from resources/docs).
+// Registered AFTER /docs/meta-catalog so that specific route still wins. The React
+// app reads the path after /docs to pick which markdown page to render.
+Route::get('/docs/{path?}', function () {
+    return view('react.app', [
+        'page' => 'docs',
+        'title' => 'Dokumentasi QashierWise — Panduan Penggunaan',
+        'description' => 'Panduan lengkap penggunaan QashierWise: WhatsApp, AI Agent, Katalog, POS Kasir, Reservasi, Delivery, Pembayaran, dan langganan.',
+    ]);
+})->where('path', '.*')->name('docs');
+
 // Public QRIS Payment Page
-Route::get('/pay/qris/{orderId}', [App\Http\Controllers\QrisPaymentPageController::class, 'show'])
+Route::get('/pay/qris/{orderId}', [QrisPaymentPageController::class, 'show'])
     ->name('qris.payment.page');
 
+// Public Driver Proof-of-Delivery Page (token-protected, no auth)
+Route::get('/delivery/{token}', [DeliveryProofController::class, 'show'])
+    ->name('delivery.proof');
+Route::post('/delivery/{token}', [DeliveryProofController::class, 'submit'])
+    ->name('delivery.proof.submit');
+
+// Public Reservation Form Routes
+Route::prefix('reservations')->name('reservation.')->group(function () {
+    Route::get('/form', [ReservationFormController::class, 'show'])
+        ->name('form');
+    Route::post('/form/submit', [ReservationFormController::class, 'submit'])
+        ->name('submit');
+    Route::get('/form/status/{orderId}', [ReservationFormController::class, 'status'])
+        ->name('status');
+    Route::get('/tables', [ReservationFormController::class, 'getAvailableTables'])
+        ->name('tables');
+    Route::get('/products', [ReservationFormController::class, 'getAvailableProducts'])
+        ->name('products');
+});
+
+// Google Calendar OAuth callback — MERCHANT (identified via encrypted state).
+Route::get('/auth/google/callback', [GoogleOAuthController::class, 'handleGoogleCallback'])
+    ->name('google.callback');
+
+// Google Calendar OAuth — BUYER (customer side, no auth required).
+// Buyer taps the link in their WhatsApp, connects once, future events auto-added.
+Route::get('/calendar/buyer/connect', [BuyerCalendarOAuthController::class, 'connect'])
+    ->name('buyer.calendar.connect');
+Route::get('/calendar/buyer/callback', [BuyerCalendarOAuthController::class, 'callback'])
+    ->name('buyer.calendar.callback');
+
+// Short alias for the buyer calendar connect URL.
+// /c/{code} → resolves to /calendar/buyer/connect using a cached token.
+Route::get('/c/{code}', [BuyerCalendarOAuthController::class, 'connectShort'])
+    ->name('buyer.calendar.connect.short')
+    ->where('code', '[a-zA-Z0-9]{6,12}');
+
+// Short alias for the reservation form pre-filled with catalog cart items + phone.
+// /r/{code} → resolves to /reservations/form?merchantName=...&prefill={...}
+Route::get('/r/{code}', [\App\Http\Controllers\ReservationShortLinkController::class, 'resolve'])
+    ->name('reservation.short')
+    ->where('code', '[a-zA-Z0-9]{6,12}');
+
 // Dashboard routes (protected by authentication middleware)
-Route::middleware(['web', 'check.web.auth'])->group(function () {
+Route::middleware(['web', 'check.web.auth', 'block.author.login'])->group(function () {
     Route::get('/dashboard', function () {
         return view('dashboard.index');
     })->name('dashboard');
@@ -78,10 +173,6 @@ Route::middleware(['web', 'check.web.auth'])->group(function () {
         return view('dashboard.templates');
     })->name('dashboard.templates');
 
-    Route::get('/dashboard/reservations', function () {
-        return view('dashboard.reservations');
-    })->name('dashboard.reservations');
-
     Route::get('/dashboard/profile', function () {
         return view('dashboard.profile');
     })->name('dashboard.profile');
@@ -90,43 +181,81 @@ Route::middleware(['web', 'check.web.auth'])->group(function () {
         return view('dashboard.whatsapp-account');
     })->name('dashboard.whatsapp-account');
 
+    Route::get('/dashboard/meta-catalog', function () {
+        return view('dashboard.meta-catalog');
+    })->name('dashboard.meta-catalog');
+
+    Route::get('/dashboard/meta-catalog/{catalogId}', function ($catalogId) {
+        return view('dashboard.meta-catalog', ['initialCatalogId' => $catalogId]);
+    })->name('dashboard.meta-catalog.catalog');
+
     Route::get('/dashboard/ai-agent', function () {
         return view('dashboard.ai-agent');
     })->name('dashboard.ai-agent');
 
+    Route::get('/dashboard/customer-tags', function () {
+        return view('dashboard.customer-tags');
+    })->name('dashboard.customer-tags');
+
+    Route::get('/dashboard/delivery', function () {
+        return view('dashboard.delivery');
+    })->name('dashboard.delivery');
+
+    Route::get('/dashboard/complain', function () {
+        return view('dashboard.complain');
+    })->name('dashboard.complain');
+
+    // Reservation routes
+    Route::get('/dashboard/reservations', function () {
+        return view('dashboard.reservations.index');
+    })->name('dashboard.reservations');
+
+    Route::get('/dashboard/reservations/calendar', function () {
+        return view('dashboard.reservations.calendar');
+    })->name('dashboard.reservations.calendar');
+
+    Route::get('/dashboard/reservations/config', function () {
+        return view('dashboard.reservations.config');
+    })->name('dashboard.reservations.config');
+
+    // Developer Webhook UI
+    Route::get('/dashboard/developer/webhooks', function () {
+        return view('dashboard.developer-webhooks');
+    })->name('dashboard.developer-webhooks');
+
     // Subscription routes
     Route::prefix('subscription')->name('subscription.')->group(function () {
-        Route::get('/pricing', [App\Http\Controllers\SubscriptionController::class, 'index'])
+        Route::get('/pricing', [SubscriptionController::class, 'index'])
             ->name('pricing');
-        Route::post('/checkout', [App\Http\Controllers\SubscriptionController::class, 'createCheckout'])
+        Route::post('/checkout', [SubscriptionController::class, 'createCheckout'])
             ->name('checkout');
         // Card tokenization for Midtrans Subscription API
-        Route::get('/tokenization', [App\Http\Controllers\SubscriptionController::class, 'tokenization'])
+        Route::get('/tokenization', [SubscriptionController::class, 'tokenization'])
             ->name('tokenization');
-        Route::post('/create-subscription', [App\Http\Controllers\SubscriptionController::class, 'createSubscription'])
+        Route::post('/create-subscription', [SubscriptionController::class, 'createSubscription'])
             ->name('create-subscription');
         // Legacy payment route (kept for compatibility)
-        Route::get('/payment', [App\Http\Controllers\SubscriptionController::class, 'payment'])
+        Route::get('/payment', [SubscriptionController::class, 'payment'])
             ->name('payment');
-        Route::get('/success', [App\Http\Controllers\SubscriptionController::class, 'success'])
+        Route::get('/success', [SubscriptionController::class, 'success'])
             ->name('success');
-        Route::get('/cancel', [App\Http\Controllers\SubscriptionController::class, 'cancel'])
+        Route::get('/cancel', [SubscriptionController::class, 'cancel'])
             ->name('cancel');
-        Route::get('/error', [App\Http\Controllers\SubscriptionController::class, 'error'])
+        Route::get('/error', [SubscriptionController::class, 'error'])
             ->name('error');
-        Route::get('/manage', [App\Http\Controllers\SubscriptionController::class, 'manage'])
+        Route::get('/manage', [SubscriptionController::class, 'manage'])
             ->name('manage');
-        Route::post('/cancel', [App\Http\Controllers\SubscriptionController::class, 'cancelSubscription'])
+        Route::post('/cancel', [SubscriptionController::class, 'cancelSubscription'])
             ->name('cancel.post');
     });
 
     // Monitoring Dashboard routes (admin only)
     Route::prefix('monitoring')->name('monitoring.')->middleware('can:view-monitoring')->group(function () {
-        Route::get('/dashboard', [App\Http\Controllers\MonitoringDashboardController::class, 'index'])
+        Route::get('/dashboard', [MonitoringDashboardController::class, 'index'])
             ->name('dashboard');
-        Route::get('/metrics', [App\Http\Controllers\MonitoringDashboardController::class, 'metrics'])
+        Route::get('/metrics', [MonitoringDashboardController::class, 'metrics'])
             ->name('metrics');
-        Route::get('/health', [App\Http\Controllers\MonitoringDashboardController::class, 'health'])
+        Route::get('/health', [MonitoringDashboardController::class, 'health'])
             ->name('health');
     });
 
@@ -192,14 +321,6 @@ Route::middleware(['web', 'check.web.auth'])->group(function () {
             return view('dashboard.sub-merchant.settings');
         })->name('settings');
 
-        Route::get('/provider-settings', function () {
-            return view('dashboard.sub-merchant.provider-settings');
-        })->name('provider-settings');
-
-        Route::get('/migrate', function () {
-            return view('dashboard.sub-merchant.migrate');
-        })->name('migrate');
-
         Route::get('/qris', function () {
             return view('dashboard.sub-merchant.qris');
         })->name('qris');
@@ -207,5 +328,13 @@ Route::middleware(['web', 'check.web.auth'])->group(function () {
         Route::get('/balance', function () {
             return view('dashboard.sub-merchant.balance');
         })->name('balance');
+
+        Route::get('/withdrawals', function () {
+            return view('dashboard.sub-merchant.withdrawals');
+        })->name('withdrawals');
+
+        Route::get('/bank-account', function () {
+            return view('dashboard.sub-merchant.bank-account');
+        })->name('bank-account');
     });
 });

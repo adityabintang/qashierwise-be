@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\NewWhatsAppMessage;
+use App\Events\ProfileUpdated;
 use App\Exceptions\WhatsAppNotConnectedException;
 use App\Http\Controllers\Controller;
 use App\Models\WhatsAppAccount;
@@ -15,6 +17,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 use Netflie\WhatsAppCloudApi\Message\ButtonReply\Button;
 use Netflie\WhatsAppCloudApi\Message\ButtonReply\ButtonAction;
 use Netflie\WhatsAppCloudApi\Message\Media\LinkID;
@@ -201,7 +204,7 @@ class WhatsAppController extends Controller
         ]);
 
         // Broadcast the new message event (include sender so message appears in their UI)
-        broadcast(new \App\Events\NewWhatsAppMessage($message->load('contact'), $contact));
+        broadcast(new NewWhatsAppMessage($message->load('contact'), $contact));
 
         return $message;
     }
@@ -301,31 +304,18 @@ class WhatsAppController extends Controller
                     $request->language
                 );
             } else {
-                // For templates with parameters
-                $component_header = [];
-                $component_body = [];
-                $component_buttons = [];
-
-                // Add components if provided
-                if ($request->has('header_params')) {
-                    $component_header = [new Component($request->header_params)];
-                }
-
-                if ($request->has('body_params')) {
-                    $component_body = [new Component($request->body_params)];
-                }
-
-                if ($request->has('button_params')) {
-                    $component_buttons = [new Component($request->button_params)];
-                }
+                // For templates with parameters — single Component wrapping header, body, buttons
+                $component = new Component(
+                    $request->input('header_params', []),
+                    $request->input('body_params', []),
+                    $request->input('button_params', [])
+                );
 
                 $response = $whatsapp->sendTemplate(
                     $request->to,
                     $request->template_name,
                     $request->language,
-                    $component_header,
-                    $component_body,
-                    $component_buttons
+                    $component
                 );
             }
 
@@ -1137,7 +1127,7 @@ class WhatsAppController extends Controller
             // Broadcast profile update event
             $userId = auth()->user()->getEffectiveUserId();
             if ($userId) {
-                broadcast(new \App\Events\ProfileUpdated($userId, $data, 'business_profile'));
+                broadcast(new ProfileUpdated($userId, $data, 'business_profile'));
             }
 
             return response()->json([
@@ -1151,7 +1141,7 @@ class WhatsAppController extends Controller
                 'error_code' => $e->getErrorCode(),
                 'message' => $e->getMessage(),
             ], $e->getCode());
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
@@ -1596,8 +1586,17 @@ class WhatsAppController extends Controller
             $perPage = $request->get('per_page', 15);
 
             // RLS in model automatically filters by user_id
-            $contacts = WhatsAppContact::withCount('messages')
-                ->orderBy('last_message_at', 'desc')
+            $query = WhatsAppContact::with('tags')
+                ->withCount('messages');
+
+            // Filter by tag if tag_id parameter is provided
+            if ($request->has('tag_id') && $request->tag_id) {
+                $query->whereHas('tags', function ($q) use ($request) {
+                    $q->where('contact_tags.id', $request->tag_id);
+                });
+            }
+
+            $contacts = $query->orderBy('last_message_at', 'desc')
                 ->paginate($perPage);
 
             return response()->json([
@@ -1614,6 +1613,26 @@ class WhatsAppController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve contacts',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function toggleContactAi($contactId): JsonResponse
+    {
+        try {
+            $contact = WhatsAppContact::findOrFail($contactId);
+            $contact->ai_active = ! $contact->ai_active;
+            $contact->save();
+
+            return response()->json([
+                'success' => true,
+                'data' => ['ai_active' => $contact->ai_active],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to toggle AI for contact',
                 'error' => $e->getMessage(),
             ], 500);
         }
@@ -1637,17 +1656,33 @@ class WhatsAppController extends Controller
             // Verify contact belongs to user (RLS will handle this)
             $contact = WhatsAppContact::findOrFail($contactId);
 
-            $perPage = $request->get('per_page', 100);
+            // WhatsApp-like windowed loading: fetch the latest N messages, or
+            // (when `before_id` is supplied) the N messages older than that
+            // cursor. Fetch one extra row to detect whether older history still
+            // exists, then return the page in ascending (chat) order.
+            $perPage = max(1, min((int) $request->get('per_page', 10), 50));
+            $beforeId = $request->get('before_id');
 
-            // RLS in model automatically filters by user_id
-            $messages = WhatsAppMessage::with(['contact'])
+            $rows = WhatsAppMessage::with(['contact'])
                 ->where('contact_id', $contactId)
-                ->orderBy('created_at', 'asc')
+                ->when($beforeId, fn ($q) => $q->where('id', '<', (int) $beforeId))
+                ->orderBy('id', 'desc')
+                ->limit($perPage + 1)
                 ->get();
+
+            $hasMore = $rows->count() > $perPage;
+            if ($hasMore) {
+                $rows = $rows->slice(0, $perPage);
+            }
+
+            // Ascending order for rendering (oldest → newest).
+            $messages = $rows->reverse()->values();
 
             return response()->json([
                 'success' => true,
                 'data' => $messages,
+                'has_more' => $hasMore,
+                'oldest_id' => $messages->first()->id ?? null,
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
@@ -1778,6 +1813,8 @@ class WhatsAppController extends Controller
                     'header' => $template->header,
                     'header_type' => $template->header_type,
                     'body' => $template->body,
+                    'body_examples' => $template->body_examples,
+                    'variable_type' => $template->variable_type ?? 'numeric',
                     'footer' => $template->footer,
                     'buttons' => $template->buttons ? json_decode($template->buttons, true) : [],
                     'quality_score' => $template->quality_score,
@@ -1964,6 +2001,15 @@ class WhatsAppController extends Controller
                 ], 422);
             }
 
+            $variableEdgeValidation = $this->templateService->validateLeadingTrailingVariables($bodyText);
+            if (! $variableEdgeValidation['valid']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => ['body' => $variableEdgeValidation['error']],
+                ], 422);
+            }
+
             // Validate footer if present
             if (! empty($data['footer'])) {
                 $footerText = is_array($data['footer']) ? ($data['footer']['text'] ?? '') : $data['footer'];
@@ -2030,6 +2076,16 @@ class WhatsAppController extends Controller
                 $buttons = json_encode($data['buttons']);
             }
 
+            // Prepare body examples if provided
+            $bodyExamples = null;
+            if (! empty($data['body_examples']) && is_array($data['body_examples'])) {
+                // Filter out empty examples
+                $filteredExamples = array_filter($data['body_examples'], fn ($ex) => is_string($ex) && trim($ex) !== '');
+                if (! empty($filteredExamples)) {
+                    $bodyExamples = array_values($filteredExamples);
+                }
+            }
+
             $template = WhatsAppTemplate::create([
                 'whatsapp_account_id' => $account->id,
                 'phone_number_id' => $account->phone_number_id,
@@ -2041,6 +2097,8 @@ class WhatsAppController extends Controller
                 'header' => $header,
                 'header_type' => $headerType,
                 'body' => $bodyText,
+                'body_examples' => $bodyExamples,
+                'variable_type' => $data['variable_type'] ?? 'numeric',
                 'footer' => $footer,
                 'buttons' => $buttons,
                 'components' => $components,
@@ -2092,6 +2150,17 @@ class WhatsAppController extends Controller
                 ], 404);
             }
 
+            // Meta's API only allows editing templates with REJECTED or PAUSED status.
+            // APPROVED and PENDING templates cannot be modified — only deleted/recreated.
+            $editableStatuses = ['REJECTED', 'PAUSED'];
+            if (! in_array(strtoupper($template->status ?? ''), $editableStatuses)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Template cannot be edited',
+                    'error' => "Only templates with REJECTED or PAUSED status can be edited. This template is currently '{$template->status}'. To change an approved template, delete it and create a new one.",
+                ], 422);
+            }
+
             $data = $request->all();
 
             // Validate body if present
@@ -2139,6 +2208,22 @@ class WhatsAppController extends Controller
                 $account->waba_id
             );
 
+            // Ensure name and language are included in the data
+            // WhatsApp API requires these for template updates
+            if (! isset($data['name']) || empty($data['name'])) {
+                $data['name'] = $template->name;
+            }
+            if (! isset($data['language']) || empty($data['language'])) {
+                $data['language'] = $template->language;
+            }
+
+            // Inherit variable_type from the existing template when not sent by the client.
+            // Without this, buildComponents defaults to 'positional' and drops named variable
+            // examples, causing Meta to reject the payload.
+            if (! isset($data['variable_type']) || $data['variable_type'] === '') {
+                $data['variable_type'] = $template->variable_type ?? 'numeric';
+            }
+
             // Call TemplateService to update template via WhatsApp API
             $result = $this->templateService->updateTemplate($template->template_id, $data);
 
@@ -2172,6 +2257,19 @@ class WhatsAppController extends Controller
 
             if (isset($data['buttons'])) {
                 $updateData['buttons'] = ! empty($data['buttons']) ? json_encode($data['buttons']) : null;
+            }
+
+            if (isset($data['variable_type'])) {
+                $updateData['variable_type'] = $data['variable_type'];
+            }
+
+            if (isset($data['body_examples'])) {
+                if (! empty($data['body_examples']) && is_array($data['body_examples'])) {
+                    $filteredExamples = array_filter($data['body_examples'], fn ($ex) => is_string($ex) && trim($ex) !== '');
+                    $updateData['body_examples'] = ! empty($filteredExamples) ? array_values($filteredExamples) : null;
+                } else {
+                    $updateData['body_examples'] = null;
+                }
             }
 
             $template->update($updateData);

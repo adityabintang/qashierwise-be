@@ -70,6 +70,15 @@ class SubscriptionService
             return $this->getTrialStatus($user);
         }
 
+        // A 'pending' subscription means the checkout was initiated but the
+        // payment has not been confirmed yet. The user must NOT receive paid
+        // tier benefits until the Xendit/Midtrans webhook activates it. Treat
+        // pending as if the user has no paid subscription so they fall back to
+        // trial logic (and downstream feature checks block pro features).
+        if ($subscription->status === 'pending') {
+            return $this->getTrialStatus($user);
+        }
+
         // If subscription is cancelled but still within period
         if ($subscription->isCancelled() && ! $subscription->isExpired()) {
             return new SubscriptionStatus(
@@ -142,35 +151,378 @@ class SubscriptionService
     }
 
     /**
-     * Process a webhook event from Midtrans.
+     * Process a webhook event from Xendit recurring subscriptions.
      *
      * @param  array  $payload  The webhook payload data
      */
-    public function processMidtransWebhook(array $payload): void
+    public function processXenditWebhook(array $payload): void
     {
-        $transactionStatus = $payload['transaction_status'] ?? null;
-        $subscriptionId = $payload['subscription_id'] ?? null;
-        $orderId = $payload['order_id'] ?? null;
+        $event = $payload['event'] ?? '';
+        $data = $payload['data'] ?? [];
 
-        if ($transactionStatus === null) {
-            Log::warning('Midtrans webhook missing transaction_status', ['payload' => $payload]);
+        if (empty($event)) {
+            Log::warning('Xendit webhook missing event type', ['payload' => $payload]);
 
             return;
         }
 
-        Log::info('Processing Midtrans webhook', [
-            'transaction_status' => $transactionStatus,
-            'subscription_id' => $subscriptionId,
-            'order_id' => $orderId,
+        Log::info('Processing Xendit recurring webhook', [
+            'event' => $event,
+            'subscription_id' => $data['id'] ?? null,
+            'reference_id' => $data['reference_id'] ?? null,
         ]);
 
-        // Handle different transaction statuses
-        match ($transactionStatus) {
-            'capture', 'settlement' => $this->handleMidtransPaymentSuccess($payload),
-            'pending' => $this->handleMidtransPaymentPending($payload),
-            'deny', 'cancel', 'expire' => $this->handleMidtransPaymentFailed($payload),
-            default => Log::info('Unhandled Midtrans transaction status', ['status' => $transactionStatus]),
+        // Handle different event types
+        match ($event) {
+            'recurring.plan.activated' => $this->handleXenditActivation($data),
+            'recurring.plan.inactivated' => $this->handleXenditDeactivation($data),
+            'recurring.cycle.succeeded' => $this->handleXenditCycleSuccess($data),
+            'recurring.cycle.failed' => $this->handleXenditCycleFailed($data),
+            'recurring.cycle.created' => $this->handleXenditCycleCreated($data),
+            'recurring.cycle.retrying' => $this->handleXenditCycleRetrying($data),
+            default => Log::info('Unhandled Xendit recurring event type', ['event' => $event]),
         };
+    }
+
+    /**
+     * Handle Xendit recurring plan activated webhook.
+     *
+     * @param  array  $data  The webhook data
+     */
+    private function handleXenditActivation(array $data): void
+    {
+        $subscriptionId = $data['id'] ?? null;
+        $referenceId = $data['reference_id'] ?? null;
+
+        if ($subscriptionId === null) {
+            Log::warning('Xendit activation webhook missing subscription ID');
+
+            return;
+        }
+
+        Log::info('Xendit subscription activated', [
+            'subscription_id' => $subscriptionId,
+            'reference_id' => $referenceId,
+        ]);
+
+        $subscription = Subscription::where('xendit_subscription_id', $subscriptionId)->first();
+
+        if ($subscription === null) {
+            Log::warning('Xendit subscription not found for activation', [
+                'xendit_subscription_id' => $subscriptionId,
+            ]);
+
+            return;
+        }
+
+        $subscription->update(['status' => 'active']);
+
+        $this->recordXenditPayment($subscription, $subscriptionId, $referenceId, $data);
+
+        Log::info('Xendit subscription activated and updated', [
+            'subscription_id' => $subscription->id,
+            'xendit_subscription_id' => $subscriptionId,
+        ]);
+    }
+
+    /**
+     * Record a payment in the billing history for a Xendit activation.
+     *
+     * Idempotent: skips creation if a record for the same transaction_id
+     * already exists, so it's safe to call from both the webhook path and
+     * the polling/redirect fallback paths without creating duplicates.
+     */
+    public function recordXenditPayment(
+        Subscription $subscription,
+        string $xenditSubscriptionId,
+        ?string $referenceId = null,
+        array $xenditData = []
+    ): void {
+        // Idempotency: one billing-history row per Xendit plan activation
+        $alreadyRecorded = \App\Models\SubscriptionPayment::where('transaction_id', $xenditSubscriptionId)
+            ->where('status', 'settlement')
+            ->exists();
+
+        if ($alreadyRecorded) {
+            return;
+        }
+
+        $metadata = is_string($subscription->metadata)
+            ? json_decode($subscription->metadata, true)
+            : ($subscription->metadata ?? []);
+
+        \App\Models\SubscriptionPayment::create([
+            'subscription_id' => $subscription->id,
+            'user_id' => $subscription->user_id,
+            'order_id' => $referenceId ?? 'xendit_'.$xenditSubscriptionId,
+            'transaction_id' => $xenditSubscriptionId,
+            'plan_name' => $subscription->plan_name,
+            'duration' => $metadata['duration'] ?? ($metadata['months'] ? $metadata['months'].'_months' : '1_month'),
+            'gross_amount' => $metadata['amount'] ?? 0,
+            'currency' => $metadata['currency'] ?? 'IDR',
+            'payment_type' => 'xendit_recurring',
+            'status' => 'settlement',
+            'transaction_time' => now(),
+            'metadata' => ! empty($xenditData) ? ['xendit_data' => $xenditData] : null,
+        ]);
+
+        Log::info('Xendit payment recorded in billing history', [
+            'subscription_id' => $subscription->id,
+            'transaction_id' => $xenditSubscriptionId,
+        ]);
+    }
+
+    /**
+     * Handle Xendit recurring plan inactivated webhook.
+     *
+     * @param  array  $data  The webhook data
+     */
+    private function handleXenditDeactivation(array $data): void
+    {
+        $subscriptionId = $data['id'] ?? null;
+        $referenceId = $data['reference_id'] ?? null;
+
+        Log::info('Xendit subscription inactivated', [
+            'subscription_id' => $subscriptionId,
+            'reference_id' => $referenceId,
+        ]);
+
+        // Find subscription by Xendit subscription ID
+        $subscription = Subscription::where('xendit_subscription_id', $subscriptionId)->first();
+
+        if ($subscription === null) {
+            Log::warning('Xendit subscription not found for deactivation', [
+                'xendit_subscription_id' => $subscriptionId,
+            ]);
+
+            return;
+        }
+
+        // Mark subscription as cancelled
+        $subscription->update([
+            'cancelled_at' => now(),
+        ]);
+
+        Log::info('Xendit subscription marked as cancelled', [
+            'subscription_id' => $subscription->id,
+            'xendit_subscription_id' => $subscriptionId,
+        ]);
+    }
+
+    /**
+     * Handle Xendit recurring cycle succeeded webhook.
+     *
+     * @param  array  $data  The webhook data
+     */
+    private function handleXenditCycleSuccess(array $data): void
+    {
+        $subscriptionId = $data['id'] ?? null;
+        $cycleId = $data['cycle_id'] ?? null;
+        $amount = $data['amount'] ?? null;
+
+        Log::info('Xendit subscription cycle succeeded', [
+            'subscription_id' => $subscriptionId,
+            'cycle_id' => $cycleId,
+            'amount' => $amount,
+        ]);
+
+        // Find subscription by Xendit subscription ID
+        $subscription = Subscription::where('xendit_subscription_id', $subscriptionId)->first();
+
+        if ($subscription === null) {
+            Log::warning('Xendit subscription not found for cycle success', [
+                'xendit_subscription_id' => $subscriptionId,
+            ]);
+
+            return;
+        }
+
+        // Record payment in SubscriptionPayment
+        $paymentData = [
+            'subscription_id' => $subscription->id,
+            'user_id' => $subscription->user_id,
+            'order_id' => $data['order_id'] ?? 'xendit_'.$cycleId,
+            'transaction_id' => $data['transaction_id'] ?? $cycleId,
+            'plan_name' => $subscription->plan_name,
+            'duration' => '1_month',
+            'gross_amount' => $amount ?? 0,
+            'currency' => $data['currency'] ?? 'IDR',
+            'payment_type' => 'xendit_recurring',
+            'status' => 'settlement',
+            'transaction_time' => now(),
+        ];
+
+        // Get duration from metadata
+        $metadata = is_string($subscription->metadata)
+            ? json_decode($subscription->metadata, true)
+            : $subscription->metadata;
+
+        if (isset($metadata['months'])) {
+            $paymentData['duration'] = $metadata['months'].'_months';
+        }
+
+        \App\Models\SubscriptionPayment::create($paymentData);
+
+        // Extend subscription period
+        $currentEnd = $subscription->current_period_end ?? now();
+        $monthsToAdd = $metadata['interval_count'] ?? 1;
+
+        $subscription->update([
+            'current_period_start' => $subscription->current_period_start ?? now(),
+            'current_period_end' => $currentEnd->addMonths($monthsToAdd),
+            'status' => 'active',
+        ]);
+
+        Log::info('Xendit subscription cycle recorded and period extended', [
+            'subscription_id' => $subscription->id,
+            'cycle_id' => $cycleId,
+            'new_period_end' => $subscription->fresh()->current_period_end,
+        ]);
+    }
+
+    /**
+     * Handle Xendit recurring cycle failed webhook.
+     *
+     * @param  array  $data  The webhook data
+     */
+    private function handleXenditCycleFailed(array $data): void
+    {
+        $subscriptionId = $data['id'] ?? null;
+        $cycleId = $data['cycle_id'] ?? null;
+        $failureReason = $data['failure_reason'] ?? 'Unknown';
+
+        Log::warning('Xendit subscription cycle failed', [
+            'subscription_id' => $subscriptionId,
+            'cycle_id' => $cycleId,
+            'failure_reason' => $failureReason,
+        ]);
+
+        // Find subscription by Xendit subscription ID
+        $subscription = Subscription::where('xendit_subscription_id', $subscriptionId)->first();
+
+        if ($subscription === null) {
+            Log::warning('Xendit subscription not found for cycle failure', [
+                'xendit_subscription_id' => $subscriptionId,
+            ]);
+
+            return;
+        }
+
+        // Record failed payment in SubscriptionPayment
+        \App\Models\SubscriptionPayment::create([
+            'subscription_id' => $subscription->id,
+            'user_id' => $subscription->user_id,
+            'order_id' => $data['order_id'] ?? 'xendit_failed_'.$cycleId,
+            'transaction_id' => $cycleId,
+            'plan_name' => $subscription->plan_name,
+            'duration' => '1_month',
+            'gross_amount' => $data['amount'] ?? 0,
+            'currency' => $data['currency'] ?? 'IDR',
+            'payment_type' => 'xendit_recurring',
+            'status' => 'failed',
+            'transaction_time' => now(),
+        ]);
+
+        Log::info('Xendit subscription payment failure recorded', [
+            'subscription_id' => $subscription->id,
+            'cycle_id' => $cycleId,
+            'failure_reason' => $failureReason,
+        ]);
+    }
+
+    /**
+     * Handle Xendit recurring cycle created webhook.
+     *
+     * @param  array  $data  The webhook data
+     */
+    private function handleXenditCycleCreated(array $data): void
+    {
+        $subscriptionId = $data['id'] ?? null;
+        $cycleId = $data['cycle_id'] ?? null;
+
+        Log::info('Xendit subscription cycle created', [
+            'subscription_id' => $subscriptionId,
+            'cycle_id' => $cycleId,
+        ]);
+    }
+
+    /**
+     * Handle Xendit recurring cycle retrying webhook.
+     *
+     * @param  array  $data  The webhook data
+     */
+    private function handleXenditCycleRetrying(array $data): void
+    {
+        $subscriptionId = $data['id'] ?? null;
+        $cycleId = $data['cycle_id'] ?? null;
+        $nextRetry = $data['next_retry_timestamp'] ?? null;
+
+        Log::info('Xendit subscription cycle retrying', [
+            'subscription_id' => $subscriptionId,
+            'cycle_id' => $cycleId,
+            'next_retry' => $nextRetry,
+        ]);
+    }
+
+    /**
+     * Create or update a subscription for a user from Xendit data.
+     *
+     * @param  User  $user  The user (could be master admin or POS user)
+     * @param  array  $xenditData  The Xendit recurring plan data
+     */
+    public function createOrUpdateXenditSubscription(User $user, array $xenditData): Subscription
+    {
+        // CRITICAL: Get the master admin who owns the subscription
+        $masterAdmin = $user->isMasterAdmin() ? $user : $user->getMasterAdmin();
+
+        if ($masterAdmin === null) {
+            Log::error('Cannot create Xendit subscription - no master admin found', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+            ]);
+            throw new \Exception('Cannot create subscription: User is not associated with any merchant');
+        }
+
+        $subscription = $masterAdmin->subscription;
+
+        $data = [
+            'user_id' => $masterAdmin->id,
+            'xendit_subscription_id' => $xenditData['id'],
+            'xendit_customer_id' => $xenditData['customer_id'] ?? null,
+            'plan_name' => 'pro',
+            'status' => 'pending',
+            'current_period_start' => now(),
+            'current_period_end' => now()->addMonth(),
+            'metadata' => json_encode([
+                'reference_id' => $xenditData['reference_id'] ?? null,
+                'amount' => $xenditData['amount'] ?? null,
+                'currency' => $xenditData['currency'] ?? 'IDR',
+                'interval' => $xenditData['schedule']['interval'] ?? 'MONTH',
+                'interval_count' => $xenditData['schedule']['interval_count'] ?? 1,
+                'initiated_by_user_id' => $user->id,
+                'initiated_by_email' => $user->email,
+            ]),
+        ];
+
+        if ($subscription !== null) {
+            $subscription->update($data);
+            Log::info('Xendit subscription updated', [
+                'event' => 'subscription.xendit.updated',
+                'subscriptionId' => $subscription->id,
+                'xenditSubscriptionId' => $xenditData['id'],
+            ]);
+
+            return $subscription->fresh();
+        }
+
+        $subscription = Subscription::create($data);
+        Log::info('Xendit subscription created', [
+            'event' => 'subscription.xendit.created',
+            'subscriptionId' => $subscription->id,
+            'xenditSubscriptionId' => $xenditData['id'],
+        ]);
+
+        return $subscription;
     }
 
     /**

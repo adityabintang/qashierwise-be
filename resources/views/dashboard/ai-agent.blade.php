@@ -1,4 +1,15 @@
 @extends('layouts.app')
+@include('components.dashboard-scripts')
+
+@push('styles')
+<style>
+/* Markdown rendering inside test-chat assistant bubbles */
+.prose-chat strong { font-weight: 600; }
+.prose-chat em     { font-style: italic; }
+.prose-chat li     { display: list-item; margin-left: 1.25rem; list-style-type: disc; }
+.prose-chat code   { font-family: ui-monospace, monospace; font-size: 0.75rem; }
+</style>
+@endpush
 
 @section('title', __('dashboard.ai_agent_title'))
 
@@ -250,27 +261,207 @@
                                     </p>
                                 </div>
 
+                                <!-- Meta Catalog: toggle + conditional picker -->
+                                <div class="space-y-3">
+                                    <label class="block text-sm font-medium text-[hsl(var(--foreground))]">
+                                        <i class="fas fa-book-open text-emerald-400 mr-1.5"></i>
+                                        Katalog Meta
+                                    </label>
+
+                                    <!-- Toggle row -->
+                                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl"
+                                         :class="catalogPlatformLocked ? 'bg-gray-50 border border-gray-200 opacity-70' : (config.catalog_enabled ? 'bg-emerald-100 border border-emerald-400 shadow-sm shadow-emerald-100' : 'bg-gray-50 border border-gray-200')">
+                                        <div class="flex-1">
+                                            <p class="font-medium" :class="config.catalog_enabled && !catalogPlatformLocked ? 'text-emerald-950' : 'text-gray-700'">Enable Catalog Mode</p>
+                                            <p class="text-sm" :class="config.catalog_enabled && !catalogPlatformLocked ? 'text-emerald-800' : 'text-gray-500'">
+                                                <span x-show="!catalogPlatformLocked && config.catalog_enabled">Pelanggan memilih produk lewat katalog Meta (tap menu).</span>
+                                                <span x-show="!catalogPlatformLocked && !config.catalog_enabled">Katalog non-aktif — AI Agent berjalan dalam mode AI text.</span>
+                                                <span x-show="catalogPlatformLocked"><i class="fas fa-lock mr-1"></i>Catalog mode dikunci oleh administrator (fitur beta).</span>
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            @click="if(!catalogPlatformLocked) config.catalog_enabled = !config.catalog_enabled"
+                                            :disabled="catalogPlatformLocked"
+                                            :class="[
+                                                config.catalog_enabled && !catalogPlatformLocked ? 'bg-emerald-600 ring-2 ring-emerald-200' : 'bg-gray-300',
+                                                catalogPlatformLocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                                            ]"
+                                            class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 flex-shrink-0"
+                                        >
+                                            <span
+                                                :class="config.catalog_enabled && !catalogPlatformLocked ? 'translate-x-6' : 'translate-x-1'"
+                                                class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md"
+                                            ></span>
+                                        </button>
+                                    </div>
+
+                                    <!-- Catalog picker (only when enabled) -->
+                                    <div x-show="!catalogPlatformLocked && config.catalog_enabled" x-transition class="space-y-2 pl-1">
+                                        <label class="block text-xs font-medium text-[hsl(var(--muted-foreground))]">Pilih Katalog</label>
+                                        <select
+                                            x-model="form.catalog_id"
+                                            @change="catalogLinkError = false"
+                                            class="w-full h-10 px-3 rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--background))] text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                                            :class="catalogLinkError ? 'border-red-400 focus:ring-red-400' : ''"
+                                            :disabled="catalogsLoading"
+                                        >
+                                            <option value="">-- Pilih katalog --</option>
+                                            <template x-for="catalog in catalogs" :key="catalog.id">
+                                                <option :value="catalog.id" x-text="catalog.name + ' (' + (catalog.product_count || 0) + ' produk)'"></option>
+                                            </template>
+                                        </select>
+                                        <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                                            Saat dipilih, AI akan langsung mengirim katalog ke pelanggan ketika mereka ingin melihat menu atau memesan.
+                                        </p>
+                                        <p x-show="!catalogsLoading && catalogs.length === 0" class="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                            Belum ada katalog. <a href="/dashboard/meta-catalog" class="underline hover:no-underline">Buat katalog terlebih dahulu</a>
+                                        </p>
+                                        <p x-show="catalogsLoading" class="text-xs text-[hsl(var(--muted-foreground))] mt-1 flex items-center gap-1">
+                                            <i class="fas fa-spinner fa-spin"></i>
+                                            Memuat daftar katalog…
+                                        </p>
+
+                                        <!-- Test send catalog: probe MPM to a phone before customer trigger -->
+                                        <div x-show="form.catalog_id" class="mt-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)] p-3 space-y-2">
+                                            <div class="flex items-center gap-2">
+                                                <i class="fab fa-whatsapp text-emerald-600"></i>
+                                                <span class="text-xs font-medium">Test kirim katalog</span>
+                                                <span class="text-[10px] text-[hsl(var(--muted-foreground))]">— validasi MPM sebelum customer pertama</span>
+                                            </div>
+                                            <div class="flex flex-col sm:flex-row gap-2">
+                                                <input type="tel" x-model="testCatalogPhone"
+                                                       placeholder="62812xxxxxxxx (E.164, tanpa +)"
+                                                       class="input flex-1 h-9 text-xs"
+                                                       :disabled="testCatalogSending">
+                                                <button type="button" @click="testSendCatalog()"
+                                                        :disabled="!testCatalogPhone || testCatalogSending"
+                                                        class="btn btn-outline btn-sm whitespace-nowrap">
+                                                    <i class="fas" :class="testCatalogSending ? 'fa-spinner animate-spin' : 'fa-paper-plane'"></i>
+                                                    <span x-text="testCatalogSending ? 'Mengirim…' : 'Kirim Test'"></span>
+                                                </button>
+                                            </div>
+                                            <div x-show="testCatalogResult" x-transition
+                                                 class="text-xs p-2 rounded"
+                                                 :class="testCatalogResult?.success
+                                                     ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                                                     : 'bg-red-50 border border-red-200 text-red-800'">
+                                                <div class="flex items-start gap-2">
+                                                    <i class="fas mt-0.5"
+                                                       :class="testCatalogResult?.success ? 'fa-circle-check text-emerald-600' : 'fa-circle-xmark text-red-600'"></i>
+                                                    <div class="flex-1 min-w-0">
+                                                        <div class="font-medium" x-text="testCatalogResult?.message"></div>
+                                                        <div x-show="testCatalogResult && (testCatalogResult.products_total ?? 0) > 0"
+                                                             class="text-[10px] mt-0.5 opacity-80">
+                                                            Diserahkan ke Meta: <span x-text="testCatalogResult?.products_sent ?? 0"></span> /
+                                                            <span x-text="testCatalogResult?.products_total ?? 0"></span> produk
+                                                            (Meta yang memutuskan berapa sampai ke WhatsApp)
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <p class="text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                Semua produk available dikirim ke Meta; Meta yang filter berdasarkan
+                                                aturan internal-nya. Sukses = Meta menerima request, bukan jaminan
+                                                semua produk sampai. Untuk test number, nomor harus sudah di-allowlist.
+                                            </p>
+                                        </div>
+
+                                        <!-- Error: catalog already linked to another WABA -->
+                                        <div x-show="catalogLinkError" x-transition class="mt-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                                            <div class="flex items-start gap-2">
+                                                <i class="fas fa-exclamation-circle mt-0.5 text-red-500 shrink-0"></i>
+                                                <div class="space-y-1">
+                                                    <p class="font-semibold">Katalog sudah terhubung ke WhatsApp lain</p>
+                                                    <p class="text-red-700">Katalog ini sudah ditautkan ke akun WhatsApp Business lain. Meta hanya mengizinkan satu koneksi per katalog.</p>
+                                                    <p class="text-red-700">Pilih salah satu:</p>
+                                                    <ul class="list-disc list-inside space-y-1 text-red-700">
+                                                        <li>
+                                                            <a href="https://business.facebook.com/commerce" target="_blank" rel="noopener"
+                                                               class="font-medium underline hover:no-underline">
+                                                                Buka Meta Commerce Manager
+                                                            </a>
+                                                            → pilih katalog → Settings → WhatsApp Accounts → Disconnect, lalu simpan ulang.
+                                                        </li>
+                                                        <li>Atau pilih katalog lain dari dropdown di atas.</li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <!-- Order Toggle - AFTER store selection -->
-                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl" :class="form.default_store_id ? 'bg-emerald-50 border border-emerald-200' : 'bg-gray-50 border border-gray-200'">
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl"
+                                    :class="orderCatalogLocked || !form.default_store_id ? 'bg-gray-50 border border-gray-200 opacity-70' : (config.order_enabled ? 'bg-emerald-100 border border-emerald-400 shadow-sm shadow-emerald-100' : 'bg-emerald-50 border border-emerald-200')">
                                     <div class="flex-1">
-                                        <p class="font-medium" :class="form.default_store_id ? 'text-emerald-900' : 'text-gray-600'">Enable Order via Chat</p>
-                                        <p class="text-sm" :class="form.default_store_id ? 'text-emerald-700' : 'text-gray-500'">
-                                            <span x-show="form.default_store_id">Pelanggan bisa melihat produk, menambah ke keranjang, dan order langsung via chat</span>
+                                        <p class="font-medium" :class="config.order_enabled && !orderCatalogLocked && form.default_store_id ? 'text-emerald-950' : (orderCatalogLocked ? 'text-gray-600' : (form.default_store_id ? 'text-emerald-900' : 'text-gray-600'))">Enable Order via Chat</p>
+                                        <p class="text-sm" :class="config.order_enabled && !orderCatalogLocked && form.default_store_id ? 'text-emerald-800' : 'text-gray-500'">
                                             <span x-show="!form.default_store_id"><i class="fas fa-info-circle mr-1"></i>Pilih store terlebih dahulu untuk mengaktifkan fitur ini</span>
+                                            <span x-show="form.default_store_id && catalogs.length === 0"><i class="fas fa-lock mr-1"></i>Buat katalog terlebih dahulu untuk mengaktifkan fitur ini</span>
+                                            <span x-show="form.default_store_id && catalogs.length > 0 && orderCatalogLocked"><i class="fas fa-lock mr-1"></i>Katalog belum memiliki produk — tambahkan produk terlebih dahulu</span>
+                                            <span x-show="form.default_store_id && !orderCatalogLocked">Pelanggan bisa melihat produk, menambah ke keranjang, dan order langsung via chat</span>
                                         </p>
                                     </div>
                                     <button
                                         type="button"
-                                        @click="if(form.default_store_id) config.order_enabled = !config.order_enabled"
-                                        :disabled="!form.default_store_id"
+                                        @click="if(form.default_store_id && !orderCatalogLocked) config.order_enabled = !config.order_enabled"
+                                        :disabled="!form.default_store_id || orderCatalogLocked"
                                         :class="[
-                                            config.order_enabled && form.default_store_id ? 'bg-emerald-500' : 'bg-gray-300',
-                                            !form.default_store_id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                                            config.order_enabled && form.default_store_id && !orderCatalogLocked ? 'bg-emerald-600 ring-2 ring-emerald-200' : 'bg-gray-300',
+                                            (!form.default_store_id || orderCatalogLocked) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
                                         ]"
                                         class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 flex-shrink-0"
                                     >
                                         <span
-                                            :class="config.order_enabled && form.default_store_id ? 'translate-x-6' : 'translate-x-1'"
+                                            :class="config.order_enabled && form.default_store_id && !orderCatalogLocked ? 'translate-x-6' : 'translate-x-1'"
+                                            class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md"
+                                        ></span>
+                                    </button>
+                                </div>
+
+                                <!-- No Reservation Config Warning -->
+                                <div x-show="!hasReservationConfig" x-transition class="bg-red-50 border border-red-200 rounded-xl p-4">
+                                    <p class="text-sm text-red-800 font-medium">
+                                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                                        Konfigurasi reservasi belum dibuat
+                                    </p>
+                                    <p class="text-sm text-red-700 mt-1">
+                                        Reservasi via chat memerlukan konfigurasi reservasi aktif. Silakan atur jadwal, kapasitas, dan slot reservasi terlebih dahulu agar dapat menggunakan fitur ini.
+                                    </p>
+                                    <a href="{{ config('app.url') }}/dashboard/reservations/config"
+                                        class="inline-flex items-center gap-2 mt-3 text-sm font-medium text-red-700 underline hover:no-underline">
+                                        <i class="fas fa-external-link-alt"></i>
+                                        Atur konfigurasi reservasi sekarang
+                                    </a>
+                                </div>
+
+                                <!-- Reservation Toggle (locked until reservation config exists) -->
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl"
+                                    :class="!hasReservationConfig ? 'bg-gray-50 border border-gray-200 opacity-60' : (config.reservation_enabled ? 'bg-purple-100 border border-purple-400 shadow-sm shadow-purple-100' : 'bg-gray-50 border border-gray-200')">
+                                    <div class="flex-1">
+                                        <p class="font-medium" :class="config.reservation_enabled && hasReservationConfig ? 'text-purple-950' : 'text-gray-600'">Enable Reservation via Chat</p>
+                                        <p class="text-sm" :class="config.reservation_enabled && hasReservationConfig ? 'text-purple-800' : 'text-gray-500'">
+                                            <span x-show="config.reservation_enabled && hasReservationConfig">AI Agent akan mengirim form reservasi agar pelanggan bisa booking meja via chat</span>
+                                            <span x-show="!config.reservation_enabled || !hasReservationConfig">Reservasi via chat nonaktif</span>
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        @click="hasReservationConfig && (config.reservation_enabled = !config.reservation_enabled)"
+                                        :class="{
+                                            'bg-purple-600 ring-2 ring-purple-200': config.reservation_enabled && hasReservationConfig,
+                                            'bg-gray-300': !(config.reservation_enabled && hasReservationConfig),
+                                            'cursor-not-allowed': !hasReservationConfig,
+                                            'cursor-pointer': hasReservationConfig
+                                        }"
+                                        :disabled="!hasReservationConfig"
+                                        :title="!hasReservationConfig ? 'Atur konfigurasi reservasi terlebih dahulu untuk mengaktifkan fitur ini' : ''"
+                                        class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 flex-shrink-0"
+                                    >
+                                        <span
+                                            :class="config.reservation_enabled && hasReservationConfig ? 'translate-x-6' : 'translate-x-1'"
                                             class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md"
                                         ></span>
                                     </button>
@@ -304,30 +495,54 @@
                                 </p>
                             </div>
                             <div class="p-4 sm:p-6 space-y-5">
+                                <!-- No Sub-Merchant Warning -->
+                                <div x-show="!hasSubMerchant" x-transition class="bg-red-50 border border-red-200 rounded-xl p-4">
+                                    <p class="text-sm text-red-800 font-medium">
+                                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                                        Sub Merchant belum dibuat
+                                    </p>
+                                    <p class="text-sm text-red-700 mt-1">
+                                        QRIS Payment memerlukan Sub Merchant aktif. Silakan buat Sub Merchant terlebih dahulu agar dapat menggunakan fitur ini.
+                                    </p>
+                                    <a href="{{ config('app.url') }}/dashboard/sub-merchant/"
+                                        class="inline-flex items-center gap-2 mt-3 text-sm font-medium text-red-700 underline hover:no-underline">
+                                        <i class="fas fa-external-link-alt"></i>
+                                        Buat Sub Merchant sekarang
+                                    </a>
+                                </div>
+
                                 <!-- QRIS Toggle -->
-                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl" :class="config.qris_enabled ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50 border border-gray-200'">
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl"
+                                    :class="!hasSubMerchant ? 'bg-gray-50 border border-gray-200 opacity-60' : (config.qris_enabled ? 'bg-blue-100 border border-blue-400 shadow-sm shadow-blue-100' : 'bg-gray-50 border border-gray-200')">
                                     <div class="flex-1">
-                                        <p class="font-medium" :class="config.qris_enabled ? 'text-blue-900' : 'text-gray-600'">Enable QRIS Payment</p>
-                                        <p class="text-sm" :class="config.qris_enabled ? 'text-blue-700' : 'text-gray-500'">
-                                            <span x-show="config.qris_enabled">QRIS akan otomatis di-generate saat pelanggan konfirmasi pembelian</span>
-                                            <span x-show="!config.qris_enabled">Pembayaran manual - pelanggan akan diarahkan ke kasir</span>
+                                        <p class="font-medium" :class="config.qris_enabled && hasSubMerchant ? 'text-blue-950' : 'text-gray-600'">Enable QRIS Payment</p>
+                                        <p class="text-sm" :class="config.qris_enabled && hasSubMerchant ? 'text-blue-800' : 'text-gray-500'">
+                                            <span x-show="config.qris_enabled && hasSubMerchant">QRIS akan otomatis di-generate saat pelanggan konfirmasi pembelian</span>
+                                            <span x-show="!config.qris_enabled || !hasSubMerchant">Pembayaran manual - pelanggan akan diarahkan ke kasir</span>
                                         </p>
                                     </div>
                                     <button
                                         type="button"
-                                        @click="config.qris_enabled = !config.qris_enabled"
-                                        :class="config.qris_enabled ? 'bg-blue-500' : 'bg-gray-300'"
-                                        class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex-shrink-0 cursor-pointer"
+                                        @click="hasSubMerchant && (config.qris_enabled = !config.qris_enabled)"
+                                        :class="{
+                                            'bg-blue-600 ring-2 ring-blue-200': config.qris_enabled && hasSubMerchant,
+                                            'bg-gray-300': !(config.qris_enabled && hasSubMerchant),
+                                            'cursor-not-allowed': !hasSubMerchant,
+                                            'cursor-pointer': hasSubMerchant
+                                        }"
+                                        :disabled="!hasSubMerchant"
+                                        :title="!hasSubMerchant ? 'Buat Sub Merchant terlebih dahulu untuk mengaktifkan QRIS' : ''"
+                                        class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex-shrink-0"
                                     >
                                         <span
-                                            :class="config.qris_enabled ? 'translate-x-6' : 'translate-x-1'"
+                                            :class="config.qris_enabled && hasSubMerchant ? 'translate-x-6' : 'translate-x-1'"
                                             class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md"
                                         ></span>
                                     </button>
                                 </div>
 
                                 <!-- QRIS Enabled Info -->
-                                <div x-show="config.qris_enabled" x-transition class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                                <div x-show="config.qris_enabled && hasSubMerchant" x-transition class="bg-blue-50 border border-blue-200 rounded-xl p-4">
                                     <p class="text-sm text-blue-800 font-medium">
                                         <i class="fas fa-check-circle mr-2"></i>
                                         QRIS Payment aktif! Saat pelanggan konfirmasi pembelian:
@@ -337,14 +552,15 @@
                                         <li>Pelanggan dapat scan QR code untuk bayar</li>
                                         <li>Setelah pembayaran sukses, AI akan mengirim konfirmasi dengan Order ID, nama produk, dan total harga</li>
                                     </ul>
-                                    <p class="text-xs text-blue-600 mt-3 flex items-center gap-1">
+                                    <!-- Provider Settings info - Temporarily Hidden -->
+                                    <p class="hidden text-xs text-blue-600 mt-3 flex items-center gap-1">
                                         <i class="fas fa-info-circle"></i>
                                         Pastikan payment provider sudah dikonfigurasi di <a href="/dashboard/sub-merchant/provider-settings" class="underline hover:no-underline">Provider Settings</a>
                                     </p>
                                 </div>
 
-                                <!-- QRIS Disabled Info -->
-                                <div x-show="!config.qris_enabled" x-transition class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                                <!-- QRIS Disabled Info (only show when sub-merchant exists but QRIS off) -->
+                                <div x-show="hasSubMerchant && !config.qris_enabled" x-transition class="bg-amber-50 border border-amber-200 rounded-xl p-4">
                                     <p class="text-sm text-amber-800 font-medium">
                                         <i class="fas fa-info-circle mr-2"></i>
                                         Mode Manual - Saat pelanggan konfirmasi pembelian:
@@ -354,6 +570,168 @@
                                         <li>Status pembayaran: <span class="font-medium">Pending</span></li>
                                         <li>Pelanggan diminta menunjukkan pesan tersebut ke kasir untuk diproses</li>
                                     </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Delivery Feature Card -->
+                        <div class="card" x-show="config.order_enabled && form.default_store_id">
+                            <div class="card-header border-b border-[hsl(var(--border))]">
+                                <h3 class="card-title flex items-center gap-2">
+                                    <i class="fas fa-truck text-orange-500"></i>
+                                    Delivery
+                                </h3>
+                                <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                                    Aktifkan fitur delivery agar pelanggan bisa memilih pickup atau delivery saat order via chat
+                                </p>
+                            </div>
+                            <div class="p-4 sm:p-6 space-y-5">
+                                <!-- Delivery Toggle -->
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl" :class="config.delivery_enabled ? 'bg-orange-100 border border-orange-400 shadow-sm shadow-orange-100' : 'bg-gray-50 border border-gray-200'">
+                                    <div class="flex-1">
+                                        <p class="font-medium" :class="config.delivery_enabled ? 'text-orange-950' : 'text-gray-600'">Enable Delivery</p>
+                                        <p class="text-sm" :class="config.delivery_enabled ? 'text-orange-800' : 'text-gray-500'">
+                                            <span x-show="config.delivery_enabled">AI akan bertanya "Pickup atau Delivery?" sebelum checkout</span>
+                                            <span x-show="!config.delivery_enabled">Pelanggan hanya bisa pickup</span>
+                                        </p>
+                                        <p x-show="!deliveryMasterActive" class="text-xs text-amber-600 mt-1">
+                                            <i class="fas fa-lock mr-1"></i>Aktifkan "Delivery" di
+                                            <a href="/dashboard/delivery" class="underline font-medium">halaman Delivery</a> terlebih dahulu.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        @click="toggleDeliveryEnabled()"
+                                        :disabled="!deliveryMasterActive"
+                                        :class="[config.delivery_enabled ? 'bg-orange-600 ring-2 ring-orange-200' : 'bg-gray-300', !deliveryMasterActive ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer']"
+                                        class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 flex-shrink-0"
+                                    >
+                                        <span
+                                            :class="config.delivery_enabled ? 'translate-x-6' : 'translate-x-1'"
+                                            class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md"
+                                        ></span>
+                                    </button>
+                                </div>
+
+                                <!-- Delivery Info -->
+                                <div x-show="config.delivery_enabled" x-transition class="bg-orange-50 border border-orange-200 rounded-xl p-4">
+                                    <p class="text-sm text-orange-800 font-medium">
+                                        <i class="fas fa-check-circle mr-2"></i>
+                                        Delivery aktif! Alur AI Agent:
+                                    </p>
+                                    <ul class="text-sm text-orange-700 mt-2 ml-6 list-disc space-y-1">
+                                        <li>Pelanggan pilih menu → tambah ke keranjang</li>
+                                        <li>AI bertanya: "Pickup atau Delivery?"</li>
+                                        <li>Jika delivery → AI tanya alamat → ongkir otomatis ditambahkan</li>
+                                        <li>Pelanggan bisa tambah catatan (catatan)</li>
+                                        <li>Konfirmasi pesanan dengan semua detail</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Follow-up Settings Card -->
+                        <div class="card mb-6">
+                            <div class="p-4 sm:p-6">
+                                <div class="flex items-start gap-3 mb-4">
+                                    <div class="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-clock text-amber-600"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-base font-semibold">Follow-up Settings</h3>
+                                        <p class="text-sm text-[hsl(var(--muted-foreground))] mt-0.5">
+                                            Atur pengingat otomatis saat pelanggan diam di tengah proses pemesanan.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-4">
+                                    <!-- Enable Follow-up Toggle -->
+                                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl"
+                                         :class="form.settings.followup_enabled ? 'bg-amber-50 border border-amber-300' : 'bg-gray-50 border border-gray-200'">
+                                        <div class="flex-1">
+                                            <p class="font-medium" :class="form.settings.followup_enabled ? 'text-amber-950' : 'text-gray-700'">Enable Follow-up</p>
+                                            <p class="text-sm" :class="form.settings.followup_enabled ? 'text-amber-800' : 'text-gray-500'">
+                                                <span x-show="form.settings.followup_enabled">Kirim pesan pengingat jika customer tidak merespon dalam interval tertentu.</span>
+                                                <span x-show="!form.settings.followup_enabled">Follow-up nonaktif. Pelanggan tidak akan dikirim pengingat otomatis.</span>
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            @click="form.settings.followup_enabled = !form.settings.followup_enabled"
+                                            :class="form.settings.followup_enabled ? 'bg-amber-500 ring-2 ring-amber-200' : 'bg-gray-300'"
+                                            class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none cursor-pointer flex-shrink-0"
+                                        >
+                                            <span
+                                                :class="form.settings.followup_enabled ? 'translate-x-6' : 'translate-x-1'"
+                                                class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md"
+                                            ></span>
+                                        </button>
+                                    </div>
+
+                                    <!-- Interval picker -->
+                                    <div x-show="form.settings.followup_enabled" x-transition class="space-y-2">
+                                        <label class="block text-sm font-medium text-[hsl(var(--foreground))]">
+                                            Interval antar follow-up
+                                        </label>
+                                        <div class="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                                            <template x-for="opt in followupIntervalOptions" :key="opt">
+                                                <button
+                                                    type="button"
+                                                    @click="form.settings.followup_interval_minutes = opt"
+                                                    :class="form.settings.followup_interval_minutes === opt
+                                                        ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                                                        : 'bg-white text-gray-700 border-gray-300 hover:border-amber-400'"
+                                                    class="h-10 rounded-lg border text-sm font-medium transition-all cursor-pointer"
+                                                    x-text="opt + ' mnt'"
+                                                ></button>
+                                            </template>
+                                        </div>
+                                        <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                                            Pesan pengingat dikirim setiap
+                                            <span x-text="form.settings.followup_interval_minutes" class="font-semibold"></span>
+                                            menit ketika pelanggan diam di tengah flow.
+                                        </p>
+                                    </div>
+
+                                    <!-- Auto-cancel (max follow-up count is hardcoded to 3) -->
+                                    <div x-show="form.settings.followup_enabled" x-transition>
+                                        <div class="flex items-start gap-3 p-3 rounded-lg border"
+                                             :class="form.settings.followup_auto_cancel ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'">
+                                            <button
+                                                type="button"
+                                                @click="form.settings.followup_auto_cancel = !form.settings.followup_auto_cancel"
+                                                :class="form.settings.followup_auto_cancel ? 'bg-red-500 ring-2 ring-red-200' : 'bg-gray-300'"
+                                                class="mt-0.5 relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer flex-shrink-0"
+                                            >
+                                                <span
+                                                    :class="form.settings.followup_auto_cancel ? 'translate-x-5' : 'translate-x-1'"
+                                                    class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow"
+                                                ></span>
+                                            </button>
+                                            <div class="text-sm">
+                                                <p class="font-medium" :class="form.settings.followup_auto_cancel ? 'text-red-900' : 'text-gray-700'">Auto-cancel</p>
+                                                <p class="text-xs mt-0.5" :class="form.settings.followup_auto_cancel ? 'text-red-700' : 'text-gray-500'">
+                                                    Batalkan pesanan setelah follow-up maksimum tercapai.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Inline summary -->
+                                    <div x-show="form.settings.followup_enabled" x-transition class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                        <p>
+                                            Ringkasan: pesan pengingat dikirim hingga
+                                            <span class="font-semibold">3</span>×,
+                                            tiap <span class="font-semibold" x-text="form.settings.followup_interval_minutes"></span> menit.
+                                            <template x-if="form.settings.followup_auto_cancel">
+                                                <span>Pesanan auto-batal di menit ke <span class="font-semibold" x-text="form.settings.followup_interval_minutes * 4"></span>.</span>
+                                            </template>
+                                            <template x-if="!form.settings.followup_auto_cancel">
+                                                <span>Setelah itu pengingat berhenti tanpa membatalkan pesanan.</span>
+                                            </template>
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -462,13 +840,27 @@
                 <!-- Messages -->
                 <template x-for="(msg, index) in testMessages" :key="index">
                     <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
-                        <div :class="msg.role === 'user' ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-800'" class="rounded-lg px-4 py-2 max-w-[80%]">
-                            <p class="text-sm whitespace-pre-wrap" x-text="msg.content"></p>
-                        </div>
+                        <!-- User bubble: plain text, no markdown -->
+                        <template x-if="msg.role === 'user'">
+                            <div class="bg-purple-500 text-white rounded-lg px-4 py-2 max-w-[80%]">
+                                <p class="text-sm whitespace-pre-wrap" x-text="msg.content"></p>
+                            </div>
+                        </template>
+                        <!-- Assistant bubble: render markdown as HTML -->
+                        <template x-if="msg.role === 'assistant'">
+                            <div class="bg-gray-100 text-gray-800 rounded-lg px-4 py-2 max-w-[80%]">
+                                <div class="text-sm prose-chat" x-html="parseMarkdown(msg.content)"></div>
+                                <!-- blinking cursor while streaming -->
+                                <span
+                                    x-show="msg.streaming"
+                                    class="inline-block w-0.5 h-3.5 bg-gray-500 ml-0.5 align-middle animate-pulse"
+                                ></span>
+                            </div>
+                        </template>
                     </div>
                 </template>
 
-                <!-- Loading State -->
+                <!-- Initial loading spinner (shown before first token arrives) -->
                 <div x-show="testLoading" class="flex justify-start">
                     <div class="bg-gray-100 rounded-lg px-4 py-2">
                         <i class="fas fa-spinner animate-spin text-gray-500"></i>
@@ -515,15 +907,35 @@ function aiAgentApp() {
         loading: true,
         saving: false,
         hasWhatsAppAccount: false,
+        hasSubMerchant: false,
+        hasReservationConfig: false,
+        catalogPlatformLocked: false,
+        get orderCatalogLocked() {
+            if (this.catalogs.length === 0) return true;
+            const selected = this.catalogs.find(c => String(c.id) === String(this.form.catalog_id));
+            return !selected || (selected.product_count || 0) === 0;
+        },
+        deliveryMasterActive: true,
         togglingActive: false,
         togglingOrder: false,
         lastSaved: null,
         stores: [],
+        catalogs: [],
+        catalogsLoading: false,
+        catalogLinkError: false,
+        // Test send catalog state
+        testCatalogPhone: '',
+        testCatalogSending: false,
+        testCatalogResult: null,
+        followupIntervalOptions: [5, 10, 15, 20, 30, 45, 60],
         config: {
             id: null,
             is_active: false,
             order_enabled: false,
             qris_enabled: false,
+            reservation_enabled: false,
+            delivery_enabled: false,
+            catalog_enabled: false,
         },
         form: {
             bot_name: '',
@@ -535,6 +947,18 @@ function aiAgentApp() {
                 phone: '',
             },
             default_store_id: '',
+            catalog_id: '',
+            default_ongkir: 0,
+            settings: {
+                followup_enabled: true,
+                followup_interval_minutes: 10,
+                followup_max_count: 3,
+                followup_auto_cancel: true,
+                drip_enabled: true,
+                quiet_hours_start: null,
+                quiet_hours_end: null,
+                max_drips_per_24h: 3,
+            },
         },
         // Test modal
         showTestModal: false,
@@ -547,15 +971,98 @@ function aiAgentApp() {
             this.initSidebar();
 
             try {
-                // Load stores
-                await this.loadStores();
+                // Load stores and catalogs in parallel
+                await Promise.all([
+                    this.loadStores(),
+                    this.loadCatalogs(),
+                ]);
 
                 // Load AI Agent config
                 await this.loadConfig();
+                await this.loadDeliveryMaster();
             } catch (error) {
                 console.error('Init error:', error);
             } finally {
                 this.loading = false;
+            }
+        },
+
+        // Delivery is gated by the master switch on /dashboard/delivery.
+        async loadDeliveryMaster() {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch('/api/delivery/config', { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
+                const data = await res.json();
+                if (data.success) {
+                    this.deliveryMasterActive = !!data.data.is_active;
+                    if (!this.deliveryMasterActive) this.config.delivery_enabled = false;
+                }
+            } catch (e) { /* keep default */ }
+        },
+        toggleDeliveryEnabled() {
+            if (!this.deliveryMasterActive) {
+                this.showNotification('Aktifkan "Delivery" di halaman Delivery terlebih dahulu.', 'warning');
+                return;
+            }
+            this.config.delivery_enabled = !this.config.delivery_enabled;
+        },
+
+        async loadCatalogs() {
+            const token = localStorage.getItem('token');
+            this.catalogsLoading = true;
+            try {
+                const response = await fetch('/api/whatsapp/catalog/catalogs', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json',
+                    }
+                });
+                const data = await response.json();
+                // API returns { success, data: { catalogs: [...], business_id, total, filtered_out } }
+                const catalogs = data?.data?.catalogs;
+                if (data?.success && Array.isArray(catalogs)) {
+                    this.catalogs = catalogs;
+                }
+            } catch (error) {
+                console.error('Failed to load catalogs:', error);
+            } finally {
+                this.catalogsLoading = false;
+            }
+        },
+
+        async testSendCatalog() {
+            if (!this.form.catalog_id || !this.testCatalogPhone) return;
+            const token = localStorage.getItem('token');
+            this.testCatalogSending = true;
+            this.testCatalogResult = null;
+            try {
+                const response = await fetch('/api/whatsapp/catalog/test-send', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        catalog_id: this.form.catalog_id,
+                        phone: this.testCatalogPhone,
+                        bot_name: this.form.bot_name || 'Test',
+                    }),
+                });
+                const data = await response.json();
+                this.testCatalogResult = {
+                    success: !!data.success,
+                    message: data.message || (data.success ? 'Terkirim.' : 'Gagal mengirim.'),
+                    products_sent: data.products_sent ?? 0,
+                    products_total: data.products_total ?? 0,
+                };
+            } catch (e) {
+                this.testCatalogResult = {
+                    success: false,
+                    message: 'Network error: ' + (e?.message || e),
+                };
+            } finally {
+                this.testCatalogSending = false;
             }
         },
 
@@ -570,7 +1077,8 @@ function aiAgentApp() {
                 });
                 const data = await response.json();
                 if (data.success && data.data) {
-                    this.stores = data.data.filter(s => s.is_active);
+                    const stores = Array.isArray(data.data) ? data.data : (data.data.data || []);
+                    this.stores = stores.filter(s => s.is_active);
                 }
             } catch (error) {
                 console.error('Failed to load stores:', error);
@@ -596,13 +1104,25 @@ function aiAgentApp() {
                 }
 
                 this.hasWhatsAppAccount = true;
+                this.hasSubMerchant = data.has_sub_merchant || false;
+                this.hasReservationConfig = data.has_reservation_config || false;
+                this.catalogPlatformLocked = data.catalog_platform_locked || false;
 
                 if (data.success && data.data) {
+                    const settings = data.data.settings || {};
                     this.config = {
                         id: data.data.id,
                         is_active: data.data.is_active,
                         order_enabled: data.data.order_enabled,
-                        qris_enabled: data.data.qris_enabled || false,
+                        // Force features off when their prerequisite config is
+                        // missing — keeps the locked toggle visually OFF and
+                        // prevents the save endpoint from rejecting with 422.
+                        qris_enabled: (data.data.qris_enabled && this.hasSubMerchant) || false,
+                        reservation_enabled: (data.data.reservation_enabled && this.hasReservationConfig) || false,
+                        delivery_enabled: data.data.delivery_enabled || false,
+                        // Platform lock wins: hide the user toggle effect even
+                        // if the DB row has it ON.
+                        catalog_enabled: (data.data.catalog_enabled && !this.catalogPlatformLocked) || false,
                     };
                     this.form = {
                         bot_name: data.data.bot_name || '',
@@ -614,6 +1134,18 @@ function aiAgentApp() {
                             phone: data.data.business_info?.phone || '',
                         },
                         default_store_id: data.data.default_store_id || '',
+                        catalog_id: data.data.catalog_id || '',
+                        default_ongkir: data.data.default_ongkir || 0,
+                        settings: {
+                            followup_enabled: settings.followup_enabled ?? true,
+                            followup_interval_minutes: settings.followup_interval_minutes ?? 10,
+                            followup_max_count: settings.followup_max_count ?? 3,
+                            followup_auto_cancel: settings.followup_auto_cancel ?? true,
+                            drip_enabled: settings.drip_enabled ?? true,
+                            quiet_hours_start: settings.quiet_hours_start ?? null,
+                            quiet_hours_end: settings.quiet_hours_end ?? null,
+                            max_drips_per_24h: settings.max_drips_per_24h ?? 3,
+                        },
                     };
                     if (data.data.updated_at) {
                         this.lastSaved = new Date(data.data.updated_at).toLocaleString('id-ID');
@@ -646,18 +1178,27 @@ function aiAgentApp() {
                         system_prompt: this.form.system_prompt,
                         business_info: this.form.business_info,
                         default_store_id: this.form.default_store_id || null,
+                        catalog_id: this.form.catalog_id || null,
+                        catalog_enabled: this.config.catalog_enabled,
                         is_active: this.config.is_active,
                         order_enabled: this.config.order_enabled,
                         qris_enabled: this.config.qris_enabled,
+                        reservation_enabled: this.config.reservation_enabled,
+                        delivery_enabled: this.config.delivery_enabled,
+                        default_ongkir: this.form.default_ongkir || 0,
+                        settings: this.form.settings,
                     }),
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
+                    this.catalogLinkError = false;
                     this.config.id = data.data.id;
                     this.lastSaved = new Date().toLocaleString('id-ID');
                     this.showNotification('Configuration saved successfully!', 'success');
+                } else if (data.error_code === 'CATALOG_ALREADY_LINKED_ELSEWHERE') {
+                    this.catalogLinkError = true;
                 } else {
                     this.showNotification(data.message || 'Failed to save', 'error');
                 }
@@ -791,42 +1332,120 @@ function aiAgentApp() {
             this.testInput = '';
             this.testLoading = true;
 
-            // Scroll to bottom
-            this.$nextTick(() => {
-                const chatArea = document.getElementById('testChatArea');
-                if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
-            });
+            const scrollToBottom = () => {
+                this.$nextTick(() => {
+                    const chatArea = document.getElementById('testChatArea');
+                    if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
+                });
+            };
+            scrollToBottom();
 
             const token = localStorage.getItem('token');
 
             try {
-                const response = await fetch('/api/ai-agent/test', {
+                const response = await fetch('/api/ai-agent/test/stream', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json',
+                        'Accept': 'text/event-stream',
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({ message }),
                 });
 
-                const data = await response.json();
-
-                if (data.success) {
-                    this.testMessages.push({ role: 'assistant', content: data.data.ai_response });
-                } else {
-                    this.testMessages.push({ role: 'assistant', content: 'Error: ' + (data.message || 'Failed to get response') });
+                if (!response.ok || !response.body) {
+                    throw new Error('Stream unavailable (HTTP ' + response.status + ')');
                 }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                // Add empty assistant bubble that will be filled token by token
+                const bubbleIndex = this.testMessages.length;
+                this.testMessages.push({ role: 'assistant', content: '', streaming: true });
+                this.testLoading = false; // hide spinner once bubble is visible
+                scrollToBottom();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // keep incomplete line
+
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        let event;
+                        try { event = JSON.parse(line.slice(6)); } catch { continue; }
+
+                        if (event.type === 'token') {
+                            this.testMessages[bubbleIndex].content += event.content;
+                            scrollToBottom();
+                        } else if (event.type === 'done') {
+                            this.testMessages[bubbleIndex].streaming = false;
+                            scrollToBottom();
+                        } else if (event.type === 'error') {
+                            this.testMessages[bubbleIndex].content = 'Error: ' + event.message;
+                            this.testMessages[bubbleIndex].streaming = false;
+                        }
+                    }
+                }
+
+                // Ensure streaming flag is cleared if stream ended without 'done' event
+                if (this.testMessages[bubbleIndex]?.streaming) {
+                    this.testMessages[bubbleIndex].streaming = false;
+                }
+
             } catch (error) {
-                console.error('Test error:', error);
-                this.testMessages.push({ role: 'assistant', content: 'Error: Failed to connect to AI Agent' });
+                console.error('Test stream error:', error);
+                this.testMessages.push({ role: 'assistant', content: 'Error: Gagal terhubung ke AI Agent', streaming: false });
+                scrollToBottom();
             } finally {
                 this.testLoading = false;
-                this.$nextTick(() => {
-                    const chatArea = document.getElementById('testChatArea');
-                    if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
-                });
             }
+        },
+
+        /**
+         * Convert a subset of Markdown to safe HTML for the chat bubble.
+         * Only processes: bold, italic, inline code, headings, bullet lists, newlines.
+         * HTML-escapes the input first to prevent XSS.
+         */
+        parseMarkdown(text) {
+            if (!text) return '';
+
+            // 1. Escape HTML entities to prevent XSS
+            let html = text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+
+            // 2. Headings (### ## #) — before bold so # isn't confused
+            html = html.replace(/^### (.+)$/gm, '<strong class="block text-sm">$1</strong>');
+            html = html.replace(/^## (.+)$/gm,  '<strong class="block text-sm">$1</strong>');
+            html = html.replace(/^# (.+)$/gm,   '<strong class="block text-sm">$1</strong>');
+
+            // 3. Bold **text** or __text__
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/__(.+?)__/g,     '<strong>$1</strong>');
+
+            // 4. Italic *text* or _text_ (single, not double)
+            html = html.replace(/\*([^*\n]+?)\*/g, '<em>$1</em>');
+            html = html.replace(/_([^_\n]+?)_/g,   '<em>$1</em>');
+
+            // 5. Inline code `text`
+            html = html.replace(/`([^`]+)`/g, '<code class="bg-gray-200 rounded px-1 text-xs font-mono">$1</code>');
+
+            // 6. Bullet list items (- item or • item at line start)
+            html = html.replace(/^[ \t]*[-•]\s+(.+)$/gm, '<li class="ml-4 list-disc">$1</li>');
+
+            // 7. Newlines → <br> (but collapse consecutive <br> after list items)
+            html = html.replace(/\n/g, '<br>');
+            html = html.replace(/(<\/li>)<br>/g, '$1');
+
+            return html;
         },
 
         showNotification(message, type = 'info') {

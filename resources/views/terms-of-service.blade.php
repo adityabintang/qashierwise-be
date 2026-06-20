@@ -3,37 +3,31 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="{{ __('legal.terms_of_service.meta_description') }}">
     <title>{{ __('legal.terms_of_service.meta_title') }}</title>
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#4910ce',
-                    }
-                }
-            }
-        }
-    </script>
-
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <!-- Alpine.js -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/logo-32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/logo-16.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/logo-180.png') }}">
+    <link rel="manifest" href="{{ asset('site.webmanifest') }}">
+    <meta name="theme-color" content="#4910ce">
+        <!-- Vite Assets (Tailwind CSS v4 + JS bundle with Alpine only) -->
+    @vite(['resources/css/app.css', 'resources/js/static.js'])
     <style>
-        body { font-family: 'Inter', sans-serif; }
         [x-cloak] { display: none !important; }
     </style>
+
+    <!-- Trigger Alpine.js to load immediately for legal pages (menu interaction) -->
+    <script>
+        // Trigger Alpine loading immediately by dispatching an event
+        // This overrides the 3s delay in static.js for better LCP
+        document.addEventListener('DOMContentLoaded', () => {
+            // Dispatch a click event to trigger Alpine loading from static.js
+            document.dispatchEvent(new Event('click'));
+        });
+    </script>
 </head>
 <body class="bg-white">
     <!-- Navigation -->

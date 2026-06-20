@@ -55,10 +55,6 @@
             <i class="fas fa-file-alt w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_templates') }}</span>
         </a>
-        <a href="/dashboard/reservations" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'reservations' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('reservations')">
-            <i class="fas fa-calendar-check w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>Reservations</span>
-        </a>
         <a href="/dashboard/profile" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'profile' ? 'active' : '' }}">
             <i class="fas fa-building w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_business_profile') }}</span>
@@ -70,6 +66,34 @@
         <a href="/dashboard/ai-agent" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'ai-agent' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('ai-agent')">
             <i class="fas fa-robot w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_ai_agent') }}</span>
+        </a>
+        <a href="/dashboard/customer-tags" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'customer-tags' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('customer-tags')">
+            <i class="fas fa-tags w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_customer_tags') }}</span>
+        </a>
+
+        <a href="/dashboard/developer/webhooks" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'developer-webhooks' ? 'active' : '' }}">
+            <i class="fas fa-code w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Developer</span>
+        </a>
+
+        <!-- Reservation Section -->
+        <div x-show="sidebarOpen || isMobile" x-transition class="pt-4">
+            <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
+                Reservasi
+            </div>
+        </div>
+        <a href="/dashboard/reservations" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'reservations' ? 'active' : '' }}">
+            <i class="fas fa-calendar-check w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Daftar Reservasi</span>
+        </a>
+        <a href="/dashboard/reservations/calendar" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'reservations-calendar' ? 'active' : '' }}">
+            <i class="fas fa-calendar-alt w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Kalender</span>
+        </a>
+        <a href="/dashboard/reservations/config" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'reservations-config' ? 'active' : '' }}">
+            <i class="fas fa-cog w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Konfigurasi</span>
         </a>
 
         <!-- POS Section - Orders & Payment -->
@@ -88,6 +112,14 @@
             <i class="fas fa-credit-card w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_payment') }}</span>
         </a>
+        <a href="/dashboard/delivery" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'delivery' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('pos.orders')">
+            <i class="fas fa-motorcycle w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Delivery</span>
+        </a>
+        <a href="/dashboard/complain" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'complain' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('pos.orders')">
+            <i class="fas fa-triangle-exclamation w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Complain</span>
+        </a>
 
         <!-- POS Inventory Section -->
         <template x-if="$store.permissions.hasPermission('pos.products') || $store.permissions.hasPermission('pos.categories')">
@@ -101,6 +133,19 @@
             <i class="fas fa-box w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_products') }}</span>
         </a>
+        @if(config('catalog.meta_enabled'))
+        <a href="/dashboard/meta-catalog" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'meta-catalog' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('pos.products')">
+            <i class="fab fa-facebook w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_meta_catalog') }}</span>
+        </a>
+        @else
+        <div class="sidebar-nav-item opacity-50 cursor-not-allowed select-none" x-show="$store.permissions.hasPermission('pos.products')"
+             title="Fitur Meta Catalog sedang dinonaktifkan">
+            <i class="fab fa-facebook w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition class="flex-1">{{ __('dashboard.menu_meta_catalog') }}</span>
+            <i x-show="sidebarOpen || isMobile" x-transition class="fas fa-lock text-xs ml-auto"></i>
+        </div>
+        @endif
         <a href="/dashboard/pos/categories" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'pos-categories' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('pos.categories')">
             <i class="fas fa-tags w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_categories') }}</span>
@@ -164,25 +209,29 @@
         <template x-if="$store.permissions.hasPermission('sub-merchant')">
             <div x-show="sidebarOpen || isMobile" x-transition class="pt-4">
                 <div class="px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
-                    {{ __('dashboard.section_sub_merchant') }}
+                    QRIS Payment
                 </div>
             </div>
         </template>
-        <a href="/dashboard/sub-merchant" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'sub-merchant' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('sub-merchant')">
-            <i class="fas fa-qrcode w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_sub_merchant_dashboard') }}</span>
-        </a>
-        <a href="/dashboard/sub-merchant/provider-settings" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'sub-merchant-provider-settings' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('sub-merchant')">
-            <i class="fas fa-cogs w-5 text-center"></i>
-            <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_provider_settings') }}</span>
+        <a href="/dashboard/sub-merchant/" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'sub-merchant' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('sub-merchant')">
+            <i class="fas fa-store w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Pengaturan QRIS</span>
         </a>
         <a href="/dashboard/sub-merchant/qris" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'sub-merchant-qris' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('sub-merchant')">
-            <i class="fas fa-plus-circle w-5 text-center"></i>
+            <i class="fas fa-qrcode w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_generate_qris') }}</span>
         </a>
         <a href="/dashboard/sub-merchant/balance" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'sub-merchant-balance' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('sub-merchant')">
-            <i class="fas fa-chart-pie w-5 text-center"></i>
+            <i class="fas fa-wallet w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_balance') }}</span>
+        </a>
+        <a href="/dashboard/sub-merchant/bank-account" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'sub-merchant-bank-account' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('sub-merchant')">
+            <i class="fas fa-university w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Rekening Bank</span>
+        </a>
+        <a href="/dashboard/sub-merchant/withdrawals" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'sub-merchant-withdrawals' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('sub-merchant')">
+            <i class="fas fa-money-bill-wave w-5 text-center"></i>
+            <span x-show="sidebarOpen || isMobile" x-transition>Withdrawal</span>
         </a>
     </nav>
 

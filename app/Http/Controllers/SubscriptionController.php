@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Services\MidtransSubscriptionService;
 use App\Services\SubscriptionService;
+use App\Services\XenditSubscriptionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -18,29 +20,43 @@ class SubscriptionController extends Controller
 {
     public function __construct(
         private MidtransSubscriptionService $midtransService,
-        private SubscriptionService $subscriptionService
+        private SubscriptionService $subscriptionService,
+        private XenditSubscriptionService $xenditSubscriptionService,
     ) {}
 
     /**
+     * Resolve the authenticated user across the app's two auth modes.
+     *
+     * The frontend is a token-based SPA: after login, the Sanctum token is
+     * stored in localStorage and sent via `Authorization: Bearer …` for AJAX
+     * calls. Plain browser navigation does NOT include that header, so the
+     * default web guard (`auth()->user()`) sees no user. This helper tries the
+     * Sanctum guard first (for AJAX/Bearer requests), then falls back to the
+     * web guard (for any legacy session-authenticated request).
+     *
+     * Returns null when neither guard resolves a user; callers decide whether
+     * that should redirect to login (POST actions) or silently proceed (pure
+     * view renders where client-side JS handles auth).
+     */
+    private function resolveUser(Request $request): ?User
+    {
+        return $request->user('sanctum') ?? $request->user('web') ?? auth()->user();
+    }
+
+    /**
      * Show payment page with Midtrans Snap.
+     *
+     * Browser-navigated GET. Auth is enforced client-side by `check.web.auth`.
+     * The only required server-side context is the snap token + plan in session.
      */
     public function payment(): View|RedirectResponse
     {
-        $user = auth()->user();
-
-        // Explicit authentication check
-        if ($user === null) {
-            return redirect()->route('login')->with('error', 'Please login to continue.');
-        }
-
-        // Check if snap token exists in session
         $snapToken = session('snap_token');
         $planId = session('selected_plan_id');
         $duration = session('selected_duration');
 
         if (empty($snapToken) || empty($planId) || empty($duration)) {
             Log::warning('Payment page accessed without snap token', [
-                'userId' => $user->id,
                 'hasSnapToken' => ! empty($snapToken),
                 'hasPlanId' => ! empty($planId),
                 'hasDuration' => ! empty($duration),
@@ -97,7 +113,7 @@ class SubscriptionController extends Controller
             'duration' => 'required|string|in:1_month,3_months,1_year',
         ]);
 
-        $user = $request->user();
+        $user = $this->resolveUser($request);
 
         // Explicit authentication check (defense in depth)
         if ($user === null) {
@@ -122,9 +138,13 @@ class SubscriptionController extends Controller
             return redirect()->back()->with('error', 'Subscription service is not configured. Please contact support.');
         }
 
-        // Check if user already has an active subscription (with null safety)
+        // Check if user already has an active subscription (with null safety).
+        // Use isActive() instead of raw status check: status='active' alone is
+        // not sufficient because the field is not auto-updated when the period
+        // ends. isActive() also verifies current_period_end is in the future,
+        // so an expired-but-still-flagged-active subscription can be renewed.
         $existingSubscription = $user->subscription;
-        if ($existingSubscription !== null && $existingSubscription->status === 'active') {
+        if ($existingSubscription !== null && $existingSubscription->isActive()) {
             Log::info('User already has active subscription', [
                 'event' => 'checkout.already_subscribed',
                 'userId' => $user->id,
@@ -176,15 +196,11 @@ class SubscriptionController extends Controller
 
     /**
      * Show card tokenization page for Midtrans Subscription.
+     *
+     * Browser-navigated GET. Auth is enforced client-side by `check.web.auth`.
      */
     public function tokenization(): View|RedirectResponse
     {
-        $user = auth()->user();
-
-        if ($user === null) {
-            return redirect()->route('login')->with('error', 'Please login to continue.');
-        }
-
         $planId = session('selected_plan_id');
         $duration = session('selected_duration');
 
@@ -218,7 +234,7 @@ class SubscriptionController extends Controller
             'card_token' => 'required|string',
         ]);
 
-        $user = $request->user();
+        $user = $this->resolveUser($request);
 
         if ($user === null) {
             return redirect()->route('login')->with('error', 'Please login to continue.');
@@ -269,7 +285,6 @@ class SubscriptionController extends Controller
                 'status' => $subscriptionData['status'] === 'active' ? 'active' : 'pending',
                 'current_period_start' => now(),
                 'current_period_end' => now()->addMonthsNoOverflow($months),
-                'amount' => $durationDetails['price'] ?? $plan['price_monthly'],
                 'metadata' => json_encode([
                     'midtrans_name' => $subscriptionData['name'] ?? null,
                     'amount' => $subscriptionData['amount'] ?? null,
@@ -314,29 +329,60 @@ class SubscriptionController extends Controller
     }
 
     /**
-     * Handle successful payment callback from Midtrans.
+     * Handle successful payment callback from Midtrans/Xendit.
      *
-     * No subscription property access - safe from null pointer errors.
+     * This is a return URL hit by the payment provider's redirect, so the
+     * request comes from a fresh browser navigation without a Bearer token.
+     * Auth is best-effort: if we can resolve a user (sanctum/web), we sync
+     * their subscription with the provider. If not, we still acknowledge the
+     * callback — the webhook is the source of truth for activation, the
+     * client-side `check.web.auth` script handles login enforcement on the
+     * dashboard, and this page must never block the user with a redirect to
+     * login (that would leave a successful payment in a half-handled state).
      */
     public function success(Request $request): RedirectResponse
     {
-        $user = $request->user();
-
-        // Explicit authentication check
-        if ($user === null) {
-            Log::warning('Unauthenticated success callback', [
-                'event' => 'checkout.success_unauthenticated',
-                'ip' => $request->ip(),
-            ]);
-
-            return redirect()->route('login')->with('info', 'Please login to view your subscription.');
-        }
+        $user = $this->resolveUser($request);
 
         Log::info('Subscription payment success callback', [
             'event' => 'checkout.success_callback',
-            'userId' => $user->id,
+            'userId' => $user?->id,
             'queryParams' => $request->query(),
         ]);
+
+        $subscription = $user?->getEffectiveSubscription();
+
+        if ($subscription !== null && ! empty($subscription->xendit_subscription_id)) {
+            $xenditPlan = $this->xenditSubscriptionService->getRecurringPlan($subscription->xendit_subscription_id);
+            $xenditStatus = strtoupper((string) ($xenditPlan['status'] ?? ''));
+
+            Log::info('Xendit status sync from success callback', [
+                'event' => 'checkout.success_xendit_sync',
+                'userId' => $user->id,
+                'subscriptionId' => $subscription->id,
+                'xenditSubscriptionId' => $subscription->xendit_subscription_id,
+                'xenditStatus' => $xenditStatus,
+            ]);
+
+            if ($xenditStatus === 'ACTIVE') {
+                $subscription->update([
+                    'status' => 'active',
+                ]);
+
+                // Record payment in billing history (idempotent).
+                $this->subscriptionService->recordXenditPayment(
+                    $subscription,
+                    $subscription->xendit_subscription_id,
+                    $xenditPlan['reference_id'] ?? null,
+                );
+
+                return redirect()->route('dashboard')->with('success', 'Payment successful! Your subscription is now active.');
+            }
+
+            if ($xenditStatus === 'REQUIRES_ACTION' || $subscription->status === 'pending') {
+                return redirect()->route('dashboard')->with('info', 'Pembayaran sedang diproses. Status subscription akan aktif otomatis setelah dikonfirmasi oleh Xendit.');
+            }
+        }
 
         // The actual subscription creation/update will be handled by webhook
         // Redirect to dashboard with refresh parameter to force subscription reload
@@ -345,27 +391,18 @@ class SubscriptionController extends Controller
     }
 
     /**
-     * Handle cancelled payment callback from Midtrans.
+     * Handle cancelled payment callback from Midtrans/Xendit.
      *
-     * No subscription property access - safe from null pointer errors.
+     * Provider return URL — see notes on success() for why auth must be
+     * best-effort here, not a hard requirement.
      */
     public function cancel(Request $request): RedirectResponse
     {
-        $user = $request->user();
-
-        // Explicit authentication check
-        if ($user === null) {
-            Log::warning('Unauthenticated cancel callback', [
-                'event' => 'checkout.cancel_unauthenticated',
-                'ip' => $request->ip(),
-            ]);
-
-            return redirect()->route('login')->with('info', 'Please login to try again.');
-        }
+        $user = $this->resolveUser($request);
 
         Log::info('Subscription payment cancelled', [
             'event' => 'checkout.cancel_callback',
-            'userId' => $user->id,
+            'userId' => $user?->id,
             'queryParams' => $request->query(),
         ]);
 
@@ -373,27 +410,18 @@ class SubscriptionController extends Controller
     }
 
     /**
-     * Handle payment error callback from Midtrans.
+     * Handle payment error callback from Midtrans/Xendit.
      *
-     * No subscription property access - safe from null pointer errors.
+     * Provider return URL — see notes on success() for why auth must be
+     * best-effort here, not a hard requirement.
      */
     public function error(Request $request): RedirectResponse
     {
-        $user = $request->user();
-
-        // Explicit authentication check
-        if ($user === null) {
-            Log::warning('Unauthenticated error callback', [
-                'event' => 'checkout.error_unauthenticated',
-                'ip' => $request->ip(),
-            ]);
-
-            return redirect()->route('login')->with('error', 'Please login to try again.');
-        }
+        $user = $this->resolveUser($request);
 
         Log::error('Subscription payment error', [
             'event' => 'checkout.error_callback',
-            'userId' => $user->id,
+            'userId' => $user?->id,
             'queryParams' => $request->query(),
         ]);
 
@@ -403,38 +431,18 @@ class SubscriptionController extends Controller
     /**
      * Show subscription management page.
      *
-     * Handles null subscriptions safely by using null-safe operator.
-     *
-     * @return View
+     * This is a pure GET page reached by browser navigation, which does not
+     * include the Sanctum Bearer header. Server-side auth therefore cannot be
+     * enforced here without breaking the page for every signed-in user. Auth
+     * is handled by the `check.web.auth` middleware (client-side token check)
+     * and the blade template loads subscription data from `/api/subscription/status`
+     * using the localStorage token. Server-side variables are intentionally
+     * minimal — the blade does not consume `$subscription` or `$subscriptionStatus`.
      */
-    public function manage(): View|RedirectResponse
+    public function manage(): View
     {
-        $user = auth()->user();
-
-        // Explicit authentication check (defense in depth)
-        if ($user === null) {
-            return redirect()->route('login')->with('error', 'Please login to view your subscription.');
-        }
-
-        // Use null-safe operator to prevent errors
-        $subscription = $user->subscription;
-
-        // Get subscription status (handles null subscriptions)
-        $subscriptionStatus = $this->subscriptionService->getUserSubscriptionStatus($user);
-
-        // Get available plans
-        $plans = config('subscription.plans', []);
-
-        Log::debug('Subscription management page accessed', [
-            'userId' => $user->id,
-            'hasSubscription' => $subscription !== null,
-            'subscriptionStatus' => $subscriptionStatus->status,
-        ]);
-
         return view('subscription.manage', [
-            'subscription' => $subscription,
-            'subscriptionStatus' => $subscriptionStatus,
-            'plans' => $plans,
+            'plans' => config('subscription.plans', []),
         ]);
     }
 
@@ -445,7 +453,7 @@ class SubscriptionController extends Controller
      */
     public function cancelSubscription(Request $request): RedirectResponse
     {
-        $user = $request->user();
+        $user = $this->resolveUser($request);
 
         // Explicit authentication check (defense in depth)
         if ($user === null) {
@@ -482,7 +490,7 @@ class SubscriptionController extends Controller
 
         try {
             // If subscription has Midtrans ID, cancel through Midtrans API
-            if ($subscription->provider === 'midtrans' && ! empty($subscription->midtrans_subscription_id)) {
+            if (! empty($subscription->midtrans_subscription_id)) {
                 Log::info('Cancelling Midtrans subscription via API', [
                     'event' => 'subscription.cancel_via_api',
                     'userId' => $user->id,
@@ -508,7 +516,6 @@ class SubscriptionController extends Controller
                     'event' => 'subscription.cancel_local_only',
                     'userId' => $user->id,
                     'subscriptionId' => $subscription->id,
-                    'provider' => $subscription->provider,
                     'hasMidtransId' => ! empty($subscription->midtrans_subscription_id),
                 ]);
             }
