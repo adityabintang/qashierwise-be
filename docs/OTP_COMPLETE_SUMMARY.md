@@ -94,7 +94,7 @@ CREATE TABLE otp_codes (
 MAIL_MAILER=resend
 MAIL_FROM_ADDRESS=noreply@qashierwise.com
 MAIL_FROM_NAME=Qashierwise
-RESEND_API_KEY=re_ikLUbYF3_3tsA2XQ528k1UJGdyWUM55zu
+
 
 # OTP Configuration
 OTP_EXPIRATION_MINUTES=10
