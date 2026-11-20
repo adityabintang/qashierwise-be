@@ -27,6 +27,7 @@
          prices and can start the Xendit checkout. --}}
     <script>window.__SUBSCRIPTION_PLANS__ = @json(config('subscription.plans'));</script>
 
+    @viteReactRefresh
     @vite('resources/js/next.js/main.tsx')
 </head>
 <body class="min-h-full flex flex-col bg-white text-ink-900">
