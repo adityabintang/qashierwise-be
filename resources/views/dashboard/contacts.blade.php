@@ -17,10 +17,10 @@
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto space-y-6" x-data="contactsManager()">
                 <!-- Search & Filter -->
-                <div class="card p-3 md:p-4 -mx-4 md:mx-0 rounded-none md:rounded-lg">
-                    <div class="flex flex-col sm:flex-row gap-3 md:gap-4">
-                        <div class="relative" style="flex: 1 1 0%; min-width: 0;">
-                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none z-10"></i>
+                <div class="card p-3 md:p-4 -mx-4 md:mx-0 rounded-none md:rounded-lg shadow-sm">
+                    <div class="flex flex-wrap items-center gap-3 md:gap-4" style="display:flex;flex-wrap:wrap;align-items:center;width:100%;box-sizing:border-box;">
+                        <div class="relative min-w-0 flex-1" style="flex:1 1 380px;min-width:min(100%,260px);max-width:100%;">
+                            <svg aria-hidden="true" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--muted-foreground))] pointer-events-none z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
                             <input
                                 type="text"
                                 x-model="searchQuery"
@@ -30,12 +30,22 @@
                                 style="padding-left: 2.5rem;"
                             >
                         </div>
-                        <select x-model="sortBy" @change="sortContacts" class="input w-full sm:w-auto" style="flex: 0 0 auto; min-width: 180px; max-width: 220px;">
+                        <select x-model="sortBy" @change="sortContacts" class="input" style="width:210px;max-width:100%;min-width:min(100%,170px);flex:0 1 210px;">
                             <option value="name_asc">{{ __('whatsapp.name_asc') }}</option>
                             <option value="name_desc">{{ __('whatsapp.name_desc') }}</option>
                             <option value="recent">{{ __('whatsapp.recently_added') }}</option>
                             <option value="oldest">{{ __('whatsapp.oldest_first') }}</option>
                         </select>
+                        <div class="grid grid-cols-2 gap-2" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;flex:1 1 280px;max-width:320px;min-width:min(100%,260px);">
+                            <button type="button" class="btn btn-primary min-h-10 justify-center gap-2 whitespace-nowrap px-4" style="min-width:0;" @click="window.qashierDownload('/api/whatsapp/exports/contacts?format=csv&search='+encodeURIComponent(searchQuery || ''))">
+                                <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5M12 15V3"></path></svg>
+                                <span>Unduh kontak</span>
+                            </button>
+                            <button type="button" class="btn min-h-10 justify-center gap-2 whitespace-nowrap border border-emerald-200 bg-emerald-50 px-4 text-emerald-800 transition hover:bg-emerald-100" style="min-width:0;" @click="window.qashierDownload('/api/whatsapp/exports/contacts?format=xlsx&search='+encodeURIComponent(searchQuery || ''))">
+                                <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6M8 13l5 6m0-6-5 6"></path></svg>
+                                <span>Excel</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
