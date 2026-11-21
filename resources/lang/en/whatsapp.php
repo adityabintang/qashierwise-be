@@ -100,6 +100,7 @@ return [
 
     // Contact Search & Filter
     'search_contacts' => 'Search contacts...',
+    'error_mark_read' => 'Some messages could not be marked as read. Reopen this conversation to try again.',
     'sort_by' => 'Sort by',
     'name_asc' => 'Name (A-Z)',
     'name_desc' => 'Name (Z-A)',

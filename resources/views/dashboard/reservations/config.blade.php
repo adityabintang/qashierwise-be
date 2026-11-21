@@ -3,6 +3,15 @@
 
 @section('title', 'Konfigurasi Reservasi')
 
+@push('styles')
+<style>
+    /* The dashboard content owns the page scroll. */
+    html, body {
+        overflow: hidden;
+    }
+</style>
+@endpush
+
 @section('content')
 <!-- Toast Notification Container -->
 <div id="toast-container" class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2" x-data="toastManager()">
@@ -40,12 +49,12 @@
     </template>
 </div>
 
-<div x-data="configApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
+<div x-data="configApp()" class="h-dvh flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     <!-- Sidebar -->
     @include('components.dashboard-sidebar', ['activePage' => 'reservations-config'])
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col overflow-y-auto">
+    <div class="min-h-0 min-w-0 flex-1 flex flex-col overflow-y-auto">
         <!-- Header -->
         @include('components.dashboard-header', ['title' => 'Konfigurasi Reservasi', 'description' => 'Atur pengaturan reservasi untuk setiap toko'])
 

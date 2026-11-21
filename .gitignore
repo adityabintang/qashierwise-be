@@ -26,3 +26,4 @@ command/credential.json
 .playwright-mcp/
 .env.prod
 .mcp.json
+.agents/
