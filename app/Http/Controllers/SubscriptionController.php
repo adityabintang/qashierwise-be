@@ -380,14 +380,14 @@ class SubscriptionController extends Controller
             }
 
             if ($xenditStatus === 'REQUIRES_ACTION' || $subscription->status === 'pending') {
-                return redirect()->route('dashboard')->with('info', 'Pembayaran sedang diproses. Status subscription akan aktif otomatis setelah dikonfirmasi oleh Xendit.');
+                return redirect()->route('dashboard', ['subscription' => 'success'])
+                    ->with('info', 'Pembayaran sedang diproses. Status subscription akan aktif otomatis setelah dikonfirmasi oleh Xendit.');
             }
         }
 
-        // The actual subscription creation/update will be handled by webhook
-        // Redirect to dashboard with refresh parameter to force subscription reload
-
-        return redirect()->route('dashboard')->with('success', 'Payment successful! Your subscription is now active.');
+        // The webhook may arrive after the browser returns to the dashboard.
+        return redirect()->route('dashboard', ['subscription' => 'success'])
+            ->with('success', 'Payment successful! Your subscription is now active.');
     }
 
     /**

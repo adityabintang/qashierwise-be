@@ -79,12 +79,12 @@ class SecurityHeaders
                 if (!is_array($parsed) || empty($parsed['host'])) {
                     return null;
                 }
-                
+
                 // If it's a R2 cloudflarestorage.com domain, add wildcard
                 if (Str::contains($parsed['host'], '.r2.cloudflarestorage.com')) {
                     return ($parsed['scheme'] ?? 'https') . '://*.' . Str::after($parsed['host'], '.');
                 }
-                
+
                 return null;
             })
             ->filter(fn ($value) => is_string($value) && $value !== '')
@@ -97,7 +97,7 @@ class SecurityHeaders
 
         // Add Vite dev server in development
         $viteDevServer = [];
-        if (app()->environment('local')) {
+        if (app()->environment(['local', 'development'])) {
             $viteDevServer = [
                 'http://localhost:5173',
                 'ws://localhost:5173',

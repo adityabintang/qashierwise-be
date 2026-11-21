@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\ReservationController;
 use App\Http\Controllers\Api\SubMerchantController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\WhatsAppController;
+use App\Http\Controllers\Api\WhatsAppExportController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
 use App\Http\Controllers\Api\UserWebhookController;
 use App\Http\Controllers\Api\WithdrawalController;
@@ -162,6 +163,8 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
 
     // WhatsApp Business API routes
     Route::prefix('whatsapp')->group(function () {
+        Route::get('/exports/contacts', [WhatsAppExportController::class, 'contacts']);
+        Route::get('/exports/messages', [WhatsAppExportController::class, 'messages']);
         // Embedded Signup routes
         Route::post('/embedded-signup/callback', [EmbeddedSignupController::class, 'handleCallback']);
         Route::get('/embedded-signup/config', [EmbeddedSignupController::class, 'getConfig']);

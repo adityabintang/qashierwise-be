@@ -81,6 +81,16 @@ class WhatsAppMessage extends Model
         return $this->belongsTo(WhatsAppContact::class, 'contact_id');
     }
 
+    public function media()
+    {
+        return $this->hasMany(WhatsAppMedia::class, 'message_id');
+    }
+
+    public function scopeUnreadIncoming(Builder $query): Builder
+    {
+        return $query->where('direction', 'incoming')->where('is_read', false);
+    }
+
     // Helper to get parsed content
     private function getParsedContent()
     {

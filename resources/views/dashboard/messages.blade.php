@@ -11,8 +11,35 @@
         @include('components.dashboard-header', ['title' => __('whatsapp.messages_title'), 'description' => __('whatsapp.messages_subtitle')])
         <!-- Page Content -->
         <main class="flex-1 overflow-hidden flex flex-col">
-            <div class="flex-1 overflow-hidden" x-data="messagesManager()">
-                <div class="card flex overflow-hidden" style="height: calc(100vh - 8rem);">
+            <div class="flex-1 min-h-0 flex flex-col gap-3 p-3 md:p-4" x-data="messagesManager()">
+                <section class="card flex flex-col gap-4 p-3 shadow-sm sm:p-4 xl:flex-row xl:items-center xl:justify-between" aria-label="Ekspor riwayat pesan">
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                            <svg aria-hidden="true" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5M12 15V3"></path></svg>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-semibold text-[hsl(var(--foreground))]">Ekspor riwayat pesan</h2>
+                            <p class="text-xs text-[hsl(var(--muted-foreground))]">Unduh semua percakapan atau gunakan rentang tanggal.</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-end">
+                        <label class="min-w-0 text-xs font-medium text-[hsl(var(--muted-foreground))]">Dari tanggal
+                            <input type="date" x-ref="exportFrom" class="input mt-1 h-10 w-full min-w-0 rounded-lg px-3 text-sm sm:w-40">
+                        </label>
+                        <label class="min-w-0 text-xs font-medium text-[hsl(var(--muted-foreground))]">Sampai tanggal
+                            <input type="date" x-ref="exportTo" class="input mt-1 h-10 w-full min-w-0 rounded-lg px-3 text-sm sm:w-40">
+                        </label>
+                        <button type="button" class="btn btn-primary col-span-2 min-h-10 justify-center gap-2 whitespace-nowrap px-4 sm:col-span-1" @click="window.qashierExportMessages(null, 'csv', $refs.exportFrom.value, $refs.exportTo.value)">
+                            <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5M12 15V3"></path></svg>
+                            <span>Unduh semua</span>
+                        </button>
+                        <button type="button" class="col-span-2 inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-4 text-sm font-medium text-emerald-800 transition hover:bg-emerald-100 sm:col-span-1" @click="window.qashierExportMessages(null, 'xlsx', $refs.exportFrom.value, $refs.exportTo.value)">
+                            <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6M8 13l5 6m0-6-5 6"></path></svg>
+                            <span>Ekspor Excel</span>
+                        </button>
+                    </div>
+                </section>
+                <div class="card flex min-h-0 flex-1 overflow-hidden">
                     <!-- Contacts Sidebar -->
                     <div
                         class="border-r border-[hsl(var(--border))] flex flex-col transition-all duration-300"
@@ -22,11 +49,11 @@
                         <!-- Search -->
                         <div class="p-4 pb-2 border-b border-[hsl(var(--border))]">
                             <div class="relative">
-                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none"></i>
+                                <svg aria-hidden="true" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--muted-foreground))] pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
                                 <input
                                     type="text"
                                     x-model="contactSearch"
-                                    @input="filterContactList"
+                                    @input.debounce.300ms="fetchContacts()"
                                     placeholder="{{ __('whatsapp.search_contacts') }}"
                                     class="input w-full"
                                     style="padding-left: 2.5rem;"
@@ -74,7 +101,7 @@
                             <!-- Contacts -->
                             <template x-if="!loadingContacts">
                                 <div class="p-2 space-y-1">
-                                    <template x-for="contact in filteredContactList" :key="contact.id">
+                                    <template x-for="contact in contacts" :key="contact.id">
                                         <div
                                             @click="selectContact(contact)"
                                             class="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors"
@@ -120,7 +147,7 @@
                                         </div>
                                     </template>
                                     <!-- Empty -->
-                                    <div x-show="filteredContactList.length === 0" class="empty-state py-12">
+                                    <div x-show="contacts.length === 0" class="empty-state py-12">
                                         <div class="empty-state-icon h-12 w-12">
                                             <i class="fas fa-inbox"></i>
                                         </div>
@@ -128,6 +155,15 @@
                                     </div>
                                 </div>
                             </template>
+                        </div>
+                        <div x-show="contactsLastPage > 1" class="flex items-center justify-between gap-2 border-t p-2">
+                            <button type="button" class="btn btn-ghost" :disabled="loadingContacts || contactsPage <= 1" @click="fetchContacts(contactsPage - 1)">
+                                {{ __('common.previous') }}
+                            </button>
+                            <span class="text-xs" x-text="contactsPage + ' / ' + contactsLastPage"></span>
+                            <button type="button" class="btn btn-ghost" :disabled="loadingContacts || contactsPage >= contactsLastPage" @click="fetchContacts(contactsPage + 1)">
+                                {{ __('common.next') }}
+                            </button>
                         </div>
                     </div>
                     <!-- Chat Area -->
@@ -137,6 +173,9 @@
                         :class="isMobileMessages ? 'w-full' : ''"
                     >
                         <!-- Chat Header -->
+                        <p x-cloak x-show="readErrors[selectedContact?.id]" role="status" class="px-4 py-2 text-sm text-red-600">
+                            {{ __('whatsapp.error_mark_read') }}
+                        </p>
                         <div class="px-3 md:px-4 border-b border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)]">
                             <div class="h-14 md:h-16 flex items-center justify-between">
                                 <div class="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
@@ -167,6 +206,16 @@
                                     <div class="min-w-0 flex-1">
                                         <p class="font-medium text-xs md:text-sm" x-text="selectedContact?.name || 'Unknown'">Unknown</p>
                                         <p class="text-[10px] md:text-xs text-[hsl(var(--muted-foreground))]" x-text="selectedContact?.phone_number">-</p>
+                                    </div>
+                                    <div class="flex shrink-0 items-center gap-1.5">
+                                        <button type="button" class="btn btn-outline btn-sm min-h-9 gap-1.5 px-2.5" title="Unduh percakapan sebagai CSV" aria-label="Unduh percakapan sebagai CSV" @click="window.qashierExportMessages(selectedContact.id, 'csv', $refs.exportFrom.value, $refs.exportTo.value)">
+                                            <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5M12 15V3"></path></svg>
+                                            <span class="hidden sm:inline">CSV</span>
+                                        </button>
+                                        <button type="button" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 text-sm font-medium text-emerald-800 transition hover:bg-emerald-100" title="Unduh percakapan sebagai Excel" aria-label="Unduh percakapan sebagai Excel" @click="window.qashierExportMessages(selectedContact.id, 'xlsx', $refs.exportFrom.value, $refs.exportTo.value)">
+                                            <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6M8 13l5 6m0-6-5 6"></path></svg>
+                                            <span class="hidden sm:inline">Excel</span>
+                                        </button>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-1">
@@ -1070,7 +1119,9 @@ function messagesApp() {
 function messagesManager() {
     return {
         API_BASE_URL: window.location.origin + '/api',
-        contacts: [], filteredContactList: [], selectedContact: null, messages: [], templates: [],
+        contacts: [], contactsPage: 1, contactsLastPage: 1, contactsRequestId: 0,
+        readErrors: {},
+        selectedContact: null, messages: [], templates: [],
         // Windowed (WhatsApp-like) message loading + browser cache
         messagesPerPage: 10, hasMoreOlder: false, loadingOlder: false, oldestId: null,
         newMessage: '', contactSearch: '', loadingContacts: true, loadingMessages: false, sending: false,
@@ -1127,7 +1178,7 @@ function messagesManager() {
             if (contactId) { const contact = this.contacts.find(c => c.id == contactId); if (contact) this.selectContact(contact); }
 
             // Listen for real-time messages from broadcast
-            window.addEventListener('whatsapp-message-received', (e) => {
+            window.addEventListener('whatsapp-message-received', async (e) => {
                 const newMessage = e.detail.message;
                 const messageContact = e.detail.contact;
 
@@ -1141,12 +1192,12 @@ function messagesManager() {
                         this.$nextTick(() => setTimeout(() => this.scrollToBottom(true), 50));
                         // Mark incoming message as read since user is viewing
                         if (newMessage.direction === 'incoming') {
-                            this.markContactAsRead(messageContact.id);
+                            await this.markContactAsRead(messageContact.id);
                         }
                     }
                 }
                 // Update contacts list silently
-                this.updateContactsList();
+                if (!this.loadingContacts) this.fetchContacts(this.contactsPage, false);
             });
 
             // Listen for message status updates (delivered, read)
@@ -1161,30 +1212,26 @@ function messagesManager() {
                 }
             });
         },
-        // Fetch contacts with loading indicator (initial load only)
-        async fetchContacts() {
-            this.loadingContacts = true;
+        async fetchContacts(page = 1, showLoading = true) {
+            const requestId = ++this.contactsRequestId;
+            if (showLoading) this.loadingContacts = true;
             try {
                 const token = localStorage.getItem('token');
-                let url = `${this.API_BASE_URL}/whatsapp/contacts`;
-                if (this.selectedFilterTag) url += `?tag_id=${this.selectedFilterTag}`;
-                const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+                const params = new URLSearchParams({ page, search: this.contactSearch.trim() });
+                if (this.selectedFilterTag) params.set('tag_id', this.selectedFilterTag);
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/contacts?${params}`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
                 const data = await res.json();
-                this.contacts = data.data || [];
-                this.filterContactList();
+                if (requestId !== this.contactsRequestId) return;
+                if (!res.ok || !data.success) throw new Error('Failed to load WhatsApp contacts');
+                this.contacts = data.data;
+                this.contactsPage = data.pagination.current_page;
+                this.contactsLastPage = data.pagination.last_page;
             } catch (e) { console.error('Error:', e); }
-            finally { this.loadingContacts = false; }
-        },
-
-        // Update contacts list silently (no loading indicator)
-        async updateContactsList() {
-            try {
-                const token = localStorage.getItem('token');
-                const res = await fetch(`${this.API_BASE_URL}/whatsapp/contacts`, { headers: { 'Authorization': `Bearer ${token}` } });
-                const data = await res.json();
-                this.contacts = data.data || [];
-                this.filterContactList();
-            } catch (e) { console.error('Error:', e); }
+            finally {
+                if (requestId === this.contactsRequestId) this.loadingContacts = false;
+            }
         },
         async fetchTemplates() {
             try {
@@ -1193,13 +1240,6 @@ function messagesManager() {
                 const data = await res.json();
                 this.templates = (data.data || []).filter(t => t.status === 'APPROVED');
             } catch (e) { console.error('Error:', e); }
-        },
-        filterContactList() {
-            if (!this.contactSearch) { this.filteredContactList = this.contacts; }
-            else {
-                const q = this.contactSearch.toLowerCase();
-                this.filteredContactList = this.contacts.filter(c => (c.name && c.name.toLowerCase().includes(q)) || (c.phone_number && c.phone_number.includes(q)));
-            }
         },
         async selectContact(contact) {
             this.selectedContact = contact;
@@ -1329,18 +1369,27 @@ function messagesManager() {
         async markContactAsRead(contactId) {
             try {
                 const token = localStorage.getItem('token');
-                await fetch(`${this.API_BASE_URL}/whatsapp/contacts/${contactId}/mark-read`, {
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/contacts/${contactId}/mark-read`, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
                 });
-                // Update local contact unread count
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error('Failed to mark WhatsApp messages as read');
                 if (this.selectedContact?.id === contactId) {
-                    this.selectedContact.unread_count = 0;
+                    this.selectedContact.unread_count = data.unread_count;
                 }
-                // Update in contacts list
                 const contact = this.contacts.find(c => c.id === contactId);
-                if (contact) contact.unread_count = 0;
-            } catch (e) { console.error('Error marking as read:', e); }
+                if (contact) contact.unread_count = data.unread_count;
+                this.readErrors[contactId] = data.failed_count > 0 && data.unread_count > 0;
+                if (data.updated_count > 0) {
+                    try {
+                        localStorage.setItem('whatsapp-read-state-changed', String(Date.now()));
+                    } catch (e) { console.error('Error notifying dashboard:', e); }
+                }
+            } catch (e) {
+                this.readErrors[contactId] = true;
+                console.error('Error marking as read:', e);
+            }
         },
         selectTemplate(tpl) {
             // Insert template body into the message textarea

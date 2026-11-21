@@ -1384,7 +1384,7 @@ class WhatsAppController extends Controller
             // Current totals
             $totalContacts = WhatsAppContact::where('user_id', $userId)->count();
             $totalMessages = WhatsAppMessage::where('user_id', $userId)->count();
-            $unreadMessages = WhatsAppContact::where('user_id', $userId)->sum('unread_count');
+            $unreadMessages = WhatsAppMessage::where('user_id', $userId)->unreadIncoming()->count();
 
             // Contacts growth (this month vs last month)
             $contactsThisMonth = WhatsAppContact::where('user_id', $userId)
@@ -1587,7 +1587,21 @@ class WhatsAppController extends Controller
 
             // RLS in model automatically filters by user_id
             $query = WhatsAppContact::with('tags')
-                ->withCount('messages');
+                ->withCount([
+                    'messages',
+                    'messages as unread_messages_count' => fn ($messages) => $messages->unreadIncoming(),
+                ]);
+
+            $search = trim($request->string('search')->toString());
+            if ($search !== '') {
+                $query->where(function ($contacts) use ($search) {
+                    $contacts->whereLike('name', '%'.$search.'%');
+                    $phone = ltrim($search, '+');
+                    if ($phone !== '') {
+                        $contacts->orWhereLike('wa_id', '%'.$phone.'%');
+                    }
+                });
+            }
 
             // Filter by tag if tag_id parameter is provided
             if ($request->has('tag_id') && $request->tag_id) {
@@ -1597,7 +1611,15 @@ class WhatsAppController extends Controller
             }
 
             $contacts = $query->orderBy('last_message_at', 'desc')
+                ->orderByDesc('id')
                 ->paginate($perPage);
+
+            $contacts->through(function (WhatsAppContact $contact) {
+                $contact->unread_count = $contact->unread_messages_count;
+                unset($contact->unread_messages_count);
+
+                return $contact;
+            });
 
             return response()->json([
                 'success' => true,
@@ -1715,51 +1737,43 @@ class WhatsAppController extends Controller
 
             // Get all unread incoming messages from this contact
             // RLS in model automatically filters by user_id
-            $unreadMessages = WhatsAppMessage::where('contact_id', $contactId)
-                ->where('direction', 'incoming')
-                ->where('is_read', false)
-                ->get();
+            $unreadQuery = $contact->messages()->unreadIncoming();
+            $unreadMessages = $unreadQuery->get();
 
             $markedCount = 0;
+            $failedCount = 0;
 
             // Mark each message as read in WhatsApp API
             foreach ($unreadMessages as $message) {
                 try {
                     // Call WhatsApp API to mark message as read
                     $whatsapp->markMessageAsRead($message->message_id);
-
-                    // Update in database
-                    $message->is_read = true;
-                    $message->read_at = now();
-                    $message->status = 'read';
-                    $message->save();
-
-                    $markedCount++;
-
-                    \Log::info('Message marked as read', [
-                        'message_id' => $message->message_id,
-                        'contact_id' => $contactId,
-                    ]);
                 } catch (\Exception $e) {
+                    $failedCount++;
                     \Log::error('Failed to mark message as read in WhatsApp API', [
                         'message_id' => $message->message_id,
                         'error' => $e->getMessage(),
                     ]);
-                    // Continue marking other messages even if one fails
+
+                    continue;
                 }
+
+                $markedCount += (clone $unreadQuery)->whereKey($message->id)->update([
+                    'is_read' => true,
+                    'read_at' => now(),
+                    'status' => 'read',
+                ]);
             }
 
-            // Update contact's unread count
-            $contact = WhatsAppContact::find($contactId);
-            if ($contact) {
-                $contact->unread_count = 0;
-                $contact->save();
-            }
+            $remainingCount = $unreadQuery->count();
+            $contact->update(['unread_count' => $remainingCount]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Messages marked as read',
+                'message' => $failedCount > 0 ? 'Some messages could not be marked as read' : 'Messages marked as read',
                 'updated_count' => $markedCount,
+                'failed_count' => $failedCount,
+                'unread_count' => $remainingCount,
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([

@@ -14,11 +14,11 @@
     <div class="flex-1 flex flex-col overflow-y-auto" :class="{ 'lg:ml-0': true }">
         @include('components.dashboard-header', ['title' => __('dashboard.menu_dashboard'), 'description' => __('dashboard.welcome_back')])
 
-        <main class="flex-1 p-4 md:p-6">
+        <main class="flex-1 p-4 md:p-6" x-data="subscriptionStatus()">
             <div class="max-w-7xl mx-auto space-y-6">
                 <!-- Trial Expired Banner -->
-                <div x-data="subscriptionStatus()" x-init="init()">
-                    <div x-show="!loading && subscription.status === 'trial_expired'" x-cloak
+                <div>
+                    <div x-show="subscription.status === 'trial_expired'" x-cloak
                          class="bg-gradient-to-r from-red-500 to-orange-500 rounded-xl p-4 md:p-6 text-white shadow-lg">
                         <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                             <div class="flex items-center gap-4">
@@ -98,14 +98,14 @@
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-sm font-medium text-[hsl(var(--muted-foreground))]">{{ __('dashboard.templates') }}</p>
-                                <p class="text-3xl font-bold mt-1" x-text="stats.totalTemplates || '0'">0</p>
+                                <p class="text-3xl font-bold mt-1" x-text="stats.totalTemplates ?? '-'">-</p>
                             </div>
                             <div class="h-12 w-12 rounded-xl bg-cyan-50 flex items-center justify-center">
                                 <i class="fas fa-file-alt text-xl text-cyan-500"></i>
                             </div>
                         </div>
-                        <div class="flex items-center gap-1 mt-3 text-sm text-[hsl(var(--muted-foreground))]">
-                            <span x-text="stats.approvedTemplates || '0'">0</span> {{ __('dashboard.approved') }}
+                        <div x-show="stats.approvedTemplates !== null" class="flex items-center gap-1 mt-3 text-sm text-[hsl(var(--muted-foreground))]">
+                            <span x-text="stats.approvedTemplates"></span> {{ __('dashboard.approved') }}
                         </div>
                     </div>
 
@@ -280,7 +280,7 @@
                     <!-- Right Column -->
                     <div class="space-y-6">
                         <!-- Subscription Status Card -->
-                        <div class="card" x-data="subscriptionStatus()" x-init="init()">
+                        <div class="card">
                             <div class="card-header">
                                 <h2 class="card-title">{{ __('dashboard.subscription') }}</h2>
                             </div>
@@ -303,8 +303,8 @@
                                                }"></i>
                                         </div>
                                         <div>
-                                            <p class="font-semibold capitalize" x-text="getPlanDisplayName()">Free Trial</p>
-                                            <p class="text-xs text-[hsl(var(--muted-foreground))]" x-text="getStatusText()">Active</p>
+                                            <p class="font-semibold capitalize" x-text="getPlanDisplayName()">-</p>
+                                            <p class="text-xs text-[hsl(var(--muted-foreground))]" x-text="getStatusText()">-</p>
                                         </div>
                                     </div>
 
@@ -475,17 +475,29 @@ function dashboardApp() {
 function dashboardStats() {
     return {
         API_BASE_URL: window.location.origin + '/api', loading: true,
-        stats: { totalContacts: 0, totalMessages: 0, totalTemplates: 0, unreadMessages: 0, contactsGrowth: 0, messagesGrowth: 0, approvedTemplates: 0 },
-        async init() { await this.fetchStats(); window.addEventListener('whatsapp-message-received', () => this.fetchStats()); },
+        stats: { totalContacts: 0, totalMessages: 0, totalTemplates: null, unreadMessages: 0, contactsGrowth: 0, messagesGrowth: 0, approvedTemplates: null },
+        statsRequestId: 0,
+        async init() {
+            window.addEventListener('whatsapp-message-received', () => this.fetchStats());
+            window.addEventListener('storage', (event) => {
+                if (event.key === 'whatsapp-read-state-changed') this.fetchStats();
+            });
+            window.addEventListener('pageshow', (event) => {
+                if (event.persisted) this.fetchStats();
+            });
+            this.fetchTemplates();
+            await this.fetchStats();
+        },
         async fetchStats() {
-            this.loading = true;
+            const requestId = ++this.statsRequestId;
             try {
                 const token = localStorage.getItem('token');
-                const [statsRes, templatesRes] = await Promise.all([
-                    fetch(`${this.API_BASE_URL}/whatsapp/stats`, { headers: { 'Authorization': `Bearer ${token}` } }),
-                    fetch(`${this.API_BASE_URL}/whatsapp/templates`, { headers: { 'Authorization': `Bearer ${token}` } })
-                ]);
+                const statsRes = await fetch(`${this.API_BASE_URL}/whatsapp/stats`, {
+                    cache: 'no-store',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
                 const statsData = await statsRes.json();
+                if (requestId !== this.statsRequestId) return;
                 if (statsData.success && statsData.data) {
                     this.stats.totalContacts = statsData.data.total_contacts || 0;
                     this.stats.totalMessages = statsData.data.total_messages || 0;
@@ -493,11 +505,23 @@ function dashboardStats() {
                     this.stats.contactsGrowth = statsData.data.contacts_growth || 0;
                     this.stats.messagesGrowth = statsData.data.messages_growth || 0;
                 }
-                const templatesData = await templatesRes.json();
-                this.stats.totalTemplates = templatesData.data?.length || 0;
-                this.stats.approvedTemplates = templatesData.data?.filter(t => t.status === 'APPROVED').length || 0;
             } catch (e) { console.error('Error fetching stats:', e); }
-            finally { this.loading = false; }
+            finally {
+                if (requestId === this.statsRequestId) this.loading = false;
+            }
+        },
+        async fetchTemplates() {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`${this.API_BASE_URL}/whatsapp/templates`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
+                if (!response.ok) throw new Error(`Unexpected HTTP status ${response.status}`);
+                const { data: templates } = await response.json();
+                if (!Array.isArray(templates)) return;
+                this.stats.totalTemplates = templates.length;
+                this.stats.approvedTemplates = templates.filter(template => template.status === 'APPROVED').length;
+            } catch (e) { console.error('Error fetching dashboard templates:', e); }
         }
     }
 }
@@ -681,94 +705,57 @@ function phoneInfo() {
 function subscriptionStatus() {
     return {
         API_BASE_URL: window.location.origin + '/api',
-        loading: true,
         portalLoading: false,
-        error: false,
+        pollTimer: null,
+        destroyed: false,
         subscription: {
-            status: 'trial',
-            plan_name: 'free_trial',
-            trial_days_remaining: 14,
+            status: null,
+            plan_name: null,
+            trial_days_remaining: 0,
             period_end: null,
             cancelled_at: null
         },
 
         async init() {
-            console.log('[Subscription] Initializing...');
-
-            // Set timeout to prevent infinite loading
-            setTimeout(() => {
-                if (this.loading) {
-                    console.warn('[Subscription] Loading timeout, showing default state');
-                    this.loading = false;
-                }
-            }, 5000);
-
-            await this.fetchSubscriptionStatus();
-
-            // If still on trial/expired after initial fetch, start polling
-            // This handles the case where user just completed payment
-            if (this.subscription.status === 'trial' || this.subscription.status === 'trial_expired') {
-                console.log('[Subscription] Starting polling for updates...');
-                this.startPolling();
-            }
+            const returnedFromCheckout = new URLSearchParams(window.location.search).get('subscription') === 'success';
+            const canCheckAgain = await this.fetchSubscriptionStatus();
+            if (returnedFromCheckout && canCheckAgain) this.scheduleStatusCheck(6);
         },
 
-        startPolling() {
-            let pollCount = 0;
-            const maxPolls = 6; // Poll for 30 seconds (6 * 5 seconds)
+        scheduleStatusCheck(attemptsLeft) {
+            if (this.destroyed || attemptsLeft <= 0 || this.subscription.status === 'active') return;
 
-            const pollInterval = setInterval(async () => {
-                pollCount++;
-                console.log(`[Subscription] Polling for updates (${pollCount}/${maxPolls})`);
+            this.pollTimer = setTimeout(async () => {
+                const canCheckAgain = await this.fetchSubscriptionStatus();
+                if (canCheckAgain) this.scheduleStatusCheck(attemptsLeft - 1);
+            }, 5000);
+        },
 
-                await this.fetchSubscriptionStatus();
-
-                // Stop polling if subscription is active or max polls reached
-                if (this.subscription.status === 'active' || pollCount >= maxPolls) {
-                    clearInterval(pollInterval);
-                    console.log('[Subscription] Polling stopped. Final status:', this.subscription.status);
-                }
-            }, 5000); // Poll every 5 seconds
+        destroy() {
+            this.destroyed = true;
+            clearTimeout(this.pollTimer);
         },
 
         async fetchSubscriptionStatus() {
-            this.loading = true;
-            this.error = false;
             try {
                 const token = localStorage.getItem('token');
-                console.log('[Subscription] Token exists:', !!token);
-                if (!token) {
-                    console.warn('[Subscription] No token found');
-                    this.loading = false;
-                    return;
-                }
+                if (!token) return false;
+
                 const response = await fetch(`${this.API_BASE_URL}/subscription/status`, {
                     headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
                 });
-                console.log('[Subscription] API response status:', response.status);
-
-                // Handle 401 Unauthorized - don't redirect, just stop polling
-                if (response.status === 401) {
-                    console.warn('[Subscription] Unauthorized - token may be invalid');
-                    this.loading = false;
-                    return;
-                }
+                if (response.status === 401 || response.status === 403) return false;
+                if (!response.ok) throw new Error(`Unexpected HTTP status ${response.status}`);
 
                 const data = await response.json();
-                console.log('[Subscription] API data:', data);
-                if (data.success && data.data?.subscription) {
+                if (!this.destroyed && data.success && data.data?.subscription) {
                     this.subscription = data.data.subscription;
-                    console.log('[Subscription] Updated subscription:', this.subscription);
-                } else {
-                    console.warn('[Subscription] API returned no data, using defaults');
                 }
             } catch (e) {
-                console.error('[Subscription] Error:', e);
-                this.error = true;
-            } finally {
-                this.loading = false;
-                console.log('[Subscription] Loading complete, status:', this.subscription.status);
+                console.error('[Subscription] Failed to load status:', e);
             }
+
+            return true;
         },
 
         getPlanDisplayName() {
@@ -777,7 +764,7 @@ function subscriptionStatus() {
                 'standard': 'Standard',
                 'pro': 'Pro'
             };
-            return names[this.subscription.plan_name] || this.subscription.plan_name;
+            return names[this.subscription.plan_name] || this.subscription.plan_name || '-';
         },
 
         getStatusText() {
@@ -788,7 +775,7 @@ function subscriptionStatus() {
                 'cancelled': 'Cancelled',
                 'expired': 'Expired'
             };
-            return statuses[this.subscription.status] || this.subscription.status;
+            return statuses[this.subscription.status] || this.subscription.status || '-';
         },
 
         formatDate(dateString) {
