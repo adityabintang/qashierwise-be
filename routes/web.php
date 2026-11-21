@@ -115,6 +115,8 @@ Route::get('/pay/qris/{orderId}', [QrisPaymentPageController::class, 'show'])
 // Public Driver Proof-of-Delivery Page (token-protected, no auth)
 Route::get('/delivery/{token}', [DeliveryProofController::class, 'show'])
     ->name('delivery.proof');
+Route::get('/whatsapp/attachments/{messageId}', [\App\Http\Controllers\Api\WhatsAppExportController::class, 'attachment'])
+    ->middleware('auth')->whereNumber('messageId')->name('whatsapp.attachment');
 Route::post('/delivery/{token}', [DeliveryProofController::class, 'submit'])
     ->name('delivery.proof.submit');
 

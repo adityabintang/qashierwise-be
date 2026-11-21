@@ -5,6 +5,24 @@
 --}}
 
 @push('head-scripts')
+    <script>
+        window.qashierDownload = async (url) => {
+            const token = localStorage.getItem('token');
+            const response = await fetch(url, { headers: { 'Authorization': token ? `Bearer ${token}` : '', 'Accept': 'application/json' } });
+            if (!response.ok) { const body = await response.json().catch(() => ({})); alert(body.message || 'Unduhan gagal.'); return; }
+            const blob = await response.blob(); const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob); link.download = response.headers.get('Content-Disposition')?.split('filename="')[1]?.replace('"', '') || 'ekspor.csv';
+            link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        };
+        window.qashierExportMessages = (contactId, format, from, to) => {
+            const params = new URLSearchParams({ format });
+            if (contactId) params.set('contact_id', contactId);
+            if (from) params.set('from', from);
+            if (to) params.set('to', to);
+            params.set('timezone', Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+            window.qashierDownload('/api/whatsapp/exports/messages?' + params.toString());
+        };
+    </script>
     <!-- Pusher & Laravel Echo (self-hosted, only on dashboard) -->
     @vite('resources/js/echo.js')
 

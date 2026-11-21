@@ -11,8 +11,35 @@
         @include('components.dashboard-header', ['title' => __('whatsapp.messages_title'), 'description' => __('whatsapp.messages_subtitle')])
         <!-- Page Content -->
         <main class="flex-1 overflow-hidden flex flex-col">
-            <div class="flex-1 overflow-hidden" x-data="messagesManager()">
-                <div class="card flex overflow-hidden" style="height: calc(100vh - 8rem);">
+            <div class="flex-1 min-h-0 flex flex-col gap-3 p-3 md:p-4" x-data="messagesManager()">
+                <section class="card flex flex-col gap-4 p-3 shadow-sm sm:p-4 xl:flex-row xl:items-center xl:justify-between" aria-label="Ekspor riwayat pesan">
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                            <svg aria-hidden="true" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5M12 15V3"></path></svg>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-semibold text-[hsl(var(--foreground))]">Ekspor riwayat pesan</h2>
+                            <p class="text-xs text-[hsl(var(--muted-foreground))]">Unduh semua percakapan atau gunakan rentang tanggal.</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-end">
+                        <label class="min-w-0 text-xs font-medium text-[hsl(var(--muted-foreground))]">Dari tanggal
+                            <input type="date" x-ref="exportFrom" class="input mt-1 h-10 w-full min-w-0 rounded-lg px-3 text-sm sm:w-40">
+                        </label>
+                        <label class="min-w-0 text-xs font-medium text-[hsl(var(--muted-foreground))]">Sampai tanggal
+                            <input type="date" x-ref="exportTo" class="input mt-1 h-10 w-full min-w-0 rounded-lg px-3 text-sm sm:w-40">
+                        </label>
+                        <button type="button" class="btn btn-primary col-span-2 min-h-10 justify-center gap-2 whitespace-nowrap px-4 sm:col-span-1" @click="window.qashierExportMessages(null, 'csv', $refs.exportFrom.value, $refs.exportTo.value)">
+                            <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5M12 15V3"></path></svg>
+                            <span>Unduh semua</span>
+                        </button>
+                        <button type="button" class="col-span-2 inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-4 text-sm font-medium text-emerald-800 transition hover:bg-emerald-100 sm:col-span-1" @click="window.qashierExportMessages(null, 'xlsx', $refs.exportFrom.value, $refs.exportTo.value)">
+                            <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6M8 13l5 6m0-6-5 6"></path></svg>
+                            <span>Ekspor Excel</span>
+                        </button>
+                    </div>
+                </section>
+                <div class="card flex min-h-0 flex-1 overflow-hidden">
                     <!-- Contacts Sidebar -->
                     <div
                         class="border-r border-[hsl(var(--border))] flex flex-col transition-all duration-300"
@@ -22,7 +49,7 @@
                         <!-- Search -->
                         <div class="p-4 pb-2 border-b border-[hsl(var(--border))]">
                             <div class="relative">
-                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none"></i>
+                                <svg aria-hidden="true" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--muted-foreground))] pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
                                 <input
                                     type="text"
                                     x-model="contactSearch"
@@ -179,6 +206,16 @@
                                     <div class="min-w-0 flex-1">
                                         <p class="font-medium text-xs md:text-sm" x-text="selectedContact?.name || 'Unknown'">Unknown</p>
                                         <p class="text-[10px] md:text-xs text-[hsl(var(--muted-foreground))]" x-text="selectedContact?.phone_number">-</p>
+                                    </div>
+                                    <div class="flex shrink-0 items-center gap-1.5">
+                                        <button type="button" class="btn btn-outline btn-sm min-h-9 gap-1.5 px-2.5" title="Unduh percakapan sebagai CSV" aria-label="Unduh percakapan sebagai CSV" @click="window.qashierExportMessages(selectedContact.id, 'csv', $refs.exportFrom.value, $refs.exportTo.value)">
+                                            <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5M12 15V3"></path></svg>
+                                            <span class="hidden sm:inline">CSV</span>
+                                        </button>
+                                        <button type="button" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 text-sm font-medium text-emerald-800 transition hover:bg-emerald-100" title="Unduh percakapan sebagai Excel" aria-label="Unduh percakapan sebagai Excel" @click="window.qashierExportMessages(selectedContact.id, 'xlsx', $refs.exportFrom.value, $refs.exportTo.value)">
+                                            <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6M8 13l5 6m0-6-5 6"></path></svg>
+                                            <span class="hidden sm:inline">Excel</span>
+                                        </button>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-1">
