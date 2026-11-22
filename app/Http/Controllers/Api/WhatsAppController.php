@@ -26,6 +26,7 @@ use Netflie\WhatsAppCloudApi\Message\OptionsList\Action as ListAction;
 use Netflie\WhatsAppCloudApi\Message\OptionsList\Row as ListRow;
 use Netflie\WhatsAppCloudApi\Message\OptionsList\Section as ListSection;
 use Netflie\WhatsAppCloudApi\Message\Template\Component;
+use Netflie\WhatsAppCloudApi\Response\ResponseException;
 use Netflie\WhatsAppCloudApi\WhatsAppCloudApi;
 
 class WhatsAppController extends Controller
@@ -1610,7 +1611,10 @@ class WhatsAppController extends Controller
                 });
             }
 
-            $contacts = $query->orderBy('last_message_at', 'desc')
+            // Keep conversations needing attention at the top, then sort by
+            // the most recent activity within each unread/read group.
+            $contacts = $query->orderByDesc('unread_messages_count')
+                ->orderByDesc('last_message_at')
                 ->orderByDesc('id')
                 ->paginate($perPage);
 
@@ -1743,21 +1747,22 @@ class WhatsAppController extends Controller
             $markedCount = 0;
             $failedCount = 0;
 
-            // Mark each message as read in WhatsApp API
             foreach ($unreadMessages as $message) {
                 try {
-                    // Call WhatsApp API to mark message as read
                     $whatsapp->markMessageAsRead($message->message_id);
                 } catch (\Exception $e) {
-                    $failedCount++;
-                    \Log::error('Failed to mark message as read in WhatsApp API', [
-                        'message_id' => $message->message_id,
-                        'error' => $e->getMessage(),
-                    ]);
+                    if (! $this->isMissingWhatsAppMessage($e, $message->message_id)) {
+                        $failedCount++;
+                        \Log::error('Failed to mark message as read in WhatsApp API', [
+                            'message_id' => $message->message_id,
+                            'error' => $e->getMessage(),
+                        ]);
 
-                    continue;
+                        continue;
+                    }
                 }
 
+                // Clear the Inbox unread state even if Meta no longer recognizes the message.
                 $markedCount += (clone $unreadQuery)->whereKey($message->id)->update([
                     'is_read' => true,
                     'read_at' => now(),
@@ -1788,6 +1793,20 @@ class WhatsAppController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    private function isMissingWhatsAppMessage(\Exception $exception, string $messageId): bool
+    {
+        if (! $exception instanceof ResponseException) {
+            return false;
+        }
+
+        $error = $exception->responseData()['error'] ?? [];
+        $details = $error['error_data']['details'] ?? null;
+
+        return ($error['code'] ?? null) === 100
+            && is_string($details)
+            && str_starts_with($details, "Message ID: {$messageId} does not exist.");
     }
 
     /**
