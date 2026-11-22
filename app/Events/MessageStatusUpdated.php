@@ -88,6 +88,7 @@ class MessageStatusUpdated implements ShouldBroadcastNow
             'id' => $this->message->id,
             'message_id' => $this->message->message_id,
             'contact_id' => $this->message->contact_id,
+            'direction' => $this->message->direction,
             'status' => $this->message->status,
             'delivered_at' => $this->message->delivered_at?->toISOString(),
             'read_at' => $this->message->read_at?->toISOString(),

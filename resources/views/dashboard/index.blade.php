@@ -479,6 +479,7 @@ function dashboardStats() {
         statsRequestId: 0,
         async init() {
             window.addEventListener('whatsapp-message-received', () => this.fetchStats());
+            window.addEventListener('whatsapp-status-updated', () => this.fetchStats());
             window.addEventListener('storage', (event) => {
                 if (event.key === 'whatsapp-read-state-changed') this.fetchStats();
             });
