@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\Payment;
 use App\Models\PlatformFee;
 use App\Models\QrisTransaction;
+use App\Models\Reservation;
 use App\Services\AiAgentService;
 use App\Services\BalanceService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -45,7 +46,7 @@ class ProcessQrisPayment implements ShouldQueue
     protected QrisTransaction $transaction;
 
     /**
-     * The webhook payload from Midtrans.
+     * The webhook payload from the payment provider.
      */
     protected array $payload;
 
@@ -53,7 +54,7 @@ class ProcessQrisPayment implements ShouldQueue
      * Create a new job instance.
      *
      * @param  QrisTransaction  $transaction  The settled transaction
-     * @param  array  $payload  The webhook payload from Midtrans
+     * @param  array  $payload  The webhook payload
      */
     public function __construct(QrisTransaction $transaction, array $payload = [])
     {
@@ -85,6 +86,19 @@ class ProcessQrisPayment implements ShouldQueue
                 return;
             }
 
+            $reservation = Reservation::where('qris_transaction_id', $this->transaction->id)
+                ->where('status', Reservation::STATUS_PENDING_PAYMENT)
+                ->first();
+
+            if ($reservation) {
+                ProcessReservationPayment::dispatch($reservation, 'success', $this->transaction);
+
+                Log::info('Reservation payment queued from QRIS processing', [
+                    'reservation_id' => $reservation->id,
+                    'order_id' => $this->transaction->order_id,
+                ]);
+            }
+
             // Check if platform fee already exists (prevent duplicate processing)
             if ($this->transaction->platformFee()->exists()) {
                 Log::info('Platform fee already exists, skipping duplicate processing', [
@@ -102,6 +116,22 @@ class ProcessQrisPayment implements ShouldQueue
 
             // Send WhatsApp notification to customer (outside DB transaction)
             $this->sendPaymentNotification($aiAgentService);
+
+            // Notify merchant for delivery orders (pickup notified in OrderCreator
+            // immediately, reservation notified in ProcessReservationPayment).
+            // Wrapped in try/catch so notif failure can't fail the payment job.
+            try {
+                $payment = Payment::where('qris_transaction_id', $this->transaction->id)->first();
+                $order   = $payment?->order;
+                if ($order && $order->delivery_type === \App\Models\Order::DELIVERY_TYPE_DELIVERY) {
+                    app(\App\Services\MerchantNotificationService::class)->notifyNewOrder($order);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Merchant delivery notif failed (non-fatal)', [
+                    'order_id' => $this->transaction->order_id,
+                    'error'    => $e->getMessage(),
+                ]);
+            }
 
             Log::info('ProcessQrisPayment job completed successfully', [
                 'order_id' => $this->transaction->order_id,
@@ -171,7 +201,7 @@ class ProcessQrisPayment implements ShouldQueue
         Log::info('QRIS Payment Audit Trail', [
             'event' => 'payment_processed',
             'order_id' => $this->transaction->order_id,
-            'midtrans_transaction_id' => $this->transaction->midtrans_transaction_id,
+            'provider_transaction_id' => $this->transaction->provider_transaction_id,
             'sub_merchant_id' => $merchant->id,
             'user_id' => $merchant->user_id,
             'gross_amount' => $grossAmount,
@@ -181,10 +211,9 @@ class ProcessQrisPayment implements ShouldQueue
             'settled_at' => $this->transaction->settled_at?->toIso8601String(),
             'new_available_balance' => $merchant->balance->fresh()->available_balance,
             'webhook_payload' => [
-                'transaction_id' => $this->payload['transaction_id'] ?? null,
-                'transaction_status' => $this->payload['transaction_status'] ?? null,
-                'payment_type' => $this->payload['payment_type'] ?? null,
-                'transaction_time' => $this->payload['transaction_time'] ?? null,
+                'reference_id' => $this->payload['reference_id'] ?? $this->payload['id'] ?? null,
+                'status' => $this->payload['status'] ?? null,
+                'type' => $this->payload['type'] ?? null,
             ],
         ]);
     }

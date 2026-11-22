@@ -1,4 +1,5 @@
 @extends('layouts.app')
+@include('components.dashboard-scripts')
 
 @section('title', __('dashboard.contacts_title'))
 
@@ -16,10 +17,10 @@
         <main class="flex-1 p-4 md:p-6">
             <div class="max-w-7xl mx-auto space-y-6" x-data="contactsManager()">
                 <!-- Search & Filter -->
-                <div class="card p-3 md:p-4 -mx-4 md:mx-0 rounded-none md:rounded-lg">
-                    <div class="flex flex-col sm:flex-row gap-3 md:gap-4">
-                        <div class="relative" style="flex: 1 1 0%; min-width: 0;">
-                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-sm pointer-events-none z-10"></i>
+                <div class="card p-3 md:p-4 -mx-4 md:mx-0 rounded-none md:rounded-lg shadow-sm">
+                    <div class="flex flex-wrap items-center gap-3 md:gap-4" style="display:flex;flex-wrap:wrap;align-items:center;width:100%;box-sizing:border-box;">
+                        <div class="relative min-w-0 flex-1" style="flex:1 1 380px;min-width:min(100%,260px);max-width:100%;">
+                            <svg aria-hidden="true" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--muted-foreground))] pointer-events-none z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
                             <input
                                 type="text"
                                 x-model="searchQuery"
@@ -29,12 +30,22 @@
                                 style="padding-left: 2.5rem;"
                             >
                         </div>
-                        <select x-model="sortBy" @change="sortContacts" class="input w-full sm:w-auto" style="flex: 0 0 auto; min-width: 180px; max-width: 220px;">
+                        <select x-model="sortBy" @change="sortContacts" class="input" style="width:210px;max-width:100%;min-width:min(100%,170px);flex:0 1 210px;">
                             <option value="name_asc">{{ __('whatsapp.name_asc') }}</option>
                             <option value="name_desc">{{ __('whatsapp.name_desc') }}</option>
                             <option value="recent">{{ __('whatsapp.recently_added') }}</option>
                             <option value="oldest">{{ __('whatsapp.oldest_first') }}</option>
                         </select>
+                        <div class="grid grid-cols-2 gap-2" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;flex:1 1 280px;max-width:320px;min-width:min(100%,260px);">
+                            <button type="button" class="btn btn-primary min-h-10 justify-center gap-2 whitespace-nowrap px-4" style="min-width:0;" @click="window.qashierDownload('/api/whatsapp/exports/contacts?format=csv&search='+encodeURIComponent(searchQuery || ''))">
+                                <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5M12 15V3"></path></svg>
+                                <span>Unduh kontak</span>
+                            </button>
+                            <button type="button" class="btn min-h-10 justify-center gap-2 whitespace-nowrap border border-emerald-200 bg-emerald-50 px-4 text-emerald-800 transition hover:bg-emerald-100" style="min-width:0;" @click="window.qashierDownload('/api/whatsapp/exports/contacts?format=xlsx&search='+encodeURIComponent(searchQuery || ''))">
+                                <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6M8 13l5 6m0-6-5 6"></path></svg>
+                                <span>Excel</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -111,6 +122,9 @@
 
                                 <!-- Actions -->
                                 <div class="flex gap-2">
+                                    <button @click.stop="toggleAi(contact)" class="btn btn-icon md:btn-md" :class="contact.ai_active !== false ? 'btn-primary' : 'btn-outline text-gray-400'" :title="contact.ai_active !== false ? 'AI Active - Click to disable' : 'AI Inactive - Click to enable'">
+                                        <i class="fas fa-robot"></i>
+                                    </button>
                                     <button @click.stop="sendMessage(contact)" class="btn btn-primary btn-icon md:btn-md md:flex-1">
                                         <i class="fas fa-paper-plane"></i>
                                         <span class="hidden md:inline">Message</span>
@@ -213,6 +227,28 @@
                                         <label class="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">{{ __('whatsapp.last_activity') }}</label>
                                         <p class="mt-1" x-text="formatDate(selectedContact?.last_message_at || selectedContact?.created_at)">-</p>
                                     </div>
+                                </div>
+                                <div class="flex items-center justify-between p-3 rounded-lg" :class="selectedContact?.ai_active !== false ? 'bg-purple-50 border border-purple-200' : 'bg-gray-50 border border-gray-200'">
+                                    <div>
+                                        <p class="font-medium text-sm flex items-center gap-2">
+                                            <i class="fas fa-robot" :class="selectedContact?.ai_active !== false ? 'text-purple-600' : 'text-gray-400'"></i>
+                                            AI Agent
+                                        </p>
+                                        <p class="text-xs" :class="selectedContact?.ai_active !== false ? 'text-purple-600' : 'text-gray-500'">
+                                            <span x-show="selectedContact?.ai_active !== false">AI aktif untuk kontak ini</span>
+                                            <span x-show="selectedContact?.ai_active === false">AI nonaktif untuk kontak ini</span>
+                                        </p>
+                                    </div>
+                                    <button
+                                        @click="toggleAi(selectedContact)"
+                                        :class="selectedContact?.ai_active !== false ? 'bg-purple-600' : 'bg-gray-300'"
+                                        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 cursor-pointer"
+                                    >
+                                        <span
+                                            :class="selectedContact?.ai_active !== false ? 'translate-x-6' : 'translate-x-1'"
+                                            class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow"
+                                        ></span>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -366,6 +402,22 @@ function contactsManager() {
                 this.filterContacts();
             } catch (e) { console.error('Error:', e); }
             finally { this.loading = false; }
+        },
+
+        async toggleAi(contact) {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${this.API_BASE_URL}/whatsapp/contacts/${contact.id}/toggle-ai`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    contact.ai_active = data.data.ai_active;
+                    this.contacts = [...this.contacts];
+                    this.filterContacts();
+                }
+            } catch (e) { console.error('Toggle AI error:', e); }
         },
 
         filterContacts() {

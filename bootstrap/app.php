@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\CatalogNotConnectedException;
 use App\Exceptions\EmbeddedSignupDisabledException;
 use App\Exceptions\EncryptionException;
 use App\Exceptions\NoActiveProviderException;
@@ -9,9 +10,22 @@ use App\Exceptions\UnsupportedProviderException;
 use App\Exceptions\WhatsAppNotConnectedException;
 use App\Exceptions\WhatsAppTokenExpiredException;
 use App\Exceptions\WhatsAppTokenInvalidException;
+use App\Http\Middleware\AdminSessionValidation;
+use App\Http\Middleware\BlockAuthorFromRegularLogin;
+use App\Http\Middleware\CheckPosPermission;
+use App\Http\Middleware\CheckWebAuth;
+use App\Http\Middleware\ClearPermissionCache;
+use App\Http\Middleware\EnsureWhatsAppConnected;
+use App\Http\Middleware\GzipMiddleware;
+use App\Http\Middleware\LocalizationMiddleware;
+use App\Http\Middleware\QrisRateLimiter;
+use App\Http\Middleware\SanitizeProviderErrors;
+use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\SetPostgresUserContext;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Middleware\HandleCors;
 use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -25,21 +39,26 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
 
+        // Trust proxies for HTTPS forwarding
+        $middleware->trustProxies(at: '*');
+
         // CORS configuration
         $middleware->api(prepend: [
-            \Illuminate\Http\Middleware\HandleCors::class,
+            HandleCors::class,
         ]);
 
         // Apply localization middleware to all routes
         $middleware->appendToGroup('web', [
-            \App\Http\Middleware\LocalizationMiddleware::class,
-            \App\Http\Middleware\SetPostgresUserContext::class,
-            \App\Http\Middleware\SecurityHeaders::class,
+            GzipMiddleware::class,
+            LocalizationMiddleware::class,
+            SetPostgresUserContext::class,
+            SecurityHeaders::class,
         ]);
 
         $middleware->appendToGroup('api', [
-            \App\Http\Middleware\LocalizationMiddleware::class,
-            \App\Http\Middleware\SetPostgresUserContext::class,
+            GzipMiddleware::class,
+            LocalizationMiddleware::class,
+            SetPostgresUserContext::class,
         ]);
 
         // Disable CSRF for API routes
@@ -51,15 +70,16 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Register custom middleware aliases
         $middleware->alias([
-            'localization' => \App\Http\Middleware\LocalizationMiddleware::class,
-            'check.web.auth' => \App\Http\Middleware\CheckWebAuth::class,
-            'whatsapp.connected' => \App\Http\Middleware\EnsureWhatsAppConnected::class,
-            'qris.rate_limit' => \App\Http\Middleware\QrisRateLimiter::class,
-            'admin.session' => \App\Http\Middleware\AdminSessionValidation::class,
-            'postgres.user.context' => \App\Http\Middleware\SetPostgresUserContext::class,
-            'sanitize.provider.errors' => \App\Http\Middleware\SanitizeProviderErrors::class,
-            'pos.permission' => \App\Http\Middleware\CheckPosPermission::class,
-            'clear.permission.cache' => \App\Http\Middleware\ClearPermissionCache::class,
+            'localization' => LocalizationMiddleware::class,
+            'check.web.auth' => CheckWebAuth::class,
+            'whatsapp.connected' => EnsureWhatsAppConnected::class,
+            'qris.rate_limit' => QrisRateLimiter::class,
+            'admin.session' => AdminSessionValidation::class,
+            'postgres.user.context' => SetPostgresUserContext::class,
+            'sanitize.provider.errors' => SanitizeProviderErrors::class,
+            'pos.permission' => CheckPosPermission::class,
+            'clear.permission.cache' => ClearPermissionCache::class,
+            'block.author.login' => BlockAuthorFromRegularLogin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -133,6 +153,17 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Handle WhatsApp Not Connected Exception
         $exceptions->render(function (WhatsAppNotConnectedException $e, Request $request) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => $e->getErrorCode(),
+                    'message' => $e->getMessage(),
+                ], $e->getCode());
+            }
+        });
+
+        // Handle Catalog Not Connected Exception
+        $exceptions->render(function (CatalogNotConnectedException $e, Request $request) {
             if ($request->expectsJson() || $request->is('api/*')) {
                 return response()->json([
                     'success' => false,

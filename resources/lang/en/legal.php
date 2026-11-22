@@ -18,6 +18,7 @@ return [
     'privacy_policy' => [
         'title' => 'Privacy Policy',
         'meta_title' => 'Privacy Policy - QashierWise',
+        'meta_description' => 'QashierWise Privacy Policy. Learn how we collect, use, and protect your data and our compliance with data protection regulations.',
         'last_updated_date' => 'November 27, 2025',
 
         'section_1' => [
@@ -114,6 +115,7 @@ return [
     'terms_of_service' => [
         'title' => 'Terms of Service',
         'meta_title' => 'Terms of Service - QashierWise',
+        'meta_description' => 'Read QashierWise Terms of Service. Learn about user rights, responsibilities, data security, and service conditions for our restaurant management platform.',
         'last_updated_date' => 'February 10, 2025',
 
         'intro' => [
@@ -194,6 +196,7 @@ return [
     'refund_policy' => [
         'title' => 'Refund Policy',
         'meta_title' => 'Refund Policy - QashierWise',
+        'meta_description' => 'QashierWise Refund Policy. Refund conditions, free trial period, and your rights as our customer.',
         'last_updated_date' => 'January 23, 2026',
 
         'intro' => 'At QashierWise, we are committed to providing the best service to our customers. This refund policy explains your rights regarding refunds for QashierWise subscription services.',

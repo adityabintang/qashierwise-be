@@ -100,6 +100,7 @@ return [
 
     // Contact Search & Filter
     'search_contacts' => 'Cari kontak...',
+    'error_mark_read' => 'Sebagian pesan gagal ditandai sebagai dibaca. Buka kembali percakapan ini untuk mencoba lagi.',
     'sort_by' => 'Urutkan berdasarkan',
     'name_asc' => 'Nama (A-Z)',
     'name_desc' => 'Nama (Z-A)',

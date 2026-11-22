@@ -22,11 +22,8 @@ class SubscriptionFactory extends Factory
     {
         return [
             'user_id' => User::factory(),
-            'provider' => 'midtrans',
-            'plan_name' => 'standard',
+            'plan_name' => 'pro',
             'status' => 'active',
-            'polar_subscription_id' => 'polar_'.$this->faker->uuid(), // Required by schema
-            'polar_customer_id' => 'polar_cust_'.$this->faker->uuid(), // Required by schema
             'midtrans_subscription_id' => 'sub_'.$this->faker->uuid(),
             'midtrans_customer_id' => 'cust_'.$this->faker->uuid(),
             'current_period_start' => now(),
@@ -82,28 +79,11 @@ class SubscriptionFactory extends Factory
     }
 
     /**
-     * Indicate that the subscription uses Polar provider.
-     */
-    public function polar(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'provider' => 'polar',
-            'polar_subscription_id' => 'polar_sub_'.$this->faker->uuid(),
-            'polar_customer_id' => 'polar_cust_'.$this->faker->uuid(),
-            'midtrans_subscription_id' => 'mid_'.$this->faker->uuid(), // Required by schema
-            'midtrans_customer_id' => 'mid_cust_'.$this->faker->uuid(), // Required by schema
-        ]);
-    }
-
-    /**
      * Indicate that the subscription uses Midtrans provider.
      */
     public function midtrans(): static
     {
         return $this->state(fn (array $attributes) => [
-            'provider' => 'midtrans',
-            'polar_subscription_id' => 'polar_'.$this->faker->uuid(), // Required by schema
-            'polar_customer_id' => 'polar_cust_'.$this->faker->uuid(), // Required by schema
             'midtrans_subscription_id' => 'sub_'.$this->faker->uuid(),
             'midtrans_customer_id' => 'cust_'.$this->faker->uuid(),
         ]);

@@ -19,6 +19,7 @@ return [
     'profile_title' => 'Profil Bisnis - QashierWise',
     'whatsapp_account_title' => 'Akun WhatsApp - QashierWise',
     'ai_agent_title' => 'Agen AI - QashierWise',
+    'customer_tags_title' => 'Tag Pelanggan - QashierWise',
     'reservations_title' => 'Reservasi - QashierWise',
 
     // Main Navigation Menu Items
@@ -29,6 +30,8 @@ return [
     'menu_business_profile' => 'Profil Bisnis',
     'menu_whatsapp_account' => 'Akun WhatsApp',
     'menu_ai_agent' => 'Agen AI',
+    'menu_customer_tags' => 'Tag Pelanggan',
+    'customer_tags_description' => 'Kelola tag untuk kontak WhatsApp Anda',
 
     // POS Section Headers
     'section_point_of_sale' => 'Point of Sale',
@@ -41,6 +44,7 @@ return [
     'menu_orders' => 'Pesanan',
     'menu_payment' => 'Pembayaran',
     'menu_products' => 'Produk',
+    'menu_meta_catalog' => 'Meta Katalog',
     'menu_categories' => 'Kategori',
     'menu_stores' => 'Toko',
     'menu_tables' => 'Meja',
@@ -210,8 +214,10 @@ return [
 
     // Confirmation Messages
     'confirm_delete' => 'Apakah Anda yakin ingin menghapus ini?',
+    'confirm_delete_message' => 'Apakah Anda yakin ingin menghapus ini? Tindakan ini tidak dapat dibatalkan.',
     'confirm_action' => 'Apakah Anda yakin ingin melanjutkan?',
     'action_cannot_undone' => 'Tindakan ini tidak dapat dibatalkan',
+    'deleting' => 'Menghapus',
 
     // Loading States
     'loading_data' => 'Memuat data...',
@@ -243,5 +249,16 @@ return [
     'future_reservations' => 'Reservasi mendatang',
     'awaiting_confirmation' => 'Menunggu konfirmasi',
     'total_reservations' => 'Total reservasi',
+
+    // Reservation Config
+    'reservation' => [
+        'config_updated' => 'Reservation Configuration Successfully updated',
+        'config_created' => 'Reservation Configuration Successfully created',
+        'config_update_failed' => 'Failed to update Reservation Configuration',
+        'config_create_failed' => 'Failed to create Reservation Configuration',
+        'config_deleted' => 'Reservation Configuration Successfully deleted',
+        'config_delete_failed' => 'Failed to delete Reservation Configuration',
+        'config_already_exists' => 'Reservation Configuration already exists for this store',
+    ],
 
 ];

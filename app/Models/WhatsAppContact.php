@@ -51,10 +51,12 @@ class WhatsAppContact extends Model
         'last_message_at',
         'last_message_text',
         'unread_count',
+        'ai_active',
     ];
 
     protected $casts = [
         'last_message_at' => 'datetime',
+        'ai_active' => 'boolean',
     ];
 
     protected $appends = ['phone_number'];
@@ -77,6 +79,19 @@ class WhatsAppContact extends Model
     public function latestMessage()
     {
         return $this->hasOne(WhatsAppMessage::class, 'contact_id')->latest();
+    }
+
+    /**
+     * The tags assigned to this contact.
+     */
+    public function tags()
+    {
+        return $this->belongsToMany(
+            ContactTag::class,
+            'contact_tag_pivot',
+            'whatsapp_contact_id',
+            'contact_tag_id'
+        )->withTimestamps();
     }
 
     /**

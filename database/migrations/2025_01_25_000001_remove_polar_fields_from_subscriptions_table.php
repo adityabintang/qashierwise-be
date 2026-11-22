@@ -11,23 +11,35 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Drop indexes first (required for SQLite compatibility)
         Schema::table('subscriptions', function (Blueprint $table) {
-            // Drop indexes for provider (if exists)
+            if (Schema::hasColumn('subscriptions', 'polar_subscription_id')) {
+                $table->dropUnique(['polar_subscription_id']);
+            }
+            if (Schema::hasColumn('subscriptions', 'polar_customer_id')) {
+                $table->dropIndex(['polar_customer_id']);
+            }
             if (Schema::hasIndex('subscriptions', 'idx_subscriptions_provider')) {
                 $table->dropIndex('idx_subscriptions_provider');
             }
-
-            // Drop Polar-specific fields
-            if (Schema::hasColumn('subscriptions', 'polar_subscription_id')) {
-                $table->dropColumn('polar_subscription_id');
-            }
-            if (Schema::hasColumn('subscriptions', 'polar_customer_id')) {
-                $table->dropColumn('polar_customer_id');
-            }
-            if (Schema::hasColumn('subscriptions', 'provider')) {
-                $table->dropColumn('provider');
-            }
         });
+
+        // Drop columns in separate calls for SQLite compatibility
+        if (Schema::hasColumn('subscriptions', 'polar_subscription_id')) {
+            Schema::table('subscriptions', function (Blueprint $table) {
+                $table->dropColumn('polar_subscription_id');
+            });
+        }
+        if (Schema::hasColumn('subscriptions', 'polar_customer_id')) {
+            Schema::table('subscriptions', function (Blueprint $table) {
+                $table->dropColumn('polar_customer_id');
+            });
+        }
+        if (Schema::hasColumn('subscriptions', 'provider')) {
+            Schema::table('subscriptions', function (Blueprint $table) {
+                $table->dropColumn('provider');
+            });
+        }
     }
 
     /**

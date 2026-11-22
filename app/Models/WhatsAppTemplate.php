@@ -44,13 +44,17 @@ class WhatsAppTemplate extends Model
 
     protected $fillable = [
         'whatsapp_account_id',
+        'phone_number_id',
         'template_id',
         'name',
         'language',
         'category',
         'status',
+        'rejection_info',
         'components',
         'body',
+        'body_examples',
+        'variable_type',
         'header',
         'header_type',
         'footer',
@@ -62,6 +66,8 @@ class WhatsAppTemplate extends Model
     protected $casts = [
         'components' => 'array',
         'buttons' => 'array',
+        'body_examples' => 'array',
+        'rejection_info' => 'array',
         'usage_count' => 'integer',
     ];
 

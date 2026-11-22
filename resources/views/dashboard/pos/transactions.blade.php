@@ -1,4 +1,5 @@
 @extends('layouts.app')
+@include('components.dashboard-scripts')
 
 @section('title', __('dashboard.menu_transactions') . ' - QashierWise POS')
 

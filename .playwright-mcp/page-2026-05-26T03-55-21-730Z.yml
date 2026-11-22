@@ -1,0 +1,177 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e5]:
+        - img "Logo" [ref=e6]
+        - generic [ref=e7]: QashierWise
+      - navigation [ref=e8]:
+        - link "Dasbor" [ref=e9] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e11]: Dasbor
+        - link "Kontak" [ref=e12] [cursor=pointer]:
+          - /url: /dashboard/contacts
+          - generic [ref=e14]: Kontak
+        - link "Pesan" [ref=e15] [cursor=pointer]:
+          - /url: /dashboard/messages
+          - generic [ref=e17]: Pesan
+        - link "Template" [ref=e18] [cursor=pointer]:
+          - /url: /dashboard/templates
+          - generic [ref=e20]: Template
+        - link "Profil Bisnis" [ref=e21] [cursor=pointer]:
+          - /url: /dashboard/profile
+          - generic [ref=e23]: Profil Bisnis
+        - link "Akun WhatsApp" [ref=e24] [cursor=pointer]:
+          - /url: /dashboard/whatsapp-account
+          - generic [ref=e26]: Akun WhatsApp
+        - link "Agen AI" [ref=e27] [cursor=pointer]:
+          - /url: /dashboard/ai-agent
+          - generic [ref=e29]: Agen AI
+        - link "Tag Pelanggan" [ref=e30] [cursor=pointer]:
+          - /url: /dashboard/customer-tags
+          - generic [ref=e32]: Tag Pelanggan
+        - link "Developer" [ref=e33] [cursor=pointer]:
+          - /url: /dashboard/developer/webhooks
+          - generic [ref=e35]: Developer
+        - generic [ref=e37]: Reservasi
+        - link "Daftar Reservasi" [ref=e38] [cursor=pointer]:
+          - /url: /dashboard/reservations
+          - generic [ref=e40]: Daftar Reservasi
+        - link "Kalender" [ref=e41] [cursor=pointer]:
+          - /url: /dashboard/reservations/calendar
+          - generic [ref=e43]: Kalender
+        - link "Konfigurasi" [ref=e44] [cursor=pointer]:
+          - /url: /dashboard/reservations/config
+          - generic [ref=e46]: Konfigurasi
+        - generic [ref=e48]: Point of Sale
+        - link "Pesanan" [ref=e49] [cursor=pointer]:
+          - /url: /dashboard/pos/orders
+          - generic [ref=e51]: Pesanan
+        - link "Pembayaran" [ref=e52] [cursor=pointer]:
+          - /url: /dashboard/pos/payment
+          - generic [ref=e54]: Pembayaran
+        - generic [ref=e56]: Inventaris
+        - link "Produk" [ref=e57] [cursor=pointer]:
+          - /url: /dashboard/pos/products
+          - generic [ref=e59]: Produk
+        - link "Meta Katalog" [ref=e60] [cursor=pointer]:
+          - /url: /dashboard/meta-catalog
+          - generic [ref=e62]: Meta Katalog
+        - link "Kategori" [ref=e63] [cursor=pointer]:
+          - /url: /dashboard/pos/categories
+          - generic [ref=e65]: Kategori
+        - generic [ref=e67]: Operasional
+        - link "Toko" [ref=e68] [cursor=pointer]:
+          - /url: /dashboard/pos/stores
+          - generic [ref=e70]: Toko
+        - link "Meja" [ref=e71] [cursor=pointer]:
+          - /url: /dashboard/pos/tables
+          - generic [ref=e73]: Meja
+        - generic [ref=e76] [cursor=pointer]: Users Management
+        - generic [ref=e79]: Analitik
+        - link "Laporan" [ref=e80] [cursor=pointer]:
+          - /url: /dashboard/pos/reports
+          - generic [ref=e82]: Laporan
+        - link "Transaksi" [ref=e83] [cursor=pointer]:
+          - /url: /dashboard/pos/transactions
+          - generic [ref=e85]: Transaksi
+        - generic [ref=e87]: QRIS Payment
+        - link "Pengaturan QRIS" [ref=e88] [cursor=pointer]:
+          - /url: /dashboard/sub-merchant/
+          - generic [ref=e90]: Pengaturan QRIS
+        - link "Buat QRIS" [ref=e91] [cursor=pointer]:
+          - /url: /dashboard/sub-merchant/qris
+          - generic [ref=e93]: Buat QRIS
+        - link "Saldo" [ref=e94] [cursor=pointer]:
+          - /url: /dashboard/sub-merchant/balance
+          - generic [ref=e96]: Saldo
+        - link "Rekening Bank" [ref=e97] [cursor=pointer]:
+          - /url: /dashboard/sub-merchant/bank-account
+          - generic [ref=e99]: Rekening Bank
+        - link "Withdrawal" [ref=e100] [cursor=pointer]:
+          - /url: /dashboard/sub-merchant/withdrawals
+          - generic [ref=e102]: Withdrawal
+      - generic [ref=e103]:
+        - generic [ref=e105]:
+          - img "Super Admin" [ref=e106]
+          - generic [ref=e107]:
+            - paragraph [ref=e108]: Super Admin
+            - paragraph [ref=e109]: admin@qashierwise.com
+        - generic [ref=e110]:
+          - button "Keluar" [ref=e111] [cursor=pointer]:
+            - generic [ref=e113]: Keluar
+          - button [ref=e114] [cursor=pointer]
+    - generic [ref=e116]:
+      - banner [ref=e117]:
+        - generic [ref=e118]:
+          - generic [ref=e119]:
+            - button "Toggle navigation menu" [ref=e120] [cursor=pointer]
+            - generic [ref=e122]:
+              - heading "Meta Catalog" [level=1] [ref=e123]
+              - paragraph [ref=e124]: Produk dari katalog Meta Business Anda
+          - generic [ref=e125]:
+            - button "Switch language" [ref=e127]:
+              - generic [ref=e129]: ID
+            - button [ref=e132] [cursor=pointer]
+      - main [ref=e134]:
+        - generic [ref=e135]:
+          - generic [ref=e136]:
+            - heading "Katalog Meta Anda" [level=2] [ref=e139]
+            - button "Muat Ulang" [ref=e141] [cursor=pointer]:
+              - generic [ref=e142]: Muat Ulang
+          - generic [ref=e144]:
+            - generic [ref=e145]:
+              - heading "Tidak Ada Katalog Commerce" [level=3] [ref=e148]
+              - paragraph [ref=e149]:
+                - text: Pastikan akun Meta Business Anda memiliki katalog produk yang aktif dengan tipe
+                - strong [ref=e150]: commerce
+                - text: .
+            - generic [ref=e155]:
+              - generic [ref=e156]:
+                - heading "Mengapa katalog saya tidak muncul di sini?" [level=4] [ref=e157]
+                - paragraph [ref=e158]:
+                  - text: Halaman ini
+                  - strong [ref=e159]: hanya menampilkan katalog bertipe commerce
+                  - text: ", karena hanya tipe inilah yang kompatibel dengan fitur produk WhatsApp Business (cart, multi-product message, dan order flow QashierWise)."
+              - generic [ref=e160]:
+                - generic [ref=e161]:
+                  - generic [ref=e164]: Pilih ini saat membuat katalog di Meta
+                  - list [ref=e165]:
+                    - listitem [ref=e166]:
+                      - strong [ref=e167]: Produk fisik → Produk online
+                      - text: (disarankan untuk F&B / retail)
+                    - listitem [ref=e168]:
+                      - strong [ref=e169]: Produk atau layanan lokal
+                      - text: (restoran, warung dengan delivery)
+                    - listitem [ref=e170]:
+                      - strong [ref=e171]: Layanan → Jasa profesional
+                    - listitem [ref=e172]:
+                      - strong [ref=e173]: Produk atau konten digital → Aplikasi / Artikel
+                - generic [ref=e174]:
+                  - generic [ref=e177]: Hindari — tidak akan muncul di sini
+                  - list [ref=e178]:
+                    - listitem [ref=e179]:
+                      - strong [ref=e180]: Real estate
+                      - text: (home_listings)
+                    - listitem [ref=e181]:
+                      - strong [ref=e182]: Kendaraan / Kendaraan dan promo
+                      - text: (vehicles)
+                    - listitem [ref=e183]:
+                      - strong [ref=e184]: Hotel dan penyewaan
+                      - text: (hotels)
+                    - listitem [ref=e185]:
+                      - strong [ref=e186]: Penerbangan / Tujuan
+                      - text: (flights, destinations)
+                    - listitem [ref=e187]:
+                      - strong [ref=e188]: Media streaming
+                      - text: (media_title)
+              - paragraph [ref=e189]:
+                - strong [ref=e191]: "Tip:"
+                - text: Tipe katalog tidak bisa diubah setelah dibuat. Untuk menghindari kesalahan, disarankan membuat katalog langsung dari tombol "Buat Katalog Baru" di halaman ini — tipe commerce akan otomatis diterapkan.
+  - generic [ref=e194]:
+    - generic [ref=e195]:
+      - paragraph [ref=e196]: Kami menggunakan cookies untuk meningkatkan pengalaman Anda dan menganalisis trafik. Dengan melanjutkan, Anda menyetujui penggunaan cookies kami.
+      - link "Baca Kebijakan Privasi" [ref=e197] [cursor=pointer]:
+        - /url: http://localhost:8000/privacy-policy
+    - generic [ref=e198]:
+      - button "Tolak" [ref=e199]
+      - button "Terima Semua" [ref=e200]

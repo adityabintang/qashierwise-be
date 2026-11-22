@@ -64,6 +64,10 @@ class AiAgentPromptBuilder
             $sections[] = $this->getAntiHallucinationReminder();
         }
 
+        if ($this->shouldIncludeReservationInstructions()) {
+            $sections[] = $this->getReservationInstructions();
+        }
+
         return implode("\n\n", array_filter($sections));
     }
 
@@ -95,8 +99,30 @@ class AiAgentPromptBuilder
 
         // Ultra-compact system context (~50 tokens)
         $prompt = "Asisten {$botName}. ";
-        $prompt .= config('ai_agent_prompts.core_rules');
-        $prompt .= "\n".config('ai_agent_prompts.ordering_workflow');
+
+        // Use appropriate core rules based on order_enabled
+        $configKey = $this->agent->isOrderEnabled()
+            ? 'ai_agent_prompts.core_rules'
+            : 'ai_agent_prompts.core_rules_without_ordering';
+        $prompt .= config($configKey) ?? config('ai_agent_prompts.core_rules');
+
+        // Only add ordering workflow if enabled
+        if ($this->agent->isOrderEnabled()) {
+            $prompt .= "\n".config('ai_agent_prompts.ordering_workflow');
+        }
+
+        if ($this->agent->isDeliveryEnabled()) {
+            $deliveryPrompt = config('ai_agent_prompts.delivery_workflow');
+            $deliveryPrompt = str_replace(':ongkir', number_format($this->agent->default_ongkir, 0, ',', '.'), $deliveryPrompt);
+            $prompt .= "\n".$deliveryPrompt;
+        }
+
+        if ($this->shouldIncludeReservationInstructions()) {
+            $reservationInstructions = $this->getReservationInstructions();
+            if ($reservationInstructions !== '') {
+                $prompt .= "\n".$reservationInstructions;
+            }
+        }
 
         return str_replace(':business_name', $botName, $prompt);
     }
@@ -180,6 +206,10 @@ class AiAgentPromptBuilder
             $dynamicParts[] = $this->getAntiHallucinationReminder();
         }
 
+        if ($this->shouldIncludeReservationInstructions()) {
+            $dynamicParts[] = $this->getReservationInstructions();
+        }
+
         return $staticPart."\n\n".implode("\n\n", array_filter($dynamicParts));
     }
 
@@ -221,17 +251,27 @@ class AiAgentPromptBuilder
             $sections[] = $this->getOrderingWorkflow();
         }
 
+        if ($this->shouldIncludeReservationInstructions()) {
+            $sections[] = $this->getReservationInstructions();
+        }
+
         return implode("\n\n", array_filter($sections));
     }
 
     private function getCoreRules(): string
     {
         // Use TOON-optimized rules if enabled
-        $configKey = ($this->agent->use_toon_format ?? false)
-            ? 'ai_agent_prompts.toon_core_rules'
-            : 'ai_agent_prompts.core_rules';
+        if ($this->agent->use_toon_format ?? false) {
+            $configKey = $this->agent->isOrderEnabled()
+                ? 'ai_agent_prompts.toon_core_rules'
+                : 'ai_agent_prompts.toon_core_rules_without_ordering';
+        } else {
+            $configKey = $this->agent->isOrderEnabled()
+                ? 'ai_agent_prompts.core_rules'
+                : 'ai_agent_prompts.core_rules_without_ordering';
+        }
 
-        $rules = config($configKey);
+        $rules = config($configKey) ?? config('ai_agent_prompts.core_rules');
 
         return str_replace(':business_name', $this->agent->bot_name, $rules);
     }
@@ -327,7 +367,7 @@ class AiAgentPromptBuilder
 
             $lines = ['## Produk (Sample):'];
             $lines[] = Toon::convert(['menu' => $categorizedArray]);
-            $lines[] = "Total: {$totalProducts} produk | Full: get_all_products(page=1) | 20/page | Hide ID";
+            $lines[] = "Total: {$totalProducts} produk | Full: get_all_products(page=1) | 10/page | Hide ID";
 
             return implode("\n", $lines);
         }
@@ -343,7 +383,7 @@ class AiAgentPromptBuilder
             }
         }
 
-        $lines[] = "\n**PENTING**: Ini hanya sample. Untuk menu lengkap: `get_all_products(page=1)` (20 produk per halaman, dikategorikan)";
+        $lines[] = "\n**PENTING**: Ini hanya sample. Untuk menu lengkap: `get_all_products(page=1)` (10 produk per halaman, dikategorikan)";
         $lines[] = "Jika user minta 'menu lainnya': `get_all_products(page=2)`, dst.";
         $lines[] = 'Jangan tampilkan [ID:X] ke user!';
 
@@ -369,6 +409,21 @@ class AiAgentPromptBuilder
         return config('ai_agent_prompts.anti_hallucination_reminder');
     }
 
+    private function getReservationInstructions(): string
+    {
+        $reservationLink = $this->agent->getReservationFormUrl();
+        if (! $reservationLink) {
+            return '';
+        }
+
+        $template = config('ai_agent_prompts.reservation_instructions');
+        if (! $template) {
+            return '';
+        }
+
+        return str_replace(':reservation_link', $reservationLink, $template);
+    }
+
     private function shouldIncludeBusinessInfo(): bool
     {
         // Only include for greeting, business_info, or unknown intents
@@ -383,19 +438,15 @@ class AiAgentPromptBuilder
         ]);
     }
 
+    /**
+     * Product list is no longer injected into the system prompt — that was
+     * the root cause of "AI hallucinates a product that doesn't exist".
+     * The LLM now learns about products exclusively through the
+     * `get_all_products` tool, which always returns ground truth from the DB.
+     */
     private function shouldIncludeProductSamples(): bool
     {
-        // Only include for menu viewing, searching, or ordering
-        if ($this->intent === null) {
-            return true;
-        }
-
-        return in_array($this->intent, [
-            UserIntent::VIEW_MENU,
-            UserIntent::SEARCH_PRODUCT,
-            UserIntent::ORDER,
-            UserIntent::UNKNOWN,
-        ]);
+        return false;
     }
 
     private function shouldIncludeOrderingWorkflow(): bool
@@ -419,44 +470,49 @@ class AiAgentPromptBuilder
         ]);
     }
 
-    /**
-     * Get few-shot examples for early conversations
-     */
-    public static function getFewShotExamples(): array
+    private function shouldIncludeReservationInstructions(): bool
     {
-        return [
-            [
-                'role' => 'user',
-                'content' => 'menunya apa aja?',
-            ],
-            [
-                'role' => 'assistant',
-                'content' => null,
-                'tool_calls' => [
-                    [
-                        'id' => 'call_example_1',
-                        'type' => 'function',
-                        'function' => [
-                            'name' => 'get_all_products',
-                            'arguments' => '{}',
-                        ],
-                    ],
-                ],
-            ],
-            [
-                'role' => 'tool',
-                'tool_call_id' => 'call_example_1',
-                'content' => json_encode([
-                    'products' => [
-                        ['name' => 'Dimsum Keju', 'price' => 40000],
-                        ['name' => 'Teh Jumbo', 'price' => 5000],
-                    ],
-                ]),
-            ],
-            [
-                'role' => 'assistant',
-                'content' => "Berikut menu kami:\n\n1. Dimsum Keju - Rp 40.000\n2. Teh Jumbo - Rp 5.000\n\nMau pesan yang mana? 😊",
-            ],
-        ];
+        return $this->agent->isReservationEnabled();
     }
+
+    // /**
+    //  * Get few-shot examples for early conversations
+    //  */
+    // public static function getFewShotExamples(): array
+    // {
+    //     return [
+    //         [
+    //             'role' => 'user',
+    //             'content' => 'menunya apa aja?',
+    //         ],
+    //         [
+    //             'role' => 'assistant',
+    //             'content' => null,
+    //             'tool_calls' => [
+    //                 [
+    //                     'id' => 'call_example_1',
+    //                     'type' => 'function',
+    //                     'function' => [
+    //                         'name' => 'get_all_products',
+    //                         'arguments' => '{}',
+    //                     ],
+    //                 ],
+    //             ],
+    //         ],
+    //         [
+    //             'role' => 'tool',
+    //             'tool_call_id' => 'call_example_1',
+    //             'content' => json_encode([
+    //                 'products' => [
+    //                     ['name' => 'Dimsum Keju', 'price' => 40000],
+    //                     ['name' => 'Teh Jumbo', 'price' => 5000],
+    //                 ],
+    //             ]),
+    //         ],
+    //         [
+    //             'role' => 'assistant',
+    //             'content' => "Berikut menu kami:\n\n1. Dimsum Keju - Rp 40.000\n2. Teh Jumbo - Rp 5.000\n\nMau pesan yang mana? 😊",
+    //         ],
+    //     ];
+    // }
 }

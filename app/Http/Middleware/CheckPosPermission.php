@@ -35,6 +35,7 @@ class CheckPosPermission
 
         if (! $user) {
             \Log::warning('CheckPosPermission: No user - RETURN 401');
+
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized',
@@ -45,19 +46,21 @@ class CheckPosPermission
         // This is a system-wide administrator, not tied to any merchant
         if ($user->isSuperAdmin()) {
             \Log::info('CheckPosPermission: Super admin bypass - GRANTED');
+
             return $next($request);
         }
 
         // Check if user is master admin (can access everything for their merchant)
         if ($user->isMasterAdmin()) {
             \Log::info('CheckPosPermission: Master admin bypass - GRANTED');
+
             return $next($request);
         }
 
         // Load POS user to verify store assignment
         $posUser = $user->posUsers()->first();
         \Log::info('CheckPosPermission: POS User check', [
-            'has_pos_user' => (bool)$posUser,
+            'has_pos_user' => (bool) $posUser,
             'pos_user_id' => $posUser?->id,
             'store_id' => $posUser?->store_id,
             'is_active' => $posUser?->is_active,
@@ -66,6 +69,7 @@ class CheckPosPermission
         // If user is not a POS user (no store assignment), deny access
         if (! $posUser) {
             \Log::warning('CheckPosPermission: No POS user found - DENIED - RETURN 403');
+
             return response()->json([
                 'success' => false,
                 'message' => 'You do not have permission to access this resource.',
@@ -73,8 +77,9 @@ class CheckPosPermission
         }
 
         // Check if POS user is active
-        if (!$posUser->is_active) {
+        if (! $posUser->is_active) {
             \Log::warning('CheckPosPermission: POS user inactive - DENIED - RETURN 403');
+
             return response()->json([
                 'success' => false,
                 'message' => 'Your account is inactive. Please contact your administrator.',
@@ -107,6 +112,7 @@ class CheckPosPermission
                 'required' => $requiredPermissions,
                 'has' => $allPermissions,
             ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'You do not have permission to access this resource.',
@@ -114,6 +120,7 @@ class CheckPosPermission
         }
 
         \Log::info('CheckPosPermission: GRANTED - PASS THROUGH');
+
         return $next($request);
     }
 }

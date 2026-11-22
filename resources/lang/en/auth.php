@@ -30,11 +30,21 @@ return [
     'password' => 'Password',
     'password_placeholder' => 'Enter your password',
     'sign_in' => 'Sign In',
+    'login_as_editor' => 'Login as Editor',
     'remember_me' => 'Remember Me',
     'forgot_password' => 'Forgot Your Password?',
     'login_button' => 'Login',
     'processing' => 'Processing...',
     'back_to_home' => 'Back to home',
+
+    // Admin Login Page
+    'admin_login_heading' => 'Sign in to your account',
+    'admin_login_email' => 'Email address',
+    'admin_login_password' => 'Password',
+    'admin_login_remember' => 'Remember me',
+    'admin_login_button' => 'Sign in',
+    'admin_login_forgot' => 'Forgot password?',
+    'admin_login_back_home' => 'Home',
 
     // Register Page
     'free_trial' => 'Try Free for 14 Days',
@@ -73,6 +83,7 @@ return [
     'token_expired' => 'Your session has expired. Please login again.',
     'token_invalid' => 'Invalid authentication token.',
     'email_not_registered' => 'The email is not registered in the application',
+    'author_must_use_admin_panel' => 'Authors must use the Editor panel at /admin/login',
 
     // Validation Messages (Auth-specific)
     'name_required' => 'Business name is required',
@@ -93,6 +104,9 @@ return [
     'confirm_new_password' => 'Confirm New Password',
     'reset_password_button' => 'Reset Password',
     'password_reset_success' => 'Password has been reset successfully',
+    'reset_link_expired' => 'This password reset link has expired.',
+    'reset_link_expired_description' => 'For security reasons, password reset links are only valid for 60 minutes. Please request a new link to reset your password.',
+    'request_new_link' => 'Request New Link',
 
     // Email Verification
     'verify_email' => 'Verify Email',

@@ -10,8 +10,31 @@
         <span class="text-xl md:text-2xl font-bold text-[hsl(var(--primary))]">QashierWise</span>
     </div>
 
+    <!-- Loading State -->
+    <div x-show="verifying" x-transition class="card w-full max-w-md p-5 md:p-8">
+        <div class="flex flex-col items-center justify-center py-8">
+            <i class="fas fa-spinner animate-spin text-2xl text-[hsl(var(--primary))] mb-4"></i>
+            <p class="text-sm text-[hsl(var(--muted-foreground))]">{{ __('auth.processing') }}...</p>
+        </div>
+    </div>
+
+    <!-- Expired Token State -->
+    <div x-show="expired" x-transition x-cloak class="card w-full max-w-md p-5 md:p-8">
+        <div class="flex flex-col items-center text-center">
+            <div class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+                <i class="fas fa-clock text-2xl text-red-500"></i>
+            </div>
+            <h2 class="text-xl md:text-2xl font-bold mb-2">{{ __('auth.reset_link_expired') }}</h2>
+            <p class="text-sm text-[hsl(var(--muted-foreground))] mb-6">{{ __('auth.reset_link_expired_description') }}</p>
+            <a href="/forgot-password" class="btn btn-primary w-full h-11 md:h-12 touch-target flex items-center justify-center">
+                <i class="fas fa-envelope mr-2"></i>
+                {{ __('auth.request_new_link') }}
+            </a>
+        </div>
+    </div>
+
     <!-- Reset Password Card -->
-    <div class="card w-full max-w-md p-5 md:p-8">
+    <div x-show="!verifying && !expired" x-transition x-cloak class="card w-full max-w-md p-5 md:p-8">
         <div class="mb-5 md:mb-6">
             <h2 class="text-xl md:text-2xl font-bold">{{ __('auth.reset_password') }}</h2>
             <p class="text-xs md:text-sm text-[hsl(var(--primary))] mt-1">{{ __('auth.reset_password_subtitle') }}</p>
@@ -72,14 +95,37 @@ function resetPasswordForm() {
         showPassword: false,
         showConfirmPassword: false,
         loading: false,
+        verifying: true,
+        expired: false,
         error: '',
         success: '',
 
-        init() {
+        async init() {
             const urlParams = new URLSearchParams(window.location.search);
             this.token = urlParams.get('token');
+
             if (!this.token) {
-                this.error = 'Invalid or missing reset token';
+                this.expired = true;
+                this.verifying = false;
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/verify-reset-token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ token: this.token })
+                });
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    this.expired = true;
+                }
+            } catch (e) {
+                this.error = '{{ __("auth.network_error") }}';
+            } finally {
+                this.verifying = false;
             }
         },
 

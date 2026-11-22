@@ -188,6 +188,10 @@
                 <i class="fas fa-file-alt text-xl w-6"></i>
                 <span x-show="sidebarOpen">Templates</span>
             </a>
+            <a href="/dashboard/reservations" class="flex items-center space-x-3 px-6 py-3 hover:bg-green-500 transition">
+                <i class="fas fa-calendar-check text-xl w-6"></i>
+                <span x-show="sidebarOpen">Reservasi</span>
+            </a>
             <a href="/dashboard/profile" class="flex items-center space-x-3 px-6 py-3 hover:bg-green-500 transition">
                 <i class="fas fa-building text-xl w-6"></i>
                 <span x-show="sidebarOpen">Business Profile</span>

@@ -1,1 +1,12 @@
-{"mcpServers":{"laravel-boost":{"command":"C:\\xampp\\php\\php.exe","args":["artisan","boost:mcp"],"cwd":"${workspaceFolder}","disabled":false,"alwaysAllow":[]},"exa":{"command":"npx","args":["-y","exa-mcp-server"],"env":{"EXA_API_KEY":"692bf254-1515-4ed8-96e9-dccd02e42c15"}},"context7":{"command":"npx","args":["-y","@upstash/context7-mcp"],"env":{"DEFAULT_MINIMUM_TOKENS":""}}}}
+{"mcpServers":{"laravel-boost":{"command":"C:\\xampp\\php\\php.exe","args":["artisan","boost:mcp"],"cwd":"${workspaceFolder}","disabled":false,"alwaysAllow":["database-schema"]},"exa":{"command":"npx","args":["-y","exa-mcp-server"],"env":{"EXA_API_KEY":"692bf254-1515-4ed8-96e9-dccd02e42c15"}},"context7":{"command":"npx","args":["-y","@upstash/context7-mcp"],"env":{"DEFAULT_MINIMUM_TOKENS":""},"disabled":false,"alwaysAllow":[]}, "com.postman/postman-mcp-server": {
+            "type": "stdio",
+            "command": "npx",
+            "args": [
+                "@postman/postman-mcp-server@2.6.0"
+            ],
+            "env": {
+                "POSTMAN_API_KEY": "${input:POSTMAN_API_KEY}"
+            },
+            "gallery": "https://api.mcp.github.com",
+            "version": "2.6.0"
+        }}}

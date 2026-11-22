@@ -22,21 +22,21 @@ class MenuVisibilityService
         'profile' => ['permission' => null, 'group' => 'main'],
 
         // POS Section
-        'pos-orders' => ['permission' => 'view_orders', 'group' => 'pos'],
-        'pos-payment' => ['permission' => 'process_payment', 'group' => 'pos'],
+        'pos-orders' => ['permission' => 'pos.view_orders', 'group' => 'pos'],
+        'pos-payment' => ['permission' => 'pos.process_payment', 'group' => 'pos'],
 
         // Inventory Section
-        'pos-products' => ['permission' => 'view_products', 'group' => 'inventory'],
-        'pos-categories' => ['permission' => 'view_categories', 'group' => 'inventory'],
+        'pos-products' => ['permission' => 'pos.view_products', 'group' => 'inventory'],
+        'pos-categories' => ['permission' => 'pos.view_categories', 'group' => 'inventory'],
 
         // Operations Section
-        'pos-stores' => ['permission' => 'view_stores', 'group' => 'operations'],
-        'pos-tables' => ['permission' => 'view_tables', 'group' => 'operations'],
-        'pos-users' => ['permission' => 'manage_users', 'group' => 'operations'],
+        'pos-stores' => ['permission' => 'pos.view_stores', 'group' => 'operations'],
+        'pos-tables' => ['permission' => 'pos.view_tables', 'group' => 'operations'],
+        'pos-users' => ['permission' => 'pos.manage_users', 'group' => 'operations'],
 
         // Analytics Section
-        'pos-reports' => ['permission' => 'view_reports', 'group' => 'analytics'],
-        'pos-transactions' => ['permission' => 'view_orders', 'group' => 'analytics'],
+        'pos-reports' => ['permission' => 'pos.view_reports', 'group' => 'analytics'],
+        'pos-transactions' => ['permission' => 'pos.view_orders', 'group' => 'analytics'],
     ];
 
     /**
@@ -105,34 +105,30 @@ class MenuVisibilityService
     public static function getAllPosPermissions(): array
     {
         return [
-            'pos.orders.view',
-            'pos.orders.create',
-            'pos.orders.update',
-            'pos.orders.delete',
-            'pos.payments.view',
-            'pos.payments.create',
-            'pos.products.view',
-            'pos.products.create',
-            'pos.products.update',
-            'pos.products.delete',
-            'pos.categories.view',
-            'pos.categories.create',
-            'pos.categories.update',
-            'pos.categories.delete',
-            'pos.stores.view',
-            'pos.stores.create',
-            'pos.stores.update',
-            'pos.stores.delete',
-            'pos.tables.view',
-            'pos.tables.create',
-            'pos.tables.update',
-            'pos.tables.delete',
-            'pos.users.view',
-            'pos.users.create',
-            'pos.users.update',
-            'pos.users.delete',
-            'pos.reports.view',
-            'pos.transactions.view',
+            'pos.view_orders',
+            'pos.create_order',
+            'pos.edit_order',
+            'pos.manage_orders',
+            'pos.void_order',
+            'pos.process_payment',
+            'pos.view_products',
+            'pos.edit_products',
+            'pos.manage_products',
+            'pos.delete_products',
+            'pos.view_categories',
+            'pos.manage_categories',
+            'pos.view_stores',
+            'pos.manage_stores',
+            'pos.view_tables',
+            'pos.manage_tables',
+            'pos.manage_users',
+            'pos.view_users',
+            'pos.view_reports',
+            'pos.export_reports',
+            'pos.view_inventory',
+            'pos.adjust_inventory',
+            'pos.give_discount',
+            'pos.refund_payment',
         ];
     }
 }

@@ -35,6 +35,7 @@ class WhatsAppAccount extends Model
         'waba_id',
         'access_token',
         'token_expires_at',
+        'catalog_business_id',
         'is_active',
         'coexistence_enabled',
         'connection_method',

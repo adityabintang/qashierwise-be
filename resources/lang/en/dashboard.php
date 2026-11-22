@@ -19,6 +19,7 @@ return [
     'profile_title' => 'Business Profile - QashierWise',
     'whatsapp_account_title' => 'WhatsApp Account - QashierWise',
     'ai_agent_title' => 'AI Agent - QashierWise',
+    'customer_tags_title' => 'Customer Tags - QashierWise',
     'reservations_title' => 'Reservations - QashierWise',
 
     // Main Navigation Menu Items
@@ -29,6 +30,8 @@ return [
     'menu_business_profile' => 'Business Profile',
     'menu_whatsapp_account' => 'WhatsApp Account',
     'menu_ai_agent' => 'AI Agent',
+    'menu_customer_tags' => 'Customer Tags',
+    'customer_tags_description' => 'Manage tags for your WhatsApp contacts',
 
     // POS Section Headers
     'section_point_of_sale' => 'Point of Sale',
@@ -41,6 +44,7 @@ return [
     'menu_orders' => 'Orders',
     'menu_payment' => 'Payment',
     'menu_products' => 'Products',
+    'menu_meta_catalog' => 'Meta Catalog',
     'menu_categories' => 'Categories',
     'menu_stores' => 'Stores',
     'menu_tables' => 'Tables',
@@ -210,8 +214,10 @@ return [
 
     // Confirmation Messages
     'confirm_delete' => 'Are you sure you want to delete this?',
+    'confirm_delete_message' => 'Are you sure you want to delete this? This action cannot be undone.',
     'confirm_action' => 'Are you sure you want to proceed?',
     'action_cannot_undone' => 'This action cannot be undone',
+    'deleting' => 'Deleting',
 
     // Loading States
     'loading_data' => 'Loading data...',
@@ -243,5 +249,16 @@ return [
     'future_reservations' => 'Future reservations',
     'awaiting_confirmation' => 'Awaiting confirmation',
     'total_reservations' => 'Total reservations',
+
+    // Reservation Config
+    'reservation' => [
+        'config_updated' => 'Reservation Configuration Successfully updated',
+        'config_created' => 'Reservation Configuration Successfully created',
+        'config_update_failed' => 'Failed to update Reservation Configuration',
+        'config_create_failed' => 'Failed to create Reservation Configuration',
+        'config_deleted' => 'Reservation Configuration Successfully deleted',
+        'config_delete_failed' => 'Failed to delete Reservation Configuration',
+        'config_already_exists' => 'Reservation Configuration already exists for this store',
+    ],
 
 ];

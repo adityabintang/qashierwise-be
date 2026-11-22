@@ -1,0 +1,190 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e5]:
+        - img "Logo" [ref=e6]
+        - generic [ref=e7]: QashierWise
+      - navigation [ref=e8]:
+        - link "Dasbor" [ref=e9] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e11]: Dasbor
+        - link "Kontak" [ref=e12] [cursor=pointer]:
+          - /url: /dashboard/contacts
+          - generic [ref=e14]: Kontak
+        - link "Pesan" [ref=e15] [cursor=pointer]:
+          - /url: /dashboard/messages
+          - generic [ref=e17]: Pesan
+        - link "Template" [ref=e18] [cursor=pointer]:
+          - /url: /dashboard/templates
+          - generic [ref=e20]: Template
+        - link "Profil Bisnis" [ref=e21] [cursor=pointer]:
+          - /url: /dashboard/profile
+          - generic [ref=e23]: Profil Bisnis
+        - link "Akun WhatsApp" [ref=e24] [cursor=pointer]:
+          - /url: /dashboard/whatsapp-account
+          - generic [ref=e26]: Akun WhatsApp
+        - link "Agen AI" [ref=e27] [cursor=pointer]:
+          - /url: /dashboard/ai-agent
+          - generic [ref=e29]: Agen AI
+        - link "Tag Pelanggan" [ref=e30] [cursor=pointer]:
+          - /url: /dashboard/customer-tags
+          - generic [ref=e32]: Tag Pelanggan
+        - link "Developer" [ref=e33] [cursor=pointer]:
+          - /url: /dashboard/developer/webhooks
+          - generic [ref=e35]: Developer
+        - generic [ref=e37]: Reservasi
+        - link "Daftar Reservasi" [ref=e38] [cursor=pointer]:
+          - /url: /dashboard/reservations
+          - generic [ref=e40]: Daftar Reservasi
+        - link "Kalender" [ref=e41] [cursor=pointer]:
+          - /url: /dashboard/reservations/calendar
+          - generic [ref=e43]: Kalender
+        - link "Konfigurasi" [ref=e44] [cursor=pointer]:
+          - /url: /dashboard/reservations/config
+          - generic [ref=e46]: Konfigurasi
+        - generic [ref=e48]: Point of Sale
+        - link "Pesanan" [ref=e49] [cursor=pointer]:
+          - /url: /dashboard/pos/orders
+          - generic [ref=e51]: Pesanan
+        - link "Pembayaran" [ref=e52] [cursor=pointer]:
+          - /url: /dashboard/pos/payment
+          - generic [ref=e54]: Pembayaran
+        - generic [ref=e56]: Inventaris
+        - link "Produk" [ref=e57] [cursor=pointer]:
+          - /url: /dashboard/pos/products
+          - generic [ref=e59]: Produk
+        - link "Meta Katalog" [ref=e60] [cursor=pointer]:
+          - /url: /dashboard/meta-catalog
+          - generic [ref=e62]: Meta Katalog
+        - link "Kategori" [ref=e63] [cursor=pointer]:
+          - /url: /dashboard/pos/categories
+          - generic [ref=e65]: Kategori
+        - generic [ref=e67]: Operasional
+        - link "Toko" [ref=e68] [cursor=pointer]:
+          - /url: /dashboard/pos/stores
+          - generic [ref=e70]: Toko
+        - link "Meja" [ref=e71] [cursor=pointer]:
+          - /url: /dashboard/pos/tables
+          - generic [ref=e73]: Meja
+        - generic [ref=e76] [cursor=pointer]: Users Management
+        - generic [ref=e79]: Analitik
+        - link "Laporan" [ref=e80] [cursor=pointer]:
+          - /url: /dashboard/pos/reports
+          - generic [ref=e82]: Laporan
+        - link "Transaksi" [ref=e83] [cursor=pointer]:
+          - /url: /dashboard/pos/transactions
+          - generic [ref=e85]: Transaksi
+        - generic [ref=e87]: QRIS Payment
+        - link "Pengaturan QRIS" [ref=e88] [cursor=pointer]:
+          - /url: /dashboard/sub-merchant/
+          - generic [ref=e90]: Pengaturan QRIS
+        - link "Buat QRIS" [ref=e91] [cursor=pointer]:
+          - /url: /dashboard/sub-merchant/qris
+          - generic [ref=e93]: Buat QRIS
+        - link "Saldo" [ref=e94] [cursor=pointer]:
+          - /url: /dashboard/sub-merchant/balance
+          - generic [ref=e96]: Saldo
+        - link "Rekening Bank" [ref=e97] [cursor=pointer]:
+          - /url: /dashboard/sub-merchant/bank-account
+          - generic [ref=e99]: Rekening Bank
+        - link "Withdrawal" [ref=e100] [cursor=pointer]:
+          - /url: /dashboard/sub-merchant/withdrawals
+          - generic [ref=e102]: Withdrawal
+      - generic [ref=e103]:
+        - generic [ref=e105]:
+          - img "Super Admin" [ref=e106]
+          - generic [ref=e107]:
+            - paragraph [ref=e108]: Super Admin
+            - paragraph [ref=e109]: admin@qashierwise.com
+        - generic [ref=e110]:
+          - button "Keluar" [ref=e111] [cursor=pointer]:
+            - generic [ref=e113]: Keluar
+          - button [ref=e114] [cursor=pointer]
+    - generic [ref=e116]:
+      - banner [ref=e117]:
+        - generic [ref=e118]:
+          - generic [ref=e119]:
+            - button "Toggle navigation menu" [ref=e120] [cursor=pointer]
+            - generic [ref=e122]:
+              - heading "Meta Catalog" [level=1] [ref=e123]
+              - paragraph [ref=e124]: Produk dari katalog Meta Business Anda
+          - generic [ref=e125]:
+            - button "Switch language" [ref=e127]:
+              - generic [ref=e129]: ID
+            - button [ref=e132] [cursor=pointer]
+      - main [ref=e134]:
+        - generic [ref=e135]:
+          - generic [ref=e136]:
+            - generic [ref=e201]:
+              - generic [ref=e202]:
+                - button "Katalog" [ref=e203]
+                - generic [ref=e205]: Catalogue_Products
+              - heading "Catalogue_Products" [level=2] [ref=e206]
+              - paragraph [ref=e207]: "ID: 1286304463610787"
+            - generic [ref=e140]:
+              - button "Kembali" [ref=e208] [cursor=pointer]: Kembali
+              - button "Tambah Produk" [ref=e210] [cursor=pointer]: Tambah Produk
+          - generic [ref=e212]:
+            - generic [ref=e213]:
+              - textbox "Cari produk berdasarkan nama atau SKU..." [ref=e215]
+              - generic [ref=e216]: 3 / 3 produk
+            - generic [ref=e217]:
+              - generic [ref=e218]:
+                - generic [ref=e219]:
+                  - generic [ref=e220]:
+                    - img "iga bakar" [ref=e221]
+                    - generic [ref=e222]:
+                      - button "Edit" [ref=e223] [cursor=pointer]: Edit
+                      - button "Hapus" [ref=e225] [cursor=pointer]: Hapus
+                  - generic [ref=e227]:
+                    - heading "iga bakar" [level=3] [ref=e228]
+                    - generic [ref=e232]: Makanan Utama
+                    - paragraph [ref=e233]: Produk makanan & minuman pilihan, disiapkan dengan bahan segar berkualitas untuk pengalaman kuliner terbaik Anda.
+                    - generic [ref=e234]:
+                      - generic [ref=e235]: "SKU: SKU-MP6F6Z47-463M"
+                      - generic [ref=e236]: "Stok: 54"
+                    - generic [ref=e237]:
+                      - generic [ref=e238]: Rp 30.000
+                      - generic [ref=e241]: Tersedia
+                - generic [ref=e242]:
+                  - generic [ref=e243]:
+                    - img "tuna bakar" [ref=e244]
+                    - generic [ref=e245]:
+                      - button "Edit" [ref=e246] [cursor=pointer]: Edit
+                      - button "Hapus" [ref=e248] [cursor=pointer]: Hapus
+                  - generic [ref=e250]:
+                    - heading "tuna bakar" [level=3] [ref=e251]
+                    - generic [ref=e255]: Makanan Utama
+                    - paragraph [ref=e256]: Produk makanan & minuman pilihan, disiapkan dengan bahan segar berkualitas untuk pengalaman kuliner terbaik Anda.
+                    - generic [ref=e257]:
+                      - generic [ref=e258]: "SKU: SKU-MP6F1WX5-TZSU"
+                      - generic [ref=e259]: "Stok: 12"
+                    - generic [ref=e260]:
+                      - generic [ref=e261]: Rp 4.000
+                      - generic [ref=e264]: Tersedia
+                - generic [ref=e265]:
+                  - generic [ref=e266]:
+                    - img "sate kambingf" [ref=e267]
+                    - generic [ref=e268]:
+                      - button "Edit" [ref=e269] [cursor=pointer]: Edit
+                      - button "Hapus" [ref=e271] [cursor=pointer]: Hapus
+                  - generic [ref=e273]:
+                    - heading "sate kambingf" [level=3] [ref=e274]
+                    - generic [ref=e278]: Makanan Utama
+                    - paragraph [ref=e279]: Produk makanan & minuman pilihan, disiapkan dengan bahan segar berkualitas untuk pengalaman kuliner terbaik Anda.
+                    - generic [ref=e280]:
+                      - generic [ref=e281]: "SKU: SKU-MP6FC3LN-SJK7"
+                      - generic [ref=e282]: "Stok: 10"
+                    - generic [ref=e283]:
+                      - generic [ref=e284]: Rp 400.000
+                      - generic [ref=e287]: Tersedia
+              - button "Muat Lebih Banyak" [ref=e289] [cursor=pointer]:
+                - generic [ref=e290]: Muat Lebih Banyak
+  - generic [ref=e194]:
+    - generic [ref=e195]:
+      - paragraph [ref=e196]: Kami menggunakan cookies untuk meningkatkan pengalaman Anda dan menganalisis trafik. Dengan melanjutkan, Anda menyetujui penggunaan cookies kami.
+      - link "Baca Kebijakan Privasi" [ref=e197] [cursor=pointer]:
+        - /url: http://localhost:8000/privacy-policy
+    - generic [ref=e198]:
+      - button "Tolak" [ref=e199]
+      - button "Terima Semua" [ref=e200]

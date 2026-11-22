@@ -241,7 +241,7 @@ class PosUserController extends Controller
         // that either created them or already owns them through the ownership chain
         $userToAssign = User::find($validated['user_id']);
 
-        if (!$userToAssign) {
+        if (! $userToAssign) {
             return response()->json([
                 'success' => false,
                 'message' => 'User not found.',
@@ -256,6 +256,7 @@ class PosUserController extends Controller
                 'target_user_email' => $userToAssign->email,
                 'store_id' => $store->id,
             ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Cannot assign users from another merchant.',
@@ -278,6 +279,7 @@ class PosUserController extends Controller
                     'attempted_store_id' => $store->id,
                     'attempted_store_owner' => $effectiveUserId,
                 ]);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'User is already assigned to a different merchant.',
@@ -285,7 +287,7 @@ class PosUserController extends Controller
             }
 
             // Same merchant, different store - check if duplicate
-            if ($existing->store_id === (int)$validated['store_id']) {
+            if ($existing->store_id === (int) $validated['store_id']) {
                 return response()->json([
                     'success' => false,
                     'message' => 'User already assigned to this store',

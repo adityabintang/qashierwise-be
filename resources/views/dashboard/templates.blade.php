@@ -1,4 +1,5 @@
 @extends('layouts.app')
+@include('components.dashboard-scripts')
 
 @section('title', __('dashboard.templates_title'))
 
@@ -436,14 +437,49 @@
                                     <div class="space-y-4">
                                         <h4 class="font-medium text-sm text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Body <span class="text-red-500">*</span></h4>
 
+                                        <!-- Variable Type Selection -->
+                                        <div>
+                                            <label class="text-sm font-medium mb-1.5 block">Variable Type</label>
+                                            <select x-model="createForm.body.variableType" @change="onVariableTypeChange" class="input w-full">
+                                                <option value="numeric">Numeric (@{{1}}, @{{2}}, etc.)</option>
+                                                <option value="named">Named (@{{customer_name}}, @{{order_id}}, etc.)</option>
+                                            </select>
+                                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Choose the type of variables you'll use in your template</p>
+                                        </div>
+
                                         <div>
                                             <label class="text-sm font-medium mb-1.5 block">Body Text</label>
-                                            <textarea x-model="createForm.body.text" @input="validateBody" placeholder="Enter your message body. Use {{1}}, {{2}}, etc. for variables..." class="input w-full min-h-[120px] resize-y" :class="{'border-red-500': errors.body}" maxlength="1024"></textarea>
+                                            <textarea x-model="createForm.body.text" @input="validateBody" :placeholder="getBodyPlaceholder()" class="input w-full min-h-[120px] resize-y" :class="{'border-red-500': errors.body}" maxlength="1024"></textarea>
                                             <div class="flex justify-between mt-1">
                                                 <p x-show="errors.body" x-text="errors.body" class="text-xs text-red-500"></p>
                                                 <p x-show="warnings.body" x-text="warnings.body" class="text-xs text-amber-500"></p>
                                                 <p class="text-xs text-[hsl(var(--muted-foreground))]"><span x-text="(createForm.body.text || '').length"></span>/1024 characters</p>
                                             </div>
+                                        </div>
+
+                                        <!-- Sample Variables Section -->
+                                        <div x-show="getDetectedVariables().length > 0" x-collapse class="bg-[hsl(var(--muted)/0.6)] rounded-lg p-3 space-y-3">
+                                            <div>
+                                                <h5 class="text-sm font-semibold text-[hsl(var(--foreground))] mb-2">Sample Values for Variables</h5>
+                                                <p class="text-xs text-[hsl(var(--muted-foreground))] mb-3">Provide example values for each variable to personalize the template preview</p>
+                                            </div>
+
+                                            <template x-for="(varName, idx) in getDetectedVariables()" :key="'var-' + idx">
+                                                <div class="space-y-1.5">
+                                                    <label class="text-sm font-medium" :for="'var-example-' + idx">
+                                                        <span x-show="createForm.body.variableType === 'numeric'">Variable </span>
+                                                        <span x-text="getVariableDisplayName(varName)"></span>
+                                                        <span> Example</span>
+                                                    </label>
+                                                    <input
+                                                        :id="'var-example-' + idx"
+                                                        type="text"
+                                                        x-model="createForm.body.examples[idx]"
+                                                        :placeholder="getVariablePlaceholder(varName)"
+                                                        class="input w-full text-sm"
+                                                    >
+                                                </div>
+                                            </template>
                                         </div>
                                     </div>
 
@@ -652,6 +688,15 @@
                             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 p-4 sm:p-6">
                                 <!-- Form Section -->
                                 <div class="space-y-4 sm:space-y-5">
+                                    <!-- Edit restriction notice for non-editable statuses -->
+                                    <div x-show="!['REJECTED','PAUSED'].includes(editForm.status)" class="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+                                        <i class="fas fa-lock text-amber-500 mt-0.5 flex-shrink-0"></i>
+                                        <div>
+                                            <p class="text-sm font-semibold text-amber-800">Template cannot be edited</p>
+                                            <p class="text-xs text-amber-700 mt-0.5">Meta only allows editing templates with <strong>REJECTED</strong> or <strong>PAUSED</strong> status. This template is <strong x-text="editForm.status"></strong>. To make changes, delete this template and create a new one.</p>
+                                        </div>
+                                    </div>
+
                                     <!-- Basic Info -->
                                     <div class="space-y-4">
                                         <h4 class="font-medium text-sm text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Basic Information</h4>
@@ -715,14 +760,49 @@
                                     <div class="space-y-4">
                                         <h4 class="font-medium text-sm text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Body <span class="text-red-500">*</span></h4>
 
+                                        <!-- Variable Type Selection -->
+                                        <div>
+                                            <label class="text-sm font-medium mb-1.5 block">Variable Type</label>
+                                            <select x-model="editForm.body.variableType" @change="onEditVariableTypeChange" class="input w-full">
+                                                <option value="numeric">Numeric (@{{1}}, @{{2}}, etc.)</option>
+                                                <option value="named">Named (@{{customer_name}}, @{{order_id}}, etc.)</option>
+                                            </select>
+                                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">Choose the type of variables you'll use in your template</p>
+                                        </div>
+
                                         <div>
                                             <label class="text-sm font-medium mb-1.5 block">Body Text</label>
-                                            <textarea x-model="editForm.body.text" @input="validateEditBody" placeholder="Enter your message body. Use {{1}}, {{2}}, etc. for variables..." class="input w-full min-h-[120px] resize-y" :class="{'border-red-500': editErrors.body}" maxlength="1024"></textarea>
+                                            <textarea x-model="editForm.body.text" @input="validateEditBody" :placeholder="editForm.body.variableType === 'named' ? 'Enter your message body. Use @{{customer_name}}, @{{order_id}}, etc. for variables...' : 'Enter your message body. Use @{{1}}, @{{2}}, etc. for variables...'" class="input w-full min-h-[120px] resize-y" :class="{'border-red-500': editErrors.body}" maxlength="1024"></textarea>
                                             <div class="flex justify-between mt-1">
                                                 <p x-show="editErrors.body" x-text="editErrors.body" class="text-xs text-red-500"></p>
                                                 <p x-show="editWarnings.body" x-text="editWarnings.body" class="text-xs text-amber-500"></p>
                                                 <p class="text-xs text-[hsl(var(--muted-foreground))]"><span x-text="(editForm.body.text || '').length"></span>/1024 characters</p>
                                             </div>
+                                        </div>
+
+                                        <!-- Sample Variables Section -->
+                                        <div x-show="getEditDetectedVariables().length > 0" x-collapse class="bg-[hsl(var(--muted)/0.6)] rounded-lg p-3 space-y-3">
+                                            <div>
+                                                <h5 class="text-sm font-semibold text-[hsl(var(--foreground))] mb-2">Sample Values for Variables</h5>
+                                                <p class="text-xs text-[hsl(var(--muted-foreground))] mb-3">Provide example values for each variable to personalize the template preview</p>
+                                            </div>
+
+                                            <template x-for="(varName, idx) in getEditDetectedVariables()" :key="'edit-var-' + idx">
+                                                <div class="space-y-1.5">
+                                                    <label class="text-sm font-medium" :for="'edit-var-example-' + idx">
+                                                        <span x-show="editForm.body.variableType === 'numeric'">Variable </span>
+                                                        <span x-text="getEditVariableDisplayName(varName)"></span>
+                                                        <span> Example</span>
+                                                    </label>
+                                                    <input
+                                                        :id="'edit-var-example-' + idx"
+                                                        type="text"
+                                                        x-model="editForm.body.examples[idx]"
+                                                        :placeholder="getEditVariablePlaceholder(varName)"
+                                                        class="input w-full text-sm"
+                                                    >
+                                                </div>
+                                            </template>
                                         </div>
                                     </div>
 
@@ -860,13 +940,13 @@
                                         </div>
 
                                         <!-- Variable Legend -->
-                                        <div x-show="getEditVariableCount() > 0" class="mt-4 p-3 bg-white/80 rounded-lg">
+                                        <div x-show="getEditDetectedVariables().length > 0" class="mt-4 p-3 bg-white/80 rounded-lg">
                                             <p class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-2">Variables in this template:</p>
                                             <div class="flex flex-wrap gap-2">
-                                                <template x-for="i in getEditVariableCount()" :key="'edit-var-'+i">
+                                                <template x-for="(varName, idx) in getEditDetectedVariables()" :key="'edit-legend-'+idx">
                                                     <span class="inline-flex items-center px-2 py-1 bg-[#dcf8c6] text-xs rounded">
-                                                        <span x-text="'{{' + i + '}}'"></span>
-                                                        <span class="ml-1 text-[hsl(var(--muted-foreground))]">→ [Variable <span x-text="i"></span>]</span>
+                                                        <span x-text="'{{' + varName + '}}'"></span>
+                                                        <span class="ml-1 text-[hsl(var(--muted-foreground))]">→ <span x-text="(editForm.body.examples[idx] || '').trim() || '[sample]'"></span></span>
                                                     </span>
                                                 </template>
                                             </div>
@@ -898,7 +978,7 @@
                                 </p>
                                 <div class="flex gap-3 sm:ml-auto w-full sm:w-auto">
                                     <button type="button" @click="closeEditModal" class="btn btn-outline btn-md flex-1 sm:flex-none min-h-[44px]" :disabled="updating">Cancel</button>
-                                    <button type="button" @click="submitEdit" :disabled="updating || !isEditFormValid()" class="btn btn-primary btn-md flex-1 sm:flex-none min-h-[44px]">
+                                    <button type="button" @click="submitEdit" :disabled="updating || !isEditFormValid() || !['REJECTED','PAUSED'].includes(editForm.status)" class="btn btn-primary btn-md flex-1 sm:flex-none min-h-[44px]">
                                         <i class="fas" :class="updating ? 'fa-spinner animate-spin' : 'fa-check'"></i>
                                         <span x-text="updating ? 'Updating...' : 'Update'"></span>
                                     </button>
@@ -1108,9 +1188,10 @@ function templatesManager() {
             name: '',
             category: '',
             language: '',
+            status: '',
             hasHeader: false,
             header: { type: 'TEXT', text: '', example: '' },
-            body: { text: '' },
+            body: { text: '', variableType: 'numeric', examples: [] },
             hasFooter: false,
             footer: { text: '' },
             hasButtons: false,
@@ -1214,7 +1295,7 @@ function templatesManager() {
                 language: '',
                 hasHeader: false,
                 header: { type: 'TEXT', text: '', example: '' },
-                body: { text: '' },
+                body: { text: '', examples: [], variableType: 'numeric' },
                 hasFooter: false,
                 footer: { text: '' },
                 hasButtons: false,
@@ -1251,6 +1332,13 @@ function templatesManager() {
                 this.errors.body = 'Body text cannot exceed 1024 characters';
                 return false;
             }
+
+            // Validate variable type consistency
+            const typeValidation = this.validateVariableTypeConsistency(body);
+            if (!typeValidation.valid) {
+                this.errors.body = typeValidation.error;
+                return false;
+            }
             delete this.errors.body;
 
             // Check variable sequence (warning only)
@@ -1258,23 +1346,120 @@ function templatesManager() {
             return true;
         },
 
-        validateVariableSequence() {
-            const body = this.createForm.body.text;
-            const matches = body.match(/\{\{(\d+)\}\}/g);
-            if (!matches) {
-                delete this.warnings.body;
-                return;
+        validateVariableTypeConsistency(body) {
+            const variableType = this.createForm.body.variableType;
+
+            if (variableType === 'numeric') {
+                // Check for numeric variables @{{1}}, @{{2}}
+                const namedVarRegex = /\{\{[a-z_][a-z0-9_]*\}\}/gi;
+                const namedVars = body.match(namedVarRegex);
+                if (namedVars && namedVars.length > 0) {
+                    return {
+                        valid: false,
+                        error: 'Template contains named variables like @{{' + namedVars[0].slice(2, -2) + '}} but numeric format (@{{1}}, @{{2}}) was selected. Use numeric format only.'
+                    };
+                }
+            } else if (variableType === 'named') {
+                // Check for named variables @{{customer_name}}, @{{order_id}}
+                const numericVarRegex = /\{\{\d+\}\}/g;
+                const numericVars = body.match(numericVarRegex);
+                if (numericVars && numericVars.length > 0) {
+                    return {
+                        valid: false,
+                        error: 'Template contains numeric variables like @{{1}}, @{{2}} but named format (@{{customer_name}}, @{{order_id}}) was selected. Use named format only.'
+                    };
+                }
             }
 
-            const numbers = matches.map(m => parseInt(m.replace(/[{}]/g, ''))).sort((a, b) => a - b);
-            const unique = [...new Set(numbers)];
-            const expected = Array.from({ length: unique.length }, (_, i) => i + 1);
+            return { valid: true };
+        },
 
-            if (JSON.stringify(unique) !== JSON.stringify(expected)) {
-                this.warnings.body = 'Variables should be sequential starting from {{1}}';
+        validateVariableSequence() {
+            const body = this.createForm.body.text;
+            const variableType = this.createForm.body.variableType;
+
+            if (variableType === 'numeric') {
+                const matches = body.match(/\{\{(\d+)\}\}/g);
+                if (!matches) {
+                    delete this.warnings.body;
+                    return;
+                }
+
+                const numbers = matches.map(m => parseInt(m.replace(/[{}]/g, ''))).sort((a, b) => a - b);
+                const unique = [...new Set(numbers)];
+                const expected = Array.from({ length: unique.length }, (_, i) => i + 1);
+
+                if (JSON.stringify(unique) !== JSON.stringify(expected)) {
+                    this.warnings.body = 'Variables should be sequential starting from @{{1}}';
+                } else {
+                    delete this.warnings.body;
+                }
             } else {
                 delete this.warnings.body;
             }
+        },
+
+        getDetectedVariables() {
+            const body = this.createForm.body.text;
+            const variableType = this.createForm.body.variableType;
+
+            let matches = [];
+            let variables = [];
+
+            if (variableType === 'numeric') {
+                matches = body.match(/\{\{(\d+)\}\}/g) || [];
+                const numbers = matches.map(m => parseInt(m.replace(/[{}]/g, '')));
+                variables = [...new Set(numbers)].sort((a, b) => a - b);
+            } else if (variableType === 'named') {
+                matches = body.match(/\{\{([a-z_][a-z0-9_]*)\}\}/gi) || [];
+                const names = matches.map(m => m.slice(2, -2).toLowerCase());
+                variables = [...new Set(names)];
+            }
+
+            // Initialize examples array if needed
+            if (!this.createForm.body.examples) {
+                this.createForm.body.examples = [];
+            }
+
+            // Ensure examples array has same length as variables
+            while (this.createForm.body.examples.length < variables.length) {
+                this.createForm.body.examples.push('');
+            }
+
+            return variables;
+        },
+
+        getVariableDisplayName(varName) {
+            const variableType = this.createForm.body.variableType;
+            if (variableType === 'numeric') {
+                return '{{' + varName + '}}';
+            } else {
+                return '@{{' + varName + '}}';
+            }
+        },
+
+        getBodyPlaceholder() {
+            if (this.createForm.body.variableType === 'numeric') {
+                return 'Enter your message body. Use @{{1}}, @{{2}}, etc. for variables...';
+            } else {
+                return 'Enter your message body. Use @{{customer_name}}, @{{order_id}}, etc. for variables...';;
+            }
+        },
+
+        getVariablePlaceholder(varName) {
+            const variableType = this.createForm.body.variableType;
+            if (variableType === 'numeric') {
+                return 'e.g., Example value for @{{' + varName + '}}';
+            } else {
+                return 'e.g., Example value for @{{' + varName + '}}';;
+            }
+        },
+
+        onVariableTypeChange() {
+            // Clear examples when changing variable type
+            this.createForm.body.examples = [];
+            // Re-validate body
+            this.validateBody();
         },
 
         validateFooter() {
@@ -1329,9 +1514,44 @@ function templatesManager() {
         // Preview Methods
         getPreviewBody() {
             let body = this.createForm.body.text || 'Your message body will appear here...';
-            // Replace variables with styled placeholders
-            body = body.replace(/\{\{(\d+)\}\}/g, '<span class="inline-block px-1 py-0.5 bg-[#dcf8c6] rounded text-xs font-medium">[Variable $1]</span>');
+            const variableType = this.createForm.body.variableType;
+
+            // Get detected variables
+            const variables = this.getDetectedVariables();
+
+            // If no examples provided, show placeholder style
+            if (!variables.length || !this.createForm.body.examples.some(ex => ex?.trim())) {
+                if (variableType === 'numeric') {
+                    body = body.replace(/\{\{(\d+)\}\}/g, '<span class="inline-block px-1 py-0.5 bg-[#dcf8c6] rounded text-xs font-medium">[Variable $1]</span>');
+                } else {
+                    body = body.replace(/\{\{([a-z_][a-z0-9_]*)\}\}/gi, '<span class="inline-block px-1 py-0.5 bg-[#dcf8c6] rounded text-xs font-medium">[Variable $1]</span>');
+                }
+            } else {
+                // Replace with actual examples
+                variables.forEach((varNum, idx) => {
+                    const example = this.createForm.body.examples[idx] || `[Variable ${varNum}]`;
+                    if (variableType === 'numeric') {
+                        body = body.replace(new RegExp(`\\{\\{${varNum}\\}\\}`, 'g'),
+                            `<span class="inline-block px-1 py-0.5 bg-[#dcf8c6] rounded text-xs font-medium">${this.escapeHtml(example)}</span>`);
+                    } else {
+                        body = body.replace(new RegExp(`\\{\\{${varNum}\\}\\}`, 'gi'),
+                            `<span class="inline-block px-1 py-0.5 bg-[#dcf8c6] rounded text-xs font-medium">${this.escapeHtml(example)}</span>`);
+                    }
+                });
+            }
+
             return body;
+        },
+
+        escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
         },
 
         getVariableCount() {
@@ -1369,8 +1589,15 @@ function templatesManager() {
                     name: this.createForm.name,
                     category: this.createForm.category,
                     language: this.createForm.language,
-                    body: this.createForm.body.text
+                    body: this.createForm.body.text,
+                    variable_type: this.createForm.body.variableType
                 };
+
+                // Add body examples if any variables exist
+                const variables = this.getDetectedVariables();
+                if (variables.length > 0 && this.createForm.body.examples.some(ex => ex.trim())) {
+                    payload.body_examples = this.createForm.body.examples;
+                }
 
                 // Add header if enabled
                 if (this.createForm.hasHeader) {
@@ -1447,6 +1674,7 @@ function templatesManager() {
             this.editForm.name = template.name;
             this.editForm.category = template.category;
             this.editForm.language = template.language;
+            this.editForm.status = template.status || '';
 
             // Populate header
             if (template.header || template.header_type) {
@@ -1457,6 +1685,8 @@ function templatesManager() {
 
             // Populate body
             this.editForm.body.text = template.body || '';
+            this.editForm.body.variableType = template.variable_type || 'numeric';
+            this.editForm.body.examples = template.body_examples || [];
 
             // Populate footer
             if (template.footer) {
@@ -1506,9 +1736,10 @@ function templatesManager() {
                 name: '',
                 category: '',
                 language: '',
+                status: '',
                 hasHeader: false,
                 header: { type: 'TEXT', text: '', example: '' },
-                body: { text: '' },
+                body: { text: '', variableType: 'numeric', examples: [] },
                 hasFooter: false,
                 footer: { text: '' },
                 hasButtons: false,
@@ -1531,15 +1762,55 @@ function templatesManager() {
                 this.editErrors.body = 'Body text cannot exceed 1024 characters';
                 return false;
             }
+
+            // Validate variable type consistency
+            const typeValidation = this.validateEditVariableTypeConsistency(body);
+            if (!typeValidation.valid) {
+                this.editErrors.body = typeValidation.error;
+                return false;
+            }
             delete this.editErrors.body;
 
-            // Check variable sequence (warning only)
+            // Check variable sequence (warning only for numeric)
             this.validateEditVariableSequence();
             return true;
         },
 
+        validateEditVariableTypeConsistency(body) {
+            const variableType = this.editForm.body.variableType;
+
+            if (variableType === 'numeric') {
+                const namedVarRegex = /\{\{[a-z_][a-z0-9_]*\}\}/gi;
+                const namedVars = body.match(namedVarRegex);
+                if (namedVars && namedVars.length > 0) {
+                    return {
+                        valid: false,
+                        error: 'Template contains named variables like @{{' + namedVars[0].slice(2, -2) + '}} but numeric format (@{{1}}, @{{2}}) was selected. Use numeric format only.'
+                    };
+                }
+            } else if (variableType === 'named') {
+                const numericVarRegex = /\{\{\d+\}\}/g;
+                const numericVars = body.match(numericVarRegex);
+                if (numericVars && numericVars.length > 0) {
+                    return {
+                        valid: false,
+                        error: 'Template contains numeric variables like @{{1}}, @{{2}} but named format (@{{customer_name}}, @{{order_id}}) was selected. Use named format only.'
+                    };
+                }
+            }
+
+            return { valid: true };
+        },
+
         validateEditVariableSequence() {
             const body = this.editForm.body.text;
+            const variableType = this.editForm.body.variableType;
+
+            if (variableType !== 'numeric') {
+                delete this.editWarnings.body;
+                return;
+            }
+
             const matches = body.match(/\{\{(\d+)\}\}/g);
             if (!matches) {
                 delete this.editWarnings.body;
@@ -1551,7 +1822,7 @@ function templatesManager() {
             const expected = Array.from({ length: unique.length }, (_, i) => i + 1);
 
             if (JSON.stringify(unique) !== JSON.stringify(expected)) {
-                this.editWarnings.body = 'Variables should be sequential starting from {{1}}';
+                this.editWarnings.body = 'Variables should be sequential starting from @{{1}}';
             } else {
                 delete this.editWarnings.body;
             }
@@ -1609,17 +1880,78 @@ function templatesManager() {
         // Edit Preview Methods
         getEditPreviewBody() {
             let body = this.editForm.body.text || 'Your message body will appear here...';
-            // Replace variables with styled placeholders
-            body = body.replace(/\{\{(\d+)\}\}/g, '<span class="inline-block px-1 py-0.5 bg-[#dcf8c6] rounded text-xs font-medium">[Variable $1]</span>');
+            const variableType = this.editForm.body.variableType;
+            const variables = this.getEditDetectedVariables();
+            const span = '<span class="inline-block px-1 py-0.5 bg-[#dcf8c6] rounded text-xs font-medium">';
+            const hasExamples = variables.length > 0 && this.editForm.body.examples.some(ex => (ex || '').trim());
+
+            if (!hasExamples) {
+                // No sample values yet — show placeholder badges
+                if (variableType === 'numeric') {
+                    body = body.replace(/\{\{(\d+)\}\}/g, span + '[Variable $1]</span>');
+                } else {
+                    body = body.replace(/\{\{([a-z_][a-z0-9_]*)\}\}/gi, (_, name) => span + '[' + name + ']</span>');
+                }
+            } else {
+                // Replace with actual sample values
+                variables.forEach((varName, idx) => {
+                    const example = (this.editForm.body.examples[idx] || '').trim() || (variableType === 'numeric' ? `[Variable ${varName}]` : `[${varName}]`);
+                    const escaped = this.escapeHtml(example);
+                    if (variableType === 'numeric') {
+                        body = body.replace(new RegExp('\\{\\{' + varName + '\\}\\}', 'g'), span + escaped + '</span>');
+                    } else {
+                        body = body.replace(new RegExp('\\{\\{' + varName + '\\}\\}', 'gi'), span + escaped + '</span>');
+                    }
+                });
+            }
+
             return body;
         },
 
-        getEditVariableCount() {
+        getEditDetectedVariables() {
             const body = this.editForm.body.text || '';
-            const matches = body.match(/\{\{(\d+)\}\}/g);
-            if (!matches) return 0;
-            const numbers = matches.map(m => parseInt(m.replace(/[{}]/g, '')));
-            return Math.max(...numbers, 0);
+            const variableType = this.editForm.body.variableType;
+
+            let variables = [];
+
+            if (variableType === 'numeric') {
+                const matches = body.match(/\{\{(\d+)\}\}/g) || [];
+                const numbers = matches.map(m => parseInt(m.replace(/[{}]/g, '')));
+                variables = [...new Set(numbers)].sort((a, b) => a - b);
+            } else if (variableType === 'named') {
+                const matches = body.match(/\{\{([a-z_][a-z0-9_]*)\}\}/gi) || [];
+                const names = matches.map(m => m.slice(2, -2).toLowerCase());
+                variables = [...new Set(names)];
+            }
+
+            if (!this.editForm.body.examples) {
+                this.editForm.body.examples = [];
+            }
+            while (this.editForm.body.examples.length < variables.length) {
+                this.editForm.body.examples.push('');
+            }
+
+            return variables;
+        },
+
+        getEditVariableDisplayName(varName) {
+            if (this.editForm.body.variableType === 'numeric') {
+                return '{{' + varName + '}}';
+            }
+            return '@{{' + varName + '}}';
+        },
+
+        getEditVariablePlaceholder(varName) {
+            return 'e.g., Example value for @{{' + varName + '}}';
+        },
+
+        onEditVariableTypeChange() {
+            this.editForm.body.examples = [];
+            this.validateEditBody();
+        },
+
+        getEditVariableCount() {
+            return this.getEditDetectedVariables().length;
         },
 
         // Edit API Submission
@@ -1639,8 +1971,15 @@ function templatesManager() {
 
                 // Build request payload
                 const payload = {
-                    body: this.editForm.body.text
+                    body: this.editForm.body.text,
+                    variable_type: this.editForm.body.variableType
                 };
+
+                // Add body examples if variables exist
+                const editVariables = this.getEditDetectedVariables();
+                if (editVariables.length > 0 && this.editForm.body.examples.some(ex => (ex || '').trim())) {
+                    payload.body_examples = this.editForm.body.examples;
+                }
 
                 // Add header if enabled
                 if (this.editForm.hasHeader) {

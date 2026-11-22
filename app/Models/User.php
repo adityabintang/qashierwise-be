@@ -49,6 +49,9 @@ class User extends Authenticatable
         'password',
         'language_preference',
         'is_master_admin',
+        'slug',
+        'google_calendar_refresh_token',
+        'google_calendar_email',
     ];
 
     /**
@@ -172,11 +175,27 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the blog posts authored by this user.
+     */
+    public function blogPosts(): HasMany
+    {
+        return $this->hasMany(BlogPost::class);
+    }
+
+    /**
      * Check if the user is a master admin.
      */
     public function isMasterAdmin(): bool
     {
         return $this->is_master_admin === true;
+    }
+
+    /**
+     * Check if the user is an author (blog content manager).
+     */
+    public function isAuthor(): bool
+    {
+        return $this->hasRole('author');
     }
 
     /**
@@ -193,7 +212,7 @@ class User extends Authenticatable
      */
     public function isMerchantAdmin(): bool
     {
-        return $this->isMasterAdmin() && !$this->isSuperAdmin();
+        return $this->isMasterAdmin() && ! $this->isSuperAdmin();
     }
 
     /**

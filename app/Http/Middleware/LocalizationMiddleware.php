@@ -37,14 +37,14 @@ class LocalizationMiddleware
      */
     private function detectLocale(Request $request): string
     {
-        // 1. Check user preference (if authenticated)
-        if (auth()->check() && auth()->user()->language_preference) {
-            return auth()->user()->language_preference;
-        }
-
-        // 2. Check session
+        // 1. Check session (highest priority - covers both guest and authenticated users)
         if (session()->has('locale')) {
             return session('locale');
+        }
+
+        // 2. Check user preference (if authenticated and no session yet)
+        if (auth()->check() && auth()->user()->language_preference) {
+            return auth()->user()->language_preference;
         }
 
         // 3. Check Accept-Language header

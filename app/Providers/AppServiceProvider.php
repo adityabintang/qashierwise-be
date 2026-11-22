@@ -71,10 +71,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Force HTTPS when behind proxy (Easypanel, Cloudflare, etc.)
-        if ($this->app->environment('production') || str_starts_with(config('app.url'), 'https')) {
+        // Force HTTPS in production
+        if ($this->app->environment('production')) {
             \Illuminate\Support\Facades\URL::forceScheme('https');
         }
+
+        // Cache invalidators for AiAgent dependency checks
+        \App\Models\SubMerchant::observe(\App\Observers\SubMerchantObserver::class);
+        \App\Models\ReservationConfig::observe(\App\Observers\ReservationConfigObserver::class);
 
         // Handle missing translation keys in development
         if ($this->app->isLocal()) {

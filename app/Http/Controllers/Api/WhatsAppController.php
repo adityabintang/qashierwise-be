@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\MessageStatusUpdated;
+use App\Events\NewWhatsAppMessage;
+use App\Events\ProfileUpdated;
 use App\Exceptions\WhatsAppNotConnectedException;
 use App\Http\Controllers\Controller;
 use App\Models\WhatsAppAccount;
@@ -15,6 +18,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 use Netflie\WhatsAppCloudApi\Message\ButtonReply\Button;
 use Netflie\WhatsAppCloudApi\Message\ButtonReply\ButtonAction;
 use Netflie\WhatsAppCloudApi\Message\Media\LinkID;
@@ -23,6 +27,7 @@ use Netflie\WhatsAppCloudApi\Message\OptionsList\Action as ListAction;
 use Netflie\WhatsAppCloudApi\Message\OptionsList\Row as ListRow;
 use Netflie\WhatsAppCloudApi\Message\OptionsList\Section as ListSection;
 use Netflie\WhatsAppCloudApi\Message\Template\Component;
+use Netflie\WhatsAppCloudApi\Response\ResponseException;
 use Netflie\WhatsAppCloudApi\WhatsAppCloudApi;
 
 class WhatsAppController extends Controller
@@ -200,8 +205,8 @@ class WhatsAppController extends Controller
             'last_message_text' => $this->getLastMessageText($type, $content, $templateName),
         ]);
 
-        // Broadcast the new message event (include sender so message appears in their UI)
-        broadcast(new \App\Events\NewWhatsAppMessage($message->load('contact'), $contact));
+        // Let other tabs receive the message without making the sender wait for Pusher.
+        defer(fn () => rescue(fn () => NewWhatsAppMessage::dispatch($message, $contact)));
 
         return $message;
     }
@@ -257,12 +262,13 @@ class WhatsAppController extends Controller
 
             // Save to database
             $contact = $this->getOrCreateContact($request->to);
-            $this->saveMessage($contact, 'text', $request->message, $response);
+            $savedMessage = $this->saveMessage($contact, 'text', $request->message, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Text message sent successfully',
                 'data' => $response->decodedBody(),
+                'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -301,37 +307,24 @@ class WhatsAppController extends Controller
                     $request->language
                 );
             } else {
-                // For templates with parameters
-                $component_header = [];
-                $component_body = [];
-                $component_buttons = [];
-
-                // Add components if provided
-                if ($request->has('header_params')) {
-                    $component_header = [new Component($request->header_params)];
-                }
-
-                if ($request->has('body_params')) {
-                    $component_body = [new Component($request->body_params)];
-                }
-
-                if ($request->has('button_params')) {
-                    $component_buttons = [new Component($request->button_params)];
-                }
+                // For templates with parameters — single Component wrapping header, body, buttons
+                $component = new Component(
+                    $request->input('header_params', []),
+                    $request->input('body_params', []),
+                    $request->input('button_params', [])
+                );
 
                 $response = $whatsapp->sendTemplate(
                     $request->to,
                     $request->template_name,
                     $request->language,
-                    $component_header,
-                    $component_body,
-                    $component_buttons
+                    $component
                 );
             }
 
             // Save to database
             $contact = $this->getOrCreateContact($request->to);
-            $this->saveMessage(
+            $savedMessage = $this->saveMessage(
                 $contact,
                 'template',
                 json_encode($request->except(['to'])),
@@ -344,6 +337,7 @@ class WhatsAppController extends Controller
                 'success' => true,
                 'message' => 'Template message sent successfully',
                 'data' => $response->decodedBody(),
+                'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -416,12 +410,13 @@ class WhatsAppController extends Controller
                 'url' => $imageUrl,
                 'caption' => $request->caption ?? '',
             ];
-            $this->saveMessage($contact, 'image', $content, $response);
+            $savedMessage = $this->saveMessage($contact, 'image', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Image sent successfully',
                 'data' => $response->decodedBody(),
+                'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -499,12 +494,13 @@ class WhatsAppController extends Controller
                 'filename' => $filename,
                 'caption' => $request->caption ?? '',
             ];
-            $this->saveMessage($contact, 'document', $content, $response);
+            $savedMessage = $this->saveMessage($contact, 'document', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Document sent successfully',
                 'data' => $response->decodedBody(),
+                'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -570,12 +566,13 @@ class WhatsAppController extends Controller
             // Save to database
             $contact = $this->getOrCreateContact($request->to);
             $content = ['url' => $audioUrl];
-            $this->saveMessage($contact, 'audio', $content, $response);
+            $savedMessage = $this->saveMessage($contact, 'audio', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Audio sent successfully',
                 'data' => $response->decodedBody(),
+                'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -647,12 +644,13 @@ class WhatsAppController extends Controller
                 'url' => $videoUrl,
                 'caption' => $request->caption ?? '',
             ];
-            $this->saveMessage($contact, 'video', $content, $response);
+            $savedMessage = $this->saveMessage($contact, 'video', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Video sent successfully',
                 'data' => $response->decodedBody(),
+                'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -700,12 +698,13 @@ class WhatsAppController extends Controller
                 'name' => $request->name ?? '',
                 'address' => $request->address ?? '',
             ];
-            $this->saveMessage($contact, 'location', $content, $response);
+            $savedMessage = $this->saveMessage($contact, 'location', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Location sent successfully',
                 'data' => $response->decodedBody(),
+                'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -752,12 +751,13 @@ class WhatsAppController extends Controller
             // Save to database
             $contact = $this->getOrCreateContact($request->to);
             $content = ['contacts' => $contacts];
-            $this->saveMessage($contact, 'contacts', $content, $response);
+            $savedMessage = $this->saveMessage($contact, 'contacts', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Contact sent successfully',
                 'data' => $response->decodedBody(),
+                'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -815,12 +815,13 @@ class WhatsAppController extends Controller
                 'header' => $request->header ?? null,
                 'footer' => $request->footer ?? null,
             ];
-            $this->saveMessage($contact, 'interactive', $content, $response);
+            $savedMessage = $this->saveMessage($contact, 'interactive', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Button message sent successfully',
                 'data' => $response->decodedBody(),
+                'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -889,12 +890,13 @@ class WhatsAppController extends Controller
                 'header' => $request->header ?? null,
                 'footer' => $request->footer ?? null,
             ];
-            $this->saveMessage($contact, 'interactive', $content, $response);
+            $savedMessage = $this->saveMessage($contact, 'interactive', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'List message sent successfully',
                 'data' => $response->decodedBody(),
+                'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -1137,7 +1139,7 @@ class WhatsAppController extends Controller
             // Broadcast profile update event
             $userId = auth()->user()->getEffectiveUserId();
             if ($userId) {
-                broadcast(new \App\Events\ProfileUpdated($userId, $data, 'business_profile'));
+                broadcast(new ProfileUpdated($userId, $data, 'business_profile'));
             }
 
             return response()->json([
@@ -1151,7 +1153,7 @@ class WhatsAppController extends Controller
                 'error_code' => $e->getErrorCode(),
                 'message' => $e->getMessage(),
             ], $e->getCode());
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
@@ -1394,7 +1396,7 @@ class WhatsAppController extends Controller
             // Current totals
             $totalContacts = WhatsAppContact::where('user_id', $userId)->count();
             $totalMessages = WhatsAppMessage::where('user_id', $userId)->count();
-            $unreadMessages = WhatsAppContact::where('user_id', $userId)->sum('unread_count');
+            $unreadMessages = WhatsAppMessage::where('user_id', $userId)->unreadIncoming()->count();
 
             // Contacts growth (this month vs last month)
             $contactsThisMonth = WhatsAppContact::where('user_id', $userId)
@@ -1596,9 +1598,43 @@ class WhatsAppController extends Controller
             $perPage = $request->get('per_page', 15);
 
             // RLS in model automatically filters by user_id
-            $contacts = WhatsAppContact::withCount('messages')
-                ->orderBy('last_message_at', 'desc')
+            $query = WhatsAppContact::with('tags')
+                ->withCount([
+                    'messages',
+                    'messages as unread_messages_count' => fn ($messages) => $messages->unreadIncoming(),
+                ]);
+
+            $search = trim($request->string('search')->toString());
+            if ($search !== '') {
+                $query->where(function ($contacts) use ($search) {
+                    $contacts->whereLike('name', '%'.$search.'%');
+                    $phone = ltrim($search, '+');
+                    if ($phone !== '') {
+                        $contacts->orWhereLike('wa_id', '%'.$phone.'%');
+                    }
+                });
+            }
+
+            // Filter by tag if tag_id parameter is provided
+            if ($request->has('tag_id') && $request->tag_id) {
+                $query->whereHas('tags', function ($q) use ($request) {
+                    $q->where('contact_tags.id', $request->tag_id);
+                });
+            }
+
+            // Keep conversations needing attention at the top, then sort by
+            // the most recent activity within each unread/read group.
+            $contacts = $query->orderByDesc('unread_messages_count')
+                ->orderByDesc('last_message_at')
+                ->orderByDesc('id')
                 ->paginate($perPage);
+
+            $contacts->through(function (WhatsAppContact $contact) {
+                $contact->unread_count = $contact->unread_messages_count;
+                unset($contact->unread_messages_count);
+
+                return $contact;
+            });
 
             return response()->json([
                 'success' => true,
@@ -1614,6 +1650,26 @@ class WhatsAppController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve contacts',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function toggleContactAi($contactId): JsonResponse
+    {
+        try {
+            $contact = WhatsAppContact::findOrFail($contactId);
+            $contact->ai_active = ! $contact->ai_active;
+            $contact->save();
+
+            return response()->json([
+                'success' => true,
+                'data' => ['ai_active' => $contact->ai_active],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to toggle AI for contact',
                 'error' => $e->getMessage(),
             ], 500);
         }
@@ -1637,17 +1693,33 @@ class WhatsAppController extends Controller
             // Verify contact belongs to user (RLS will handle this)
             $contact = WhatsAppContact::findOrFail($contactId);
 
-            $perPage = $request->get('per_page', 100);
+            // WhatsApp-like windowed loading: fetch the latest N messages, or
+            // (when `before_id` is supplied) the N messages older than that
+            // cursor. Fetch one extra row to detect whether older history still
+            // exists, then return the page in ascending (chat) order.
+            $perPage = max(1, min((int) $request->get('per_page', 10), 50));
+            $beforeId = $request->get('before_id');
 
-            // RLS in model automatically filters by user_id
-            $messages = WhatsAppMessage::with(['contact'])
+            $rows = WhatsAppMessage::with(['contact'])
                 ->where('contact_id', $contactId)
-                ->orderBy('created_at', 'asc')
+                ->when($beforeId, fn ($q) => $q->where('id', '<', (int) $beforeId))
+                ->orderBy('id', 'desc')
+                ->limit($perPage + 1)
                 ->get();
+
+            $hasMore = $rows->count() > $perPage;
+            if ($hasMore) {
+                $rows = $rows->slice(0, $perPage);
+            }
+
+            // Ascending order for rendering (oldest → newest).
+            $messages = $rows->reverse()->values();
 
             return response()->json([
                 'success' => true,
                 'data' => $messages,
+                'has_more' => $hasMore,
+                'oldest_id' => $messages->first()->id ?? null,
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
@@ -1680,51 +1752,50 @@ class WhatsAppController extends Controller
 
             // Get all unread incoming messages from this contact
             // RLS in model automatically filters by user_id
-            $unreadMessages = WhatsAppMessage::where('contact_id', $contactId)
-                ->where('direction', 'incoming')
-                ->where('is_read', false)
-                ->get();
+            $unreadQuery = $contact->messages()->unreadIncoming();
+            $unreadMessages = $unreadQuery->get();
 
             $markedCount = 0;
+            $failedCount = 0;
 
-            // Mark each message as read in WhatsApp API
             foreach ($unreadMessages as $message) {
                 try {
-                    // Call WhatsApp API to mark message as read
                     $whatsapp->markMessageAsRead($message->message_id);
-
-                    // Update in database
-                    $message->is_read = true;
-                    $message->read_at = now();
-                    $message->status = 'read';
-                    $message->save();
-
-                    $markedCount++;
-
-                    \Log::info('Message marked as read', [
-                        'message_id' => $message->message_id,
-                        'contact_id' => $contactId,
-                    ]);
                 } catch (\Exception $e) {
-                    \Log::error('Failed to mark message as read in WhatsApp API', [
-                        'message_id' => $message->message_id,
-                        'error' => $e->getMessage(),
-                    ]);
-                    // Continue marking other messages even if one fails
+                    if (! $this->isMissingWhatsAppMessage($e, $message->message_id)) {
+                        $failedCount++;
+                        \Log::error('Failed to mark message as read in WhatsApp API', [
+                            'message_id' => $message->message_id,
+                            'error' => $e->getMessage(),
+                        ]);
+
+                        continue;
+                    }
+                }
+
+                // Clear the Inbox unread state even if Meta no longer recognizes the message.
+                $readState = [
+                    'is_read' => true,
+                    'read_at' => now(),
+                    'status' => 'read',
+                ];
+                $updated = (clone $unreadQuery)->whereKey($message->id)->update($readState);
+                $markedCount += $updated;
+                if ($updated > 0) {
+                    $message->fill($readState);
+                    defer(fn () => rescue(fn () => MessageStatusUpdated::dispatch($message)));
                 }
             }
 
-            // Update contact's unread count
-            $contact = WhatsAppContact::find($contactId);
-            if ($contact) {
-                $contact->unread_count = 0;
-                $contact->save();
-            }
+            $remainingCount = $unreadQuery->count();
+            $contact->update(['unread_count' => $remainingCount]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Messages marked as read',
+                'message' => $failedCount > 0 ? 'Some messages could not be marked as read' : 'Messages marked as read',
                 'updated_count' => $markedCount,
+                'failed_count' => $failedCount,
+                'unread_count' => $remainingCount,
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -1739,6 +1810,20 @@ class WhatsAppController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    private function isMissingWhatsAppMessage(\Exception $exception, string $messageId): bool
+    {
+        if (! $exception instanceof ResponseException) {
+            return false;
+        }
+
+        $error = $exception->responseData()['error'] ?? [];
+        $details = $error['error_data']['details'] ?? null;
+
+        return ($error['code'] ?? null) === 100
+            && is_string($details)
+            && str_starts_with($details, "Message ID: {$messageId} does not exist.");
     }
 
     /**
@@ -1778,6 +1863,8 @@ class WhatsAppController extends Controller
                     'header' => $template->header,
                     'header_type' => $template->header_type,
                     'body' => $template->body,
+                    'body_examples' => $template->body_examples,
+                    'variable_type' => $template->variable_type ?? 'numeric',
                     'footer' => $template->footer,
                     'buttons' => $template->buttons ? json_decode($template->buttons, true) : [],
                     'quality_score' => $template->quality_score,
@@ -1964,6 +2051,15 @@ class WhatsAppController extends Controller
                 ], 422);
             }
 
+            $variableEdgeValidation = $this->templateService->validateLeadingTrailingVariables($bodyText);
+            if (! $variableEdgeValidation['valid']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => ['body' => $variableEdgeValidation['error']],
+                ], 422);
+            }
+
             // Validate footer if present
             if (! empty($data['footer'])) {
                 $footerText = is_array($data['footer']) ? ($data['footer']['text'] ?? '') : $data['footer'];
@@ -2030,6 +2126,16 @@ class WhatsAppController extends Controller
                 $buttons = json_encode($data['buttons']);
             }
 
+            // Prepare body examples if provided
+            $bodyExamples = null;
+            if (! empty($data['body_examples']) && is_array($data['body_examples'])) {
+                // Filter out empty examples
+                $filteredExamples = array_filter($data['body_examples'], fn ($ex) => is_string($ex) && trim($ex) !== '');
+                if (! empty($filteredExamples)) {
+                    $bodyExamples = array_values($filteredExamples);
+                }
+            }
+
             $template = WhatsAppTemplate::create([
                 'whatsapp_account_id' => $account->id,
                 'phone_number_id' => $account->phone_number_id,
@@ -2041,6 +2147,8 @@ class WhatsAppController extends Controller
                 'header' => $header,
                 'header_type' => $headerType,
                 'body' => $bodyText,
+                'body_examples' => $bodyExamples,
+                'variable_type' => $data['variable_type'] ?? 'numeric',
                 'footer' => $footer,
                 'buttons' => $buttons,
                 'components' => $components,
@@ -2092,6 +2200,17 @@ class WhatsAppController extends Controller
                 ], 404);
             }
 
+            // Meta's API only allows editing templates with REJECTED or PAUSED status.
+            // APPROVED and PENDING templates cannot be modified — only deleted/recreated.
+            $editableStatuses = ['REJECTED', 'PAUSED'];
+            if (! in_array(strtoupper($template->status ?? ''), $editableStatuses)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Template cannot be edited',
+                    'error' => "Only templates with REJECTED or PAUSED status can be edited. This template is currently '{$template->status}'. To change an approved template, delete it and create a new one.",
+                ], 422);
+            }
+
             $data = $request->all();
 
             // Validate body if present
@@ -2139,6 +2258,22 @@ class WhatsAppController extends Controller
                 $account->waba_id
             );
 
+            // Ensure name and language are included in the data
+            // WhatsApp API requires these for template updates
+            if (! isset($data['name']) || empty($data['name'])) {
+                $data['name'] = $template->name;
+            }
+            if (! isset($data['language']) || empty($data['language'])) {
+                $data['language'] = $template->language;
+            }
+
+            // Inherit variable_type from the existing template when not sent by the client.
+            // Without this, buildComponents defaults to 'positional' and drops named variable
+            // examples, causing Meta to reject the payload.
+            if (! isset($data['variable_type']) || $data['variable_type'] === '') {
+                $data['variable_type'] = $template->variable_type ?? 'numeric';
+            }
+
             // Call TemplateService to update template via WhatsApp API
             $result = $this->templateService->updateTemplate($template->template_id, $data);
 
@@ -2172,6 +2307,19 @@ class WhatsAppController extends Controller
 
             if (isset($data['buttons'])) {
                 $updateData['buttons'] = ! empty($data['buttons']) ? json_encode($data['buttons']) : null;
+            }
+
+            if (isset($data['variable_type'])) {
+                $updateData['variable_type'] = $data['variable_type'];
+            }
+
+            if (isset($data['body_examples'])) {
+                if (! empty($data['body_examples']) && is_array($data['body_examples'])) {
+                    $filteredExamples = array_filter($data['body_examples'], fn ($ex) => is_string($ex) && trim($ex) !== '');
+                    $updateData['body_examples'] = ! empty($filteredExamples) ? array_values($filteredExamples) : null;
+                } else {
+                    $updateData['body_examples'] = null;
+                }
             }
 
             $template->update($updateData);

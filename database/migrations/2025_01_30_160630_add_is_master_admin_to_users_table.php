@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             // Add is_master_admin if not exists
-            if (!Schema::hasColumn('users', 'is_master_admin')) {
+            if (! Schema::hasColumn('users', 'is_master_admin')) {
                 $table->boolean('is_master_admin')->default(false)->after('language_preference');
             }
         });

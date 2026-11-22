@@ -117,6 +117,51 @@ class TemplateService
     }
 
     /**
+     * Validate that body text does not start or end with a variable.
+     *
+     * @param  string  $body  Body text to validate
+     * @return array{valid: bool, error: string|null}
+     */
+    public function validateLeadingTrailingVariables(string $body): array
+    {
+        $trimmedBody = trim($body);
+        if ($trimmedBody === '') {
+            return ['valid' => true, 'error' => null];
+        }
+
+        $variablePattern = '([a-z_][a-z0-9_]*|\d+)';
+        if (preg_match('/^\{\{\s*'.$variablePattern.'\s*\}\}/i', $trimmedBody) === 1) {
+            return [
+                'valid' => false,
+                'error' => 'Variables cannot appear at the start of the template body',
+            ];
+        }
+
+        if (preg_match('/\{\{\s*'.$variablePattern.'\s*\}\}$/i', $trimmedBody) === 1) {
+            return [
+                'valid' => false,
+                'error' => 'Variables cannot appear at the end of the template body',
+            ];
+        }
+
+        return ['valid' => true, 'error' => null];
+    }
+
+    /**
+     * Validate body examples - optional but recommended when body contains variables
+     *
+     * @param  string  $body  The body text
+     * @param  array|null  $examples  Array of example values
+     * @return array{valid: bool, error: string|null}
+     */
+    public function validateBodyExamples(string $body, ?array $examples = null): array
+    {
+        // For now, body examples are optional to maintain backward compatibility
+        // But we'll filter out empty values if provided
+        return ['valid' => true, 'error' => null];
+    }
+
+    /**
      * Validate buttons - max 10 quick reply OR max 2 CTA buttons
      *
      * @param  array|null  $buttons  Array of button configurations
@@ -241,6 +286,7 @@ class TemplateService
     public function buildComponents(array $formData): array
     {
         $components = [];
+        $parameterFormat = $this->resolveParameterFormat($formData);
 
         // Build HEADER component if present
         if (! empty($formData['header'])) {
@@ -272,11 +318,41 @@ class TemplateService
                 'text' => $bodyData['text'] ?? $formData['body'],
             ];
 
-            // Add example values for variables if provided
-            if (! empty($bodyData['examples'])) {
-                $bodyComponent['example'] = [
-                    'body_text' => $bodyData['examples'],
-                ];
+            // Detect variables in body to determine if example field is needed
+            $bodyText = $bodyData['text'] ?? $formData['body'];
+            $numericMatches = preg_match_all('/\{\{\s*(\d+)\s*\}\}/', $bodyText, $numericVars);
+            $namedMatches = preg_match_all('/\{\{\s*([a-z_][a-z0-9_]*)\s*\}\}/i', $bodyText, $namedVars);
+            $namedKeys = array_values(array_unique($namedVars[1] ?? []));
+            $variableCount = $parameterFormat === 'named'
+                ? count($namedKeys)
+                : count(array_unique($numericVars[1] ?? []));
+            $hasVariables = $variableCount > 0;
+
+            // Get example values from either nested or root location
+            $examples = $bodyData['examples'] ?? $formData['body_examples'] ?? null;
+
+            // If body has variables, example field is required by Meta
+            if ($hasVariables) {
+                if ($parameterFormat === 'named') {
+                    $normalizedExamples = $this->normalizeNamedBodyExamples($examples, $namedKeys, true);
+                    $bodyComponent['example'] = [
+                        'body_text_named_params' => $normalizedExamples,
+                    ];
+                } else {
+                    $normalizedExamples = $this->normalizeBodyExamples($examples, $variableCount, true);
+                    $bodyComponent['example'] = [
+                        'body_text' => $normalizedExamples,
+                    ];
+                }
+            } elseif (! empty($examples) && is_array($examples)) {
+                if ($parameterFormat !== 'named') {
+                    $normalizedExamples = $this->normalizeBodyExamples($examples, 0, false);
+                    if (! empty($normalizedExamples)) {
+                        $bodyComponent['example'] = [
+                            'body_text' => $normalizedExamples,
+                        ];
+                    }
+                }
             }
 
             $components[] = $bodyComponent;
@@ -330,6 +406,140 @@ class TemplateService
     }
 
     /**
+     * Determine parameter format for template variables.
+     */
+    protected function resolveParameterFormat(array $formData): string
+    {
+        $explicit = $formData['parameter_format'] ?? null;
+        if (is_string($explicit) && $explicit !== '') {
+            return strtolower($explicit) === 'named' ? 'named' : 'positional';
+        }
+
+        $variableType = $formData['variable_type'] ?? null;
+        if (is_string($variableType) && strtolower($variableType) === 'named') {
+            return 'named';
+        }
+
+        return 'positional';
+    }
+
+    /**
+     * Normalize body examples into the format expected by Meta's API.
+     *
+     * @param  array|null  $examples  Examples from the request payload
+     * @param  int  $variableCount  Number of placeholders in the body
+     * @param  bool  $forcePlaceholder  Whether to include placeholders when examples are missing
+     * @return array<int, array<int, string>>
+     */
+    protected function normalizeBodyExamples(?array $examples, int $variableCount, bool $forcePlaceholder): array
+    {
+        if (empty($examples)) {
+            return $forcePlaceholder && $variableCount > 0
+                ? [array_fill(0, $variableCount, '')]
+                : [];
+        }
+
+        $firstExample = $examples[0] ?? null;
+        $rawRows = is_array($firstExample) ? $examples : [$examples];
+        $rows = [];
+
+        foreach ($rawRows as $row) {
+            $rowValues = is_array($row) ? $row : [$row];
+            $values = array_map(static function ($value) {
+                return is_string($value) ? trim($value) : '';
+            }, $rowValues);
+
+            if ($variableCount > 0) {
+                if (count($values) < $variableCount) {
+                    $values = array_pad($values, $variableCount, '');
+                } elseif (count($values) > $variableCount) {
+                    $values = array_slice($values, 0, $variableCount);
+                }
+            } else {
+                $values = array_values(array_filter($values, static fn ($value) => $value !== ''));
+            }
+
+            if ($forcePlaceholder || ! empty($values)) {
+                $rows[] = $values;
+            }
+        }
+
+        if (empty($rows) && $forcePlaceholder && $variableCount > 0) {
+            return [array_fill(0, $variableCount, '')];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Normalize named body examples for Meta's API format.
+     *
+     * @param  array|null  $examples  Examples from the request payload
+     * @param  array<int, string>  $paramNames  Named parameters in the body
+     * @param  bool  $forcePlaceholder  Whether to include placeholders when examples are missing
+     * @return array<int, array{param_name: string, example: string}>
+     */
+    protected function normalizeNamedBodyExamples(?array $examples, array $paramNames, bool $forcePlaceholder): array
+    {
+        if (empty($paramNames)) {
+            return [];
+        }
+
+        $values = $this->resolveNamedExampleValues($examples, $paramNames, $forcePlaceholder);
+        $normalized = [];
+
+        foreach ($paramNames as $index => $paramName) {
+            $normalized[] = [
+                'param_name' => $paramName,
+                'example' => $values[$index] ?? '',
+            ];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Resolve named example values by param name or by position.
+     *
+     * @param  array<int, string>  $paramNames
+     * @return array<int, string>
+     */
+    protected function resolveNamedExampleValues(?array $examples, array $paramNames, bool $forcePlaceholder): array
+    {
+        if (empty($examples)) {
+            return $forcePlaceholder ? array_fill(0, count($paramNames), '') : [];
+        }
+
+        $candidate = $examples;
+        if (isset($examples[0]) && is_array($examples[0])) {
+            $candidate = $examples[0];
+        }
+
+        $values = [];
+        if (array_is_list($candidate)) {
+            foreach ($paramNames as $index => $paramName) {
+                $value = $candidate[$index] ?? '';
+                $values[] = is_string($value) ? trim($value) : '';
+            }
+        } else {
+            foreach ($paramNames as $paramName) {
+                $value = $candidate[$paramName] ?? '';
+                $values[] = is_string($value) ? trim($value) : '';
+            }
+        }
+
+        if (! $forcePlaceholder) {
+            $values = array_values(array_filter($values, static fn ($value) => $value !== ''));
+        }
+
+        if (empty($values) && $forcePlaceholder) {
+            return array_fill(0, count($paramNames), '');
+        }
+
+        return $values;
+    }
+
+    /**
      * Create a new template via WhatsApp Business Management API
      *
      * @param  array  $data  Template data (name, category, language, components or form data)
@@ -365,6 +575,15 @@ class TemplateService
                 'success' => false,
                 'data' => null,
                 'error' => $bodyValidation['error'],
+            ];
+        }
+
+        $variableEdgeValidation = $this->validateLeadingTrailingVariables($bodyText);
+        if (! $variableEdgeValidation['valid']) {
+            return [
+                'success' => false,
+                'data' => null,
+                'error' => $variableEdgeValidation['error'],
             ];
         }
 
@@ -404,6 +623,18 @@ class TemplateService
             'language' => $data['language'],
             'components' => $components,
         ];
+
+        $parameterFormat = $this->resolveParameterFormat($data);
+        if ($parameterFormat === 'named') {
+            $payload['parameter_format'] = 'named';
+        }
+
+        if (app()->environment(['local', 'development'])) {
+            Log::debug('Template create payload', [
+                'name' => $data['name'],
+                'payload' => $payload,
+            ]);
+        }
 
         try {
             $url = $this->getBaseUrl()."/{$this->businessAccountId}/message_templates";
@@ -473,6 +704,15 @@ class TemplateService
                     'error' => $bodyValidation['error'],
                 ];
             }
+
+            $variableEdgeValidation = $this->validateLeadingTrailingVariables($bodyText);
+            if (! $variableEdgeValidation['valid']) {
+                return [
+                    'success' => false,
+                    'data' => null,
+                    'error' => $variableEdgeValidation['error'],
+                ];
+            }
         }
 
         // Validate footer if present
@@ -503,7 +743,17 @@ class TemplateService
         // Build components from form data
         $components = $this->buildComponents($data);
 
+        // Meta's update endpoint does NOT accept 'example' fields in components —
+        // those are for creation only. Stripping them avoids "Invalid parameter" errors.
+        $components = array_map(function (array $component): array {
+            unset($component['example']);
+
+            return $component;
+        }, $components);
+
         // Build API request payload for update
+        // WhatsApp API only accepts 'components' when updating via /{template-id}
+        // 'name' and 'language' are NOT accepted and cause "Invalid parameter" errors
         $payload = [
             'components' => $components,
         ];

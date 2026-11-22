@@ -2,17 +2,24 @@
 
 namespace App\Services;
 
+use App\Models\AiAgent;
 use App\Models\MerchantBalance;
 use App\Models\SubMerchant;
 use App\Models\User;
+use App\Models\WhatsAppAccount;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 
 class SubMerchantService
 {
+    public function __construct(
+        private XenPlatformService $xenPlatformService,
+    ) {}
+
     /**
      * Register a user as a sub-merchant.
+     * Creates the sub-merchant record, initializes balance, and creates a XenPlatform sub-account.
      *
      * @param  User  $user  The user to register as sub-merchant
      * @param  array  $details  Optional details (business_name)
@@ -34,6 +41,7 @@ class SubMerchantService
                 'business_name' => $details['business_name'] ?? $user->name,
                 'is_active' => true,
                 'verified_at' => null,
+                'xendit_account_status' => 'pending',
             ]);
 
             // Initialize balance to zero
@@ -51,20 +59,64 @@ class SubMerchantService
                 'sub_merchant_id' => $subMerchant->id,
             ]);
 
+            // Create XenPlatform sub-account (OWNED)
+            // Throws RuntimeException on failure, which rolls back the transaction
+            $xenditAccount = $this->xenPlatformService->createSubAccount($subMerchant);
+
+            $subMerchant->update([
+                'xendit_account_id' => $xenditAccount['id'],
+                'xendit_account_status' => 'active',
+            ]);
+
+            Log::info('XenPlatform sub-account created', [
+                'sub_merchant_id' => $subMerchant->id,
+                'xendit_account_id' => $xenditAccount['id'],
+            ]);
+
             return $subMerchant->fresh(['balance']);
         });
     }
 
     /**
+     * Retry creating a XenPlatform sub-account for a merchant that failed initially.
+     */
+    public function retryXenPlatformAccount(SubMerchant $merchant): bool
+    {
+        if ($merchant->hasXenditAccount()) {
+            return true; // Already has an active account
+        }
+
+        try {
+            $xenditAccount = $this->xenPlatformService->createSubAccount($merchant);
+
+            $merchant->update([
+                'xendit_account_id' => $xenditAccount['id'],
+                'xendit_account_status' => 'active',
+            ]);
+
+            Log::info('XenPlatform sub-account created on retry', [
+                'sub_merchant_id' => $merchant->id,
+                'xendit_account_id' => $xenditAccount['id'],
+            ]);
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Retry failed: XenPlatform sub-account creation', [
+                'sub_merchant_id' => $merchant->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
      * Activate a sub-merchant.
-     *
-     * @param  SubMerchant  $merchant  The sub-merchant to activate
-     * @return bool True if activation was successful
      */
     public function activateSubMerchant(SubMerchant $merchant): bool
     {
         if ($merchant->is_active) {
-            return true; // Already active
+            return true;
         }
 
         $merchant->is_active = true;
@@ -81,14 +133,11 @@ class SubMerchantService
 
     /**
      * Deactivate a sub-merchant.
-     *
-     * @param  SubMerchant  $merchant  The sub-merchant to deactivate
-     * @return bool True if deactivation was successful
      */
     public function deactivateSubMerchant(SubMerchant $merchant): bool
     {
         if (! $merchant->is_active) {
-            return true; // Already inactive
+            return true;
         }
 
         $merchant->is_active = false;
@@ -105,14 +154,11 @@ class SubMerchantService
 
     /**
      * Verify a sub-merchant (admin action).
-     *
-     * @param  SubMerchant  $merchant  The sub-merchant to verify
-     * @return bool True if verification was successful
      */
     public function verifySubMerchant(SubMerchant $merchant): bool
     {
         if ($merchant->isVerified()) {
-            return true; // Already verified
+            return true;
         }
 
         $merchant->verified_at = now();
@@ -129,8 +175,6 @@ class SubMerchantService
 
     /**
      * Find a sub-merchant by ID.
-     *
-     * @param  int  $id  Sub-merchant ID
      */
     public function find(int $id): ?SubMerchant
     {
@@ -139,8 +183,6 @@ class SubMerchantService
 
     /**
      * Find a sub-merchant by user ID.
-     *
-     * @param  int  $userId  User ID
      */
     public function findByUserId(int $userId): ?SubMerchant
     {
@@ -149,9 +191,6 @@ class SubMerchantService
 
     /**
      * Get sub-merchant with balance information.
-     *
-     * @param  SubMerchant  $merchant  The sub-merchant
-     * @return array Sub-merchant data with balance
      */
     public function getWithBalance(SubMerchant $merchant): array
     {
@@ -166,12 +205,87 @@ class SubMerchantService
 
     /**
      * Check if a user can become a sub-merchant.
-     *
-     * @param  User  $user  The user to check
-     * @return bool True if user can become a sub-merchant
      */
     public function canBecomeSubMerchant(User $user): bool
     {
         return $user->subMerchant === null;
+    }
+
+    /**
+     * Verify that the user's sub-merchant actually exists in XenPlatform.
+     * If the account is invalid (missing, or not found in Xendit), delete all
+     * sub-merchant data so the user can re-register cleanly.
+     *
+     * Returns true if cleanup was performed, false otherwise.
+     * Never throws — all errors are logged silently to avoid blocking login.
+     */
+    public function verifyAndCleanupInvalidAccount(User $user): bool
+    {
+        try {
+            $subMerchant = $this->findByUserId($user->id);
+
+            if ($subMerchant === null) {
+                return false;
+            }
+
+            $needsCleanup = false;
+
+            if ($subMerchant->xendit_account_id === null || $subMerchant->xendit_account_status !== 'active') {
+                // Local state is already invalid — no Xendit call needed
+                Log::warning('SubMerchant has invalid local XenPlatform state, cleaning up', [
+                    'user_id' => $user->id,
+                    'sub_merchant_id' => $subMerchant->id,
+                    'xendit_account_id' => $subMerchant->xendit_account_id,
+                    'xendit_account_status' => $subMerchant->xendit_account_status,
+                ]);
+                $needsCleanup = true;
+            } else {
+                // Has a xendit_account_id marked active — verify it actually exists in Xendit
+                $exists = $this->xenPlatformService->verifySubAccount($subMerchant->xendit_account_id);
+
+                if ($exists === false) {
+                    Log::warning('SubMerchant xendit account not found in XenPlatform, cleaning up', [
+                        'user_id' => $user->id,
+                        'sub_merchant_id' => $subMerchant->id,
+                        'xendit_account_id' => $subMerchant->xendit_account_id,
+                    ]);
+                    $needsCleanup = true;
+                } elseif ($exists === null) {
+                    // Network error or unexpected response — skip cleanup, try next login
+                    return false;
+                }
+                // $exists === true → all good
+            }
+
+            if (! $needsCleanup) {
+                return false;
+            }
+
+            DB::transaction(function () use ($user, $subMerchant) {
+                // Disable QRIS on AI agent so user knows they need to re-register
+                $whatsappAccount = WhatsAppAccount::where('user_id', $user->id)->first();
+                if ($whatsappAccount) {
+                    AiAgent::where('whatsapp_account_id', $whatsappAccount->id)
+                        ->update(['qris_enabled' => false]);
+                }
+
+                // Delete sub-merchant — cascades to merchant_balances, qris_transactions, withdrawal_requests
+                $subMerchant->delete();
+            });
+
+            Log::info('SubMerchant invalid XenPlatform account cleaned up', [
+                'user_id' => $user->id,
+                'sub_merchant_id' => $subMerchant->id,
+            ]);
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error('SubMerchant verification/cleanup failed unexpectedly', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 }

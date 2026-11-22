@@ -45,26 +45,15 @@
     <meta name="twitter:image" content="https://qashierwise.com/images/og-image.png">
     <meta name="twitter:image:alt" content="QashierWise - AI Chatbot WhatsApp untuk Restoran">
 
-    <!-- Preconnect for critical resources -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preconnect" href="https://cdn.tailwindcss.com">
-    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
-    <link rel="preconnect" href="https://cdn.jsdelivr.net">
-    <link rel="preconnect" href="https://images.unsplash.com">
+    <!-- Preload critical resources to reduce network dependency chain -->
+    <link rel="preload" href="{{ asset('site.webmanifest') }}" as="fetch" crossorigin>
+    <link rel="preload" as="image" type="image/avif" href="{{ asset('images/hero-restaurant-205w.avif') }}" media="(max-width: 767px)" fetchpriority="high">
+    <link rel="preload" as="image" type="image/avif" href="{{ asset('images/hero-restaurant-400w.avif') }}" media="(min-width: 768px)" fetchpriority="high">
+    <link rel="preload" href="{{ asset('build/assets/fa-solid-900-DRAAbZTg.woff2') }}" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="{{ asset('build/assets/fa-brands-400-BP5tdqmh.woff2') }}" as="font" type="font/woff2" crossorigin>
 
-    <!-- DNS Prefetch for additional resources -->
-    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
-    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
-    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
-
-    <!-- Preload critical fonts (non-blocking) -->
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"></noscript>
-
-    <!-- Preload Font Awesome with lower priority -->
-    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'" fetchpriority="low">
-    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"></noscript>
+    <!-- Vite Assets (Tailwind CSS v4 + JS bundle with Alpine, Font Awesome, Inter font) -->
+    @vite(['resources/css/app.css', 'resources/js/welcome.js'])
 
     <!-- Additional SEO Meta -->
     <meta name="geo.region" content="ID-JT">
@@ -74,142 +63,18 @@
 
     <!-- Critical CSS inline for above-the-fold content -->
     <style>
-        /* Critical CSS - Inline for faster FCP */
-        *,::after,::before{box-sizing:border-box;border:0 solid #e5e7eb}
-        html{line-height:1.5;-webkit-text-size-adjust:100%;font-family:Inter,ui-sans-serif,system-ui,sans-serif}
-        body{margin:0;line-height:inherit}
-        .bg-white{background-color:#fff}
-        .text-gray-900{color:#111827}
-        .text-gray-600{color:#4b5563}
-        .font-bold{font-weight:700}
-        .font-semibold{font-weight:600}
-        .text-xl{font-size:1.25rem;line-height:1.75rem}
-        .text-3xl{font-size:1.875rem;line-height:2.25rem}
-        .rounded-xl{border-radius:.75rem}
-        .rounded-2xl{border-radius:1rem}
-        .px-4{padding-left:1rem;padding-right:1rem}
-        .py-2{padding-top:.5rem;padding-bottom:.5rem}
-        .mb-4{margin-bottom:1rem}
-        .flex{display:flex}
-        .items-center{align-items:center}
-        .justify-between{justify-content:space-between}
-        .space-x-2>:not([hidden])~:not([hidden]){margin-left:.5rem}
-        .fixed{position:fixed}
-        .top-0{top:0}
-        .left-0{left:0}
-        .right-0{right:0}
-        .z-50{z-index:50}
-        .h-16{height:4rem}
-        .h-7{height:1.75rem}
-        .max-w-7xl{max-width:80rem}
-        .mx-auto{margin-left:auto;margin-right:auto}
-        .hidden{display:none}
-        .pt-24{padding-top:6rem}
-        .pb-12{padding-bottom:3rem}
-        .text-center{text-align:center}
-        .leading-tight{line-height:1.25}
-        .gradient-text{background:linear-gradient(135deg,#4910ce 0%,#7c3aed 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-        .hero-gradient{background:linear-gradient(135deg,#f3e8ff 0%,#ede9fe 50%,#faf5ff 100%)}
-        .bg-primary{background-color:#4910ce}
-        .text-primary{color:#4910ce}
-        .text-white{color:#fff}
-        @media(min-width:768px){.md\\:flex{display:flex}.md\\:hidden{display:none}.md\\:pt-32{padding-top:8rem}.md\\:text-5xl{font-size:3rem;line-height:1}}
-        @media(min-width:1024px){.lg\\:grid{display:grid}.lg\\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.lg\\:text-left{text-align:left}.lg\\:text-6xl{font-size:3.75rem;line-height:1}}
         [x-cloak]{display:none!important}
-        body{font-family:'Inter',sans-serif}
-
-        /* Prevent layout shifts */
-        body { margin-bottom: 0; overflow-x: hidden; }
-        /* Reserve space for elements */
-        img { max-width: 100%; height: auto; }
-        /* Ensure consistent spacing */
-        .hero-gradient { min-height: 600px; contain: layout style; }
-        /* Navigation stability */
-        nav { height: 64px; contain: layout; }
-        /* Hero image container */
-        .hero-image-container { aspect-ratio: 665/444; min-height: 300px; }
-        /* Floating elements stability */
-        .floating-card { contain: layout style; will-change: transform; }
-        /* Font loading stability */
-        @font-face { font-display: swap; }
-        /* Additional critical CSS for less CLS */
-        .absolute{position:absolute}
-        .relative{position:relative}
-        .w-full{width:100%}
-        .grid{display:grid}
-        .gap-4{gap:1rem}
-        .gap-6{gap:1.5rem}
-        .gap-8{gap:2rem}
-        .py-12{padding-top:3rem;padding-bottom:3rem}
-        .py-20{padding-top:5rem;padding-bottom:5rem}
-        .px-6{padding-left:1.5rem;padding-right:1.5rem}
-        .px-8{padding-left:2rem;padding-right:2rem}
-        .mt-8{margin-top:2rem}
-        .mb-2{margin-bottom:.5rem}
-        .mb-3{margin-bottom:.75rem}
-        .mb-10{margin-bottom:2.5rem}
-        .mb-16{margin-bottom:4rem}
-        .text-sm{font-size:.875rem;line-height:1.25rem}
-        .text-base{font-size:1rem;line-height:1.5rem}
-        .text-lg{font-size:1.125rem;line-height:1.75rem}
-        .text-2xl{font-size:1.5rem;line-height:2rem}
-        .text-4xl{font-size:2.25rem;line-height:2.5rem}
-        .text-5xl{font-size:3rem;line-height:1}
-        .text-6xl{font-size:3.75rem;line-height:1}
-        .text-xs{font-size:.75rem;line-height:1rem}
-        .shadow-xl{box-shadow:0 20px 25px -5px rgba(0,0,0,.1),0 10px 10px -5px rgba(0,0,0,.04)}
-        .shadow-2xl{box-shadow:0 25px 50px -12px rgba(0,0,0,.25)}
-        .order-1{order:1}
-        .order-2{order:2}
-        .backdrop-blur-md{backdrop-filter:blur(12px)}
-        .transition{transition-property:all;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}
-        .hover\\:text-primary:hover{color:#4910ce}
-        .border-b{border-bottom-width:1px}
-        .border-gray-100{border-color:#f3f4f6}
-        .bg-gray-50{background-color:#f9fafb}
-        .bg-green-100{background-color:#dcfce7}
-        .bg-purple-100{background-color:#f3e8ff}
-        .text-green-600{color:#16a34a}
-        .text-gray-500{color:#6b7280}
-        .space-x-3>:not([hidden])~:not([hidden]){margin-left:.75rem}
-        .space-x-4>:not([hidden])~:not([hidden]){margin-left:1rem}
-        .space-x-8>:not([hidden])~:not([hidden]){margin-left:2rem}
-        .whitespace-nowrap{white-space:nowrap}
-        .flex-shrink-0{flex-shrink:0}
-        .max-w-md{max-width:28rem}
-        .max-w-2xl{max-width:42rem}
-        @media(min-width:640px){.sm\\:block{display:block}.sm\\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.sm\\:text-3xl{font-size:1.875rem;line-height:2.25rem}}
-        @media(min-width:1024px){.lg\\:max-w-none{max-width:none}.lg\\:gap-12{gap:3rem}.lg\\:mt-0{margin-top:0}.lg\\:order-1{order:1}.lg\\:order-2{order:2}}
+        body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif;margin:0;overflow-x:hidden}
+        .gradient-text{background:linear-gradient(135deg,#4910ce 0%,#7c3aed 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+       .hero-gradient{background:linear-gradient(135deg,#f3e8ff 0%,#ede9fe 50%,#faf5ff 100%);min-height:500px;contain:layout style}
+        nav{height:64px;contain:layout}
+        .hero-image-container{aspect-ratio:4/3;min-height:240px;contain:layout style}
+        .floating-card{contain:layout style;will-change:transform}
+        img{max-width:100%;height:auto}
+        @media(min-width:768px){.hero-gradient{min-height:600px}.hero-image-container{aspect-ratio:665/444;min-height:300px}}
+        @font-face{font-family:'Font Awesome 6 Free';font-display:swap}
+        @font-face{font-family:'Font Awesome 6 Brands';font-display:swap}
     </style>
-
-    <!-- Tailwind CSS - Deferred loading with requestIdleCallback -->
-    <script>
-        // Load Tailwind CSS when browser is idle
-        function loadTailwind() {
-            var tw = document.createElement('script');
-            tw.src = 'https://cdn.tailwindcss.com';
-            tw.onload = function() {
-                tailwind.config = {
-                    theme: {
-                        extend: {
-                            colors: {
-                                primary: '#4910ce',
-                            }
-                        }
-                    }
-                }
-            };
-            document.head.appendChild(tw);
-        }
-        if ('requestIdleCallback' in window) {
-            requestIdleCallback(loadTailwind);
-        } else {
-            setTimeout(loadTailwind, 1);
-        }
-    </script>
-
-    <!-- Alpine.js - Deferred -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
     @verbatim
     <!-- Structured Data - Organization -->
@@ -486,8 +351,45 @@
         }
     </style>
 
-    <!-- Google Analytics 4 -->
-    <x-google-analytics />
+    <!-- Google Analytics 4 - Delayed for Lighthouse -->
+    <script>
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                if (localStorage.getItem('cookieConsent') === 'accepted') {
+                    loadGoogleAnalytics();
+                }
+            }, 5000);
+        });
+
+        window.addEventListener('cookieConsentUpdated', (e) => {
+            if (e.detail.consent === 'accepted') {
+                setTimeout(() => loadGoogleAnalytics(), 5000);
+            }
+        });
+
+        function loadGoogleAnalytics() {
+            const script = document.createElement('script');
+            script.async = true;
+            script.src = 'https://www.googletagmanager.com/gtag/js?id={{ config("services.google_analytics.measurement_id") }}';
+            document.head.appendChild(script);
+
+            window.dataLayer = window.dataLayer || [];
+            function gtag() { dataLayer.push(arguments); }
+            window.gtag = gtag;
+
+            gtag('js', new Date());
+            gtag('config', '{{ config("services.google_analytics.measurement_id") }}', {
+                'anonymize_ip': true,
+                'cookie_flags': 'SameSite=None;Secure'
+            });
+        }
+
+        window.trackSignup = function(method = 'email') {
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'sign_up', { 'method': method, 'page_location': window.location.href });
+            }
+        };
+    </script>
 </head>
 <body class="bg-white">
     <!-- Breadcrumb Navigation -->
@@ -508,7 +410,8 @@
                     <a href="#features" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.how_it_works') }}</a>
                     <a href="#fitur" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.features') }}</a>
                     <a href="#pricing" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.pricing') }}</a>
-                    <a href="#about" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.about') }}</a>
+                    <a href="/blog" class="text-gray-600 hover:text-primary transition">Blog</a>
+                    <a href="{{ route('docs.meta-catalog') }}" class="text-gray-600 hover:text-primary transition">Dokumentasi</a>
                     <a href="#faq" class="text-gray-600 hover:text-primary transition">{{ __('landing.nav.faq') }}</a>
                 </div>
 
@@ -558,7 +461,8 @@
                 <a href="#features" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.how_it_works') }}</a>
                 <a href="#fitur" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.features') }}</a>
                 <a href="#pricing" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.pricing') }}</a>
-                <a href="#about" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.about') }}</a>
+                <a href="/blog" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">Blog</a>
+                <a href="{{ route('docs.meta-catalog') }}" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">Dokumentasi</a>
                 <a href="#faq" @click="menuOpen = false" class="block py-3 px-4 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition">{{ __('landing.nav.faq') }}</a>
 
                 <!-- Mobile CTA Buttons -->
@@ -654,41 +558,67 @@
                 </div>
 
                 <!-- Right Content - Hero Image -->
-                <div class="relative order-2 w-full max-w-md lg:max-w-none mx-auto mt-8 lg:mt-0" style="aspect-ratio: 665/444; min-height: 300px;">
-                    <img
-                        src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=665&q=75"
-                        srcset="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=75 400w,
-                                https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=665&q=75 665w,
-                                https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=75 800w"
-                        sizes="(max-width: 640px) 400px, (max-width: 1024px) 665px, 800px"
-                        alt="Restaurant ordering"
-                        class="rounded-2xl shadow-2xl w-full"
-                        width="665"
-                        height="444"
-                        style="aspect-ratio: 665/444; object-fit: cover; width: 100%; height: auto;"
-                        fetchpriority="high"
-                        decoding="async"
-                        loading="eager">
+                <div class="relative order-2 w-full max-w-sm lg:max-w-none mx-auto mt-6 lg:mt-0" style="aspect-ratio: 4/3; min-height: 240px;">
+                    <picture>
+                        <source
+                            media="(max-width: 767px)"
+                            type="image/avif"
+                            srcset="{{ asset('images/hero-restaurant-205w.avif') }}"
+                            width="205" height="137">
+                        <source
+                            media="(max-width: 767px)"
+                            type="image/webp"
+                            srcset="{{ asset('images/hero-restaurant-205w.webp') }}"
+                            width="205" height="137">
+                        <source
+                            media="(max-width: 767px)"
+                            srcset="{{ asset('images/hero-restaurant-205w.jpg') }}"
+                            width="205" height="137">
+                        <source
+                            media="(min-width: 768px)"
+                            type="image/avif"
+                            srcset="{{ asset('images/hero-restaurant-400w.avif') }} 400w,
+                                    {{ asset('images/hero-restaurant-665w.avif') }} 665w"
+                            sizes="(min-width: 1024px) 400px, 320px">
+                        <source
+                            media="(min-width: 768px)"
+                            type="image/webp"
+                            srcset="{{ asset('images/hero-restaurant-400w.webp') }} 400w,
+                                    {{ asset('images/hero-restaurant-665w.webp') }} 665w"
+                            sizes="(min-width: 1024px) 400px, 320px">
+                        <img
+                            src="{{ asset('images/hero-restaurant-205w.jpg') }}"
+                            srcset="{{ asset('images/hero-restaurant-205w.jpg') }} 205w,
+                                    {{ asset('images/hero-restaurant-400w.jpg') }} 400w"
+                            sizes="(max-width: 767px) 205px, (min-width: 1024px) 400px, 320px"
+                            alt="Restaurant ordering"
+                            class="rounded-2xl shadow-2xl w-full"
+                            width="205"
+                            height="137"
+                            style="aspect-ratio: 4/3; object-fit: cover; width: 100%; height: auto;"
+                            fetchpriority="high"
+                            loading="eager">
+                    </picture>
                     <!-- Floating Elements - Hidden on small mobile, visible on larger screens -->
-                    <div class="hidden sm:block absolute -bottom-4 md:-bottom-6 -left-2 md:-left-6 bg-white rounded-xl p-3 md:p-4 shadow-xl floating-card" style="contain: layout style; will-change: transform; width: 180px; height: 60px;">
-                        <div class="flex items-center space-x-2 md:space-x-3">
+                    <div class="hidden sm:block absolute -bottom-4 md:-bottom-6 -left-2 md:-left-6 bg-white rounded-xl p-3 md:p-4 shadow-xl floating-card" style="contain: layout style; will-change: transform;">
+                        <div class="flex items-center gap-2 md:gap-3">
                             <div class="w-8 h-8 md:w-10 md:h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
                                 <i class="fab fa-whatsapp text-green-600 text-lg md:text-xl"></i>
                             </div>
-                            <div style="min-width: 100px;">
-                                <p class="text-xs md:text-sm font-semibold text-gray-900 whitespace-nowrap">{{ __('landing.hero.floating_messages') }}</p>
-                                <p class="text-xs text-gray-500 whitespace-nowrap">{{ __('landing.hero.floating_messages_count') }}</p>
+                            <div class="flex flex-col justify-center">
+                                <p class="text-xs md:text-sm font-semibold text-gray-900 leading-tight">{{ __('landing.hero.floating_messages') }}</p>
+                                <p class="text-xs text-gray-500 leading-tight">{{ __('landing.hero.floating_messages_count') }}</p>
                             </div>
                         </div>
                     </div>
-                    <div class="hidden sm:block absolute -top-2 md:-top-4 -right-2 md:-right-4 bg-white rounded-xl p-3 md:p-4 shadow-xl floating-card" style="contain: layout style; will-change: transform; width: 180px; height: 60px;">
-                        <div class="flex items-center space-x-2 md:space-x-3">
+                    <div class="hidden sm:block absolute -top-2 md:-top-4 -right-2 md:-right-4 bg-white rounded-xl p-3 md:p-4 shadow-xl floating-card" style="contain: layout style; will-change: transform;">
+                        <div class="flex items-center gap-2 md:gap-3">
                             <div class="w-8 h-8 md:w-10 md:h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
                                 <i class="fas fa-chart-line text-primary text-lg md:text-xl"></i>
                             </div>
-                            <div style="min-width: 100px;">
-                                <p class="text-xs md:text-sm font-semibold text-gray-900 whitespace-nowrap">{{ __('landing.hero.floating_sales') }}</p>
-                                <p class="text-xs text-green-600 whitespace-nowrap">{{ __('landing.hero.floating_sales_trend') }}</p>
+                            <div class="flex flex-col justify-center">
+                                <p class="text-xs md:text-sm font-semibold text-gray-900 leading-tight">{{ __('landing.hero.floating_sales') }}</p>
+                                <p class="text-xs text-green-700 leading-tight">{{ __('landing.hero.floating_sales_trend') }}</p>
                             </div>
                         </div>
                     </div>
@@ -947,7 +877,7 @@
                         class="px-4 md:px-6 py-2 rounded-full font-semibold transition-all text-xs md:text-sm relative"
                     >
                         1 Tahun
-                        <span class="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">-10%</span>
+                        <span class="absolute -top-2 -right-2 bg-green-700 text-white text-xs px-2 py-0.5 rounded-full font-bold">-10%</span>
                     </button>
                 </div>
 
@@ -1348,6 +1278,7 @@
                 selectedPlan: null,
                 selectedDuration: '1_month', // Default to monthly
                 currentPlan: null,
+                currentPlanStatus: null,
                 token: null,
 
                 // Promo code state
@@ -1358,13 +1289,7 @@
                 appliedPromo: null,
 
                 // Pricing data from config
-                plans: {
-                    pro: {
-                        '1_month': { price: 350000, perMonth: 350000, discount: 0, label: '1 Bulan' },
-                        '3_months': { price: 1050000, perMonth: 350000, discount: 0, label: '3 Bulan' },
-                        '1_year': { price: 3780000, perMonth: 315000, discount: 10, label: '1 Tahun' }
-                    }
-                },
+                plans: @js(config('subscription.plans')),
 
                 init() {
                     // Get auth token from localStorage (stored as 'token' during login)
@@ -1384,7 +1309,8 @@
                 },
 
                 getPrice(plan) {
-                    const basePrice = this.plans[plan][this.selectedDuration].price;
+                    const planData = this.plans?.[plan]?.durations?.[this.selectedDuration];
+                    const basePrice = planData?.price ?? 0;
                     // If promo is applied and matches this plan, show discounted price
                     if (this.appliedPromo && this.appliedPromo.plan === plan) {
                         return this.appliedPromo.final_amount;
@@ -1400,7 +1326,7 @@
                 },
 
                 getDiscount(plan) {
-                    return this.plans[plan][this.selectedDuration].discount;
+                    return this.plans?.[plan]?.durations?.[this.selectedDuration]?.discount ?? 0;
                 },
 
                 formatPrice(amount) {
@@ -1494,6 +1420,7 @@
                             const data = await response.json();
                             if (data.success && data.data.subscription) {
                                 this.currentPlan = data.data.subscription.plan_name;
+                                this.currentPlanStatus = data.data.subscription.status;
                             }
                         }
                     } catch (e) {
@@ -1502,7 +1429,7 @@
                 },
 
                 isCurrentPlan(plan) {
-                    return this.currentPlan === plan;
+                    return this.currentPlan === plan && this.currentPlanStatus === 'active';
                 },
 
                 async checkout(planId) {
@@ -1540,9 +1467,10 @@
 
                         const data = await response.json();
 
-                        if (response.ok && data.data?.redirect_url) {
-                            // Redirect to Midtrans payment page
-                            window.location.href = data.data.redirect_url;
+                        const checkoutUrl = data.data?.checkout_url ?? data.data?.redirect_url;
+
+                        if (response.ok && checkoutUrl) {
+                            window.location.href = checkoutUrl;
                         } else {
                             this.error = data.error?.message || 'Gagal membuat sesi checkout. Silakan coba lagi.';
                         }

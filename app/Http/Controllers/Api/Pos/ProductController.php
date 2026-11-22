@@ -125,6 +125,15 @@ class ProductController extends Controller
 
         $product = $this->productService->update($product, $validated);
 
+        // Manual POS stock edit also triggers low-stock notif (parity with
+        // catalog-side stock edits). Service handles its own dedupe + errors.
+        if (array_key_exists('stock_quantity', $validated)) {
+            try {
+                app(\App\Services\MerchantNotificationService::class)
+                    ->notifyLowStockIfApplicable($product);
+            } catch (\Throwable) {}
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Product updated successfully',

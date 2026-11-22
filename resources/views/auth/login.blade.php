@@ -58,12 +58,18 @@
                 </div>
             </div>
 
-            <button type="submit" :disabled="loading" class="btn btn-primary w-full h-11 md:h-12 touch-target">
+            <button type="submit" :disabled="loading" class="btn btn-primary w-full h-11 md:h-12 touch-target mb-0">
                 <span x-show="!loading">{{ __('auth.sign_in') }}</span>
                 <span x-show="loading" class="flex items-center justify-center">
                     <i class="fas fa-spinner animate-spin mr-2"></i> {{ __('auth.processing') }}
                 </span>
             </button>
+
+            <div class="mt-3">
+                <a href="/admin" class="text-sm text-[hsl(var(--primary))] hover:underline touch-target">
+                    {{ __('auth.login_as_editor') }}
+                </a>
+            </div>
         </form>
     </div>
 

@@ -408,18 +408,16 @@
                 </div>
 
                 <div class="space-y-3">
-                    <form action="{{ route('subscription.cancel.post') }}" method="POST" @submit="cancelLoading = true">
-                        @csrf
-                        <button type="submit"
-                                :disabled="cancelLoading"
-                                class="w-full py-3 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-all disabled:opacity-50">
-                            <span x-show="!cancelLoading">Yes, Cancel Subscription</span>
-                            <span x-show="cancelLoading" class="flex items-center justify-center gap-2">
-                                <i class="fas fa-spinner fa-spin"></i>
-                                Cancelling...
-                            </span>
-                        </button>
-                    </form>
+                    <button type="button"
+                            @click="cancelSubscription()"
+                            :disabled="cancelLoading"
+                            class="w-full py-3 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-all disabled:opacity-50">
+                        <span x-show="!cancelLoading">Yes, Cancel Subscription</span>
+                        <span x-show="cancelLoading" class="flex items-center justify-center gap-2">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            Cancelling...
+                        </span>
+                    </button>
                     <button @click="showCancelModal = false"
                             :disabled="cancelLoading"
                             class="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-all disabled:opacity-50">
@@ -529,6 +527,34 @@
             formatPrice(amount) {
                 if (!amount) return 'Rp 0';
                 return 'Rp ' + parseInt(amount).toLocaleString('id-ID');
+            },
+
+            async cancelSubscription() {
+                this.cancelLoading = true;
+                try {
+                    const response = await fetch('/api/subscription/cancel', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok && data.success) {
+                        this.showCancelModal = false;
+                        await this.fetchSubscription();
+                    } else {
+                        alert(data.error?.message || 'Failed to cancel subscription. Please try again.');
+                    }
+                } catch (error) {
+                    console.error('Failed to cancel subscription:', error);
+                    alert('An error occurred. Please try again.');
+                } finally {
+                    this.cancelLoading = false;
+                }
             }
         }
     }

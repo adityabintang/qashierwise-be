@@ -67,6 +67,13 @@ class QrisTransaction extends Model
         'paid_at',
     ];
 
+    protected $appends = ['shareable_link'];
+
+    public function getShareableLinkAttribute(): string
+    {
+        return $this->getShareableLink();
+    }
+
     /**
      * Get the attributes that should be cast.
      *

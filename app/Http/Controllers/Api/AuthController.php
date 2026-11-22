@@ -13,6 +13,7 @@ use App\Services\OtpService;
 use App\Services\PasswordResetService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -46,7 +47,7 @@ class AuthController extends Controller
             return ApiResponse::validationError($validator->errors());
         }
 
-        $hasStore = !empty($request->store_name);
+        $hasStore = ! empty($request->store_name);
 
         // Create user - mark as master admin if creating a store
         $user = User::create([
@@ -130,7 +131,7 @@ class AuthController extends Controller
         $counter = 1;
 
         while (Store::where('code', $code)->exists()) {
-            $code = $baseCode . $counter;
+            $code = $baseCode.$counter;
             $counter++;
         }
 
@@ -156,6 +157,12 @@ class AuthController extends Controller
         }
 
         $user = User::where('email', $request->email)->firstOrFail();
+
+        // Block author from logging in via regular login (they should use /admin/login)
+        if ($user->isAuthor()) {
+            Auth::logout();
+            return ApiResponse::error(__('auth.author_must_use_admin_panel'), 403);
+        }
 
         // CRITICAL: Clear permission cache to prevent cross-tenant permission leakage
         // This ensures each user session starts with fresh permission data
@@ -236,6 +243,7 @@ class AuthController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'slug' => $user->slug,
                 'email_verified_at' => $user->email_verified_at,
                 'is_email_verified' => ! is_null($user->email_verified_at),
                 'is_super_admin' => $user->isSuperAdmin(),
@@ -251,29 +259,19 @@ class AuthController extends Controller
      */
     public function getUserPermissions(Request $request)
     {
-        // CRITICAL: Force reload user from database to prevent permission cache leakage
-        // This ensures fresh permission data for each request
-        $user = User::find($request->user()->id);
+        $user = $request->user();
 
-        // Clear any Spatie permission cache
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
-
-        \Log::info('=== getUserPermissions DEBUG ===');
-        \Log::info('User ID: ' . $user->id);
-        \Log::info('User Email: ' . $user->email);
-        \Log::info('Is Super Admin: ' . ($user->isSuperAdmin() ? 'true' : 'false'));
-        \Log::info('Is Master Admin: ' . ($user->isMasterAdmin() ? 'true' : 'false'));
-
-        // Get all available permissions from database
-        $allPermissions = \Spatie\Permission\Models\Permission::where('guard_name', 'sanctum')
-            ->pluck('name')
-            ->sort()
-            ->values()
-            ->toArray();
+        // All permission names rarely change — cache for 10 min to avoid repeated DB hits.
+        $allPermissions = Cache::remember('permissions.all.sanctum', 600, fn () =>
+            \Spatie\Permission\Models\Permission::where('guard_name', 'sanctum')
+                ->pluck('name')
+                ->sort()
+                ->values()
+                ->toArray()
+        );
 
         // Super admin has full system access
         if ($user->isSuperAdmin()) {
-            \Log::info('Super admin - granting all permissions');
             $response = ApiResponse::success([
                 'is_super_admin' => true,
                 'is_master_admin' => false,
@@ -292,7 +290,6 @@ class AuthController extends Controller
 
         // Master admin has full access to their merchant
         if ($user->isMasterAdmin()) {
-            \Log::info('Master admin - granting all permissions');
             $response = ApiResponse::success([
                 'is_super_admin' => false,
                 'is_master_admin' => true,
@@ -313,8 +310,7 @@ class AuthController extends Controller
         $posUser = $user->posUsers()->first();
 
         // If no POS user and not master admin, return minimal permissions
-        if (!$posUser) {
-            \Log::info('No POS user found - returning empty permissions');
+        if (! $posUser) {
             $response = ApiResponse::success([
                 'is_super_admin' => false,
                 'is_master_admin' => false,
@@ -334,12 +330,7 @@ class AuthController extends Controller
         // Get user roles and permissions using User model methods
         // These methods bypass JSON column conflict in roles table
         $roles = $user->getRoleNamesViaDirectQuery();
-        \Log::info('User roles: ' . json_encode($roles));
-
         $permissions = $user->getPermissionsViaDirectQuery();
-
-        \Log::info('Final permissions array: ' . json_encode($permissions));
-        \Log::info('Final roles: ' . json_encode($roles));
 
         $response = ApiResponse::success([
             'is_super_admin' => false,
@@ -571,6 +562,28 @@ class AuthController extends Controller
         $notifiable->notify(new SendPasswordResetLinkNotification($token));
 
         return ApiResponse::success(null, 'Password reset link sent to your email');
+    }
+
+    /**
+     * Verify if a password reset token is still valid
+     */
+    public function verifyResetToken(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'token' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return ApiResponse::validationError($validator->errors());
+        }
+
+        $email = $this->passwordResetService->verifyToken($request->token);
+
+        if (! $email) {
+            return ApiResponse::error('Invalid or expired reset token.', 400);
+        }
+
+        return ApiResponse::success(null, 'Token is valid.');
     }
 
     /**
