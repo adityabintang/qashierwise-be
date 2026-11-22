@@ -1,6 +1,6 @@
 {{--
     Dashboard Scripts - Include in all dashboard views.
-    Loads Pusher/Echo, permissions store, echo-setup, and dashboard-base.
+    Loads Pusher/Echo, the permissions store, and dashboard-base.
     These are NOT loaded on public pages (welcome, login, policy pages).
 --}}
 
@@ -113,9 +113,6 @@
             });
         });
     </script>
-
-    <!-- Echo Setup Script - Deferred -->
-    <script defer src="{{ asset('js/echo-setup.js') }}"></script>
 
     <!-- Dashboard Base - Shared functionality for dashboard pages -->
     <script defer src="{{ asset('js/dashboard-base.js') }}"></script>
