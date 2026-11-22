@@ -1,6 +1,6 @@
 {{--
     Dashboard Scripts - Include in all dashboard views.
-    Loads Pusher/Echo, permissions store, echo-setup, and dashboard-base.
+    Loads Pusher/Echo, the permissions store, and dashboard-base.
     These are NOT loaded on public pages (welcome, login, policy pages).
 --}}
 
@@ -24,6 +24,15 @@
         };
     </script>
     <!-- Pusher & Laravel Echo (self-hosted, only on dashboard) -->
+    @php
+        $qashierBroadcastConfig = [
+            'key' => config('broadcasting.connections.pusher.key'),
+            'cluster' => config('broadcasting.connections.pusher.options.cluster'),
+        ];
+    @endphp
+    <script>
+        window.qashierBroadcastConfig = {{ Illuminate\Support\Js::from($qashierBroadcastConfig) }};
+    </script>
     @vite('resources/js/echo.js')
 
     <!-- Alpine Permissions Store - MUST load before Alpine starts -->
@@ -104,9 +113,6 @@
             });
         });
     </script>
-
-    <!-- Echo Setup Script - Deferred -->
-    <script defer src="{{ asset('js/echo-setup.js') }}"></script>
 
     <!-- Dashboard Base - Shared functionality for dashboard pages -->
     <script defer src="{{ asset('js/dashboard-base.js') }}"></script>

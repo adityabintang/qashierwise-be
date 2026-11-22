@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\MessageStatusUpdated;
 use App\Events\NewWhatsAppMessage;
 use App\Events\ProfileUpdated;
 use App\Exceptions\WhatsAppNotConnectedException;
@@ -204,8 +205,8 @@ class WhatsAppController extends Controller
             'last_message_text' => $this->getLastMessageText($type, $content, $templateName),
         ]);
 
-        // Broadcast the new message event (include sender so message appears in their UI)
-        broadcast(new NewWhatsAppMessage($message->load('contact'), $contact));
+        // Let other tabs receive the message without making the sender wait for Pusher.
+        defer(fn () => rescue(fn () => NewWhatsAppMessage::dispatch($message, $contact)));
 
         return $message;
     }
@@ -261,12 +262,13 @@ class WhatsAppController extends Controller
 
             // Save to database
             $contact = $this->getOrCreateContact($request->to);
-            $this->saveMessage($contact, 'text', $request->message, $response);
+            $savedMessage = $this->saveMessage($contact, 'text', $request->message, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Text message sent successfully',
                 'data' => $response->decodedBody(),
+                'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -322,7 +324,7 @@ class WhatsAppController extends Controller
 
             // Save to database
             $contact = $this->getOrCreateContact($request->to);
-            $this->saveMessage(
+            $savedMessage = $this->saveMessage(
                 $contact,
                 'template',
                 json_encode($request->except(['to'])),
@@ -335,6 +337,7 @@ class WhatsAppController extends Controller
                 'success' => true,
                 'message' => 'Template message sent successfully',
                 'data' => $response->decodedBody(),
+                'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -407,12 +410,13 @@ class WhatsAppController extends Controller
                 'url' => $imageUrl,
                 'caption' => $request->caption ?? '',
             ];
-            $this->saveMessage($contact, 'image', $content, $response);
+            $savedMessage = $this->saveMessage($contact, 'image', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Image sent successfully',
                 'data' => $response->decodedBody(),
+                'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -490,12 +494,13 @@ class WhatsAppController extends Controller
                 'filename' => $filename,
                 'caption' => $request->caption ?? '',
             ];
-            $this->saveMessage($contact, 'document', $content, $response);
+            $savedMessage = $this->saveMessage($contact, 'document', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Document sent successfully',
                 'data' => $response->decodedBody(),
+                'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -561,12 +566,13 @@ class WhatsAppController extends Controller
             // Save to database
             $contact = $this->getOrCreateContact($request->to);
             $content = ['url' => $audioUrl];
-            $this->saveMessage($contact, 'audio', $content, $response);
+            $savedMessage = $this->saveMessage($contact, 'audio', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Audio sent successfully',
                 'data' => $response->decodedBody(),
+                'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -638,12 +644,13 @@ class WhatsAppController extends Controller
                 'url' => $videoUrl,
                 'caption' => $request->caption ?? '',
             ];
-            $this->saveMessage($contact, 'video', $content, $response);
+            $savedMessage = $this->saveMessage($contact, 'video', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Video sent successfully',
                 'data' => $response->decodedBody(),
+                'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -691,12 +698,13 @@ class WhatsAppController extends Controller
                 'name' => $request->name ?? '',
                 'address' => $request->address ?? '',
             ];
-            $this->saveMessage($contact, 'location', $content, $response);
+            $savedMessage = $this->saveMessage($contact, 'location', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Location sent successfully',
                 'data' => $response->decodedBody(),
+                'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -743,12 +751,13 @@ class WhatsAppController extends Controller
             // Save to database
             $contact = $this->getOrCreateContact($request->to);
             $content = ['contacts' => $contacts];
-            $this->saveMessage($contact, 'contacts', $content, $response);
+            $savedMessage = $this->saveMessage($contact, 'contacts', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Contact sent successfully',
                 'data' => $response->decodedBody(),
+                'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -806,12 +815,13 @@ class WhatsAppController extends Controller
                 'header' => $request->header ?? null,
                 'footer' => $request->footer ?? null,
             ];
-            $this->saveMessage($contact, 'interactive', $content, $response);
+            $savedMessage = $this->saveMessage($contact, 'interactive', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Button message sent successfully',
                 'data' => $response->decodedBody(),
+                'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -880,12 +890,13 @@ class WhatsAppController extends Controller
                 'header' => $request->header ?? null,
                 'footer' => $request->footer ?? null,
             ];
-            $this->saveMessage($contact, 'interactive', $content, $response);
+            $savedMessage = $this->saveMessage($contact, 'interactive', $content, $response);
 
             return response()->json([
                 'success' => true,
                 'message' => 'List message sent successfully',
                 'data' => $response->decodedBody(),
+                'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
         } catch (WhatsAppNotConnectedException $e) {
             return response()->json([
@@ -1763,11 +1774,17 @@ class WhatsAppController extends Controller
                 }
 
                 // Clear the Inbox unread state even if Meta no longer recognizes the message.
-                $markedCount += (clone $unreadQuery)->whereKey($message->id)->update([
+                $readState = [
                     'is_read' => true,
                     'read_at' => now(),
                     'status' => 'read',
-                ]);
+                ];
+                $updated = (clone $unreadQuery)->whereKey($message->id)->update($readState);
+                $markedCount += $updated;
+                if ($updated > 0) {
+                    $message->fill($readState);
+                    defer(fn () => rescue(fn () => MessageStatusUpdated::dispatch($message)));
+                }
             }
 
             $remainingCount = $unreadQuery->count();
