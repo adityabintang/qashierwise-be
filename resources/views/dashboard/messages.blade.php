@@ -1122,6 +1122,7 @@ function messagesManager() {
         contacts: [], contactsPage: 1, contactsLastPage: 1, contactsRequestId: 0,
         readErrors: {},
         selectedContact: null, messages: [], templates: [],
+        pendingMessageStatuses: new Map(),
         // Windowed (WhatsApp-like) message loading + browser cache
         messagesPerPage: 10, hasMoreOlder: false, loadingOlder: false, oldestId: null,
         newMessage: '', contactSearch: '', loadingContacts: true, loadingMessages: false, sending: false,
@@ -1172,29 +1173,12 @@ function messagesManager() {
                 }, 150);
             });
 
-            await Promise.all([this.fetchContacts(), this.fetchTemplates(), this.fetchTags()]);
-            const urlParams = new URLSearchParams(window.location.search);
-            const contactId = urlParams.get('contact');
-            if (contactId) { const contact = this.contacts.find(c => c.id == contactId); if (contact) this.selectContact(contact); }
-
             // Listen for real-time messages from broadcast
             window.addEventListener('whatsapp-message-received', async (e) => {
                 const newMessage = e.detail.message;
-                const messageContact = e.detail.contact;
-
-                if (this.selectedContact && messageContact?.id === this.selectedContact.id && newMessage) {
-                    // Check if message already exists to prevent duplicates
-                    const exists = this.messages.some(m => m.id === newMessage.id || m.message_id === newMessage.message_id);
-                    if (!exists) {
-                        this.messages.push(newMessage);
-                        this.cacheMessages(this.selectedContact.id);
-                        // Scroll to bottom with smooth animation for new messages
-                        this.$nextTick(() => setTimeout(() => this.scrollToBottom(true), 50));
-                        // Mark incoming message as read since user is viewing
-                        if (newMessage.direction === 'incoming') {
-                            await this.markContactAsRead(messageContact.id);
-                        }
-                    }
+                const added = this.showNewMessage(newMessage);
+                if (added && newMessage.direction === 'incoming') {
+                    await this.markContactAsRead(newMessage.contact_id);
                 }
                 // Update contacts list silently
                 if (!this.loadingContacts) this.fetchContacts(this.contactsPage, false);
@@ -1202,15 +1186,29 @@ function messagesManager() {
 
             // Listen for message status updates (delivered, read)
             window.addEventListener('whatsapp-status-updated', (e) => {
-                console.log('📊 Status update received:', e.detail);
-                const { id, message_id, status } = e.detail;
-                // Find message by id or message_id
-                const msg = this.messages.find(m => m.id === id || m.message_id === message_id);
-                if (msg) {
-                    console.log('✅ Updating message status:', msg.id, '->', status);
-                    msg.status = status;
+                const update = e.detail;
+                if (this.selectedContact && String(update.contact_id) === String(this.selectedContact.id)) {
+                    const id = String(update.id);
+                    const message = this.messages.find(m => String(m.id) === id);
+                    if (message) {
+                        this.upsertMessages([{ ...message, ...this.mergeMessageStatus(message, update) }]);
+                        this.cacheMessages(this.selectedContact.id);
+                    } else {
+                        this.pendingMessageStatuses.set(id, this.mergeMessageStatus(this.pendingMessageStatuses.get(id), update));
+                    }
                 }
+                if (update.direction === 'incoming') this.fetchContacts(this.contactsPage, false);
             });
+
+            window.addEventListener('echo-ready', () => {
+                if (!this.loadingContacts) this.fetchContacts(this.contactsPage, false);
+                if (this.selectedContact) this.fetchMessages();
+            });
+
+            await Promise.all([this.fetchContacts(), this.fetchTemplates(), this.fetchTags()]);
+            const contactId = new URLSearchParams(window.location.search).get('contact');
+            const contact = this.contacts.find(c => String(c.id) === contactId);
+            if (contact) this.selectContact(contact);
         },
         async fetchContacts(page = 1, showLoading = true) {
             const requestId = ++this.contactsRequestId;
@@ -1243,6 +1241,7 @@ function messagesManager() {
         },
         async selectContact(contact) {
             this.selectedContact = contact;
+            this.pendingMessageStatuses.clear();
             this.hasMoreOlder = false; this.oldestId = null;
             // Switch to chat view on mobile (Requirements 4.2, 4.4)
             if (this.isMobileMessages) {
@@ -1327,12 +1326,44 @@ function messagesManager() {
                 this.loadOlderMessages();
             }
         },
-        // Merge incoming messages into this.messages (dedupe by id), keep ascending.
+        mergeMessageStatus(current, update) {
+            const rank = { sent: 1, failed: 2, delivered: 3, read: 4 };
+            const status = (rank[update.status] ?? 0) >= (rank[current?.status] ?? 0)
+                ? (update.status ?? current?.status)
+                : current.status;
+            return {
+                status,
+                delivered_at: update.delivered_at ?? current?.delivered_at,
+                read_at: update.read_at ?? current?.read_at,
+            };
+        },
         upsertMessages(incoming) {
             if (!incoming || !incoming.length) return;
             const byId = new Map(this.messages.map(m => [String(m.id), m]));
-            for (const m of incoming) byId.set(String(m.id), m);
+            for (const message of incoming) {
+                const id = String(message.id);
+                const existing = byId.get(id);
+                let status = this.mergeMessageStatus(existing, message);
+                const pending = this.pendingMessageStatuses.get(id);
+                if (pending) {
+                    status = this.mergeMessageStatus(status, pending);
+                    this.pendingMessageStatuses.delete(id);
+                }
+                byId.set(id, { ...existing, ...message, ...status });
+            }
             this.messages = Array.from(byId.values()).sort((a, b) => Number(a.id) - Number(b.id));
+        },
+        showNewMessage(message) {
+            if (!message || !this.selectedContact || String(message.contact_id) !== String(this.selectedContact.id)) return false;
+            const added = !this.messages.some(existing => String(existing.id) === String(message.id));
+            this.upsertMessages([message]);
+            this.cacheMessages(this.selectedContact.id);
+            if (added) this.$nextTick(() => this.scrollToBottom(true));
+            return added;
+        },
+        acceptSentMessage(data) {
+            this.showNewMessage(data.saved_message);
+            this.fetchContacts(this.contactsPage, false);
         },
         // ---- browser cache (WhatsApp-like instant open) ----
         cacheKey(contactId) { return `wa_msgs_v1_${contactId}`; },
@@ -1628,8 +1659,9 @@ function messagesManager() {
                     this.newMessage = messageText;
                     this.isTemplateMessage = isTemplate;
                     this.selectedTemplateInfo = templateInfo;
+                } else {
+                    this.acceptSentMessage(data);
                 }
-                // Message will be added via broadcast event - no need to add locally
             } catch (e) {
                 console.error('Error:', e);
                 // Restore message if failed
@@ -1685,7 +1717,7 @@ function messagesManager() {
                 if (data.success) {
                     this.showImageModal = false;
                     this.imageForm = { file: null, caption: '', preview: null };
-                    // Message will be added via broadcast event
+                    this.acceptSentMessage(data);
                 }
                 else alert(data.message || 'Failed to send');
             } catch (e) { console.error('Error:', e); }
@@ -1710,7 +1742,7 @@ function messagesManager() {
                 if (data.success) {
                     this.showVideoModal = false;
                     this.videoForm = { file: null, caption: '', preview: null };
-                    // Message will be added via broadcast event
+                    this.acceptSentMessage(data);
                 }
                 else alert(data.message || 'Failed to send video');
             } catch (e) { console.error('Error:', e); }
@@ -1736,7 +1768,7 @@ function messagesManager() {
                 if (data.success) {
                     this.showDocumentModal = false;
                     this.documentForm = { file: null, filename: '', caption: '' };
-                    // Message will be added via broadcast event
+                    this.acceptSentMessage(data);
                 }
                 else alert(data.message || 'Failed to send');
             } catch (e) { console.error('Error:', e); }
@@ -1769,7 +1801,7 @@ function messagesManager() {
                 if (data.success) {
                     this.showAudioModal = false;
                     this.audioForm = { file: null, filename: '', preview: null };
-                    // Message will be added via broadcast event
+                    this.acceptSentMessage(data);
                 }
                 else alert(data.message || 'Failed to send');
             } catch (e) { console.error('Error:', e); }
@@ -1860,7 +1892,7 @@ function messagesManager() {
                 if (data.success) {
                     this.showLocationModal = false;
                     this.locationForm = { latitude: '', longitude: '', name: '', address: '', searchQuery: '', searchResults: [], gettingLocation: false };
-                    // Message will be added via broadcast event
+                    this.acceptSentMessage(data);
                 }
                 else alert(data.message || 'Failed to send');
             } catch (e) { console.error('Error:', e); }
@@ -1885,7 +1917,7 @@ function messagesManager() {
                 if (data.success) {
                     this.showButtonModal = false;
                     this.buttonForm = { body: '', buttons: ['', ''] };
-                    // Message will be added via broadcast event
+                    this.acceptSentMessage(data);
                 }
                 else alert(data.message || 'Failed to send');
             } catch (e) { console.error('Error:', e); }
@@ -1912,7 +1944,7 @@ function messagesManager() {
                 if (data.success) {
                     this.showListModal = false;
                     this.listForm = { body: '', buttonText: 'View Options', sectionTitle: 'Options', items: [{title: ''}, {title: ''}] };
-                    // Message will be added via broadcast event
+                    this.acceptSentMessage(data);
                 }
                 else alert(data.message || 'Failed to send');
             } catch (e) { console.error('Error:', e); }

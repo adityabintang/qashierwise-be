@@ -27,8 +27,9 @@
         // Enable Pusher logging for debugging
         Pusher.logToConsole = true;
 
-        // Get API base URL - use API subdomain
-        const API_BASE_URL = 'https://api.qashierwise.com/api';
+        // Use the current dashboard host so authentication follows this deployment.
+        const broadcastConfig = window.qashierBroadcastConfig || {};
+        if (!broadcastConfig.key) { console.error('Pusher app key is missing. Check the server broadcast configuration.'); return; }
 
         // Get authentication token
         const token = localStorage.getItem('token');
@@ -52,17 +53,18 @@
         // Fetch user if not available
         if (!user || !user.id) {
             console.log('🔍 Fetching user info from API...');
-            fetch(`${API_BASE_URL}/user`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+            fetch(`${window.location.origin}/api/user`, {
+                headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
             })
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) throw new Error(`User lookup returned HTTP ${res.status}`);
+                return res.json();
+            })
             .then(data => {
-                user = data.data || data.user || data;
-                localStorage.setItem('user', JSON.stringify(user));
-                console.log('✅ User info fetched:', user);
-
+                user = data.data?.user || data.user || data;
                 if (user.id) {
-                    initializeEcho(user.id, API_BASE_URL, token);
+                    localStorage.setItem('user', JSON.stringify(user));
+                    initializeEcho(user.id, broadcastConfig, token);
                 }
             })
             .catch(e => {
@@ -70,44 +72,24 @@
             });
         } else if (user.id) {
             console.log('✅ User ID found:', user.id);
-            initializeEcho(user.id, API_BASE_URL, token);
+            initializeEcho(user.id, broadcastConfig, token);
         }
     });
 
     /**
      * Initialize Laravel Echo with Pusher
      */
-    function initializeEcho(userId, apiBaseUrl, token) {
+    function initializeEcho(userId, broadcastConfig, token) {
         console.log('🎯 Initializing Echo for user:', userId);
 
         try {
-            // Initialize Pusher first with basic config
-            window.pusherInstance = new Pusher('5e011e24b7fe71be40c7', {
-                cluster: 'ap1',
-                forceTLS: true,
-                authEndpoint: `${apiBaseUrl}/broadcasting/auth`,
-                auth: {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                },
-                // Auto-reconnect settings
-                activityTimeout: 120000,      // 2 minutes before sending ping
-                pongTimeout: 30000,           // 30 seconds to wait for pong
-                unavailableTimeout: 10000,    // 10 seconds before marking unavailable
-            });
-
-            console.log('✅ Pusher instance created');
-
             // Create Echo instance with Pusher
             window.Echo = new Echo({
                 broadcaster: 'pusher',
-                key: '5e011e24b7fe71be40c7',
-                cluster: 'ap1',
+                key: broadcastConfig.key,
+                cluster: broadcastConfig.cluster,
                 forceTLS: true,
-                authEndpoint: `${apiBaseUrl}/broadcasting/auth`,
+                authEndpoint: '/api/broadcasting/auth',
                 auth: {
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -175,6 +157,8 @@
 
             // Handle subscription success
             channel.subscribed(() => {
+                window.echoReady = true;
+                window.dispatchEvent(new Event('echo-ready'));
                 console.log('✅✅✅ Successfully subscribed to whatsapp.' + userId + ' channel!');
             });
 
@@ -212,10 +196,6 @@
                     detail: data
                 }));
             });
-
-            // Mark Echo as ready
-            window.echoReady = true;
-            window.dispatchEvent(new Event('echo-ready'));
 
             console.log('✅ Echo setup complete! Ready to receive messages.');
 

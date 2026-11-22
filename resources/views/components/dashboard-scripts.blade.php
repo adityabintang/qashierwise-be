@@ -24,6 +24,15 @@
         };
     </script>
     <!-- Pusher & Laravel Echo (self-hosted, only on dashboard) -->
+    @php
+        $qashierBroadcastConfig = [
+            'key' => config('broadcasting.connections.pusher.key'),
+            'cluster' => config('broadcasting.connections.pusher.options.cluster'),
+        ];
+    @endphp
+    <script>
+        window.qashierBroadcastConfig = {{ Illuminate\Support\Js::from($qashierBroadcastConfig) }};
+    </script>
     @vite('resources/js/echo.js')
 
     <!-- Alpine Permissions Store - MUST load before Alpine starts -->

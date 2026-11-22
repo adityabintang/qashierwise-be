@@ -858,17 +858,31 @@ class WhatsAppWebhookController extends Controller
             return;
         }
 
-        // Update message status
+        $previousStatuses = match ($statusValue) {
+            'sent' => ['sent'],
+            'failed' => ['sent'],
+            'delivered' => ['sent', 'failed'],
+            'read' => ['sent', 'failed', 'delivered'],
+            default => [],
+        };
+
+        // Ignore late or duplicate receipts so a read message cannot revert to delivered.
         $updateData = ['status' => $statusValue];
 
         if ($statusValue === 'delivered') {
             $updateData['delivered_at'] = now()->timestamp($timestamp);
         } elseif ($statusValue === 'read') {
             $updateData['read_at'] = now()->timestamp($timestamp);
-            $updateData['delivered_at'] = $updateData['delivered_at'] ?? now();
         }
 
-        $message->update($updateData);
+        $updated = WhatsAppMessage::withoutGlobalScopes()
+            ->whereKey($message->id)
+            ->whereIn('status', $previousStatuses)
+            ->update($updateData);
+
+        if (! $updated) {
+            return;
+        }
 
         // Refresh message to get updated data
         $message->refresh();
