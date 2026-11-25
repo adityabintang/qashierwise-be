@@ -397,7 +397,8 @@ class DeliveryFulfillmentService
                     new Button(self::BTN_RECEIVED_OK.':'.$order->id, '✅ Konfirmasi'),
                     new Button(self::BTN_RECEIVED_BAD.':'.$order->id, '⚠️ Complain'),
                 ]);
-                $client->sendButton($this->intlPhone($order->customer_phone), $body, $action, null, null);
+                $response = $client->sendButton($this->intlPhone($order->customer_phone), $body, $action, null, null);
+                WhatsAppMessageHistory::recordInteractive($contact, $response);
 
                 return;
             } catch (\Throwable $e) {

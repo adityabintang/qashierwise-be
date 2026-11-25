@@ -161,7 +161,7 @@ class CatalogOrderFlowService
         $botName = $aiAgent->bot_name ?? 'Pesan via WhatsApp';
 
         if (! $catalogId) {
-            $this->sendText($client, $contact->wa_id,
+            $this->sendText($client, $contact,
                 'Katalog menu belum dikonfigurasi. Silakan hubungi admin.');
 
             return;
@@ -201,13 +201,14 @@ class CatalogOrderFlowService
         $action  = new OptionsListAction('Pilih Kategori', [$section]);
 
         try {
-            $client->sendList(
+            $response = $client->sendList(
                 $contact->wa_id,
                 mb_substr('Menu ' . $botName, 0, 60),
                 'Pilih kategori menu yang ingin dilihat:',
                 mb_substr($botName, 0, 60),
                 $action
             );
+            WhatsAppMessageHistory::recordInteractive($contact, $response);
 
             Log::info('Catalog category picker sent', [
                 'ai_agent_id' => $aiAgent->id,
@@ -258,7 +259,7 @@ class CatalogOrderFlowService
             Log::warning('sendCatalog called without catalog_id', [
                 'ai_agent_id' => $aiAgent->id,
             ]);
-            $this->sendText($client, $contact->wa_id,
+            $this->sendText($client, $contact,
                 'Katalog menu belum dikonfigurasi. Silakan hubungi admin.');
 
             return;
@@ -273,7 +274,7 @@ class CatalogOrderFlowService
                 'catalog_id' => $catalogId,
                 'error' => $result['error'] ?? 'unknown',
             ]);
-            $this->sendText($client, $contact->wa_id,
+            $this->sendText($client, $contact,
                 'Maaf, katalog menu tidak dapat ditampilkan saat ini. Silakan coba lagi nanti.');
 
             return;
@@ -291,7 +292,7 @@ class CatalogOrderFlowService
         }
 
         if (empty($products)) {
-            $this->sendText($client, $contact->wa_id,
+            $this->sendText($client, $contact,
                 $categoryFilter !== null
                     ? "Maaf, belum ada menu di kategori \"{$categoryFilter}\". Silakan pilih kategori lain."
                     : 'Maaf, saat ini belum ada menu yang tersedia. Silakan coba lagi nanti.');
@@ -331,7 +332,7 @@ class CatalogOrderFlowService
                 return;
             }
 
-            $this->sendText($client, $contact->wa_id,
+            $this->sendText($client, $contact,
                 'Maaf, katalog menu tidak dapat ditampilkan saat ini. Silakan coba lagi nanti.');
         }
     }
@@ -397,7 +398,7 @@ class CatalogOrderFlowService
 
         $body = trim(implode("\n", $lines));
 
-        $this->sendText($client, $contact->wa_id, $body);
+        $this->sendText($client, $contact, $body);
 
         Log::info('Catalog fallback: sent text menu', [
             'ai_agent_id' => $aiAgent->id,
@@ -522,7 +523,7 @@ class CatalogOrderFlowService
 
         // Netflie 2.x types catalog_id as int — Meta catalog IDs are numeric
         // strings; cast safely on 64-bit PHP. PHP_INT_SIZE is 8 on prod servers.
-        $client->sendMultiProduct(
+        $response = $client->sendMultiProduct(
             $contact->wa_id,
             (int) $catalogId,
             new MultiProductAction($sections),
@@ -530,6 +531,7 @@ class CatalogOrderFlowService
             $body,
             $footer
         );
+        WhatsAppMessageHistory::recordInteractive($contact, $response, array_column($products, 'name', 'retailer_id'));
     }
 
     /**
@@ -600,7 +602,7 @@ class CatalogOrderFlowService
         if (empty($items)) {
             $this->sendText(
                 $this->client($account),
-                $contact->wa_id,
+                $contact,
                 'Maaf, keranjang Anda kosong. Silakan pilih menu dari katalog terlebih dahulu.'
             );
 
@@ -757,7 +759,7 @@ class CatalogOrderFlowService
             app(\App\Services\AiAgent\Drip\DripScheduler::class)->onConversationResumed($conversation);
             $this->sendText(
                 $this->client($account),
-                $contact->wa_id,
+                $contact,
                 'Baik, pengingat otomatis dinonaktifkan untuk 30 hari ke depan. Kamu tetap bisa pesan kapan saja dengan ketik *menu*.'
             );
 
@@ -783,7 +785,7 @@ class CatalogOrderFlowService
             app(\App\Services\AiAgent\Drip\DripScheduler::class)->onConversationResumed($conversation);
             $this->sendText(
                 $this->client($account),
-                $contact->wa_id,
+                $contact,
                 '🗑️ Cart dikosongkan. Tap *Lihat Menu* kalau ingin pesan lagi.'
             );
 
@@ -946,7 +948,7 @@ class CatalogOrderFlowService
 
         if ($buttonId === self::BTN_DELIVERY) {
             if (! $aiAgent->isDeliveryEnabled()) {
-                $this->sendText($client, $contact->wa_id,
+                $this->sendText($client, $contact,
                     'Maaf, layanan delivery sedang tidak tersedia. Silakan pilih Pickup atau Reservasi.');
 
                 return true;
@@ -984,7 +986,7 @@ class CatalogOrderFlowService
 
             $this->sendText(
                 $client,
-                $contact->wa_id,
+                $contact,
                 "✏️ *Edit Informasi Delivery*\n\n"
                 ."Ketik field yang ingin diperbaiki, contoh:\n"
                 ."ubah nama = Budi\n"
@@ -1154,13 +1156,14 @@ class CatalogOrderFlowService
         ]);
     }
 
-    protected function sendText(WhatsAppCloudApi $client, string $to, string $message): void
+    protected function sendText(WhatsAppCloudApi $client, WhatsAppContact $contact, string $message): void
     {
         try {
-            $client->sendTextMessage($to, $message);
+            $response = $client->sendTextMessage($contact->wa_id, $message);
+            WhatsAppMessageHistory::recordText($contact, $response, $message);
         } catch (\Throwable $e) {
             Log::error('Failed to send text message in catalog flow', [
-                'to' => $to,
+                'to' => $contact->wa_id,
                 'error' => $e->getMessage(),
             ]);
         }

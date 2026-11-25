@@ -120,7 +120,9 @@ class WhatsAppMessage extends Model
 
         // For interactive messages (buttons, lists)
         if ($this->type === 'interactive') {
-            return $content['body'] ?? 'Interactive message';
+            $details = $this->interactive_details;
+
+            return $details['body'] ?? $details['selection'] ?? 'Interactive message';
         }
 
         // For location messages
@@ -170,6 +172,67 @@ class WhatsAppMessage extends Model
 
         // For other message types, just return the type
         return ucfirst($this->type ?? 'Message');
+    }
+
+    public function getInteractiveDetailsAttribute(): ?array
+    {
+        $metadata = $this->metadata ?? [];
+        $type = $this->type === 'unsupported' ? ($metadata['original_type'] ?? $this->type) : $this->type;
+        if (! in_array($type, ['interactive', 'button', 'order', 'unsupported'], true) && ! isset($metadata['interactive'])) {
+            return null;
+        }
+
+        $payload = $this->getParsedContent();
+
+        if (in_array($type, ['order', 'unsupported'], true)) {
+            $items = $payload['product_items'] ?? $metadata['order']['product_items'] ?? $metadata['product_items'] ?? [];
+            if ($type === 'order' || $items) {
+                return ['selection' => 'Pesanan katalog', 'sections' => [['rows' => $items]]];
+            }
+        }
+
+        $interactive = $payload['interactive'] ?? $metadata['interactive'] ?? $payload;
+        if (! in_array($type, ['interactive', 'button'], true) && ! isset($metadata['interactive']) && ! isset($payload['interactive'])) {
+            return null;
+        }
+
+        if ($this->direction === 'incoming') {
+            if (isset($metadata['response_json']) || isset($interactive['nfm_reply'])) {
+                return ['body' => 'Formulir WhatsApp dikirim oleh pelanggan'];
+            }
+
+            $reply = $interactive['button_reply'] ?? $interactive['list_reply'] ?? $metadata['button'] ?? $metadata;
+            $selection = $reply['title'] ?? $reply['text'] ?? null;
+            if ($selection === null && $type !== 'unsupported' && ! is_array($payload) && ! str_starts_with($this->content ?? '', 'Unsupported message type:')) {
+                $selection = $this->content;
+            }
+
+            return [
+                'selection' => $selection,
+                'description' => $reply['description'] ?? null,
+            ];
+        }
+
+        $interactive ??= $metadata;
+        $action = $interactive['action'] ?? [];
+        $sections = array_map(fn (array $section) => [
+            'title' => $section['title'] ?? null,
+            'rows' => $section['rows'] ?? $section['product_items'] ?? [],
+        ], $action['sections'] ?? $interactive['sections'] ?? []);
+
+        $productId = $action['product_retailer_id'] ?? null;
+        if ($productId) {
+            $sections = [['rows' => [['product_retailer_id' => $productId]]]];
+        }
+
+        return [
+            'header' => $interactive['header']['text'] ?? (is_string($interactive['header'] ?? null) ? $interactive['header'] : null),
+            'body' => $interactive['body']['text'] ?? (is_string($interactive['body'] ?? null) ? $interactive['body'] : null),
+            'footer' => $interactive['footer']['text'] ?? (is_string($interactive['footer'] ?? null) ? $interactive['footer'] : null),
+            'buttons' => $action['buttons'] ?? $interactive['buttons'] ?? [],
+            'button_text' => $action['button'] ?? $action['parameters']['display_text'] ?? $action['parameters']['flow_cta'] ?? $interactive['button_text'] ?? null,
+            'sections' => $sections,
+        ];
     }
 
     public function getMediaUrlAttribute()
@@ -303,6 +366,7 @@ class WhatsAppMessage extends Model
         'buttons',
         'list_sections',
         'button_text',
+        'interactive_details',
         'latitude',
         'longitude',
         'location_name',

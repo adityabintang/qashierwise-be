@@ -9,6 +9,7 @@ use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
 use App\Services\CatalogOrderFlowService;
 use App\Services\OrderService;
+use App\Services\WhatsAppMessageHistory;
 use Illuminate\Support\Facades\Log;
 use Netflie\WhatsAppCloudApi\Message\ButtonReply\Button;
 use Netflie\WhatsAppCloudApi\Message\ButtonReply\ButtonAction;
@@ -60,19 +61,20 @@ class CatalogMessageRenderer
             $action = new ButtonAction([
                 new Button(CatalogOrderFlowService::BTN_SHOW_MENU, 'Lihat Menu'),
             ]);
-            $client->sendButton(
+            $response = $client->sendButton(
                 $contact->wa_id,
                 $body,
                 $action,
                 null,
                 $aiAgent->bot_name ?: null,
             );
+            WhatsAppMessageHistory::recordInteractive($contact, $response);
         } catch (\Throwable $e) {
             Log::error('Failed to send fallback button reply', [
                 'contact_wa_id' => $contact->wa_id,
                 'error' => $e->getMessage(),
             ]);
-            $this->sendText($client, $contact->wa_id, $body);
+            $this->sendText($client, $contact, $body);
         }
     }
 
@@ -89,13 +91,14 @@ class CatalogMessageRenderer
             $action = new ButtonAction([
                 new Button(CatalogOrderFlowService::BTN_SHOW_MENU, 'Lihat Menu'),
             ]);
-            $client->sendButton($contact->wa_id, $body, $action, null, null);
+            $response = $client->sendButton($contact->wa_id, $body, $action, null, null);
+            WhatsAppMessageHistory::recordInteractive($contact, $response);
         } catch (\Throwable $e) {
             Log::error('Failed to send cancelled reply button', [
                 'contact_wa_id' => $contact->wa_id,
                 'error' => $e->getMessage(),
             ]);
-            $this->sendText($client, $contact->wa_id,
+            $this->sendText($client, $contact,
                 '❌ Pesanan dibatalkan. Ketik *menu* kapan saja untuk memesan lagi.');
         }
     }
@@ -117,13 +120,14 @@ class CatalogMessageRenderer
             $action = new ButtonAction([
                 new Button(CatalogOrderFlowService::BTN_SHOW_MENU, 'Lihat Menu'),
             ]);
-            $client->sendButton(
+            $response = $client->sendButton(
                 $contact->wa_id,
                 $greetingText,
                 $action,
                 null,
                 $aiAgent->bot_name ?: 'Pesan via WhatsApp',
             );
+            WhatsAppMessageHistory::recordInteractive($contact, $response);
 
             Log::info('Greeting with menu button sent', [
                 'ai_agent_id' => $aiAgent->id,
@@ -134,7 +138,7 @@ class CatalogMessageRenderer
                 'ai_agent_id' => $aiAgent->id,
                 'error' => $e->getMessage(),
             ]);
-            $this->sendText($client, $contact->wa_id, $greetingText);
+            $this->sendText($client, $contact, $greetingText);
         }
     }
 
@@ -178,13 +182,14 @@ class CatalogMessageRenderer
                 new Button(CatalogOrderFlowService::BTN_CONFIRM_CART, '✅ Konfirmasi'),
                 new Button(CatalogOrderFlowService::BTN_CANCEL_ORDER, '❌ Batal'),
             ]);
-            $client->sendButton($contact->wa_id, $this->truncate($body), $action, null, null);
+            $response = $client->sendButton($contact->wa_id, $this->truncate($body), $action, null, null);
+            WhatsAppMessageHistory::recordInteractive($contact, $response);
         } catch (\Throwable $e) {
             Log::error('Failed to send cart confirmation', [
                 'error' => $e->getMessage(),
                 'contact_wa_id' => $contact->wa_id,
             ]);
-            $this->sendText($client, $contact->wa_id,
+            $this->sendText($client, $contact,
                 'Pesanan Anda diterima. Balas *konfirmasi* untuk lanjut atau *batal* untuk membatalkan.');
         }
     }
@@ -211,19 +216,20 @@ class CatalogMessageRenderer
         }
 
         try {
-            $client->sendButton(
+            $response = $client->sendButton(
                 $contact->wa_id,
                 $this->truncate('Silakan pilih metode lanjutan:'),
                 new ButtonAction($buttons),
                 null,
                 null,
             );
+            WhatsAppMessageHistory::recordInteractive($contact, $response);
         } catch (\Throwable $e) {
             Log::error('Failed to send fulfillment buttons', [
                 'error' => $e->getMessage(),
                 'contact_wa_id' => $contact->wa_id,
             ]);
-            $this->sendText($client, $contact->wa_id,
+            $this->sendText($client, $contact,
                 'Silakan balas dengan "pickup", "delivery", atau "reservasi".');
         }
     }
@@ -236,7 +242,7 @@ class CatalogMessageRenderer
     {
         $this->sendText(
             $this->client($account),
-            $contact->wa_id,
+            $contact,
             "🚚 *Delivery dipilih*\n\n"
             ."Mohon kirim *dalam satu pesan* informasi berikut:\n"
             ."• Nama penerima\n"
@@ -301,13 +307,14 @@ class CatalogMessageRenderer
         ]);
 
         try {
-            $client->sendButton($contact->wa_id, $this->truncate($body), $action, null, null);
+            $response = $client->sendButton($contact->wa_id, $this->truncate($body), $action, null, null);
+            WhatsAppMessageHistory::recordInteractive($contact, $response);
         } catch (\Throwable $e) {
             Log::error('Failed to send delivery info summary', [
                 'error' => $e->getMessage(),
                 'contact_wa_id' => $contact->wa_id,
             ]);
-            $this->sendText($client, $contact->wa_id,
+            $this->sendText($client, $contact,
                 "Mohon balas 'edit' untuk mengubah atau 'konfirmasi' untuk lanjut.");
         }
     }
@@ -364,13 +371,14 @@ class CatalogMessageRenderer
         ]);
 
         try {
-            $client->sendButton($contact->wa_id, $this->truncate(implode("\n", $lines)), $action, null, null);
+            $response = $client->sendButton($contact->wa_id, $this->truncate(implode("\n", $lines)), $action, null, null);
+            WhatsAppMessageHistory::recordInteractive($contact, $response);
         } catch (\Throwable $e) {
             Log::error('Failed to send order summary', [
                 'error' => $e->getMessage(),
                 'contact_wa_id' => $contact->wa_id,
             ]);
-            $this->sendText($client, $contact->wa_id,
+            $this->sendText($client, $contact,
                 "Mohon balas 'konfirmasi' untuk lanjut atau 'batal' untuk membatalkan.");
         }
     }
@@ -403,7 +411,8 @@ class CatalogMessageRenderer
                 new Button(CatalogOrderFlowService::BTN_CONTINUE_FLOW, $isPayment ? '💳 Lanjutkan' : '✅ Lanjutkan'),
                 new Button(CatalogOrderFlowService::BTN_CANCEL_ORDER, '❌ Batal'),
             ]);
-            $client->sendButton($contact->wa_id, $this->truncate($body), $action, null, null);
+            $response = $client->sendButton($contact->wa_id, $this->truncate($body), $action, null, null);
+            WhatsAppMessageHistory::recordInteractive($contact, $response);
 
             Log::info('Drip prompt sent', [
                 'ai_agent_id' => $aiAgent->id,
@@ -415,7 +424,7 @@ class CatalogMessageRenderer
                 'contact_wa_id' => $contact->wa_id,
                 'error' => $e->getMessage(),
             ]);
-            $this->sendText($client, $contact->wa_id,
+            $this->sendText($client, $contact,
                 'Mohon gunakan tombol pada pesan sebelumnya, atau kirim *batal* untuk membatalkan.');
         }
     }
@@ -435,7 +444,7 @@ class CatalogMessageRenderer
 
         if (! $qris || ! $order) {
             $conversation->clearFlowState();
-            $this->sendText($client, $contact->wa_id,
+            $this->sendText($client, $contact,
                 'Sesi pembayaran sudah berakhir. Ketik *menu* untuk memesan lagi.');
 
             return;
@@ -455,7 +464,7 @@ class CatalogMessageRenderer
             $conversation->order_context = $orderContext;
             $conversation->save();
 
-            $this->sendText($client, $contact->wa_id,
+            $this->sendText($client, $contact,
                 "⏰ Kode pembayaran sudah kadaluarsa.\n\nPesanan otomatis dibatalkan.");
 
             return;
@@ -473,7 +482,7 @@ class CatalogMessageRenderer
             $msg .= "\n\n⏰ Berlaku hingga: {$expiry}";
         }
 
-        $this->sendText($client, $contact->wa_id, $msg);
+        $this->sendText($client, $contact, $msg);
     }
 
     /**
@@ -494,7 +503,7 @@ class CatalogMessageRenderer
         $client = $this->client($account);
 
         if ($qris->isExpired()) {
-            $this->sendText($client, $contact->wa_id,
+            $this->sendText($client, $contact,
                 'Link pembayaran kadaluarsa. Tap *Lihat Menu* untuk pesan ulang.');
 
             return true;
@@ -505,7 +514,7 @@ class CatalogMessageRenderer
             ."{$qris->getShareableLink()}\n\n"
             ."Pesanan dibatalkan otomatis jika belum dibayar.";
 
-        $this->sendText($client, $contact->wa_id, $msg);
+        $this->sendText($client, $contact, $msg);
 
         return true;
     }
@@ -523,7 +532,7 @@ class CatalogMessageRenderer
         $client = $this->client($account);
 
         if (! $aiAgent->isReservationEnabled()) {
-            $this->sendText($client, $contact->wa_id,
+            $this->sendText($client, $contact,
                 'Maaf, fitur reservasi sedang tidak tersedia.');
 
             return;
@@ -531,7 +540,7 @@ class CatalogMessageRenderer
 
         $baseUrl = $aiAgent->getReservationFormUrl();
         if (! $baseUrl) {
-            $this->sendText($client, $contact->wa_id,
+            $this->sendText($client, $contact,
                 '📅 Untuk reservasi, silakan hubungi kami langsung. Tim kami akan membantu.');
 
             return;
@@ -543,7 +552,7 @@ class CatalogMessageRenderer
         $phone        = $contact->wa_id ?? '';
         $url          = $this->buildReservationShortLink($baseUrl, $catalogItems, $phone);
 
-        $this->sendText($client, $contact->wa_id,
+        $this->sendText($client, $contact,
             "📅 *Reservasi*\n\nSilakan isi form reservasi di link berikut:\n{$url}\n\n"
             .'Tim kami akan menghubungi Anda untuk konfirmasi.');
     }
@@ -626,13 +635,14 @@ class CatalogMessageRenderer
      * Plain-text send. Used as a fallback by every interactive sender so a
      * Meta API error never silences the bot completely.
      */
-    public function sendText(WhatsAppCloudApi $client, string $to, string $message): void
+    public function sendText(WhatsAppCloudApi $client, WhatsAppContact $contact, string $message): void
     {
         try {
-            $client->sendTextMessage($to, $message);
+            $response = $client->sendTextMessage($contact->wa_id, $message);
+            WhatsAppMessageHistory::recordText($contact, $response, $message);
         } catch (\Throwable $e) {
             Log::error('Failed to send text message in catalog flow', [
-                'to' => $to,
+                'to' => $contact->wa_id,
                 'error' => $e->getMessage(),
             ]);
         }

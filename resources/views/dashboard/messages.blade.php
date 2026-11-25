@@ -2,6 +2,7 @@
 @include('components.dashboard-scripts')
 @section('title', __('dashboard.messages_title'))
 @section('content')
+@vite('resources/js/chat-markdown.js')
 <div x-data="messagesApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     <!-- Sidebar -->
     @include('components.dashboard-sidebar', ['activePage' => 'messages'])
@@ -11,7 +12,7 @@
         @include('components.dashboard-header', ['title' => __('whatsapp.messages_title'), 'description' => __('whatsapp.messages_subtitle')])
         <!-- Page Content -->
         <main class="flex-1 overflow-hidden flex flex-col">
-            <div class="flex-1 min-h-0 flex flex-col gap-3 p-3 md:p-4" x-data="messagesManager()">
+            <div class="flex-1 min-h-0 flex flex-col gap-3 p-3 md:p-4" x-data="messagesManager()" @visibilitychange.document="syncLiveMessages()">
                 <section class="card flex flex-col gap-4 p-3 shadow-sm sm:p-4 xl:flex-row xl:items-center xl:justify-between" aria-label="Ekspor riwayat pesan">
                     <div class="flex items-center gap-3">
                         <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
@@ -363,17 +364,17 @@
                                             <div class="max-w-[85%] md:max-w-[70%]">
                                                 <!-- Message Bubble - Adjusted padding for mobile (Requirements 4.5) -->
                                                 <div
-                                                    class="rounded-2xl px-3 py-1.5 md:px-4 md:py-2 shadow-sm overflow-hidden"
+                                                    class="rounded-2xl px-3 py-2 md:px-4 md:py-2.5 shadow-sm overflow-hidden"
                                                     style="overflow-wrap:anywhere;word-break:break-word;"
                                                     :class="message?.direction === 'outgoing' ? 'bg-[hsl(var(--primary))] text-white rounded-br-md' : 'bg-white border border-[hsl(var(--border))] rounded-bl-md'"
                                                 >
                                                     <!-- Text -->
                                                     <div x-show="message?.type === 'text'" x-data="{ expanded: false }">
-                                                        <p
-                                                            class="text-sm break-words whitespace-pre-wrap overflow-hidden"
+                                                        <div
+                                                            class="chat-markdown text-sm break-words overflow-hidden"
                                                             :class="!expanded && (message?.content || message?.body || '').length > 300 ? 'line-clamp-4' : ''"
-                                                            x-html="formatWhatsAppText(message?.content || message?.body)"
-                                                        ></p>
+                                                            x-html="message?.type === 'text' ? formatChatMarkdown(message.content || message.body) : ''"
+                                                        ></div>
                                                         <button
                                                             x-show="(message?.content || message?.body || '').length > 300"
                                                             @click.stop="expanded = !expanded"
@@ -387,11 +388,11 @@
                                                             <i class="fas fa-file-alt text-xs"></i>
                                                             <span class="text-xs font-medium">Template</span>
                                                         </div>
-                                                        <p
-                                                            class="break-words whitespace-pre-wrap overflow-hidden"
+                                                        <div
+                                                            class="chat-markdown break-words overflow-hidden"
                                                             :class="!expanded && (message?.body || '').length > 300 ? 'line-clamp-4' : ''"
-                                                            x-html="formatWhatsAppText(message?.body || 'Template message')"
-                                                        ></p>
+                                                            x-html="message?.type === 'template' ? formatChatMarkdown(message.body || 'Template message') : ''"
+                                                        ></div>
                                                         <button
                                                             x-show="(message?.body || '').length > 300"
                                                             @click.stop="expanded = !expanded"
@@ -408,7 +409,7 @@
                                                             <i class="fas fa-image"></i>
                                                             <span class="text-sm">Image</span>
                                                         </div>
-                                                        <p x-show="message?.caption" class="text-sm mt-2" x-text="message?.caption"></p>
+                                                        <div x-show="message?.caption" class="chat-markdown text-sm mt-2" x-html="message?.type === 'image' ? formatChatMarkdown(message.caption) : ''"></div>
                                                     </div>
                                                     <!-- Video -->
                                                     <div x-show="message?.type === 'video'">
@@ -421,7 +422,7 @@
                                                             <i class="fas fa-video"></i>
                                                             <span class="text-sm">Video</span>
                                                         </div>
-                                                        <p x-show="message?.caption" class="text-sm mt-2" x-text="message?.caption"></p>
+                                                        <div x-show="message?.caption" class="chat-markdown text-sm mt-2" x-html="message?.type === 'video' ? formatChatMarkdown(message.caption) : ''"></div>
                                                     </div>
                                                     <!-- Document -->
                                                     <div x-show="message?.type === 'document'" class="flex items-center gap-3">
@@ -452,27 +453,41 @@
                                                         <p x-show="message?.location_name" class="text-sm" x-text="message?.location_name"></p>
                                                         <a x-show="message?.latitude && message?.longitude" :href="`https://maps.google.com/?q=${message?.latitude},${message?.longitude}`" target="_blank" class="text-xs underline">Open in Maps</a>
                                                     </div>
-                                                    <!-- Interactive - Buttons -->
-                                                    <div x-show="message?.type === 'interactive'">
-                                                        <p x-show="message?.body" class="text-sm mb-2" x-text="message?.body"></p>
-                                                        <!-- Button Reply -->
-                                                        <div x-show="message?.buttons && message?.buttons.length > 0" class="space-y-1 mt-2">
-                                                            <template x-for="btn in (message?.buttons || [])" :key="btn.id || btn.title">
-                                                                <div class="text-xs py-1.5 px-3 rounded text-center" :class="message?.direction === 'outgoing' ? 'bg-white/20' : 'bg-[hsl(var(--muted))]'">
-                                                                    <span x-text="btn.title || btn.reply?.title"></span>
-                                                                </div>
-                                                            </template>
-                                                        </div>
-                                                        <!-- List -->
-                                                        <div x-show="message?.list_sections && message?.list_sections.length > 0" class="mt-2 rounded p-2" :class="message?.direction === 'outgoing' ? 'bg-white/20' : 'bg-[hsl(var(--muted))]'">
-                                                            <div class="flex items-center justify-center gap-2 text-xs py-1">
-                                                                <i class="fas fa-list"></i>
-                                                                <span x-text="message?.button_text || 'View Options'"></span>
+                                                    <template x-if="message?.interactive_details">
+                                                        <div class="space-y-2 text-sm" x-data="{ get details() { return message.interactive_details; } }">
+                                                            <p x-show="details.header" class="font-semibold whitespace-pre-wrap" x-text="details.header"></p>
+                                                            <div x-show="details.body" class="chat-markdown" x-html="formatChatMarkdown(details.body)"></div>
+                                                            <div x-show="details.footer" class="chat-markdown text-xs opacity-80" x-html="formatChatMarkdown(details.footer)"></div>
+                                                            <div x-show="details.selection" class="border-l-2 border-violet-500 pl-2.5">
+                                                                <p class="text-xs font-medium text-violet-700"><i class="fas fa-check mr-1" aria-hidden="true"></i>Pilihan pelanggan</p>
+                                                                <p class="font-semibold mt-0.5" x-text="details.selection"></p>
+                                                                <div x-show="details.description" class="chat-markdown text-xs opacity-80 mt-0.5" x-html="formatChatMarkdown(details.description)"></div>
                                                             </div>
+                                                            <div x-show="details.buttons?.length || details.button_text || details.sections?.length" class="space-y-1.5">
+                                                                <p x-show="details.button_text" class="rounded-lg bg-white/15 px-3 py-1.5 text-xs font-semibold" x-text="details.button_text"></p>
+                                                                <template x-for="(button, buttonIndex) in (details.buttons || [])" :key="buttonIndex">
+                                                                    <div class="rounded-lg border border-white/20 px-3 py-1.5 text-center text-xs font-medium bg-white/15" x-text="button.reply?.title || button.title"></div>
+                                                                </template>
+                                                                <template x-for="(section, sectionIndex) in (details.sections || [])" :key="sectionIndex">
+                                                                    <div class="rounded px-3 py-2" :class="message.direction === 'outgoing' ? 'bg-white/20' : 'bg-[hsl(var(--muted))]'">
+                                                                        <p x-show="section.title" class="text-xs font-semibold" x-text="section.title"></p>
+                                                                        <ul class="divide-y divide-current/15">
+                                                                            <template x-for="(row, rowIndex) in section.rows" :key="rowIndex">
+                                                                                <li class="py-1">
+                                                                                    <div class="flex items-baseline justify-between gap-3">
+                                                                                        <span x-text="row.title || row.name || row.product_retailer_id"></span>
+                                                                                        <span x-show="row.quantity != null" class="shrink-0 text-xs" x-text="'× ' + row.quantity"></span>
+                                                                                    </div>
+                                                                                    <div x-show="row.description" class="chat-markdown text-xs opacity-80" x-html="formatChatMarkdown(row.description)"></div>
+                                                                                </li>
+                                                                            </template>
+                                                                        </ul>
+                                                                    </div>
+                                                                </template>
+                                                            </div>
+                                                            <p x-show="!details.header && !details.body && !details.footer && !details.selection && !details.buttons?.length && !details.button_text && !details.sections?.length">Detail pesan interaktif tidak tersedia</p>
                                                         </div>
-                                                        <!-- Fallback if no buttons/list -->
-                                                        <p x-show="!message?.buttons?.length && !message?.list_sections?.length && !message?.body" class="text-sm">Interactive message</p>
-                                                    </div>
+                                                    </template>
                                                     <!-- Sticker -->
                                                     <div x-show="message?.type === 'sticker'">
                                                         <img x-show="message?.media_url" :src="message?.media_url" class="w-24 h-24" alt="Sticker">
@@ -489,7 +504,7 @@
                                                     <!-- Reaction -->
                                                     <div x-show="message?.type === 'reaction'" class="text-2xl" x-text="message?.emoji || message?.body || '👍'"></div>
                                                     <!-- Unknown/Other -->
-                                                    <div x-show="!['text', 'template', 'image', 'video', 'document', 'audio', 'location', 'interactive', 'sticker', 'contacts', 'contact', 'reaction'].includes(message?.type)">
+                                                    <div x-show="!message?.interactive_details && !['text', 'template', 'image', 'video', 'document', 'audio', 'location', 'sticker', 'contacts', 'contact', 'reaction'].includes(message?.type)">
                                                         <p class="text-sm" x-text="message?.body || message?.content || (message?.type ? message.type + ' message' : 'Message')"></p>
                                                     </div>
                                                 </div>
@@ -1123,6 +1138,7 @@ function messagesManager() {
         readErrors: {},
         selectedContact: null, messages: [], templates: [],
         pendingMessageStatuses: new Map(),
+        liveCursor: null, liveTimer: null, syncingLiveMessages: false, fetchingLatest: false, conversationVersion: 0,
         // Windowed (WhatsApp-like) message loading + browser cache
         messagesPerPage: 10, hasMoreOlder: false, loadingOlder: false, oldestId: null,
         newMessage: '', contactSearch: '', loadingContacts: true, loadingMessages: false, sending: false,
@@ -1202,13 +1218,26 @@ function messagesManager() {
 
             window.addEventListener('echo-ready', () => {
                 if (!this.loadingContacts) this.fetchContacts(this.contactsPage, false);
-                if (this.selectedContact) this.fetchMessages();
+                this.syncLiveMessages();
             });
 
+            this.scheduleLiveSync();
             await Promise.all([this.fetchContacts(), this.fetchTemplates(), this.fetchTags()]);
             const contactId = new URLSearchParams(window.location.search).get('contact');
             const contact = this.contacts.find(c => String(c.id) === contactId);
             if (contact) this.selectContact(contact);
+        },
+        destroy() {
+            clearTimeout(this.liveTimer);
+            this.liveTimer = null;
+            this.conversationVersion++;
+        },
+        scheduleLiveSync() {
+            const delay = window.isEchoReady?.() ? 15000 : 4000;
+            this.liveTimer = setTimeout(async () => {
+                await this.syncLiveMessages();
+                if (this.liveTimer !== null) this.scheduleLiveSync();
+            }, delay);
         },
         async fetchContacts(page = 1, showLoading = true) {
             const requestId = ++this.contactsRequestId;
@@ -1240,7 +1269,11 @@ function messagesManager() {
             } catch (e) { console.error('Error:', e); }
         },
         async selectContact(contact) {
+            const version = ++this.conversationVersion;
             this.selectedContact = contact;
+            this.liveCursor = null;
+            this.syncingLiveMessages = false;
+            this.fetchingLatest = false;
             this.pendingMessageStatuses.clear();
             this.hasMoreOlder = false; this.oldestId = null;
             // Switch to chat view on mobile (Requirements 4.2, 4.4)
@@ -1260,9 +1293,10 @@ function messagesManager() {
                 this.messages = [];
             }
 
+            if (version !== this.conversationVersion) return;
             await this.fetchMessages();
             // Mark messages as read when opening conversation
-            if (contact.unread_count > 0) {
+            if (version === this.conversationVersion && contact.unread_count > 0) {
                 await this.markContactAsRead(contact.id);
             }
         },
@@ -1270,9 +1304,57 @@ function messagesManager() {
         backToContacts() {
             this.mobileView = 'contacts';
         },
+        async syncLiveMessages() {
+            if (document.hidden || (this.isMobileMessages && this.mobileView !== 'chat') ||
+                !this.selectedContact?.id || this.syncingLiveMessages) return;
+            if (this.liveCursor === null) return this.fetchMessages();
+
+            const contactId = this.selectedContact.id;
+            const version = this.conversationVersion;
+            const token = localStorage.getItem('token');
+            let unread = false;
+            this.syncingLiveMessages = true;
+            try {
+                let hasMore;
+                do {
+                    const params = new URLSearchParams({ after_id: this.liveCursor, per_page: 50 });
+                    const response = await fetch(`${this.API_BASE_URL}/whatsapp/contacts/${contactId}/messages?${params}`, {
+                        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+                    });
+                    const page = await response.json();
+                    if (version !== this.conversationVersion) return;
+                    if (!response.ok || !page.success) throw new Error('Failed to sync WhatsApp messages');
+                    if (!page.data.length) break;
+
+                    const knownIds = new Set(this.messages.map(message => String(message.id)));
+                    const added = page.data.filter(message => !knownIds.has(String(message.id)));
+                    unread ||= added.some(message => message.direction === 'incoming' && !message.is_read);
+                    const follow = added.length && this.isNearChatEnd();
+                    this.upsertMessages(page.data);
+                    this.liveCursor = page.data.at(-1).id;
+                    this.oldestId = this.messages[0].id;
+                    this.cacheMessages(contactId);
+                    if (follow) this.$nextTick(() => this.scrollToBottom());
+                    hasMore = page.has_more;
+                } while (hasMore);
+            } catch (error) {
+                console.error('Error syncing WhatsApp messages:', error);
+            } finally {
+                if (version === this.conversationVersion) {
+                    this.syncingLiveMessages = false;
+                    if (unread && (!this.isMobileMessages || this.mobileView === 'chat') && !document.hidden) {
+                        this.markContactAsRead(contactId).then(() => {
+                            if (!this.loadingContacts) this.fetchContacts(this.contactsPage, false);
+                        });
+                    }
+                }
+            }
+        },
         // Fetch the latest page (10) and merge into the view.
         async fetchMessages() {
-            if (!this.selectedContact?.id) return;
+            if (!this.selectedContact?.id || this.fetchingLatest) return;
+            this.fetchingLatest = true;
+            const version = this.conversationVersion;
             const hadCache = this.messages.length > 0;
             if (!hadCache) this.loadingMessages = true;
             try {
@@ -1280,9 +1362,11 @@ function messagesManager() {
                 const contactId = this.selectedContact.id;
                 const res = await fetch(`${this.API_BASE_URL}/whatsapp/contacts/${contactId}/messages?per_page=${this.messagesPerPage}`, { headers: { 'Authorization': `Bearer ${token}` } });
                 const data = await res.json();
-                if (this.selectedContact?.id !== contactId) return;
+                if (version !== this.conversationVersion) return;
+                if (!res.ok || !data.success) throw new Error('Failed to load WhatsApp messages');
 
                 const latest = data.data || [];
+                this.liveCursor ??= latest.at(-1)?.id ?? 0;
                 this.upsertMessages(latest);
                 // If we had no cache, the server's has_more is authoritative.
                 if (!hadCache) this.hasMoreOlder = !!data.has_more;
@@ -1292,7 +1376,12 @@ function messagesManager() {
                 await this.$nextTick();
                 setTimeout(() => this.scrollToBottom(), 100);
             } catch (e) { console.error('Error:', e); }
-            finally { this.loadingMessages = false; }
+            finally {
+                if (version === this.conversationVersion) {
+                    this.fetchingLatest = false;
+                    this.loadingMessages = false;
+                }
+            }
         },
         // Load the previous page (older messages) when scrolling to the top.
         async loadOlderMessages() {
@@ -1353,20 +1442,21 @@ function messagesManager() {
             }
             this.messages = Array.from(byId.values()).sort((a, b) => Number(a.id) - Number(b.id));
         },
-        showNewMessage(message) {
+        showNewMessage(message, forceFollow = false) {
             if (!message || !this.selectedContact || String(message.contact_id) !== String(this.selectedContact.id)) return false;
             const added = !this.messages.some(existing => String(existing.id) === String(message.id));
+            const follow = added && (forceFollow || this.isNearChatEnd());
             this.upsertMessages([message]);
             this.cacheMessages(this.selectedContact.id);
-            if (added) this.$nextTick(() => this.scrollToBottom(true));
+            if (follow) this.$nextTick(() => this.scrollToBottom(true));
             return added;
         },
         acceptSentMessage(data) {
-            this.showNewMessage(data.saved_message);
+            this.showNewMessage(data.saved_message, true);
             this.fetchContacts(this.contactsPage, false);
         },
         // ---- browser cache (WhatsApp-like instant open) ----
-        cacheKey(contactId) { return `wa_msgs_v1_${contactId}`; },
+        cacheKey(contactId) { return `wa_msgs_v2_${contactId}`; },
         loadCachedMessages(contactId) {
             try { return JSON.parse(localStorage.getItem(this.cacheKey(contactId))) || []; }
             catch (e) { return []; }
@@ -1542,37 +1632,13 @@ function messagesManager() {
                 this.autoResizeTextarea(textarea);
             });
         },
-        formatWhatsAppText(text) {
+        formatChatMarkdown(text) {
             if (!text) return '';
+            if (window.renderChatMarkdown) return window.renderChatMarkdown(text);
 
-            // Escape HTML first
-            let formatted = text
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
-
-            // Bold: *text*
-            formatted = formatted.replace(/\*([^\*]+)\*/g, '<strong>$1</strong>');
-
-            // Italic: _text_
-            formatted = formatted.replace(/_([^_]+)_/g, '<em>$1</em>');
-
-            // Strikethrough: ~text~
-            formatted = formatted.replace(/~([^~]+)~/g, '<del>$1</del>');
-
-            // Code: ```text```
-            formatted = formatted.replace(/```([^`]+)```/g, '<code class="bg-black/10 px-1 py-0.5 rounded text-xs font-mono">$1</code>');
-
-            // Quote: > text (at start of line)
-            formatted = formatted.replace(/^&gt; (.+)$/gm, '<div class="border-l-2 border-current pl-2 opacity-80">$1</div>');
-
-            // Auto-link URLs: make them clickable and force word-break
-            formatted = formatted.replace(
-                /(https?:\/\/[^\s<>"']+)/g,
-                '<a href="$1" target="_blank" rel="noopener noreferrer" class="underline break-all" style="word-break:break-all;overflow-wrap:anywhere;">$1</a>'
-            );
-
-            return formatted;
+            const fallback = document.createElement('div');
+            fallback.textContent = text;
+            return fallback.innerHTML;
         },
         getCountryCode(phoneNumber) {
             if (!phoneNumber) {
@@ -2130,6 +2196,10 @@ function messagesManager() {
             return `rgba(${r}, ${g}, ${b}, 0.15)`;
         },
 
+        isNearChatEnd() {
+            const container = this.$refs.messagesContainer;
+            return !container || container.scrollHeight - container.scrollTop - container.clientHeight < 96;
+        },
         scrollToBottom(smooth = false) {
             const c = this.$refs.messagesContainer;
             if (c) {

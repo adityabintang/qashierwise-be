@@ -14,6 +14,7 @@ export default defineConfig({
                 'resources/js/welcome.js',
                 'resources/js/alpine-loader.js',
                 'resources/js/echo.js',
+                'resources/js/chat-markdown.js',
                 'resources/js/apexcharts.js',
                 // React island: public landing + legal pages (ported from Next.js)
                 'resources/js/next.js/main.tsx',

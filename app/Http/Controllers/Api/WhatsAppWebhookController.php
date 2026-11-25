@@ -355,9 +355,31 @@ class WhatsAppWebhookController extends Controller
             case 'order':
                 // WhatsApp catalog cart submission. Payload contains product_items.
                 $orderPayload = $message['order'] ?? [];
-                $itemCount = count($orderPayload['product_items'] ?? []);
-                $content = "Catalog order received ({$itemCount} items)";
                 $metadata = $orderPayload;
+                $catalogMessageId = $message['context']['id'] ?? null;
+                if ($catalogMessageId) {
+                    $catalogMessage = WhatsAppMessage::withoutGlobalScopes()
+                        ->where('contact_id', $contact->id)
+                        ->where('direction', 'outgoing')
+                        ->where('message_id', $catalogMessageId)
+                        ->first();
+                    $names = [];
+                    foreach ($catalogMessage?->interactive_details['sections'] ?? [] as $section) {
+                        foreach ($section['rows'] as $row) {
+                            if (isset($row['product_retailer_id'], $row['name'])) {
+                                $names[$row['product_retailer_id']] = $row['name'];
+                            }
+                        }
+                    }
+                    foreach ($metadata['product_items'] ?? [] as $index => $item) {
+                        $name = $names[$item['product_retailer_id'] ?? ''] ?? null;
+                        if ($name !== null) {
+                            $metadata['product_items'][$index]['name'] = $name;
+                        }
+                    }
+                }
+                $itemCount = count($metadata['product_items'] ?? []);
+                $content = "Catalog order received ({$itemCount} items)";
                 break;
 
             default:
@@ -405,7 +427,7 @@ class WhatsAppWebhookController extends Controller
         }
 
         // Broadcast event to frontend
-        broadcast(new NewWhatsAppMessage($whatsappMessage, $contact));
+        rescue(fn () => NewWhatsAppMessage::dispatch($whatsappMessage, $contact));
 
         Log::info('Message saved and broadcasted', [
             'message_id' => $messageId,
@@ -774,14 +796,7 @@ class WhatsAppWebhookController extends Controller
                 break;
 
             case 'interactive':
-                $interactiveType = $message['interactive']['type'] ?? null;
-                if ($interactiveType === 'button_reply') {
-                    $content = $message['interactive']['button_reply']['title'] ?? 'Button';
-                    $metadata = $message['interactive']['button_reply'] ?? [];
-                } elseif ($interactiveType === 'list_reply') {
-                    $content = $message['interactive']['list_reply']['title'] ?? 'List item';
-                    $metadata = $message['interactive']['list_reply'] ?? [];
-                }
+                $content = json_encode($message['interactive'] ?? []);
                 break;
 
             default:
@@ -808,11 +823,19 @@ class WhatsAppWebhookController extends Controller
             ]
         );
 
+        if (in_array($type, ['text', 'interactive'], true) && ! $whatsappMessage->wasRecentlyCreated) {
+            return;
+        }
+
         // Update contact's last message info
         $contact->update([
             'last_message_at' => now(),
-            'last_message_text' => $content,
+            'last_message_text' => $type === 'interactive' ? $whatsappMessage->body : $content,
         ]);
+
+        if (in_array($type, ['text', 'interactive'], true)) {
+            rescue(fn () => NewWhatsAppMessage::dispatch($whatsappMessage, $contact));
+        }
 
         Log::info('Message echo saved to database', [
             'message_id' => $messageId,
@@ -1464,6 +1487,14 @@ class WhatsAppWebhookController extends Controller
             'content'  => $content,
             'metadata' => $metadata,
         ]);
+
+        if (in_array($type, ['text', 'interactive'], true) && $attributes['direction'] === 'outgoing') {
+            // A Cloud API send may already have stored more detail than the echo.
+            return WhatsAppMessage::withoutGlobalScopes()->firstOrCreate(
+                ['message_id' => $messageId],
+                $row
+            );
+        }
 
         try {
             return WhatsAppMessage::withoutGlobalScopes()->updateOrCreate(

@@ -84,6 +84,7 @@ class NewWhatsAppMessage implements ShouldBroadcastNow
             'buttons' => $message->buttons,
             'list_sections' => $message->list_sections,
             'button_text' => $message->button_text,
+            'interactive_details' => $message->interactive_details,
             'latitude' => $message->latitude,
             'longitude' => $message->longitude,
             'location_name' => $message->location_name,

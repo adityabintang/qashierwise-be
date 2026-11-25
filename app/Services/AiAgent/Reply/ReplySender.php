@@ -3,6 +3,8 @@
 namespace App\Services\AiAgent\Reply;
 
 use App\Models\WhatsAppAccount;
+use App\Models\WhatsAppContact;
+use App\Services\WhatsAppMessageHistory;
 use Illuminate\Support\Facades\Log;
 use Netflie\WhatsAppCloudApi\WhatsAppCloudApi;
 
@@ -34,7 +36,18 @@ class ReplySender
                 'access_token' => $account->access_token,
             ]);
 
-            $client->sendTextMessage($to, $message);
+            $response = $client->sendTextMessage($to, $message);
+            rescue(function () use ($account, $to, $message, $response) {
+                $contact = WhatsAppContact::withoutGlobalScopes()
+                    ->where('user_id', $account->user_id)
+                    ->where('phone_number_id', $account->phone_number_id)
+                    ->where('wa_id', $to)
+                    ->first();
+
+                if ($contact) {
+                    WhatsAppMessageHistory::recordText($contact, $response, $message);
+                }
+            });
         } catch (\Exception $e) {
             Log::error('Failed to send WhatsApp reply', [
                 'error' => $e->getMessage(),

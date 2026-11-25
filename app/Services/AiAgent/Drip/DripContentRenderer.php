@@ -5,6 +5,7 @@ namespace App\Services\AiAgent\Drip;
 use App\Models\AiAgentConversation;
 use App\Models\AiAgentDripSchedule;
 use App\Services\CatalogOrderFlowService;
+use App\Services\WhatsAppMessageHistory;
 use Illuminate\Support\Facades\Log;
 use Netflie\WhatsAppCloudApi\Message\ButtonReply\Button;
 use Netflie\WhatsAppCloudApi\Message\ButtonReply\ButtonAction;
@@ -67,13 +68,14 @@ class DripContentRenderer
             }
             $buttons[] = new Button(CatalogOrderFlowService::BTN_STOP_DRIP, '🔕 Stop Reminder');
 
-            $client->sendButton(
+            $response = $client->sendButton(
                 $contact->wa_id,
                 $body,
                 new ButtonAction($buttons),
                 null,
                 null
             );
+            WhatsAppMessageHistory::recordInteractive($contact, $response);
 
             return true;
         } catch (\Throwable $e) {
