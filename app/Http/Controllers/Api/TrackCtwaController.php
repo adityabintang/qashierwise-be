@@ -27,6 +27,10 @@ class TrackCtwaController extends Controller
 
     public function inbox(Request $request, WhatsAppAccountService $accounts): array
     {
+        if (! app()->environment('local', 'development')) {
+            return ['enabled' => false];
+        }
+
         $account = $accounts->getActiveAccount($request->user()->getEffectiveUserId());
 
         return ['enabled' => $account && $this->tracking->enabledSetting($account) !== null];

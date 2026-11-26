@@ -629,10 +629,12 @@
                                         style="min-height: 44px; max-height: 200px;"
                                         :disabled="sending"
                                     ></textarea>
-                                    <label x-show="trackCtwaEnabled && !isTemplateMessage" x-cloak class="flex items-center gap-2 mt-1 text-xs">
-                                        <input type="checkbox" x-model="trackCtwaRecap" :disabled="sending">
-                                        Tandai sebagai rekap order
-                                    </label>
+                                    @env(['local', 'development'])
+                                        <label x-show="trackCtwaEnabled && !isTemplateMessage" x-cloak class="flex items-center gap-2 mt-1 text-xs">
+                                            <input type="checkbox" x-model="trackCtwaRecap" :disabled="sending">
+                                            Tandai sebagai rekap order
+                                        </label>
+                                    @endenv
                                 </div>
                                 <!-- Send button with minimum 44px touch target (Requirements 6.3) -->
                                 <button type="submit" class="btn btn-primary btn-icon min-h-[44px] min-w-[44px]" :disabled="sending || !newMessage.trim()">
@@ -1177,11 +1179,13 @@ function messagesManager() {
         mobileView: 'contacts', // 'contacts' | 'chat'
         isMobileMessages: window.innerWidth < 768,
         async init() {
+            @env(['local', 'development'])
             fetch('/api/track-ctwa/inbox', {
                 headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token'), 'Accept': 'application/json' }
             }).then(response => response.ok ? response.json() : {}).then(data => {
                 this.trackCtwaEnabled = data.enabled === true;
             }).catch(() => {});
+            @endenv
             // Initialize mobile detection
             this.isMobileMessages = window.innerWidth < 768;
 
@@ -1679,7 +1683,7 @@ function messagesManager() {
             const messageText = this.newMessage;
             const isTemplate = this.isTemplateMessage;
             const templateInfo = this.selectedTemplateInfo;
-            const markedRecap = this.trackCtwaRecap;
+            const markedRecap = this.trackCtwaEnabled && this.trackCtwaRecap;
 
             // Clear input immediately for better UX
             this.newMessage = '';

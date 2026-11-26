@@ -154,6 +154,7 @@ class TrackCtwaTest extends TestCase
 
     public function test_signed_echoes_and_inbox_send_share_one_order_and_purchase(): void
     {
+        $this->app->instance('env', 'development');
         $this->click('wamid.ad', 'first-click', '111', now()->subHours(4)->timestamp);
         $this->mock(WebhookForwardingService::class)->expects('dispatch')->once();
         $incoming = [
@@ -185,7 +186,9 @@ class TrackCtwaTest extends TestCase
         $client = $this->mock(WhatsAppCloudApi::class);
         $client->expects('sendTextMessage')->with('628123456789', $inboxBody)->andReturn($response);
         $this->partialMock(WhatsAppAccountService::class)->expects('getClientForUser')->with($this->owner->id)->andReturn($client);
-        $this->actingAs($this->owner, 'sanctum')->postJson('/api/whatsapp/send/text', [
+        $this->actingAs($this->owner, 'sanctum')->getJson('/api/track-ctwa/inbox')
+            ->assertOk()->assertJsonPath('enabled', true);
+        $this->postJson('/api/whatsapp/send/text', [
             'to' => '628123456789', 'message' => $inboxBody, 'track_ctwa_recap' => true,
         ])->assertOk()->assertJsonPath('track_ctwa_warning', null);
         $this->assertDatabaseCount('ctwa_orders', 1);
@@ -246,6 +249,7 @@ class TrackCtwaTest extends TestCase
 
     public function test_message_history_and_status_survive_unavailable_ctwa_storage(): void
     {
+        $this->app->instance('env', 'local');
         Schema::drop('ctwa_settings');
         $this->mock(WebhookForwardingService::class)->expects('dispatch')->once();
 
@@ -282,6 +286,36 @@ class TrackCtwaTest extends TestCase
             ->assertJsonPath('data.1.message_id', 'wamid.echo')
             ->assertJsonPath('data.1.status', 'delivered')
             ->assertJsonPath('data.2.message_id', 'wamid.inbox');
+    }
+
+    public function test_production_inbox_sends_messages_without_tracking_recaps(): void
+    {
+        $this->app->instance('env', 'production');
+        $this->withoutVite();
+        $this->get('/dashboard/messages')->assertOk()
+            ->assertDontSee('Tandai sebagai rekap order')
+            ->assertDontSee('/api/track-ctwa/inbox');
+        $this->actingAs($this->owner, 'sanctum')->getJson('/api/track-ctwa/inbox')
+            ->assertOk()->assertJsonPath('enabled', false);
+
+        $recap = "Rekap Order\nNo. Order: INV-123\nTotal: Rp150.000";
+        $response = $this->mock(Response::class);
+        $response->expects('decodedBody')->andReturn(['messages' => [['id' => 'wamid.production']]])->atLeast()->once();
+        $client = $this->mock(WhatsAppCloudApi::class);
+        $client->expects('sendTextMessage')->with('628123456789', $recap)->andReturn($response);
+        $this->partialMock(WhatsAppAccountService::class)->expects('getClientForUser')->with($this->owner->id)->andReturn($client);
+
+        $this->postJson('/api/whatsapp/send/text', [
+            'to' => '628123456789', 'message' => $recap, 'track_ctwa_recap' => true,
+        ])->assertOk()->assertJsonPath('saved_message.direction', 'outgoing')
+            ->assertJsonPath('track_ctwa_warning', null);
+        $this->assertDatabaseHas('whatsapp_messages', ['message_id' => 'wamid.production', 'direction' => 'outgoing']);
+        $this->assertDatabaseCount('ctwa_recaps', 0);
+
+        $this->app->instance('env', 'local');
+        $this->get('/dashboard/messages')->assertOk()
+            ->assertSee('Tandai sebagai rekap order')
+            ->assertSee('/api/track-ctwa/inbox');
     }
 
     public function test_review_and_last_click_without_click_id_do_not_send_a_purchase(): void

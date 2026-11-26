@@ -249,10 +249,11 @@ class WhatsAppController extends Controller
      */
     public function sendTextMessage(Request $request)
     {
+        $trackCtwaInInbox = app()->environment('local', 'development');
         $request->validate([
             'to' => 'required|string',
             'message' => 'required|string',
-            'track_ctwa_recap' => 'sometimes|boolean',
+            'track_ctwa_recap' => $trackCtwaInInbox ? 'sometimes|boolean' : 'exclude',
         ]);
 
         try {
@@ -266,7 +267,7 @@ class WhatsAppController extends Controller
             $contact = $this->getOrCreateContact($request->to);
             $savedMessage = $this->saveMessage($contact, 'text', $request->message, $response);
             $trackingWarning = null;
-            if ($savedMessage->message_id) {
+            if ($trackCtwaInInbox && $savedMessage->message_id) {
                 try {
                     app(TrackCtwaService::class)->captureInbox(
                         $this->getWhatsAppAccount(),
