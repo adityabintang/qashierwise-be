@@ -247,7 +247,7 @@ class WhatsAppController extends Controller
     /**
      * Send text message
      */
-    public function sendTextMessage(Request $request, TrackCtwaService $trackCtwa)
+    public function sendTextMessage(Request $request)
     {
         $request->validate([
             'to' => 'required|string',
@@ -268,7 +268,7 @@ class WhatsAppController extends Controller
             $trackingWarning = null;
             if ($savedMessage->message_id) {
                 try {
-                    $trackCtwa->captureInbox(
+                    app(TrackCtwaService::class)->captureInbox(
                         $this->getWhatsAppAccount(),
                         $contact->wa_id,
                         $savedMessage->message_id,

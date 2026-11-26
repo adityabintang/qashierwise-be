@@ -14,6 +14,7 @@ use App\Models\PosUser;
 use App\Models\Store;
 use App\Models\User;
 use App\Models\WhatsAppAccount;
+use App\Models\WhatsAppContact;
 use App\Services\PaymentService;
 use App\Services\TrackCtwaService;
 use App\Services\WebhookForwardingService;
@@ -21,6 +22,7 @@ use App\Services\WhatsAppAccountService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Netflie\WhatsAppCloudApi\Response;
 use Netflie\WhatsAppCloudApi\WhatsAppCloudApi;
 use Spatie\Permission\Models\Role;
@@ -222,6 +224,66 @@ class TrackCtwaTest extends TestCase
         $this->assertSame(CtwaDelivery::ACCEPTED, CtwaDelivery::sole()->status);
     }
 
+    public function test_unsigned_message_webhooks_are_saved_without_ctwa_attribution(): void
+    {
+        $this->mock(WebhookForwardingService::class)->expects('dispatch')->once();
+
+        $this->postWebhook('messages', 'messages', [
+            'id' => 'wamid.unsigned-in', 'from' => '628123456789', 'type' => 'text', 'timestamp' => now()->timestamp,
+            'text' => ['body' => 'Saya mau pesan'],
+            'referral' => ['source_id' => '222', 'source_type' => 'ad', 'ctwa_clid' => 'unsigned-click'],
+        ], null)->assertOk();
+        $this->postWebhook('smb_message_echoes', 'message_echoes', [
+            'id' => 'wamid.unsigned-out', 'to' => '628123456789', 'type' => 'text', 'timestamp' => now()->timestamp,
+            'text' => ['body' => "Rekap Order\nNo. Order: INV-123\nTotal: Rp150.000"],
+        ], null)->assertOk();
+
+        $this->assertDatabaseHas('whatsapp_messages', ['message_id' => 'wamid.unsigned-in', 'direction' => 'incoming']);
+        $this->assertDatabaseHas('whatsapp_messages', ['message_id' => 'wamid.unsigned-out', 'direction' => 'outgoing']);
+        $this->assertDatabaseCount('ctwa_clicks', 0);
+        $this->assertDatabaseCount('ctwa_recaps', 0);
+    }
+
+    public function test_message_history_and_status_survive_unavailable_ctwa_storage(): void
+    {
+        Schema::drop('ctwa_settings');
+        $this->mock(WebhookForwardingService::class)->expects('dispatch')->once();
+
+        $this->postWebhook('messages', 'messages', [
+            'id' => 'wamid.incoming', 'from' => '628123456789', 'type' => 'text', 'timestamp' => now()->timestamp,
+            'text' => ['body' => 'Saya mau pesan'],
+            'referral' => ['source_id' => '222', 'source_type' => 'ad', 'ctwa_clid' => 'latest-click'],
+        ])->assertOk();
+        $recap = "Rekap Order\nNo. Order: INV-123\nTotal: Rp150.000";
+        $this->postWebhook('smb_message_echoes', 'message_echoes', [
+            'id' => 'wamid.echo', 'to' => '628123456789', 'type' => 'text', 'timestamp' => now()->timestamp,
+            'text' => ['body' => $recap],
+        ])->assertOk();
+        $this->postWebhook('messages', 'statuses', [
+            'id' => 'wamid.echo', 'status' => 'delivered', 'timestamp' => now()->timestamp,
+        ])->assertOk();
+
+        $response = $this->mock(Response::class);
+        $response->expects('decodedBody')->andReturn(['messages' => [['id' => 'wamid.inbox']]])->atLeast()->once();
+        $client = $this->mock(WhatsAppCloudApi::class);
+        $client->expects('sendTextMessage')->with('628123456789', $recap)->andReturn($response);
+        $this->partialMock(WhatsAppAccountService::class)->expects('getClientForUser')->with($this->owner->id)->andReturn($client);
+        $this->actingAs($this->owner, 'sanctum')->postJson('/api/whatsapp/send/text', [
+            'to' => '628123456789', 'message' => $recap, 'track_ctwa_recap' => true,
+        ])->assertOk()->assertJsonPath('saved_message.direction', 'outgoing')
+            ->assertJsonPath('track_ctwa_warning', 'Pesan terkirim. Rekap gagal dicatat di TrackCTWA.');
+
+        $contact = WhatsAppContact::sole();
+        $this->getJson("/api/whatsapp/contacts/{$contact->id}/messages")
+            ->assertOk()
+            ->assertJsonCount(3, 'data')
+            ->assertJsonPath('data.0.message_id', 'wamid.incoming')
+            ->assertJsonPath('data.0.direction', 'incoming')
+            ->assertJsonPath('data.1.message_id', 'wamid.echo')
+            ->assertJsonPath('data.1.status', 'delivered')
+            ->assertJsonPath('data.2.message_id', 'wamid.inbox');
+    }
+
     public function test_review_and_last_click_without_click_id_do_not_send_a_purchase(): void
     {
         $this->click('wamid.older', 'old-click', '111', now()->subDays(2)->timestamp);
@@ -385,7 +447,7 @@ class TrackCtwaTest extends TestCase
         ]]]);
     }
 
-    private function postWebhook(string $field, string $key, array $message, bool $valid = true)
+    private function postWebhook(string $field, string $key, array $message, ?bool $valid = true)
     {
         $body = json_encode([
             'object' => 'whatsapp_business_account',
@@ -398,10 +460,12 @@ class TrackCtwaTest extends TestCase
             ]],
         ]);
 
-        return $this->call('POST', '/api/whatsapp/webhook', [], [], [], [
-            'CONTENT_TYPE' => 'application/json',
-            'HTTP_X_HUB_SIGNATURE_256' => 'sha256='.hash_hmac('sha256', $body, $valid ? 'test-signing-secret' : 'invalid'),
-        ], $body);
+        $headers = ['CONTENT_TYPE' => 'application/json'];
+        if ($valid !== null) {
+            $headers['HTTP_X_HUB_SIGNATURE_256'] = 'sha256='.hash_hmac('sha256', $body, $valid ? 'test-signing-secret' : 'invalid');
+        }
+
+        return $this->call('POST', '/api/whatsapp/webhook', [], [], [], $headers, $body);
     }
 
     private function posOrder(string $number): Order

@@ -70,14 +70,15 @@ class WhatsAppWebhookController extends Controller
     /**
      * Handle incoming webhook events (POST request from WhatsApp)
      */
-    public function handle(Request $request, TrackCtwaService $trackCtwa)
+    public function handle(Request $request)
     {
         $secret = config('whatsapp.app_secret');
-        $verified = $secret && hash_equals(
+        $signature = $request->header('X-Hub-Signature-256');
+        $verified = $secret && $signature !== null && hash_equals(
             'sha256='.hash_hmac('sha256', $request->getContent(), $secret),
-            (string) $request->header('X-Hub-Signature-256'),
+            $signature,
         );
-        if ($secret && ! $verified) {
+        if ($secret && $signature !== null && ! $verified) {
             return response()->json(['error' => 'Invalid signature'], 403);
         }
 
@@ -128,10 +129,6 @@ class WhatsAppWebhookController extends Controller
 
                         $userId = $whatsappAccount->user_id;
 
-                        if ($verified) {
-                            $trackCtwa->captureWebhook($whatsappAccount, (string) $wabaId, (string) $field, $change['value']);
-                        }
-
                         Log::info('Webhook routed to user', [
                             'phone_number_id' => $phoneNumberId,
                             'user_id' => $userId,
@@ -157,6 +154,16 @@ class WhatsAppWebhookController extends Controller
                             foreach ($change['value']['statuses'] as $status) {
                                 $this->handleMessageStatus($status, $userId);
                             }
+                        }
+
+                        // Legacy webhooks can populate the inbox. Attribution requires a verified signature.
+                        if ($verified && (isset($change['value']['messages']) || isset($change['value']['message_echoes']))) {
+                            rescue(fn () => app(TrackCtwaService::class)->captureWebhook(
+                                $whatsappAccount,
+                                (string) $wabaId,
+                                (string) $field,
+                                $change['value'],
+                            ));
                         }
                     }
                 }
