@@ -118,6 +118,27 @@ export type DashboardData = {
   }[];
 };
 
+export type AnalyticsData = {
+  as_of: string;
+  activity_from: string;
+  months: { month: string; count: number; partial: boolean }[];
+  stats: {
+    registered: number;
+    active: number;
+    paid: number;
+    unpaid: number;
+    unverified: number;
+    messages_total: number;
+    messages_incoming: number;
+    messages_outgoing: number;
+    whatsapp_active: number;
+  };
+};
+
+export const analyticsApi = {
+  get: () => http.get<{ data: AnalyticsData }>("/analytics").then((r) => r.data.data),
+};
+
 export type UploadType = "featured" | "seo" | "content";
 
 // --- Auth ---

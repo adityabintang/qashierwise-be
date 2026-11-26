@@ -629,6 +629,10 @@
                                         style="min-height: 44px; max-height: 200px;"
                                         :disabled="sending"
                                     ></textarea>
+                                    <label x-show="trackCtwaEnabled && !isTemplateMessage" x-cloak class="flex items-center gap-2 mt-1 text-xs">
+                                        <input type="checkbox" x-model="trackCtwaRecap" :disabled="sending">
+                                        Tandai sebagai rekap order
+                                    </label>
                                 </div>
                                 <!-- Send button with minimum 44px touch target (Requirements 6.3) -->
                                 <button type="submit" class="btn btn-primary btn-icon min-h-[44px] min-w-[44px]" :disabled="sending || !newMessage.trim()">
@@ -1142,6 +1146,7 @@ function messagesManager() {
         // Windowed (WhatsApp-like) message loading + browser cache
         messagesPerPage: 10, hasMoreOlder: false, loadingOlder: false, oldestId: null,
         newMessage: '', contactSearch: '', loadingContacts: true, loadingMessages: false, sending: false,
+        trackCtwaEnabled: false, trackCtwaRecap: false,
         mediaPreview: null, mediaFile: null,
         showTemplateModal: false, showImageModal: false, showVideoModal: false, showDocumentModal: false,
         showLocationModal: false, showButtonModal: false, showListModal: false, showAudioModal: false,
@@ -1172,6 +1177,11 @@ function messagesManager() {
         mobileView: 'contacts', // 'contacts' | 'chat'
         isMobileMessages: window.innerWidth < 768,
         async init() {
+            fetch('/api/track-ctwa/inbox', {
+                headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token'), 'Accept': 'application/json' }
+            }).then(response => response.ok ? response.json() : {}).then(data => {
+                this.trackCtwaEnabled = data.enabled === true;
+            }).catch(() => {});
             // Initialize mobile detection
             this.isMobileMessages = window.innerWidth < 768;
 
@@ -1269,6 +1279,7 @@ function messagesManager() {
             } catch (e) { console.error('Error:', e); }
         },
         async selectContact(contact) {
+            this.trackCtwaRecap = false;
             const version = ++this.conversationVersion;
             this.selectedContact = contact;
             this.liveCursor = null;
@@ -1513,6 +1524,7 @@ function messagesManager() {
             }
         },
         selectTemplate(tpl) {
+            this.trackCtwaRecap = false;
             // Insert template body into the message textarea
             this.newMessage = tpl.body || '';
             this.isTemplateMessage = true;
@@ -1667,11 +1679,13 @@ function messagesManager() {
             const messageText = this.newMessage;
             const isTemplate = this.isTemplateMessage;
             const templateInfo = this.selectedTemplateInfo;
+            const markedRecap = this.trackCtwaRecap;
 
             // Clear input immediately for better UX
             this.newMessage = '';
             this.isTemplateMessage = false;
             this.selectedTemplateInfo = null;
+            this.trackCtwaRecap = false;
 
             // Reset textarea height
             this.$nextTick(() => {
@@ -1713,6 +1727,9 @@ function messagesManager() {
                     endpoint = '/whatsapp/send/text';
                 }
 
+                if (endpoint === '/whatsapp/send/text' && markedRecap) {
+                    payload.track_ctwa_recap = true;
+                }
                 const res = await fetch(`${this.API_BASE_URL}${endpoint}`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -1725,8 +1742,10 @@ function messagesManager() {
                     this.newMessage = messageText;
                     this.isTemplateMessage = isTemplate;
                     this.selectedTemplateInfo = templateInfo;
+                    this.trackCtwaRecap = markedRecap;
                 } else {
                     this.acceptSentMessage(data);
+                    if (data.track_ctwa_warning) alert(data.track_ctwa_warning);
                 }
             } catch (e) {
                 console.error('Error:', e);
@@ -1734,6 +1753,7 @@ function messagesManager() {
                 this.newMessage = messageText;
                 this.isTemplateMessage = isTemplate;
                 this.selectedTemplateInfo = templateInfo;
+                this.trackCtwaRecap = markedRecap;
             }
             finally { this.sending = false; }
         },

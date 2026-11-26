@@ -6,6 +6,7 @@ import { Spinner } from "./ui";
 import { Layout } from "./components/Layout";
 import { Login } from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
+import { Analytics } from "./pages/Analytics";
 import { PostList } from "./pages/posts/PostList";
 import { PostForm } from "./pages/posts/PostForm";
 import { PostView } from "./pages/posts/PostView";
@@ -37,6 +38,7 @@ function Routes() {
   if (matchPath("/admin/posts", path)) return <PostList />;
   if (matchPath("/admin/categories", path)) return <CategoryList />;
   if (matchPath("/admin/tags", path)) return <TagList />;
+  if (matchPath("/admin/analytics", path)) return <Analytics />;
   if (matchPath("/admin", path)) return <Dashboard />;
 
   return <Dashboard />;

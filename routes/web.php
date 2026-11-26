@@ -171,6 +171,8 @@ Route::middleware(['web', 'check.web.auth', 'block.author.login'])->group(functi
         return view('dashboard.messages');
     })->name('dashboard.messages');
 
+    Route::view('/dashboard/track-ctwa', 'dashboard.track-ctwa')->name('dashboard.track-ctwa');
+
     Route::get('/dashboard/templates', function () {
         return view('dashboard.templates');
     })->name('dashboard.templates');

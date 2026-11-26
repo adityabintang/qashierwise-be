@@ -51,6 +51,13 @@
             <i class="fas fa-comments w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_messages') }}</span>
         </a>
+        @if(app()->environment(['local', 'development']))
+            <a href="/dashboard/track-ctwa" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'track-ctwa' ? 'active' : '' }}"
+                x-show="['view_track_ctwa', 'manage_track_ctwa', 'process_track_ctwa_payment'].some(permission => $store.permissions.hasPermission(permission))">
+                <i class="fas fa-chart-line w-5 text-center"></i>
+                <span x-show="sidebarOpen || isMobile" x-transition>TrackCTWA</span>
+            </a>
+        @endif
         <a href="/dashboard/templates" @click="if(isMobile) sidebarOpen = false" class="sidebar-nav-item {{ $activePage === 'templates' ? 'active' : '' }}" x-show="$store.permissions.hasPermission('templates')">
             <i class="fas fa-file-alt w-5 text-center"></i>
             <span x-show="sidebarOpen || isMobile" x-transition>{{ __('dashboard.menu_templates') }}</span>

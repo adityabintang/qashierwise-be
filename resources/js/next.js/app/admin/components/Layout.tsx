@@ -3,6 +3,7 @@ import {
   FileText,
   FolderTree,
   Tags,
+  ChartNoAxesCombined,
   LogOut,
   Home,
   Menu,
@@ -45,7 +46,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-2">
-        {nav.map((item) => {
+        {[...nav, ...(user?.is_super_admin ? [{ to: "/admin/analytics", label: "Laporan Internal", icon: ChartNoAxesCombined }] : [])].map((item) => {
           const active = isActive(path, item.to, item.exact);
           const Icon = item.icon;
           return (

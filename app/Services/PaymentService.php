@@ -31,15 +31,6 @@ class PaymentService
      */
     public function processPayment(Order $order, array $paymentData, bool $autoComplete = false): Payment
     {
-        // Validate order status
-        if ($order->status === Order::STATUS_CANCELLED) {
-            throw new InvalidArgumentException('Cannot process payment for cancelled order');
-        }
-
-        if ($order->status === Order::STATUS_PAID) {
-            throw new InvalidArgumentException('Order is already paid');
-        }
-
         // Validate payment amount
         $amount = (float) ($paymentData['amount'] ?? 0);
         if ($amount <= 0) {
@@ -61,6 +52,8 @@ class PaymentService
         }
 
         return DB::transaction(function () use ($order, $paymentData, $amount, $method, $autoComplete) {
+            $order = $this->lockPayableOrder($order);
+
             // Create payment record
             $payment = Payment::create([
                 'order_id' => $order->id,
@@ -68,11 +61,13 @@ class PaymentService
                 'amount' => $amount,
                 'reference' => $paymentData['reference'] ?? null,
                 'metadata' => $paymentData['metadata'] ?? null,
+                'status' => $autoComplete ? Payment::STATUS_PAID : Payment::STATUS_PENDING,
+                'paid_at' => $autoComplete ? now() : null,
             ]);
 
             // Check if order is fully paid
             // Use bccomp for precise decimal comparison to avoid floating-point issues
-            $totalPaid = $order->payments()->sum('amount') + $amount;
+            $totalPaid = $order->payments()->sum('amount');
             $orderTotal = (float) $order->total;
 
             // bccomp returns 0 if equal, 1 if first > second, -1 if first < second
@@ -135,15 +130,6 @@ class PaymentService
      */
     public function splitPayment(Order $order, array $payments, bool $autoComplete = false): Collection
     {
-        // Validate order status
-        if ($order->status === Order::STATUS_CANCELLED) {
-            throw new InvalidArgumentException('Cannot process payment for cancelled order');
-        }
-
-        if ($order->status === Order::STATUS_PAID) {
-            throw new InvalidArgumentException('Order is already paid');
-        }
-
         if (empty($payments)) {
             throw new InvalidArgumentException('At least one payment is required');
         }
@@ -158,19 +144,16 @@ class PaymentService
             $totalPaymentAmount += $amount;
         }
 
-        // Get existing payments total
-        $existingPaymentsTotal = (float) $order->payments()->sum('amount');
-        $remainingAmount = (float) $order->total - $existingPaymentsTotal;
+        return DB::transaction(function () use ($order, $payments, $totalPaymentAmount, $autoComplete) {
+            $order = $this->lockPayableOrder($order);
+            $existingPaymentsTotal = (float) $order->payments()->sum('amount');
+            $remainingAmount = (float) $order->total - $existingPaymentsTotal;
+            if ($totalPaymentAmount < $remainingAmount - 0.001) {
+                throw new InvalidArgumentException(
+                    "Total payment amount ({$totalPaymentAmount}) is less than remaining order amount ({$remainingAmount})"
+                );
+            }
 
-        // Validate total payment covers remaining amount (using tolerance for floating-point comparison)
-        $tolerance = 0.001; // 0.1 cent tolerance for floating-point precision
-        if ($totalPaymentAmount < $remainingAmount - $tolerance) {
-            throw new InvalidArgumentException(
-                "Total payment amount ({$totalPaymentAmount}) is less than remaining order amount ({$remainingAmount})"
-            );
-        }
-
-        return DB::transaction(function () use ($order, $payments, $totalPaymentAmount, $existingPaymentsTotal, $autoComplete) {
             $createdPayments = [];
 
             foreach ($payments as $paymentData) {
@@ -180,6 +163,8 @@ class PaymentService
                     'amount' => (float) $paymentData['amount'],
                     'reference' => $paymentData['reference'] ?? null,
                     'metadata' => $paymentData['metadata'] ?? null,
+                    'status' => $autoComplete ? Payment::STATUS_PAID : Payment::STATUS_PENDING,
+                    'paid_at' => $autoComplete ? now() : null,
                 ]);
                 $createdPayments[] = $payment;
             }
@@ -217,6 +202,19 @@ class PaymentService
 
             return new Collection($createdPayments);
         });
+    }
+
+    private function lockPayableOrder(Order $order): Order
+    {
+        $order = Order::lockForUpdate()->findOrFail($order->id);
+        if ($order->status === Order::STATUS_CANCELLED) {
+            throw new InvalidArgumentException('Cannot process payment for cancelled order');
+        }
+        if ($order->status === Order::STATUS_PAID) {
+            throw new InvalidArgumentException('Order is already paid');
+        }
+
+        return $order;
     }
 
     /**

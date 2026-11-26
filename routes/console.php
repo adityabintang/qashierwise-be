@@ -19,6 +19,8 @@ Schedule::command('blog:publish-scheduled')
     ->everyMinute()
     ->withoutOverlapping();
 
+Schedule::command('track-ctwa:process')->everyMinute()->withoutOverlapping(5);
+
 // Drip dispatcher — scans ai_agent_drip_schedules for due rows and queues
 // SendDripJob for each. Cheap query (indexed on status + fire_at).
 Schedule::job(new \App\Jobs\DispatchDueDrips)

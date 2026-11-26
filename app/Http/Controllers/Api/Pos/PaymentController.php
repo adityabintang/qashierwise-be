@@ -32,6 +32,12 @@ class PaymentController extends Controller
         ]);
     }
 
+    private function merchantOrder(Request $request, int $id): Order
+    {
+        return Order::whereHas('store', fn ($query) => $query->where('user_id', $request->user()->getEffectiveUserId()))
+            ->findOrFail($id);
+    }
+
     /**
      * Process a payment for an order.
      */
@@ -46,7 +52,7 @@ class PaymentController extends Controller
         ]);
 
         try {
-            $order = Order::findOrFail($validated['order_id']);
+            $order = $this->merchantOrder($request, $validated['order_id']);
             $payment = $this->paymentService->processPayment($order, $validated, true);
 
             $change = 0;
@@ -91,7 +97,7 @@ class PaymentController extends Controller
         ]);
 
         try {
-            $order = Order::findOrFail($validated['order_id']);
+            $order = $this->merchantOrder($request, $validated['order_id']);
             $payments = $this->paymentService->splitPayment($order, $validated['payments'], true);
 
             return response()->json([

@@ -16,6 +16,7 @@ use App\Models\WhatsAppTemplate;
 use App\Services\AiAgentService;
 use App\Services\CatalogOrderFlowService;
 use App\Services\MediaStorageService;
+use App\Services\TrackCtwaService;
 use App\Services\WebhookForwardingService;
 use App\Services\WhatsAppAccountService;
 use App\Services\WhatsAppFlowService;
@@ -69,12 +70,19 @@ class WhatsAppWebhookController extends Controller
     /**
      * Handle incoming webhook events (POST request from WhatsApp)
      */
-    public function handle(Request $request)
+    public function handle(Request $request, TrackCtwaService $trackCtwa)
     {
+        $secret = config('whatsapp.app_secret');
+        $verified = $secret && hash_equals(
+            'sha256='.hash_hmac('sha256', $request->getContent(), $secret),
+            (string) $request->header('X-Hub-Signature-256'),
+        );
+        if ($secret && ! $verified) {
+            return response()->json(['error' => 'Invalid signature'], 403);
+        }
+
         try {
             $body = $request->all();
-
-            Log::info('Webhook received', ['body' => $body]);
 
             // Check if this is a WhatsApp webhook event
             if (isset($body['object']) && $body['object'] === 'whatsapp_business_account') {
@@ -119,6 +127,10 @@ class WhatsAppWebhookController extends Controller
                         }
 
                         $userId = $whatsappAccount->user_id;
+
+                        if ($verified) {
+                            $trackCtwa->captureWebhook($whatsappAccount, (string) $wabaId, (string) $field, $change['value']);
+                        }
 
                         Log::info('Webhook routed to user', [
                             'phone_number_id' => $phoneNumberId,
@@ -174,7 +186,10 @@ class WhatsAppWebhookController extends Controller
      */
     protected function handleIncomingMessage($message, $value, $userId, WhatsAppAccount $whatsappAccount)
     {
-        $from = $message['from'];
+        $from = $message['from'] ?? $message['from_user_id'] ?? null;
+        if (! $from) {
+            return;
+        }
         $messageId = $message['id'];
         $timestamp = $message['timestamp'];
         $type = $message['type'];
@@ -708,7 +723,10 @@ class WhatsAppWebhookController extends Controller
             return;
         }
 
-        $to = $message['to'] ?? null;
+        $to = $message['to'] ?? $message['to_user_id'] ?? null;
+        if (! $to) {
+            return;
+        }
         $from = $message['from'] ?? null; // This is the business phone number
         $timestamp = $message['timestamp'] ?? now()->timestamp;
         $type = $message['type'] ?? 'text';

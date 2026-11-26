@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\BlogCategoryController as AdminBlogCategoryContro
 use App\Http\Controllers\Admin\BlogPostController as AdminBlogPostController;
 use App\Http\Controllers\Admin\BlogTagController as AdminBlogTagController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\AnalyticsController as AdminAnalyticsController;
 use App\Http\Controllers\Admin\UploadController as AdminUploadController;
 use App\Http\Controllers\AiAgentController;
 use App\Http\Controllers\Api\AuthController;
@@ -110,6 +111,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('/auth/logout', [AdminAuthController::class, 'logout'])->name('auth.logout');
 
         Route::get('/dashboard/stats', [AdminDashboardController::class, 'stats'])->name('dashboard.stats');
+        Route::get('/analytics', [AdminAnalyticsController::class, 'index'])->name('analytics.index');
 
         Route::post('/uploads', [AdminUploadController::class, 'store'])->name('uploads.store');
 
@@ -122,6 +124,19 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
 // Protected routes
 Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function () {
+    Route::prefix('track-ctwa')->controller(\App\Http\Controllers\Api\TrackCtwaController::class)->group(function () {
+        Route::get('/', 'index');
+        Route::get('/inbox', 'inbox');
+        Route::put('/phones/{phone}', 'configurePhone')->whereNumber('phone');
+        Route::post('/ad-accounts', 'connectAdAccount');
+        Route::get('/ads-login/config', 'adsLoginConfig');
+        Route::post('/ads-login/callback', 'connectAdsFromLogin');
+        Route::get('/ad-accounts/{adAccount}/report', 'report')->whereNumber('adAccount');
+        Route::get('/phones/{phone}/recaps', 'recaps')->whereNumber('phone');
+        Route::patch('/phones/{phone}/recaps/{recap}', 'review')->whereNumber(['phone', 'recap']);
+        Route::get('/phones/{phone}/orders', 'orders')->whereNumber('phone');
+        Route::post('/phones/{phone}/orders/{order}/confirm', 'confirm')->whereNumber(['phone', 'order']);
+    });
     // Auth routes
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);

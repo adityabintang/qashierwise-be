@@ -13,6 +13,7 @@ use App\Models\WhatsAppMessage;
 use App\Models\WhatsAppTemplate;
 use App\Services\MediaStorageService;
 use App\Services\TemplateService;
+use App\Services\TrackCtwaService;
 use App\Services\WhatsAppAccountService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -246,11 +247,12 @@ class WhatsAppController extends Controller
     /**
      * Send text message
      */
-    public function sendTextMessage(Request $request)
+    public function sendTextMessage(Request $request, TrackCtwaService $trackCtwa)
     {
         $request->validate([
             'to' => 'required|string',
             'message' => 'required|string',
+            'track_ctwa_recap' => 'sometimes|boolean',
         ]);
 
         try {
@@ -263,10 +265,27 @@ class WhatsAppController extends Controller
             // Save to database
             $contact = $this->getOrCreateContact($request->to);
             $savedMessage = $this->saveMessage($contact, 'text', $request->message, $response);
+            $trackingWarning = null;
+            if ($savedMessage->message_id) {
+                try {
+                    $trackCtwa->captureInbox(
+                        $this->getWhatsAppAccount(),
+                        $contact->wa_id,
+                        $savedMessage->message_id,
+                        $request->message,
+                        $savedMessage->sent_at,
+                        $request->boolean('track_ctwa_recap'),
+                    );
+                } catch (\Throwable $e) {
+                    report($e);
+                    $trackingWarning = 'Pesan terkirim. Rekap gagal dicatat di TrackCTWA.';
+                }
+            }
 
             return response()->json([
                 'success' => true,
                 'message' => 'Text message sent successfully',
+                'track_ctwa_warning' => $trackingWarning,
                 'data' => $response->decodedBody(),
                 'saved_message' => NewWhatsAppMessage::messagePayload($savedMessage),
             ], 200);
