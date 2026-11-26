@@ -11,6 +11,7 @@ import { PageHeader } from "../../components/Layout";
 import { DataTable, Pagination, type Column } from "../../components/DataTable";
 import { ConfirmDialog, Modal } from "../../components/Modal";
 import { Badge, Button, EmptyState, Field, Input, Textarea, Toggle } from "../../ui";
+import { tr } from "../../locale";
 import { useToast } from "../../toast";
 
 const emptyForm = {
@@ -50,7 +51,7 @@ export function CategoryList() {
         setRows(res.data);
         setMeta(res.meta);
       })
-      .catch((err) => toast.error(errorMessage(err, "Gagal memuat kategori")))
+      .catch((err) => toast.error(errorMessage(err, tr("Gagal memuat kategori", "Failed to load categories"))))
       .finally(() => setLoading(false));
   }, [search, page, toast]);
 
@@ -93,15 +94,15 @@ export function CategoryList() {
     try {
       if (editing) {
         await categoryApi.update(editing.id, payload);
-        toast.success("Kategori diperbarui");
+        toast.success(tr("Kategori diperbarui", "Category updated"));
       } else {
         await categoryApi.create(payload);
-        toast.success("Kategori dibuat");
+        toast.success(tr("Kategori dibuat", "Category created"));
       }
       setShowForm(false);
       load();
     } catch (err) {
-      toast.error(errorMessage(err, "Gagal menyimpan kategori"));
+      toast.error(errorMessage(err, tr("Gagal menyimpan kategori", "Failed to save category")));
     } finally {
       setSaving(false);
     }
@@ -112,11 +113,11 @@ export function CategoryList() {
     setDeleting(true);
     try {
       await categoryApi.remove(deleteTarget.id);
-      toast.success("Kategori dihapus");
+      toast.success(tr("Kategori dihapus", "Category deleted"));
       setDeleteTarget(null);
       load();
     } catch (err) {
-      toast.error(errorMessage(err, "Gagal menghapus kategori"));
+      toast.error(errorMessage(err, tr("Gagal menghapus kategori", "Failed to delete category")));
     } finally {
       setDeleting(false);
     }
@@ -125,7 +126,7 @@ export function CategoryList() {
   const columns: Column<Category>[] = [
     {
       key: "name",
-      header: "Nama",
+      header: tr("Nama", "Name"),
       render: (c) => (
         <div>
           <p className="font-medium text-ink-900">{c.name}</p>
@@ -138,14 +139,14 @@ export function CategoryList() {
       header: "Status",
       render: (c) =>
         c.is_active ? (
-          <Badge color="success">Aktif</Badge>
+          <Badge color="success">{tr("Aktif", "Active")}</Badge>
         ) : (
-          <Badge color="gray">Nonaktif</Badge>
+          <Badge color="gray">{tr("Nonaktif", "Inactive")}</Badge>
         ),
     },
     {
       key: "posts_count",
-      header: "Artikel",
+      header: tr("Artikel", "Posts"),
       render: (c) => <span className="text-ink-600">{c.posts_count}</span>,
     },
     {
@@ -178,12 +179,12 @@ export function CategoryList() {
   return (
     <div className="admin-fade-in">
       <PageHeader
-        title="Kategori"
-        description="Kelola kategori artikel"
+        title={tr("Kategori", "Categories")}
+        description={tr("Kelola kategori artikel", "Manage post categories")}
         action={
           perms.create && (
             <Button onClick={openCreate}>
-              <Plus className="h-4 w-4" /> Kategori Baru
+              <Plus className="h-4 w-4" /> {tr("Kategori Baru", "New Category")}
             </Button>
           )
         }
@@ -197,7 +198,7 @@ export function CategoryList() {
             setSearch(e.target.value);
             setPage(1);
           }}
-          placeholder="Cari kategori…"
+          placeholder={tr("Cari kategori…", "Search categories…")}
           className="pl-9"
         />
       </div>
@@ -209,11 +210,11 @@ export function CategoryList() {
         empty={
           <EmptyState
             icon={<FolderTree className="h-10 w-10" />}
-            title="Belum ada kategori"
+            title={tr("Belum ada kategori", "No categories yet")}
             action={
               perms.create && (
                 <Button onClick={openCreate}>
-                  <Plus className="h-4 w-4" /> Kategori Baru
+                  <Plus className="h-4 w-4" /> {tr("Kategori Baru", "New Category")}
                 </Button>
               )
             }
@@ -230,23 +231,23 @@ export function CategoryList() {
       <Modal
         open={showForm}
         onClose={() => setShowForm(false)}
-        title={editing ? "Edit Kategori" : "Kategori Baru"}
+        title={editing ? tr("Edit Kategori", "Edit Category") : tr("Kategori Baru", "New Category")}
       >
         <form onSubmit={save} className="space-y-4">
-          <Field label="Nama" required>
+          <Field label={tr("Nama", "Name")} required>
             <Input
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               autoFocus
             />
           </Field>
-          <Field label="Slug" hint="Opsional; otomatis dari nama">
+          <Field label="Slug" hint={tr("Opsional; otomatis dari nama", "Optional; generated from name")}>
             <Input
               value={form.slug}
               onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
             />
           </Field>
-          <Field label="Deskripsi">
+          <Field label={tr("Deskripsi", "Description")}>
             <Textarea
               rows={3}
               value={form.description}
@@ -256,14 +257,14 @@ export function CategoryList() {
           <Toggle
             checked={form.is_active}
             onChange={(v) => setForm((f) => ({ ...f, is_active: v }))}
-            label="Aktif"
+            label={tr("Aktif", "Active")}
           />
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
-              Batal
+              {tr("Batal", "Cancel")}
             </Button>
             <Button type="submit" loading={saving}>
-              Simpan
+              {tr("Simpan", "Save")}
             </Button>
           </div>
         </form>
@@ -271,7 +272,7 @@ export function CategoryList() {
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        message={`Hapus kategori "${deleteTarget?.name}"? Artikel terkait tidak ikut terhapus.`}
+        message={tr(`Hapus kategori "${deleteTarget?.name}"? Artikel terkait tidak ikut terhapus.`, `Delete category "${deleteTarget?.name}"? Related posts will remain.`)}
         loading={deleting}
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}

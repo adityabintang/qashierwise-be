@@ -15,6 +15,7 @@ import { useEffect, useRef, useState } from "react";
 import { uploadApi, errorMessage } from "../api";
 import { useToast } from "../toast";
 import { cn } from "../../../lib/utils";
+import { tr } from "../locale";
 
 /*
  * Lightweight HTML rich-text editor built on contenteditable + execCommand.
@@ -29,25 +30,25 @@ type Cmd = {
 
 const groups: Cmd[][] = [
   [
-    { icon: Bold, title: "Bold", run: (e) => e("bold") },
-    { icon: Italic, title: "Italic", run: (e) => e("italic") },
-    { icon: Underline, title: "Underline", run: (e) => e("underline") },
+    { icon: Bold, title: tr("Tebal", "Bold"), run: (e) => e("bold") },
+    { icon: Italic, title: tr("Miring", "Italic"), run: (e) => e("italic") },
+    { icon: Underline, title: tr("Garis bawah", "Underline"), run: (e) => e("underline") },
   ],
   [
     { icon: Heading2, title: "Heading 2", run: (e) => e("formatBlock", "<h2>") },
     { icon: Heading3, title: "Heading 3", run: (e) => e("formatBlock", "<h3>") },
-    { icon: Quote, title: "Quote", run: (e) => e("formatBlock", "<blockquote>") },
+    { icon: Quote, title: tr("Kutipan", "Quote"), run: (e) => e("formatBlock", "<blockquote>") },
   ],
   [
-    { icon: List, title: "Bullet list", run: (e) => e("insertUnorderedList") },
-    { icon: ListOrdered, title: "Numbered list", run: (e) => e("insertOrderedList") },
+    { icon: List, title: tr("Daftar poin", "Bullet list"), run: (e) => e("insertUnorderedList") },
+    { icon: ListOrdered, title: tr("Daftar bernomor", "Numbered list"), run: (e) => e("insertOrderedList") },
   ],
 ];
 
 export function RichEditor({
   value,
   onChange,
-  placeholder = "Tulis konten artikel…",
+  placeholder = tr("Tulis konten artikel…", "Write your post content…"),
 }: {
   value: string;
   onChange: (html: string) => void;
@@ -74,7 +75,7 @@ export function RichEditor({
   };
 
   const addLink = () => {
-    const url = window.prompt("URL tautan:");
+    const url = window.prompt(tr("URL tautan:", "Link URL:"));
     if (url) exec("createLink", url);
   };
 
@@ -90,7 +91,7 @@ export function RichEditor({
         const { url } = await uploadApi.upload(file, "content");
         exec("insertImage", url);
       } catch (err) {
-        toast.error(errorMessage(err, "Gagal mengunggah gambar"));
+        toast.error(errorMessage(err, tr("Gagal mengunggah gambar", "Failed to upload image")));
       } finally {
         setUploading(false);
       }

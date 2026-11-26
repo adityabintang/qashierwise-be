@@ -2,6 +2,7 @@ import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { uploadApi, errorMessage, type UploadType } from "../api";
 import { useToast } from "../toast";
+import { tr } from "../locale";
 
 /*
  * Single-image upload. Stores the file on r2 via the API and reports back the
@@ -31,7 +32,7 @@ export function ImageUpload({
       const { path, url } = await uploadApi.upload(file, type);
       onChange(path, url);
     } catch (err) {
-      toast.error(errorMessage(err, "Gagal mengunggah gambar"));
+      toast.error(errorMessage(err, tr("Gagal mengunggah gambar", "Failed to upload image")));
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -56,7 +57,7 @@ export function ImageUpload({
               onClick={() => inputRef.current?.click()}
               className="rounded-lg bg-white/90 px-3 py-1.5 text-sm font-medium text-ink-700"
             >
-              Ganti
+              {tr("Ganti", "Replace")}
             </button>
             <button
               type="button"
@@ -79,7 +80,7 @@ export function ImageUpload({
           ) : (
             <ImagePlus className="h-6 w-6" />
           )}
-          <span className="text-sm">{uploading ? "Mengunggah…" : "Unggah gambar"}</span>
+          <span className="text-sm">{uploading ? tr("Mengunggah…", "Uploading…") : tr("Unggah gambar", "Upload image")}</span>
         </button>
       )}
       {helper && <p className="mt-1.5 text-xs text-ink-400">{helper}</p>}

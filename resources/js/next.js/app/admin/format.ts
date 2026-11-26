@@ -1,9 +1,11 @@
 /** Format an ISO timestamp for display in the user's local timezone. */
+import { adminLocale } from "./locale";
+
 export function formatDate(iso: string | null, withTime = false): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("id-ID", {
+  return d.toLocaleDateString(adminLocale === "en" ? "en-US" : "id-ID", {
     day: "2-digit",
     month: "short",
     year: "numeric",

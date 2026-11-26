@@ -4,29 +4,30 @@ import { PageHeader } from "../components/Layout";
 import { analyticsApi, type AnalyticsData } from "../api";
 import { Card, PageLoader } from "../ui";
 import { useToast } from "../toast";
+import { adminLocale, tr } from "../locale";
 
 const definitions = [
-  ["registered", "Merchant terdaftar", "Akun utama merchant, tanpa staf POS, penulis CMS, dan Super Admin."],
-  ["active", "Merchant aktif", "Merchant dengan pesan WhatsApp, order, atau reservasi dalam 30 hari terakhir."],
-  ["paid", "Paid", "Periode langganan berlaku dengan pembayaran berhasil pada periode tersebut."],
-  ["unpaid", "Unpaid", "Tanpa periode langganan berlaku, termasuk trial dan pembayaran tertunda."],
-  ["unverified", "Belum terverifikasi", "Periode langganan berlaku, tetapi bukti bayar periode ini belum tercatat."],
-  ["messages_total", "Pesan tercatat", "Seluruh pesan WhatsApp masuk dan keluar yang masih tersimpan, termasuk yang gagal."],
-  ["messages_incoming", "Pesan masuk", "Pesan WhatsApp masuk yang masih tersimpan."],
-  ["messages_outgoing", "Pesan keluar", "Pesan WhatsApp keluar yang masih tersimpan."],
-  ["whatsapp_active", "Merchant WhatsApp aktif", "Merchant dengan minimal satu akun WhatsApp berstatus aktif."],
+  ["registered", tr("Merchant terdaftar", "Registered merchants"), tr("Akun utama merchant, tanpa staf POS, penulis CMS, dan Super Admin.", "Primary merchant accounts, excluding POS staff, CMS authors, and super admins.")],
+  ["active", tr("Merchant aktif", "Active merchants"), tr("Merchant dengan pesan WhatsApp, order, atau reservasi dalam 30 hari terakhir.", "Merchants with WhatsApp messages, orders, or reservations in the last 30 days.")],
+  ["paid", tr("Berbayar", "Paid"), tr("Periode langganan berlaku dengan pembayaran berhasil pada periode tersebut.", "Active subscription period with a successful payment in that period.")],
+  ["unpaid", tr("Belum berbayar", "Unpaid"), tr("Tanpa periode langganan berlaku, termasuk trial dan pembayaran tertunda.", "No active subscription period, including trials and pending payments.")],
+  ["unverified", tr("Belum terverifikasi", "Unverified"), tr("Periode langganan berlaku, tetapi bukti bayar periode ini belum tercatat.", "Active subscription period without a recorded payment for that period.")],
+  ["messages_total", tr("Pesan tercatat", "Recorded messages"), tr("Seluruh pesan WhatsApp masuk dan keluar yang masih tersimpan, termasuk yang gagal.", "All stored incoming and outgoing WhatsApp messages, including failed messages.")],
+  ["messages_incoming", tr("Pesan masuk", "Incoming messages"), tr("Pesan WhatsApp masuk yang masih tersimpan.", "Stored incoming WhatsApp messages.")],
+  ["messages_outgoing", tr("Pesan keluar", "Outgoing messages"), tr("Pesan WhatsApp keluar yang masih tersimpan.", "Stored outgoing WhatsApp messages.")],
+  ["whatsapp_active", tr("Merchant WhatsApp aktif", "Active WhatsApp merchants"), tr("Merchant dengan minimal satu akun WhatsApp berstatus aktif.", "Merchants with at least one active WhatsApp account.")],
 ] as const;
 
 function exportCsv(data: AnalyticsData) {
   const rows: (string | number)[][] = [
-    ["Laporan Internal QashierWise"],
-    ["Diambil pada (WIB)", data.as_of],
-    ["Aktivitas sejak (WIB)", data.activity_from],
-    ["Metrik", "Jumlah", "Definisi"],
+    [tr("Laporan Internal QashierWise", "QashierWise Internal Report")],
+    [tr("Diambil pada (WIB)", "Generated at (WIB)"), data.as_of],
+    [tr("Aktivitas sejak (WIB)", "Activity since (WIB)"), data.activity_from],
+    [tr("Metrik", "Metric"), tr("Jumlah", "Count"), tr("Definisi", "Definition")],
     ...definitions.map(([key, label, definition]) => [label, data.stats[key], definition]),
     [],
-    ["Bulan (WIB)", "Merchant baru", "Bulan berjalan"],
-    ...data.months.map((month) => [month.month, month.count, month.partial ? "Ya" : "Tidak"]),
+    [tr("Bulan (WIB)", "Month (WIB)"), tr("Merchant baru", "New merchants"), tr("Bulan berjalan", "Current month")],
+    ...data.months.map((month) => [month.month, month.count, month.partial ? tr("Ya", "Yes") : tr("Tidak", "No")]),
   ];
   const csv = "\uFEFF" + rows.map((row) =>
     row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(",")
@@ -47,25 +48,25 @@ export function Analytics() {
   useEffect(() => {
     analyticsApi.get().then(setData).catch(() => {
       setFailed(true);
-      toast.error("Gagal memuat laporan internal");
+      toast.error(tr("Gagal memuat laporan internal", "Failed to load internal report"));
     });
   }, [toast]);
 
-  if (failed) return <p className="py-16 text-center text-ink-500">Laporan belum dapat dimuat.</p>;
+  if (failed) return <p className="py-16 text-center text-ink-500">{tr("Laporan belum dapat dimuat.", "The report could not be loaded.")}</p>;
   if (!data) return <PageLoader />;
 
-  const number = new Intl.NumberFormat("id-ID");
-  const timestamp = new Intl.DateTimeFormat("id-ID", {
+  const number = new Intl.NumberFormat(adminLocale === "en" ? "en-US" : "id-ID");
+  const timestamp = new Intl.DateTimeFormat(adminLocale === "en" ? "en-US" : "id-ID", {
     timeZone: "Asia/Jakarta", dateStyle: "long", timeStyle: "short",
   });
 
   return (
     <div className="admin-fade-in">
-      <PageHeader title="Laporan Internal" description="Pertumbuhan merchant dan penggunaan QashierWise" />
+      <PageHeader title={tr("Laporan Internal", "Internal Report")} description={tr("Pertumbuhan merchant dan penggunaan QashierWise", "Merchant growth and QashierWise usage")} />
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-ink-500">Diambil {timestamp.format(new Date(data.as_of))} WIB</p>
+        <p className="text-sm text-ink-500">{tr("Diambil", "Generated")} {timestamp.format(new Date(data.as_of))} WIB</p>
         <button onClick={() => exportCsv(data)} className="rounded-xl bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700">
-          Unduh CSV
+          {tr("Unduh CSV", "Download CSV")}
         </button>
       </div>
 
@@ -81,12 +82,12 @@ export function Analytics() {
 
       <Card className="mt-6 p-5">
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-base font-semibold text-ink-900">Pertumbuhan merchant dalam 12 bulan</h2>
-          <p className="text-xs text-ink-400">Pendaftaran baru per bulan · bulan terakhir berjalan</p>
+          <h2 className="text-base font-semibold text-ink-900">{tr("Pertumbuhan merchant dalam 12 bulan", "Merchant growth over 12 months")}</h2>
+          <p className="text-xs text-ink-400">{tr("Pendaftaran baru per bulan · bulan terakhir berjalan", "New registrations per month · current month is partial")}</p>
         </div>
         <Chart options={{
           chart: { type: "area", height: 320, toolbar: { show: false }, fontFamily: "inherit" },
-          series: [{ name: "Merchant baru", data: data.months.map((month) => month.count) }],
+          series: [{ name: tr("Merchant baru", "New merchants"), data: data.months.map((month) => month.count) }],
           xaxis: { categories: data.months.map((month) => month.month), labels: { rotate: -45 } },
           colors: ["#7c3aed"],
           stroke: { curve: "smooth", width: 3 },
@@ -97,7 +98,7 @@ export function Analytics() {
         }} />
       </Card>
       <p className="mt-4 text-xs text-ink-400">
-        Aktivitas dihitung sejak {timestamp.format(new Date(data.activity_from))} WIB. Angka laporan berasal dari data yang masih tersimpan.
+        {tr("Aktivitas dihitung sejak", "Activity counted since")} {timestamp.format(new Date(data.activity_from))} WIB. {tr("Angka laporan berasal dari data yang masih tersimpan.", "Report figures come from retained data.")}
       </p>
     </div>
   );

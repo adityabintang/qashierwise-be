@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { Spinner } from "../ui";
 import { cn } from "../../../lib/utils";
+import { tr } from "../locale";
 
 export type Column<T> = {
   key: string;
@@ -131,14 +132,14 @@ export function Pagination({
   if (lastPage <= 1) return null;
   return (
     <div className="mt-4 flex items-center justify-between text-sm text-ink-400">
-      <span>{total} item</span>
+      <span>{total} {tr("item", "items")}</span>
       <div className="flex items-center gap-1">
         <button
           disabled={page <= 1}
           onClick={() => onPage(page - 1)}
           className="rounded-lg px-3 py-1.5 font-medium text-ink-600 transition hover:bg-ink-100 disabled:opacity-40"
         >
-          Sebelumnya
+          {tr("Sebelumnya", "Previous")}
         </button>
         <span className="px-2 font-medium text-ink-700">
           {page} / {lastPage}
@@ -148,7 +149,7 @@ export function Pagination({
           onClick={() => onPage(page + 1)}
           className="rounded-lg px-3 py-1.5 font-medium text-ink-600 transition hover:bg-ink-100 disabled:opacity-40"
         >
-          Berikutnya
+          {tr("Berikutnya", "Next")}
         </button>
       </div>
     </div>

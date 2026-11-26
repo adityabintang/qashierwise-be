@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "../ui";
+import { tr } from "../locale";
 
 export function Modal({
   open,
@@ -57,9 +58,9 @@ export function Modal({
 
 export function ConfirmDialog({
   open,
-  title = "Are you sure?",
+  title = tr("Apakah Anda yakin?", "Are you sure?"),
   message,
-  confirmLabel = "Delete",
+  confirmLabel = tr("Hapus", "Delete"),
   loading = false,
   onConfirm,
   onCancel,
@@ -77,7 +78,7 @@ export function ConfirmDialog({
       <p className="text-sm text-ink-500">{message}</p>
       <div className="mt-6 flex justify-end gap-2">
         <Button variant="secondary" onClick={onCancel} disabled={loading}>
-          Batal
+          {tr("Batal", "Cancel")}
         </Button>
         <Button variant="danger" onClick={onConfirm} loading={loading}>
           {confirmLabel}

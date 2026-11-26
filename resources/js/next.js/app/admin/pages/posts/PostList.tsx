@@ -15,6 +15,7 @@ import { ConfirmDialog } from "../../components/Modal";
 import { Badge, Button, EmptyState, Input, Select } from "../../ui";
 import { useToast } from "../../toast";
 import { formatDate } from "../../format";
+import { postStatusLabel, tr } from "../../locale";
 
 export function PostList() {
   const { user } = useAuth();
@@ -48,7 +49,7 @@ export function PostList() {
         setMeta(res.meta);
         setSelected([]);
       })
-      .catch((err) => toast.error(errorMessage(err, "Gagal memuat artikel")))
+      .catch((err) => toast.error(errorMessage(err, tr("Gagal memuat artikel", "Failed to load posts"))))
       .finally(() => setLoading(false));
   }, [search, status, category, page, sort, direction, toast]);
 
@@ -76,15 +77,15 @@ export function PostList() {
     try {
       if (deleteTarget === "bulk") {
         await postApi.bulkRemove(selected);
-        toast.success(`${selected.length} artikel dihapus`);
+        toast.success(tr(`${selected.length} artikel dihapus`, `${selected.length} posts deleted`));
       } else if (deleteTarget) {
         await postApi.remove(deleteTarget.id);
-        toast.success("Artikel dihapus");
+        toast.success(tr("Artikel dihapus", "Post deleted"));
       }
       setDeleteTarget(null);
       load();
     } catch (err) {
-      toast.error(errorMessage(err, "Gagal menghapus"));
+      toast.error(errorMessage(err, tr("Gagal menghapus", "Failed to delete")));
     } finally {
       setDeleting(false);
     }
@@ -93,7 +94,7 @@ export function PostList() {
   const columns: Column<PostListItem>[] = [
     {
       key: "title",
-      header: "Judul",
+      header: tr("Judul", "Title"),
       sortable: true,
       render: (p) => (
         <div className="flex items-center gap-3">
@@ -111,18 +112,18 @@ export function PostList() {
     },
     {
       key: "category",
-      header: "Kategori",
+      header: tr("Kategori", "Category"),
       render: (p) => (p.category ? <Badge color="primary">{p.category.name}</Badge> : "—"),
     },
     {
       key: "status",
       header: "Status",
       sortable: true,
-      render: (p) => <Badge color={p.status_color}>{p.status_label}</Badge>,
+      render: (p) => <Badge color={p.status_color}>{postStatusLabel(p.status)}</Badge>,
     },
     {
       key: "published_at",
-      header: "Publikasi",
+      header: tr("Publikasi", "Publication"),
       sortable: true,
       render: (p) => (
         <span className="text-ink-500">{formatDate(p.published_at, true)}</span>
@@ -164,12 +165,12 @@ export function PostList() {
   return (
     <div className="admin-fade-in">
       <PageHeader
-        title="Artikel"
-        description="Kelola artikel blog"
+        title={tr("Artikel", "Posts")}
+        description={tr("Kelola artikel blog", "Manage blog posts")}
         action={
           perms.create && (
             <Button onClick={() => navigate("/admin/posts/create")}>
-              <Plus className="h-4 w-4" /> Artikel Baru
+              <Plus className="h-4 w-4" /> {tr("Artikel Baru", "New Post")}
             </Button>
           )
         }
@@ -184,7 +185,7 @@ export function PostList() {
               setSearch(e.target.value);
               setPage(1);
             }}
-            placeholder="Cari artikel…"
+            placeholder={tr("Cari artikel…", "Search posts…")}
             className="pl-9"
           />
         </div>
@@ -196,10 +197,10 @@ export function PostList() {
           }}
           className="w-40"
         >
-          <option value="">Semua status</option>
-          <option value="published">Published</option>
+          <option value="">{tr("Semua status", "All statuses")}</option>
+          <option value="published">{postStatusLabel("published")}</option>
           <option value="draft">Draft</option>
-          <option value="scheduled">Scheduled</option>
+          <option value="scheduled">{postStatusLabel("scheduled")}</option>
         </Select>
         <Select
           value={category}
@@ -209,7 +210,7 @@ export function PostList() {
           }}
           className="w-44"
         >
-          <option value="">Semua kategori</option>
+          <option value="">{tr("Semua kategori", "All categories")}</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -220,9 +221,9 @@ export function PostList() {
 
       {perms.delete && selected.length > 0 && (
         <div className="mb-3 flex items-center justify-between rounded-xl bg-purple-50 px-4 py-2.5 text-sm">
-          <span className="font-medium text-purple-700">{selected.length} dipilih</span>
+          <span className="font-medium text-purple-700">{selected.length} {tr("dipilih", "selected")}</span>
           <Button size="sm" variant="danger" onClick={() => setDeleteTarget("bulk")}>
-            <Trash2 className="h-4 w-4" /> Hapus
+            <Trash2 className="h-4 w-4" /> {tr("Hapus", "Delete")}
           </Button>
         </div>
       )}
@@ -243,12 +244,12 @@ export function PostList() {
         empty={
           <EmptyState
             icon={<FileText className="h-10 w-10" />}
-            title="Belum ada artikel"
-            description="Mulai tulis artikel pertama untuk blog Anda."
+            title={tr("Belum ada artikel", "No posts yet")}
+            description={tr("Mulai tulis artikel pertama untuk blog Anda.", "Write your first blog post.")}
             action={
               perms.create && (
                 <Button onClick={() => navigate("/admin/posts/create")}>
-                  <Plus className="h-4 w-4" /> Artikel Baru
+                  <Plus className="h-4 w-4" /> {tr("Artikel Baru", "New Post")}
                 </Button>
               )
             }
@@ -267,8 +268,8 @@ export function PostList() {
         open={deleteTarget !== null}
         message={
           deleteTarget === "bulk"
-            ? `Hapus ${selected.length} artikel terpilih? Tindakan ini tidak dapat dibatalkan.`
-            : "Hapus artikel ini? Tindakan ini tidak dapat dibatalkan."
+            ? tr(`Hapus ${selected.length} artikel terpilih? Tindakan ini tidak dapat dibatalkan.`, `Delete ${selected.length} selected posts? This cannot be undone.`)
+            : tr("Hapus artikel ini? Tindakan ini tidak dapat dibatalkan.", "Delete this post? This cannot be undone.")
         }
         loading={deleting}
         onConfirm={confirmDelete}

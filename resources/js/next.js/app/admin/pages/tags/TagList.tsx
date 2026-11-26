@@ -6,6 +6,7 @@ import { PageHeader } from "../../components/Layout";
 import { DataTable, Pagination, type Column } from "../../components/DataTable";
 import { ConfirmDialog, Modal } from "../../components/Modal";
 import { Button, EmptyState, Field, Input } from "../../ui";
+import { tr } from "../../locale";
 import { useToast } from "../../toast";
 
 export function TagList() {
@@ -36,7 +37,7 @@ export function TagList() {
         setRows(res.data);
         setMeta(res.meta);
       })
-      .catch((err) => toast.error(errorMessage(err, "Gagal memuat tag")))
+      .catch((err) => toast.error(errorMessage(err, tr("Gagal memuat tag", "Failed to load tags"))))
       .finally(() => setLoading(false));
   }, [search, page, toast]);
 
@@ -68,15 +69,15 @@ export function TagList() {
     try {
       if (editing) {
         await tagApi.update(editing.id, payload);
-        toast.success("Tag diperbarui");
+        toast.success(tr("Tag diperbarui", "Tag updated"));
       } else {
         await tagApi.create(payload);
-        toast.success("Tag dibuat");
+        toast.success(tr("Tag dibuat", "Tag created"));
       }
       setShowForm(false);
       load();
     } catch (err) {
-      toast.error(errorMessage(err, "Gagal menyimpan tag"));
+      toast.error(errorMessage(err, tr("Gagal menyimpan tag", "Failed to save tag")));
     } finally {
       setSaving(false);
     }
@@ -87,11 +88,11 @@ export function TagList() {
     setDeleting(true);
     try {
       await tagApi.remove(deleteTarget.id);
-      toast.success("Tag dihapus");
+      toast.success(tr("Tag dihapus", "Tag deleted"));
       setDeleteTarget(null);
       load();
     } catch (err) {
-      toast.error(errorMessage(err, "Gagal menghapus tag"));
+      toast.error(errorMessage(err, tr("Gagal menghapus tag", "Failed to delete tag")));
     } finally {
       setDeleting(false);
     }
@@ -100,7 +101,7 @@ export function TagList() {
   const columns: Column<Tag>[] = [
     {
       key: "name",
-      header: "Nama",
+      header: tr("Nama", "Name"),
       render: (t) => (
         <div>
           <p className="font-medium text-ink-900">{t.name}</p>
@@ -110,7 +111,7 @@ export function TagList() {
     },
     {
       key: "posts_count",
-      header: "Artikel",
+      header: tr("Artikel", "Posts"),
       render: (t) => <span className="text-ink-600">{t.posts_count}</span>,
     },
     {
@@ -143,12 +144,12 @@ export function TagList() {
   return (
     <div className="admin-fade-in">
       <PageHeader
-        title="Tag"
-        description="Kelola tag artikel"
+        title={tr("Tag", "Tags")}
+        description={tr("Kelola tag artikel", "Manage post tags")}
         action={
           perms.create && (
             <Button onClick={openCreate}>
-              <Plus className="h-4 w-4" /> Tag Baru
+              <Plus className="h-4 w-4" /> {tr("Tag Baru", "New Tag")}
             </Button>
           )
         }
@@ -162,7 +163,7 @@ export function TagList() {
             setSearch(e.target.value);
             setPage(1);
           }}
-          placeholder="Cari tag…"
+          placeholder={tr("Cari tag…", "Search tags…")}
           className="pl-9"
         />
       </div>
@@ -174,11 +175,11 @@ export function TagList() {
         empty={
           <EmptyState
             icon={<TagsIcon className="h-10 w-10" />}
-            title="Belum ada tag"
+            title={tr("Belum ada tag", "No tags yet")}
             action={
               perms.create && (
                 <Button onClick={openCreate}>
-                  <Plus className="h-4 w-4" /> Tag Baru
+                  <Plus className="h-4 w-4" /> {tr("Tag Baru", "New Tag")}
                 </Button>
               )
             }
@@ -195,17 +196,17 @@ export function TagList() {
       <Modal
         open={showForm}
         onClose={() => setShowForm(false)}
-        title={editing ? "Edit Tag" : "Tag Baru"}
+        title={editing ? tr("Edit Tag", "Edit Tag") : tr("Tag Baru", "New Tag")}
       >
         <form onSubmit={save} className="space-y-4">
-          <Field label="Nama" required>
+          <Field label={tr("Nama", "Name")} required>
             <Input
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               autoFocus
             />
           </Field>
-          <Field label="Slug" hint="Opsional; otomatis dari nama">
+          <Field label="Slug" hint={tr("Opsional; otomatis dari nama", "Optional; generated from name")}>
             <Input
               value={form.slug}
               onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
@@ -213,10 +214,10 @@ export function TagList() {
           </Field>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
-              Batal
+              {tr("Batal", "Cancel")}
             </Button>
             <Button type="submit" loading={saving}>
-              Simpan
+              {tr("Simpan", "Save")}
             </Button>
           </div>
         </form>
@@ -224,7 +225,7 @@ export function TagList() {
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        message={`Hapus tag "${deleteTarget?.name}"?`}
+        message={tr(`Hapus tag "${deleteTarget?.name}"?`, `Delete tag "${deleteTarget?.name}"?`)}
         loading={deleting}
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}

@@ -13,12 +13,13 @@ import { useState } from "react";
 import { useAuth } from "../auth";
 import { Link, useLocation } from "../router";
 import { cn } from "../../../lib/utils";
+import { LanguagePicker, tr } from "../locale";
 
 const nav = [
-  { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { to: "/admin/posts", label: "Artikel", icon: FileText },
-  { to: "/admin/categories", label: "Kategori", icon: FolderTree },
-  { to: "/admin/tags", label: "Tag", icon: Tags },
+  { to: "/admin", label: tr("Dasbor", "Dashboard"), icon: LayoutDashboard, exact: true },
+  { to: "/admin/posts", label: tr("Artikel", "Posts"), icon: FileText },
+  { to: "/admin/categories", label: tr("Kategori", "Categories"), icon: FolderTree },
+  { to: "/admin/tags", label: tr("Tag", "Tags"), icon: Tags },
 ];
 
 function isActive(path: string, to: string, exact?: boolean): boolean {
@@ -46,7 +47,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-2">
-        {[...nav, ...(user?.is_super_admin ? [{ to: "/admin/analytics", label: "Laporan Internal", icon: ChartNoAxesCombined }] : [])].map((item) => {
+        {[...nav, ...(user?.is_super_admin ? [{ to: "/admin/analytics", label: tr("Laporan Internal", "Internal Report"), icon: ChartNoAxesCombined }] : [])].map((item) => {
           const active = isActive(path, item.to, item.exact);
           const Icon = item.icon;
           return (
@@ -74,14 +75,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
           className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-500 transition hover:bg-ink-100 hover:text-ink-900"
         >
           <Home className="h-[18px] w-[18px]" />
-          Ke Beranda
+          {tr("Ke Beranda", "Back to Home")}
         </a>
         <button
           onClick={() => logout()}
           className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-500 transition hover:bg-rose-50 hover:text-ios-red"
         >
           <LogOut className="h-[18px] w-[18px]" />
-          Keluar
+          {tr("Keluar", "Log Out")}
         </button>
       </div>
     </div>
@@ -118,6 +119,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </button>
           <div className="hidden lg:block" />
           <div className="flex items-center gap-3">
+            <LanguagePicker />
             <div className="text-right leading-tight">
               <p className="text-sm font-semibold text-ink-900">{user?.name}</p>
               <p className="text-xs text-ink-400">{user?.email}</p>

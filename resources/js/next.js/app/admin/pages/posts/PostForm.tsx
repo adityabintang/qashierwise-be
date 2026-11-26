@@ -17,6 +17,7 @@ import { RichEditor } from "../../components/RichEditor";
 import { useToast } from "../../toast";
 import { fromLocalInput, slugify, toLocalInput } from "../../format";
 import { cn } from "../../../../lib/utils";
+import { postStatusLabel, tr } from "../../locale";
 
 type FormState = {
   title: string;
@@ -101,7 +102,7 @@ export function PostForm({ id }: { id?: number }) {
           tags: p.tags.map((t) => t.id),
         });
       })
-      .catch((err) => toast.error(errorMessage(err, "Gagal memuat artikel")))
+      .catch((err) => toast.error(errorMessage(err, tr("Gagal memuat artikel", "Failed to load post"))))
       .finally(() => setLoading(false));
   }, [editing, id, toast]);
 
@@ -143,10 +144,10 @@ export function PostForm({ id }: { id?: number }) {
       const saved = editing
         ? await postApi.update(id, payload)
         : await postApi.create(payload);
-      toast.success(editing ? "Artikel diperbarui" : "Artikel dibuat");
+      toast.success(editing ? tr("Artikel diperbarui", "Post updated") : tr("Artikel dibuat", "Post created"));
       navigate(`/admin/posts/${saved.id}`);
     } catch (err) {
-      toast.error(errorMessage(err, "Gagal menyimpan artikel"));
+      toast.error(errorMessage(err, tr("Gagal menyimpan artikel", "Failed to save post")));
     } finally {
       setSaving(false);
     }
@@ -165,11 +166,11 @@ export function PostForm({ id }: { id?: number }) {
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <h1 className="text-2xl font-bold tracking-tight text-ink-900">
-            {editing ? "Edit Artikel" : "Artikel Baru"}
+            {editing ? tr("Edit Artikel", "Edit Post") : tr("Artikel Baru", "New Post")}
           </h1>
         </div>
         <Button type="submit" loading={saving}>
-          <Save className="h-4 w-4" /> Simpan
+          <Save className="h-4 w-4" /> {tr("Simpan", "Save")}
         </Button>
       </div>
 
@@ -177,21 +178,21 @@ export function PostForm({ id }: { id?: number }) {
         {/* Main content */}
         <div className="space-y-6 lg:col-span-2">
           <Card className="space-y-4 p-5">
-            <Field label="Judul" required error={errors.title}>
+            <Field label={tr("Judul", "Title")} required error={errors.title}>
               <Input value={form.title} onChange={(e) => onTitle(e.target.value)} />
             </Field>
-            <Field label="Slug" hint="URL artikel; otomatis dari judul">
+            <Field label="Slug" hint={tr("URL artikel; otomatis dari judul", "Post URL; generated from title")}>
               <Input
                 value={form.slug}
                 onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value, slugTouched: true }))}
               />
             </Field>
-            <Field label="Kategori">
+            <Field label={tr("Kategori", "Category")}>
               <Select
                 value={form.blog_category_id}
                 onChange={(e) => set("blog_category_id", e.target.value)}
               >
-                <option value="">Tanpa kategori</option>
+                <option value="">{tr("Tanpa kategori", "Uncategorized")}</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -199,14 +200,14 @@ export function PostForm({ id }: { id?: number }) {
                 ))}
               </Select>
             </Field>
-            <Field label="Ringkasan (excerpt)">
+            <Field label={tr("Ringkasan (excerpt)", "Excerpt")}>
               <Textarea
                 rows={3}
                 value={form.excerpt}
                 onChange={(e) => set("excerpt", e.target.value)}
               />
             </Field>
-            <Field label="Konten" required error={errors.content}>
+            <Field label={tr("Konten", "Content")} required error={errors.content}>
               <RichEditor value={form.content} onChange={(html) => set("content", html)} />
             </Field>
           </Card>
@@ -215,7 +216,7 @@ export function PostForm({ id }: { id?: number }) {
         {/* Sidebar */}
         <div className="space-y-6">
           <Card className="p-5">
-            <h3 className="mb-3 text-sm font-semibold text-ink-700">Publikasi</h3>
+            <h3 className="mb-3 text-sm font-semibold text-ink-700">{tr("Publikasi", "Publication")}</h3>
             <div className="space-y-4">
               <Field label="Status">
                 <Select
@@ -223,18 +224,18 @@ export function PostForm({ id }: { id?: number }) {
                   onChange={(e) => set("status", e.target.value as PostStatus)}
                 >
                   <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                  <option value="scheduled">Scheduled</option>
+                  <option value="published">{postStatusLabel("published")}</option>
+                  <option value="scheduled">{postStatusLabel("scheduled")}</option>
                 </Select>
               </Field>
               {form.status !== "draft" && (
                 <Field
-                  label="Tanggal publikasi"
+                  label={tr("Tanggal publikasi", "Publication date")}
                   error={errors.published_at}
                   hint={
                     form.status === "scheduled"
-                      ? "Harus di masa depan"
-                      : "Tidak boleh melebihi waktu sekarang"
+                      ? tr("Harus di masa depan", "Must be in the future")
+                      : tr("Tidak boleh melebihi waktu sekarang", "Cannot be later than now")
                   }
                 >
                   <Input
@@ -247,7 +248,7 @@ export function PostForm({ id }: { id?: number }) {
               <Field label="Tag">
                 <div className="flex flex-wrap gap-1.5">
                   {tags.length === 0 && (
-                    <span className="text-xs text-ink-400">Belum ada tag</span>
+                    <span className="text-xs text-ink-400">{tr("Belum ada tag", "No tags yet")}</span>
                   )}
                   {tags.map((t) => {
                     const active = form.tags.includes(t.id);
@@ -280,7 +281,7 @@ export function PostForm({ id }: { id?: number }) {
           </Card>
 
           <Card className="p-5">
-            <h3 className="mb-3 text-sm font-semibold text-ink-700">Gambar Utama</h3>
+            <h3 className="mb-3 text-sm font-semibold text-ink-700">{tr("Gambar Utama", "Featured Image")}</h3>
             <ImageUpload
               type="featured"
               value={form.featured_image}
@@ -288,7 +289,7 @@ export function PostForm({ id }: { id?: number }) {
               onChange={(path, url) =>
                 setForm((f) => ({ ...f, featured_image: path, featured_image_url: url }))
               }
-              helper="Maks 20 MB. Rasio landscape disarankan."
+              helper={tr("Maks 20 MB. Rasio landscape disarankan.", "Max 20 MB. Landscape ratio recommended.")}
             />
           </Card>
 

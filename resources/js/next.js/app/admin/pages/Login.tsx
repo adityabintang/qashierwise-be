@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useAuth } from "../auth";
 import { errorMessage } from "../api";
 import { navigate } from "../router";
+import { LanguagePicker, tr } from "../locale";
 
 /*
  * Admin login. Styling intentionally preserved from the old Filament login
@@ -25,7 +26,7 @@ export function Login() {
       await login(email, password, remember);
       navigate("/admin");
     } catch (err) {
-      setError(errorMessage(err, "Email atau kata sandi salah"));
+      setError(errorMessage(err, tr("Email atau kata sandi salah", "Invalid email or password")));
     } finally {
       setLoading(false);
     }
@@ -35,13 +36,14 @@ export function Login() {
     <div className="admin-login">
       <form onSubmit={submit} className="admin-login-card admin-fade-in">
         <div className="mb-6 text-center">
+          <div className="mb-3 flex justify-end"><LanguagePicker light /></div>
           <img
             src="/images/logo-64.png"
             alt="QashierWise"
             className="mx-auto mb-3 h-12 w-12 rounded-2xl"
           />
           <h1 className="text-xl font-bold">QashierWise CMS</h1>
-          <p className="mt-1 text-sm opacity-80">Masuk untuk mengelola konten</p>
+          <p className="mt-1 text-sm opacity-80">{tr("Masuk untuk mengelola konten", "Sign in to manage content")}</p>
         </div>
 
         {error && (
@@ -67,7 +69,7 @@ export function Login() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium">Kata Sandi</label>
+            <label className="mb-1.5 block text-sm font-medium">{tr("Kata Sandi", "Password")}</label>
             <div className="admin-login-field">
               <Lock className="h-4 w-4" />
               <input
@@ -95,17 +97,17 @@ export function Login() {
               onChange={(e) => setRemember(e.target.checked)}
               className="h-4 w-4 accent-purple-600"
             />
-            Ingat saya
+            {tr("Ingat saya", "Remember me")}
           </label>
         </div>
 
         <button type="submit" disabled={loading} className="admin-login-btn mt-6">
           {loading ? (
             <span className="inline-flex items-center gap-2">
-              <Loader2 className="h-4 w-4 admin-spin" /> Memproses…
+              <Loader2 className="h-4 w-4 admin-spin" /> {tr("Memproses…", "Processing…")}
             </span>
           ) : (
-            "Masuk"
+            tr("Masuk", "Sign In")
           )}
         </button>
       </form>

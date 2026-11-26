@@ -6,6 +6,7 @@ import { Link, navigate } from "../../router";
 import { Badge, Button, Card, PageLoader } from "../../ui";
 import { useToast } from "../../toast";
 import { formatDate } from "../../format";
+import { postStatusLabel, tr } from "../../locale";
 
 export function PostView({ id }: { id: number }) {
   const { user } = useAuth();
@@ -18,7 +19,7 @@ export function PostView({ id }: { id: number }) {
       .get(id)
       .then(setPost)
       .catch((err) => {
-        toast.error(errorMessage(err, "Artikel tidak ditemukan"));
+        toast.error(errorMessage(err, tr("Artikel tidak ditemukan", "Post not found")));
         navigate("/admin/posts");
       });
   }, [id, toast]);
@@ -35,12 +36,12 @@ export function PostView({ id }: { id: number }) {
           >
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <h1 className="text-2xl font-bold tracking-tight text-ink-900">Detail Artikel</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-ink-900">{tr("Detail Artikel", "Post Details")}</h1>
         </div>
         <div className="flex items-center gap-2">
           <a href={`/blog/${post.slug}`} target="_blank" rel="noreferrer">
             <Button variant="secondary">
-              <ExternalLink className="h-4 w-4" /> Lihat di Blog
+              <ExternalLink className="h-4 w-4" /> {tr("Lihat di Blog", "View on Blog")}
             </Button>
           </a>
           {perms.update && (
@@ -74,18 +75,18 @@ export function PostView({ id }: { id: number }) {
         <div className="space-y-4">
           <Card className="space-y-3 p-5 text-sm">
             <Meta label="Status">
-              <Badge color={post.status_color}>{post.status_label}</Badge>
+              <Badge color={post.status_color}>{postStatusLabel(post.status)}</Badge>
             </Meta>
-            <Meta label="Kategori">
+            <Meta label={tr("Kategori", "Category")}>
               {post.category ? <Badge color="primary">{post.category.name}</Badge> : "—"}
             </Meta>
-            <Meta label="Penulis">{post.author?.name ?? "—"}</Meta>
+            <Meta label={tr("Penulis", "Author")}>{post.author?.name ?? "—"}</Meta>
             <Meta label="Slug">
               <span className="font-mono text-xs text-ink-500">{post.slug}</span>
             </Meta>
-            <Meta label="Publikasi">{formatDate(post.published_at, true)}</Meta>
-            <Meta label="Dibuat">{formatDate(post.created_at, true)}</Meta>
-            <Meta label="Diperbarui">{formatDate(post.updated_at, true)}</Meta>
+            <Meta label={tr("Publikasi", "Published")}>{formatDate(post.published_at, true)}</Meta>
+            <Meta label={tr("Dibuat", "Created")}>{formatDate(post.created_at, true)}</Meta>
+            <Meta label={tr("Diperbarui", "Updated")}>{formatDate(post.updated_at, true)}</Meta>
           </Card>
 
           {post.tags.length > 0 && (
