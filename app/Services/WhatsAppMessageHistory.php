@@ -5,11 +5,54 @@ namespace App\Services;
 use App\Events\NewWhatsAppMessage;
 use App\Models\WhatsAppContact;
 use App\Models\WhatsAppMessage;
+use Illuminate\Support\Facades\DB;
 use Netflie\WhatsAppCloudApi\Request\MessageRequest;
 use Netflie\WhatsAppCloudApi\Response;
 
 class WhatsAppMessageHistory
 {
+    public static function updateContactPreview(WhatsAppContact $contact, WhatsAppMessage $message, ?string $preview = null): void
+    {
+        $sentAt = $message->sent_at ?? $message->created_at;
+
+        WhatsAppContact::withoutGlobalScopes()->whereKey($contact->id)
+            ->where(fn ($query) => $query->whereNull('last_message_at')->orWhere('last_message_at', '<=', $sentAt))
+            ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('whatsapp_messages')
+                ->where('contact_id', $contact->id)->where('sent_at', $sentAt)->where('id', '>', $message->id))
+            ->update(['last_message_at' => $sentAt, 'last_message_text' => $preview ?? $message->body]);
+        $contact->refresh();
+    }
+
+    public static function persistLive(string $messageId, array $attributes, bool $overwriteExisting = false): ?WhatsAppMessage
+    {
+        return DB::transaction(function () use ($messageId, $attributes, $overwriteExisting) {
+            $messages = WhatsAppMessage::withoutGlobalScopes();
+            $message = $messages->firstOrCreate(['message_id' => $messageId], $attributes);
+            if ($message->wasRecentlyCreated) {
+                return $message;
+            }
+
+            $message = $messages->lockForUpdate()->findOrFail($message->id);
+            if ((int) $message->user_id !== (int) $attributes['user_id']
+                || $message->phone_number_id !== $attributes['phone_number_id']) {
+                return null;
+            }
+
+            if ($message->is_history_import) {
+                $message->update($attributes + [
+                    'is_history_import' => false,
+                    'metadata' => null,
+                    'read_at' => null,
+                ]);
+            } elseif ($overwriteExisting) {
+                unset($attributes['status'], $attributes['is_read'], $attributes['sent_at']);
+                $message->update($attributes);
+            }
+
+            return $message;
+        }, 3);
+    }
+
     public static function recordText(WhatsAppContact $contact, Response $response, string $text): void
     {
         rescue(fn () => self::record($contact, $response, 'text', $text));
@@ -46,34 +89,23 @@ class WhatsAppMessageHistory
             return;
         }
 
-        $message = WhatsAppMessage::withoutGlobalScopes()->firstOrCreate(
-            [
-                'message_id' => $messageId,
-                'user_id' => $contact->user_id,
-                'phone_number_id' => $contact->phone_number_id,
-                'contact_id' => $contact->id,
-            ],
-            [
-                'direction' => 'outgoing',
-                'type' => $type,
-                'content' => $content,
-                'status' => 'sent',
-                'is_read' => true,
-                'sent_at' => now(),
-            ]
-        );
+        $message = self::persistLive($messageId, [
+            'user_id' => $contact->user_id,
+            'phone_number_id' => $contact->phone_number_id,
+            'contact_id' => $contact->id,
+            'direction' => 'outgoing',
+            'type' => $type,
+            'content' => $content,
+            'status' => 'sent',
+            'is_read' => true,
+            'sent_at' => now(),
+        ], true);
 
-        if (! $message->wasRecentlyCreated) {
-            $message->update(['type' => $type, 'content' => $content]);
-            if (! $message->wasChanged(['type', 'content'])) {
-                return;
-            }
+        if (! $message || (! $message->wasRecentlyCreated && ! $message->wasChanged())) {
+            return;
         }
 
-        $contact->update([
-            'last_message_at' => $message->sent_at,
-            'last_message_text' => $message->body,
-        ]);
+        self::updateContactPreview($contact, $message);
 
         defer(fn () => rescue(fn () => NewWhatsAppMessage::dispatch($message, $contact)));
     }

@@ -534,6 +534,7 @@ class DeliveryFulfillmentService
         $lastInbound = WhatsAppMessage::withoutGlobalScopes()
             ->where('contact_id', $contact->id)
             ->where('direction', 'incoming')
+            ->where('is_history_import', false)
             ->latest('sent_at')
             ->value('sent_at');
 

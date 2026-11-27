@@ -7,6 +7,7 @@ use App\Events\NewWhatsAppMessage;
 use App\Events\ProfileUpdated;
 use App\Exceptions\WhatsAppNotConnectedException;
 use App\Http\Controllers\Controller;
+use App\Jobs\StoreWhatsAppHistoryAttachment;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
 use App\Models\WhatsAppMessage;
@@ -15,10 +16,12 @@ use App\Services\MediaStorageService;
 use App\Services\TemplateService;
 use App\Services\TrackCtwaService;
 use App\Services\WhatsAppAccountService;
+use App\Services\WhatsAppMessageHistory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Netflie\WhatsAppCloudApi\Message\ButtonReply\Button;
 use Netflie\WhatsAppCloudApi\Message\ButtonReply\ButtonAction;
@@ -30,6 +33,7 @@ use Netflie\WhatsAppCloudApi\Message\OptionsList\Section as ListSection;
 use Netflie\WhatsAppCloudApi\Message\Template\Component;
 use Netflie\WhatsAppCloudApi\Response\ResponseException;
 use Netflie\WhatsAppCloudApi\WhatsAppCloudApi;
+use Symfony\Component\Mime\MimeTypes;
 
 class WhatsAppController extends Controller
 {
@@ -184,11 +188,11 @@ class WhatsAppController extends Controller
             $content = $contentData;
         }
 
-        $message = WhatsAppMessage::create([
+        $metaId = $responseBody['messages'][0]['id'];
+        $message = WhatsAppMessageHistory::persistLive($metaId, [
             'user_id' => $userId,
             'phone_number_id' => $account->phone_number_id,
             'contact_id' => $contact->id,
-            'message_id' => $responseBody['messages'][0]['id'] ?? null,
             'direction' => 'outgoing',
             'status' => 'sent',
             'type' => $type,
@@ -198,13 +202,9 @@ class WhatsAppController extends Controller
                 'template_language' => $templateLanguage,
             ],
             'sent_at' => now(),
-        ]);
+        ], true) ?? throw new \RuntimeException('WhatsApp message ID belongs to another account');
 
-        // Update contact's last message info
-        $contact->update([
-            'last_message_at' => now(),
-            'last_message_text' => $this->getLastMessageText($type, $content, $templateName),
-        ]);
+        WhatsAppMessageHistory::updateContactPreview($contact, $message, $this->getLastMessageText($type, $content, $templateName));
 
         // Let other tabs receive the message without making the sender wait for Pusher.
         defer(fn () => rescue(fn () => NewWhatsAppMessage::dispatch($message, $contact)));
@@ -1718,11 +1718,25 @@ class WhatsAppController extends Controller
             $beforeId = $request->get('before_id');
             $afterId = $beforeId ? null : $request->query('after_id');
 
-            $rows = WhatsAppMessage::with(['contact'])
-                ->where('contact_id', $contact->id)
-                ->when($beforeId, fn ($q) => $q->where('id', '<', (int) $beforeId))
-                ->when($afterId !== null, fn ($q) => $q->where('id', '>', (int) $afterId))
-                ->orderBy('id', $afterId !== null ? 'asc' : 'desc')
+            $query = WhatsAppMessage::with(['contact'])->where('contact_id', $contact->id);
+            $messageTime = 'COALESCE(sent_at, created_at)';
+            if ($afterId !== null) {
+                // The polling cursor tracks insertions, including history imported since the last fetch.
+                $query->where('id', '>', (int) $afterId)->orderBy('id');
+            } else {
+                if ($beforeId) {
+                    $cursor = (clone $query)->find((int) $beforeId);
+                    if (! $cursor) {
+                        return response()->json(['success' => false, 'message' => 'Invalid message cursor'], 422);
+                    }
+                    $time = $cursor->sent_at ?? $cursor->created_at;
+                    $query->where(fn ($q) => $q->whereRaw("$messageTime < ?", [$time])
+                        ->orWhere(fn ($same) => $same->whereRaw("$messageTime = ?", [$time])->where('id', '<', $cursor->id)));
+                }
+                $query->orderByRaw("$messageTime DESC")->orderByDesc('id');
+            }
+
+            $rows = $query
                 ->limit($perPage + 1)
                 ->get();
 
@@ -1747,6 +1761,32 @@ class WhatsAppController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    public function downloadHistoryAttachment(int $id)
+    {
+        $userId = auth()->user()->getEffectiveUserId();
+        $account = $this->whatsAppAccountService->getActiveAccount($userId);
+        abort_unless($account, 404);
+
+        $message = WhatsAppMessage::withoutGlobalScopes()->whereKey($id)
+            ->where('user_id', $userId)
+            ->where('phone_number_id', $account->phone_number_id)
+            ->where('is_history_import', true)
+            ->firstOrFail();
+        abort_unless($message->metadata['history_attachment'] ?? false, 404);
+
+        $disk = Storage::disk(StoreWhatsAppHistoryAttachment::DISK);
+        $path = StoreWhatsAppHistoryAttachment::path($account->id, $message->id);
+        abort_unless($disk->exists($path), 404);
+
+        $extension = MimeTypes::getDefault()->getExtensions($message->metadata['mime_type'] ?? '')[0] ?? null;
+
+        return $disk->download($path, 'whatsapp-attachment'.($extension ? '.'.$extension : ''), [
+            'Content-Type' => 'application/octet-stream',
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     /**

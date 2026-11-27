@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\ProcessAiAgentMessage;
 use App\Models\AiAgent;
 use App\Models\AiAgentConversation;
+use App\Models\Order;
 use App\Models\Reservation;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppContact;
@@ -15,11 +16,15 @@ use App\Models\WhatsAppMessage;
 use App\Models\WhatsAppTemplate;
 use App\Services\AiAgentService;
 use App\Services\CatalogOrderFlowService;
+use App\Services\DeliveryFulfillmentService;
 use App\Services\MediaStorageService;
 use App\Services\TrackCtwaService;
 use App\Services\WebhookForwardingService;
 use App\Services\WhatsAppAccountService;
+use App\Services\WhatsAppCoexistenceImportService;
 use App\Services\WhatsAppFlowService;
+use App\Services\WhatsAppMessageHistory;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -27,6 +32,8 @@ use Illuminate\Support\Facades\Storage;
 
 class WhatsAppWebhookController extends Controller
 {
+    private const IMPORT_FIELDS = ['history', 'smb_app_state_sync'];
+
     protected MediaStorageService $mediaStorageService;
 
     protected WhatsAppAccountService $whatsAppAccountService;
@@ -83,10 +90,19 @@ class WhatsAppWebhookController extends Controller
         }
 
         try {
-            $body = $request->all();
+            // Parse the signed JSON as sent. Request middleware can alter message text and captions.
+            $body = $verified
+                ? json_decode($request->getContent(), true)
+                : $request->all();
+            if ($verified && ! is_array($body)) {
+                return response()->json(['error' => 'Invalid JSON'], 400);
+            }
 
             // Check if this is a WhatsApp webhook event
             if (isset($body['object']) && $body['object'] === 'whatsapp_business_account') {
+                if (! $verified && array_intersect(self::IMPORT_FIELDS, data_get($body, 'entry.*.changes.*.field', []))) {
+                    return response()->json(['error' => 'Invalid signature'], 403);
+                }
 
                 // Iterate through entries
                 foreach ($body['entry'] as $entry) {
@@ -108,6 +124,8 @@ class WhatsAppWebhookController extends Controller
                             continue;
                         }
 
+                        $isImport = in_array($field, self::IMPORT_FIELDS, true);
+
                         $phoneNumberId = $change['value']['metadata']['phone_number_id'] ?? null;
 
                         if (! $phoneNumberId) {
@@ -128,6 +146,20 @@ class WhatsAppWebhookController extends Controller
                         }
 
                         $userId = $whatsappAccount->user_id;
+
+                        if ($isImport) {
+                            try {
+                                app(WhatsAppCoexistenceImportService::class)->acceptBatch(
+                                    $whatsappAccount, (string) $wabaId, $field, $change['value'],
+                                );
+                            } catch (\Throwable) {
+                                Log::error('Could not accept WhatsApp import batch', ['account_id' => $whatsappAccount->id]);
+
+                                return response()->json(['error' => 'Internal Server Error'], 500);
+                            }
+
+                            continue;
+                        }
 
                         Log::info('Webhook routed to user', [
                             'phone_number_id' => $phoneNumberId,
@@ -206,7 +238,9 @@ class WhatsAppWebhookController extends Controller
         // can reply twice to the same customer message, and media downloads
         // get re-attempted needlessly. The catalog-order branch had its own
         // dedup; this one covers every type.
-        if ($messageId && WhatsAppMessage::withoutGlobalScopes()->where('message_id', $messageId)->exists()) {
+        $existing = $messageId ? WhatsAppMessage::withoutGlobalScopes()->where('message_id', $messageId)->first() : null;
+        if ($existing && (! $existing->is_history_import || (int) $existing->user_id !== (int) $userId
+            || $existing->phone_number_id !== $whatsappAccount->phone_number_id)) {
             Log::info('Duplicate webhook ignored', [
                 'message_id' => $messageId,
                 'type' => $type,
@@ -429,18 +463,18 @@ class WhatsAppWebhookController extends Controller
             ]
         );
 
-        // Update contact's last message info
-        $contact->update([
-            'last_message_at' => now(),
-            'last_message_text' => $content,
-            'unread_count' => $contact->unread_count + 1,
-        ]);
+        if (! $whatsappMessage || (! $whatsappMessage->wasRecentlyCreated && ! $whatsappMessage->wasChanged('is_history_import'))) {
+            return $messageData;
+        }
+
+        WhatsAppMessageHistory::updateContactPreview($contact, $whatsappMessage);
+        $contact->increment('unread_count');
 
         // Customer is active again — wipe the follow-up counter on any open
         // conversation so the scheduler restarts from zero when (and if) the
         // next state transition fires. Pending SendFollowupJob jobs become
         // stale on the next tick because followup_state_started_at is now null.
-        $openConversation = \App\Models\AiAgentConversation::where('whatsapp_contact_id', $contact->id)
+        $openConversation = AiAgentConversation::where('whatsapp_contact_id', $contact->id)
             ->whereNotNull('order_context')
             ->latest('id')
             ->first();
@@ -660,7 +694,7 @@ class WhatsAppWebhookController extends Controller
                 }
                 [$prefix, $orderId] = explode(':', $id, 2);
                 $action = $prefix === 'dlv_ok' ? 'ok' : 'bad';
-                $order = \App\Models\Order::find((int) $orderId);
+                $order = Order::find((int) $orderId);
             } elseif ($type === 'text') {
                 $clean = mb_strtolower(trim((string) $content));
                 if (preg_match('/^(terima|diterima|sesuai|ok)\.?$/u', $clean)) {
@@ -672,9 +706,9 @@ class WhatsAppWebhookController extends Controller
                 }
 
                 // Match the contact's latest order that is awaiting receipt.
-                $order = \App\Models\Order::whereHas('store', fn ($q) => $q->where('user_id', $userId))
+                $order = Order::whereHas('store', fn ($q) => $q->where('user_id', $userId))
                     ->where('customer_phone', preg_replace('/[^0-9]/', '', $contact->wa_id))
-                    ->where('fulfillment_status', \App\Models\Order::FULFILLMENT_OUT_FOR_DELIVERY)
+                    ->where('fulfillment_status', Order::FULFILLMENT_OUT_FOR_DELIVERY)
                     ->latest('out_for_delivery_at')
                     ->first();
             } else {
@@ -690,7 +724,7 @@ class WhatsAppWebhookController extends Controller
                 return false;
             }
 
-            $svc = app(\App\Services\DeliveryFulfillmentService::class);
+            $svc = app(DeliveryFulfillmentService::class);
             if ($action === 'ok') {
                 $svc->markDelivered($order);
             } else {
@@ -848,15 +882,11 @@ class WhatsAppWebhookController extends Controller
             ]
         );
 
-        if (in_array($type, ['text', 'interactive'], true) && ! $whatsappMessage->wasRecentlyCreated) {
+        if (! $whatsappMessage || (! $whatsappMessage->wasRecentlyCreated && ! $whatsappMessage->wasChanged())) {
             return;
         }
 
-        // Update contact's last message info
-        $contact->update([
-            'last_message_at' => now(),
-            'last_message_text' => $type === 'interactive' ? $whatsappMessage->body : $content,
-        ]);
+        WhatsAppMessageHistory::updateContactPreview($contact, $whatsappMessage);
 
         if (in_array($type, ['text', 'interactive'], true)) {
             rescue(fn () => NewWhatsAppMessage::dispatch($whatsappMessage, $contact));
@@ -1506,44 +1536,32 @@ class WhatsAppWebhookController extends Controller
         ?string $content,
         $metadata,
         array $attributes
-    ): WhatsAppMessage {
+    ): ?WhatsAppMessage {
         $row = array_merge($attributes, [
-            'type'     => $type,
-            'content'  => $content,
+            'type' => $type,
+            'content' => $content,
             'metadata' => $metadata,
         ]);
 
-        if (in_array($type, ['text', 'interactive'], true) && $attributes['direction'] === 'outgoing') {
-            // A Cloud API send may already have stored more detail than the echo.
-            return WhatsAppMessage::withoutGlobalScopes()->firstOrCreate(
-                ['message_id' => $messageId],
-                $row
-            );
-        }
+        $updateEcho = $attributes['direction'] === 'outgoing' && ! in_array($type, ['text', 'interactive'], true);
 
         try {
-            return WhatsAppMessage::withoutGlobalScopes()->updateOrCreate(
-                ['message_id' => $messageId],
-                $row
-            );
-        } catch (\Illuminate\Database\QueryException $e) {
+            return WhatsAppMessageHistory::persistLive($messageId, $row, $updateEcho);
+        } catch (QueryException $e) {
             $isTypeCheckViolation = str_contains($e->getMessage(), 'whatsapp_messages_type_check');
             if (! $isTypeCheckViolation) {
                 throw $e;
             }
 
             Log::warning('Unknown WhatsApp message type rejected by DB, storing as unsupported', [
-                'message_id'    => $messageId,
+                'message_id' => $messageId,
                 'original_type' => $type,
             ]);
 
-            $row['type']     = 'unsupported';
+            $row['type'] = 'unsupported';
             $row['metadata'] = ['original_type' => $type] + (array) $metadata;
 
-            return WhatsAppMessage::withoutGlobalScopes()->updateOrCreate(
-                ['message_id' => $messageId],
-                $row
-            );
+            return WhatsAppMessageHistory::persistLive($messageId, $row, $updateEcho);
         }
     }
 }

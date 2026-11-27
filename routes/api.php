@@ -237,6 +237,7 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         // Message History
         Route::get('/messages', [WhatsAppController::class, 'getMessages']);
         Route::get('/messages/{id}', [WhatsAppController::class, 'getMessage']);
+        Route::get('/messages/{id}/history-attachment', [WhatsAppController::class, 'downloadHistoryAttachment'])->whereNumber('id');
         Route::get('/contacts', [WhatsAppController::class, 'getContacts']);
         Route::get('/contacts/{id}/messages', [WhatsAppController::class, 'getContactMessages']);
         Route::post('/contacts/{id}/mark-read', [WhatsAppController::class, 'markContactMessagesAsRead']);

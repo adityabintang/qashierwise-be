@@ -53,6 +53,7 @@ class WhatsAppMessage extends Model
         'metadata',
         'status',
         'is_read',
+        'is_history_import',
         'sent_at',
         'delivered_at',
         'read_at',
@@ -61,6 +62,7 @@ class WhatsAppMessage extends Model
     protected $casts = [
         'metadata' => 'array',
         'is_read' => 'boolean',
+        'is_history_import' => 'boolean',
         'sent_at' => 'datetime',
         'delivered_at' => 'datetime',
         'read_at' => 'datetime',

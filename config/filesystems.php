@@ -38,6 +38,13 @@ return [
             'report' => false,
         ],
 
+        'whatsapp_history' => [
+            'driver' => 'local',
+            'root' => env('WHATSAPP_HISTORY_STORAGE_PATH', storage_path('app/private')),
+            'visibility' => 'private',
+            'throw' => true,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

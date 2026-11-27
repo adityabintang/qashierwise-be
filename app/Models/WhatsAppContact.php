@@ -61,6 +61,8 @@ class WhatsAppContact extends Model
 
     protected $appends = ['phone_number'];
 
+    protected $hidden = ['coexistence_contact_timestamp', 'coexistence_contact_name', 'coexistence_contact_import_id'];
+
     public function user()
     {
         return $this->belongsTo(User::class);

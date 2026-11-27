@@ -6,6 +6,7 @@ use App\Exceptions\WhatsAppNotConnectedException;
 use App\Exceptions\WhatsAppTokenExpiredException;
 use App\Exceptions\WhatsAppTokenInvalidException;
 use App\Models\WhatsAppAccount;
+use App\Models\WhatsAppCoexistenceImport;
 use Netflie\WhatsAppCloudApi\WhatsAppCloudApi;
 
 /**
@@ -21,14 +22,14 @@ class WhatsAppAccountService
      *
      * @param  int  $userId  User ID
      *
-     * @throws \App\Exceptions\WhatsAppNotConnectedException
+     * @throws WhatsAppNotConnectedException
      */
     public function getClientForUser(int $userId): WhatsAppCloudApi
     {
         $account = $this->getActiveAccount($userId);
 
         if (! $account) {
-            throw new \App\Exceptions\WhatsAppNotConnectedException(
+            throw new WhatsAppNotConnectedException(
                 'No connected WhatsApp account found for this user.'
             );
         }
@@ -128,6 +129,10 @@ class WhatsAppAccountService
             'coexistence_enabled' => $account->coexistence_enabled,
             'connection_method' => $account->connection_method,
             'waba_id' => $account->waba_id,
+            'coexistence_import' => $account->is_active && $account->coexistence_import_id
+                ? WhatsAppCoexistenceImport::whereKey($account->coexistence_import_id)
+                    ->where('whatsapp_account_id', $account->id)->first()?->status()
+                : null,
         ];
     }
 

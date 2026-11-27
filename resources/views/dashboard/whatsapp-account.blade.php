@@ -62,7 +62,8 @@
                             </button>
 
                             <p class="text-xs text-[hsl(var(--muted-foreground))] mt-4">
-                                You'll be redirected to Facebook to authorize your WhatsApp Business account
+                                Untuk nomor yang sudah dipakai di aplikasi, Coexistence mengimpor kontak awal.
+                                Jika Anda memilih membagikan chat di WhatsApp Business, Inbox juga menerima riwayat chat pribadi hingga 180 hari.
                             </p>
                         </div>
                     </div>
@@ -161,6 +162,36 @@
                                 </p>
                             </div>
                         </div>
+
+                        <section x-show="account?.coexistence_import" x-cloak
+                            class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.35)] p-4 space-y-3"
+                            aria-labelledby="whatsapp-import-heading">
+                            <h3 id="whatsapp-import-heading" class="font-semibold">Impor WhatsApp Business</h3>
+                            <dl class="grid gap-2 sm:grid-cols-2 text-sm">
+                                <div class="flex items-center gap-2">
+                                    <dt>Kontak</dt>
+                                    <dd class="rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5"
+                                        x-text="importStatusLabel(account?.coexistence_import?.contacts_status)"></dd>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <dt>Riwayat Inbox</dt>
+                                    <dd class="rounded-full bg-blue-100 text-blue-800 px-2 py-0.5"
+                                        x-text="importStatusLabel(account?.coexistence_import?.history_status)"></dd>
+                                </div>
+                            </dl>
+                            <div x-show="account?.coexistence_import?.history_progress != null" class="flex items-center gap-2 text-sm">
+                                <progress class="w-40" max="100" :value="account?.coexistence_import?.history_progress ?? 0"
+                                    aria-label="Progres impor riwayat"></progress>
+                                <span x-text="(account?.coexistence_import?.history_progress ?? 0) + '%'"></span>
+                            </div>
+                            <p x-show="importInProgress()" class="text-sm">Tetap buka WhatsApp Business saat impor berjalan.</p>
+                            <p x-show="account?.coexistence_import?.history_status === 'not_shared'" class="text-sm">
+                                Pesan baru tetap masuk ke Inbox.
+                            </p>
+                            <p x-show="account?.coexistence_import?.contacts_without_phone > 0"
+                                class="text-sm text-[hsl(var(--muted-foreground))]"
+                                x-text="account?.coexistence_import?.contacts_without_phone + ' kontak tanpa nomor WhatsApp dilewati.'"></p>
+                        </section>
 
                         <!-- Disconnect Button -->
                         <div class="border-t border-[hsl(var(--border))] pt-4">
@@ -345,6 +376,14 @@ function whatsAppAccountApp() {
         // WhatsApp account state
         loading: true,
         connecting: false,
+        signupAttempt: 0,
+        signupCode: null,
+        signupSession: null,
+        signupTimer: null,
+        signupSubmitting: false,
+        importPoll: null,
+        accountStatusRequest: 0,
+        signupMessageListener: null,
         disconnecting: false,
         sdkLoaded: false,
         account: null,
@@ -410,6 +449,9 @@ function whatsAppAccountApp() {
                 this.loadConfig(),
                 this.loadAccountStatus()
             ]);
+            this.importPoll = setInterval(() => {
+                if (!document.hidden && !this.connecting && !this.disconnecting && this.importInProgress()) this.loadAccountStatus(true);
+            }, 10000);
 
             // Listen for Facebook SDK ready event
             window.addEventListener('fb-sdk-ready', () => {
@@ -436,36 +478,55 @@ function whatsAppAccountApp() {
          * Requirements: 1.3, 7.4
          */
         setupMessageListener() {
-            window.addEventListener('message', (event) => {
+            this.signupMessageListener = (event) => {
                 // Only accept messages from Facebook
                 if (event.origin !== "https://www.facebook.com" &&
                     event.origin !== "https://web.facebook.com") {
                     return;
                 }
 
+                if (!this.connecting || this.signupSubmitting) return;
+
+                let data;
                 try {
-                    const data = JSON.parse(event.data);
-                    if (data.type === 'WA_EMBEDDED_SIGNUP') {
-                        // Handle different event types
-                        if (data.event === 'FINISH') {
-                            // User completed signup
-                            console.log('Embedded Signup completed:', data.data);
-                            this.handleSignupComplete(data.data);
-                        } else if (data.event === 'CANCEL') {
-                            // User cancelled signup
-                            console.log('Embedded Signup cancelled');
-                            this.handleSignupCancel();
-                        } else if (data.event === 'ERROR') {
-                            // Error occurred
-                            console.error('Embedded Signup error:', data.data);
-                            this.handleSignupError(data.data);
-                        }
-                    }
-                } catch (e) {
-                    // Not a JSON message or not from embedded signup
-                    console.debug('Non-ES message received');
+                    data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+                } catch {
+                    return;
                 }
-            });
+                if (data?.type !== 'WA_EMBEDDED_SIGNUP') return;
+
+                if (['FINISH', 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING'].includes(data.event)) {
+                    this.signupSession = { ...data.data, event: data.event };
+                    this.submitCompletedSignup();
+                } else if (data.event === 'CANCEL') {
+                    this.handleSignupCancel();
+                } else if (data.event === 'ERROR') {
+                    this.handleSignupError(data.data);
+                }
+            };
+            window.addEventListener('message', this.signupMessageListener);
+        },
+
+        destroy() {
+            clearInterval(this.importPoll);
+            clearTimeout(this.signupTimer);
+            window.removeEventListener('message', this.signupMessageListener);
+        },
+
+        importInProgress() {
+            const status = this.account?.coexistence_import;
+            return [status?.contacts_status, status?.history_status]
+                .some(value => ['waiting', 'importing', 'unconfirmed'].includes(value));
+        },
+
+        importStatusLabel(status) {
+            return {
+                waiting: 'Menunggu',
+                importing: 'Sedang diimpor',
+                imported: 'Diimpor',
+                not_shared: 'Tidak dibagikan',
+                unconfirmed: 'Belum terkonfirmasi',
+            }[status] ?? '';
         },
 
         /**
@@ -529,8 +590,9 @@ function whatsAppAccountApp() {
         /**
          * Load current WhatsApp account status
          */
-        async loadAccountStatus() {
-            this.loading = true;
+        async loadAccountStatus(silent = false) {
+            const request = ++this.accountStatusRequest;
+            if (!silent) this.loading = true;
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
@@ -538,7 +600,7 @@ function whatsAppAccountApp() {
                 const token = localStorage.getItem('token');
                 if (!token) {
                     console.warn('No auth token found');
-                    this.account = null;
+                    if (!silent) this.account = null;
                     return;
                 }
 
@@ -551,14 +613,16 @@ function whatsAppAccountApp() {
                 });
 
                 clearTimeout(timeoutId);
+                if (request !== this.accountStatusRequest || this.disconnecting) return;
 
                 if (!res.ok) {
                     console.error('API error:', res.status);
-                    this.account = null;
+                    if (!silent) this.account = null;
                     return;
                 }
 
                 const data = await res.json();
+                if (request !== this.accountStatusRequest || this.disconnecting) return;
 
                 if (data.success && data.data) {
                     this.account = data.data;
@@ -568,14 +632,14 @@ function whatsAppAccountApp() {
             } catch (e) {
                 if (e.name === 'AbortError') {
                     console.error('Request timeout loading account status');
-                    this.showToast('Loading timeout. Please refresh the page.', 'error');
+                    if (!silent) this.showToast('Loading timeout. Please refresh the page.', 'error');
                 } else {
                     console.error('Error loading account status:', e);
                 }
-                this.account = null;
+                if (!silent) this.account = null;
             } finally {
                 clearTimeout(timeoutId);
-                this.loading = false;
+                if (!silent) this.loading = false;
             }
         },
 
@@ -589,77 +653,46 @@ function whatsAppAccountApp() {
                 return;
             }
 
-            this.connecting = true;
-
-            // Try FB.login first if SDK is available
-            if (typeof FB !== 'undefined') {
-                // Store reference to this for use in callback
-                const self = this;
-
-                FB.login((response) => {
-                    if (response.authResponse) {
-                        const code = response.authResponse.code;
-                        // Get session info from extras if available (contains waba_id, phone_number_id, business_id)
-                        const sessionInfo = response.authResponse.extras?.session_info || null;
-                        console.log('FB.login response:', response);
-                        console.log('Session info from embedded signup:', sessionInfo);
-                        self.sendCodeToBackend(code, sessionInfo);
-                    } else {
-                        console.log('User cancelled login or did not fully authorize.');
-                        self.connecting = false;
-                        self.handleSignupCancel();
-                    }
-                }, {
-                    config_id: this.config.config_id,
-                    response_type: 'code',
-                    override_default_response_type: true,
-                    extras: {
-                        setup: {},
-                        featureType: 'whatsapp_business_app_onboarding',
-                        sessionInfoVersion: '3'
-                    }
-                });
-            } else {
-                // Fallback: redirect to Facebook onboarding page directly
-                this.launchWhatsAppSignupRedirect();
-            }
-        },
-
-        /**
-         * Fallback method: Launch WhatsApp Embedded Signup via popup window
-         * Used when FB SDK is not available
-         */
-        launchWhatsAppSignupRedirect() {
-            const appId = this.config.app_id;
-            const configId = this.config.config_id;
-            const extras = encodeURIComponent(JSON.stringify({
-                featureType: 'whatsapp_business_app_onboarding',
-                sessionInfoVersion: '3',
-                version: 'v3'
-            }));
-
-            const url = `https://business.facebook.com/messaging/whatsapp/onboard/?app_id=${appId}&config_id=${configId}&extras=${extras}`;
-
-            // Open in popup window
-            const width = 600;
-            const height = 700;
-            const left = (window.innerWidth - width) / 2;
-            const top = (window.innerHeight - height) / 2;
-
-            const popup = window.open(
-                url,
-                'whatsapp_signup',
-                `width=${width},height=${height},left=${left},top=${top},scrollbars=yes`
-            );
-
-            if (!popup) {
-                this.showToast('Popup blocked. Please allow popups for this site.', 'error');
-                this.connecting = false;
+            if (this.connecting) return;
+            if (typeof FB === 'undefined') {
+                this.showToast('Facebook SDK belum siap. Muat ulang halaman untuk mencoba lagi.', 'error');
                 return;
             }
 
-            // Note: The code will be received via postMessage from setupMessageListener
-            // The popup will send WA_EMBEDDED_SIGNUP events
+            this.connecting = true;
+            this.signupCode = null;
+            this.signupSession = null;
+            const attempt = ++this.signupAttempt;
+            FB.login((response) => {
+                if (!this.connecting || attempt !== this.signupAttempt) return;
+                const code = response.authResponse?.code;
+                if (!code) {
+                    this.handleSignupCancel();
+                    return;
+                }
+
+                this.signupCode = code;
+                this.signupTimer = setTimeout(() => {
+                    this.handleSignupError({ error_message: 'Detail akun WhatsApp belum diterima dari Meta.' });
+                }, 15000);
+                this.submitCompletedSignup();
+            }, {
+                config_id: this.config.config_id,
+                response_type: 'code',
+                override_default_response_type: true,
+                extras: {
+                    setup: {},
+                    featureType: 'whatsapp_business_app_onboarding',
+                    sessionInfoVersion: '3'
+                }
+            });
+        },
+
+        submitCompletedSignup() {
+            if (!this.signupCode || !this.signupSession || this.signupSubmitting) return;
+            clearTimeout(this.signupTimer);
+            this.signupSubmitting = true;
+            this.sendCodeToBackend(this.signupCode, this.signupSession);
         },
 
         /**
@@ -678,6 +711,7 @@ function whatsAppAccountApp() {
                     body.waba_id = sessionInfo.waba_id;
                     body.phone_number_id = sessionInfo.phone_number_id;
                     body.business_id = sessionInfo.business_id;
+                    body.event = sessionInfo.event;
                 }
 
                 const res = await fetch(`${this.API_BASE_URL}/whatsapp/embedded-signup/callback`, {
@@ -704,15 +738,10 @@ function whatsAppAccountApp() {
                 this.showToast('Network error. Please try again.', 'error');
             } finally {
                 this.connecting = false;
+                this.signupSubmitting = false;
+                this.signupCode = null;
+                this.signupSession = null;
             }
-        },
-
-        /**
-         * Handle successful signup completion from session info
-         */
-        handleSignupComplete(data) {
-            console.log('Signup completed with session data:', data);
-            // The actual account creation is handled by sendCodeToBackend
         },
 
         /**
@@ -720,6 +749,7 @@ function whatsAppAccountApp() {
          * Requirements: 7.4
          */
         handleSignupCancel() {
+            clearTimeout(this.signupTimer);
             this.connecting = false;
             this.showToast('WhatsApp connection cancelled.', 'info');
         },
@@ -729,6 +759,7 @@ function whatsAppAccountApp() {
          * Requirements: 7.3
          */
         handleSignupError(errorData) {
+            clearTimeout(this.signupTimer);
             this.connecting = false;
             this.showToast(`Connection failed: ${errorData?.error_message || 'Unknown error'}`, 'error');
         },

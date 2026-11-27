@@ -401,7 +401,7 @@
                                                         ></button>
                                                     </div>
                                                     <!-- Image -->
-                                                    <div x-show="message?.type === 'image'">
+                                                    <div x-show="message?.type === 'image' && !message?.is_history_import">
                                                         <a x-show="message?.media_url" :href="message?.media_url" target="_blank">
                                                             <img :src="message?.media_url" class="rounded-lg max-w-[200px] max-h-[150px] object-cover" alt="Image">
                                                         </a>
@@ -412,7 +412,7 @@
                                                         <div x-show="message?.caption" class="chat-markdown text-sm mt-2" x-html="message?.type === 'image' ? formatChatMarkdown(message.caption) : ''"></div>
                                                     </div>
                                                     <!-- Video -->
-                                                    <div x-show="message?.type === 'video'">
+                                                    <div x-show="message?.type === 'video' && !message?.is_history_import">
                                                         <div x-show="message?.media_url" class="max-w-[220px]">
                                                             <video controls class="rounded-lg w-full max-h-[150px]">
                                                                 <source :src="message?.media_url" type="video/mp4">
@@ -425,7 +425,7 @@
                                                         <div x-show="message?.caption" class="chat-markdown text-sm mt-2" x-html="message?.type === 'video' ? formatChatMarkdown(message.caption) : ''"></div>
                                                     </div>
                                                     <!-- Document -->
-                                                    <div x-show="message?.type === 'document'" class="flex items-center gap-3">
+                                                    <div x-show="message?.type === 'document' && !message?.is_history_import" class="flex items-center gap-3">
                                                         <div class="h-10 w-10 rounded-lg flex items-center justify-center" :class="message?.direction === 'outgoing' ? 'bg-white/20' : 'bg-[hsl(var(--muted))]'">
                                                             <i class="fas fa-file-alt"></i>
                                                         </div>
@@ -435,7 +435,7 @@
                                                         </div>
                                                     </div>
                                                     <!-- Audio -->
-                                                    <div x-show="message?.type === 'audio'">
+                                                    <div x-show="message?.type === 'audio' && !message?.is_history_import">
                                                         <template x-if="message?.media_url">
                                                             <audio controls class="h-10 max-w-[200px]" :src="message?.media_url"></audio>
                                                         </template>
@@ -443,6 +443,15 @@
                                                             <i class="fas fa-microphone"></i>
                                                             <span class="text-sm">Audio message</span>
                                                         </div>
+                                                    </div>
+                                                    <div x-show="message?.is_history_import && ['image', 'video', 'document', 'audio'].includes(message?.type)"
+                                                        class="space-y-1 text-sm" x-data="{ downloading: false, failed: false }">
+                                                        <button type="button" x-show="message?.metadata?.history_attachment"
+                                                            :disabled="downloading" class="underline"
+                                                            @click="downloading = true; failed = !await downloadHistoryAttachment(message); downloading = false"
+                                                            x-text="downloading ? 'Mengunduh…' : 'Unduh lampiran'"></button>
+                                                        <p x-show="!message?.metadata?.history_attachment || failed">Lampiran tidak tersedia</p>
+                                                        <p x-show="message?.caption" class="whitespace-pre-wrap" x-text="message?.caption"></p>
                                                     </div>
                                                     <!-- Location -->
                                                     <div x-show="message?.type === 'location'">
@@ -510,7 +519,7 @@
                                                 </div>
                                                 <!-- Meta -->
                                                 <div class="flex items-center justify-between mt-1 px-1">
-                                                    <p class="text-[10px] text-[hsl(var(--muted-foreground))]" x-text="formatTime(message?.created_at)">-</p>
+                                                    <p class="text-[10px] text-[hsl(var(--muted-foreground))]" x-text="formatTime(message?.sent_at || message?.created_at)">-</p>
                                                     <div x-show="message?.direction === 'outgoing'" class="flex items-center gap-1">
                                                         <i class="text-[10px]"
                                                             :class="{
@@ -1206,8 +1215,11 @@ function messagesManager() {
             // Listen for real-time messages from broadcast
             window.addEventListener('whatsapp-message-received', async (e) => {
                 const newMessage = e.detail.message;
+                const replacedImport = this.messages.some(message =>
+                    String(message.id) === String(newMessage.id) && message.is_history_import && !newMessage.is_history_import
+                );
                 const added = this.showNewMessage(newMessage);
-                if (added && newMessage.direction === 'incoming') {
+                if ((added || replacedImport) && newMessage.direction === 'incoming' && !newMessage.is_read) {
                     await this.markContactAsRead(newMessage.contact_id);
                 }
                 // Update contacts list silently
@@ -1289,6 +1301,7 @@ function messagesManager() {
             this.liveCursor = null;
             this.syncingLiveMessages = false;
             this.fetchingLatest = false;
+            this.loadingOlder = false;
             this.pendingMessageStatuses.clear();
             this.hasMoreOlder = false; this.oldestId = null;
             // Switch to chat view on mobile (Requirements 4.2, 4.4)
@@ -1347,7 +1360,6 @@ function messagesManager() {
                     const follow = added.length && this.isNearChatEnd();
                     this.upsertMessages(page.data);
                     this.liveCursor = page.data.at(-1).id;
-                    this.oldestId = this.messages[0].id;
                     this.cacheMessages(contactId);
                     if (follow) this.$nextTick(() => this.scrollToBottom());
                     hasMore = page.has_more;
@@ -1381,11 +1393,16 @@ function messagesManager() {
                 if (!res.ok || !data.success) throw new Error('Failed to load WhatsApp messages');
 
                 const latest = data.data || [];
-                this.liveCursor ??= latest.at(-1)?.id ?? 0;
+                const initialPage = this.liveCursor === null;
+                if (initialPage) {
+                    this.messages = [];
+                    this.liveCursor = latest.reduce((max, message) => Math.max(max, Number(message.id)), 0);
+                }
                 this.upsertMessages(latest);
-                // If we had no cache, the server's has_more is authoritative.
-                if (!hadCache) this.hasMoreOlder = !!data.has_more;
-                if (this.messages.length) this.oldestId = this.messages[0].id;
+                if (initialPage || !this.oldestId) {
+                    this.hasMoreOlder = !!data.has_more;
+                    this.oldestId = data.oldest_id;
+                }
                 this.cacheMessages(contactId);
 
                 await this.$nextTick();
@@ -1402,6 +1419,7 @@ function messagesManager() {
         async loadOlderMessages() {
             if (this.loadingOlder || !this.hasMoreOlder || !this.selectedContact?.id || !this.oldestId) return;
             this.loadingOlder = true;
+            const version = this.conversationVersion;
             const container = this.$refs.messagesContainer;
             const prevHeight = container ? container.scrollHeight : 0;
             try {
@@ -1409,21 +1427,24 @@ function messagesManager() {
                 const contactId = this.selectedContact.id;
                 const res = await fetch(`${this.API_BASE_URL}/whatsapp/contacts/${contactId}/messages?per_page=${this.messagesPerPage}&before_id=${this.oldestId}`, { headers: { 'Authorization': `Bearer ${token}` } });
                 const data = await res.json();
-                if (this.selectedContact?.id !== contactId) return;
+                if (version !== this.conversationVersion) return;
+                if (!res.ok || !data.success) throw new Error('Failed to load older WhatsApp messages');
 
                 const older = data.data || [];
                 if (older.length) {
                     this.upsertMessages(older);
-                    this.oldestId = this.messages[0].id;
+                    this.oldestId = data.oldest_id;
                     this.cacheMessages(contactId);
                 }
                 this.hasMoreOlder = !!data.has_more;
 
                 // Preserve scroll position so the view doesn't jump.
                 await this.$nextTick();
-                if (container) container.scrollTop = container.scrollHeight - prevHeight;
+                if (container && version === this.conversationVersion) container.scrollTop = container.scrollHeight - prevHeight;
             } catch (e) { console.error('Error:', e); }
-            finally { this.loadingOlder = false; }
+            finally {
+                if (version === this.conversationVersion) this.loadingOlder = false;
+            }
         },
         onMessagesScroll(e) {
             if (e.target.scrollTop <= 60 && this.hasMoreOlder && !this.loadingOlder) {
@@ -1447,7 +1468,8 @@ function messagesManager() {
             for (const message of incoming) {
                 const id = String(message.id);
                 const existing = byId.get(id);
-                let status = this.mergeMessageStatus(existing, message);
+                const replacedImport = existing?.is_history_import && message.is_history_import === false;
+                let status = this.mergeMessageStatus(replacedImport ? null : existing, message);
                 const pending = this.pendingMessageStatuses.get(id);
                 if (pending) {
                     status = this.mergeMessageStatus(status, pending);
@@ -1455,7 +1477,28 @@ function messagesManager() {
                 }
                 byId.set(id, { ...existing, ...message, ...status });
             }
-            this.messages = Array.from(byId.values()).sort((a, b) => Number(a.id) - Number(b.id));
+            const messageTime = message => Date.parse(message.sent_at || message.created_at) || 0;
+            this.messages = Array.from(byId.values()).sort((a, b) => messageTime(a) - messageTime(b) || Number(a.id) - Number(b.id));
+        },
+        async downloadHistoryAttachment(message) {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`${this.API_BASE_URL}/whatsapp/messages/${message.id}/history-attachment`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                if (!response.ok) return false;
+
+                const url = URL.createObjectURL(await response.blob());
+                const link = document.createElement('a');
+                link.href = url;
+                const filename = response.headers.get('Content-Disposition')?.match(/filename="?([^";]+)"?/i)?.[1];
+                link.download = message.filename || filename || 'whatsapp-attachment';
+                link.click();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                return true;
+            } catch {
+                return false;
+            }
         },
         showNewMessage(message, forceFollow = false) {
             if (!message || !this.selectedContact || String(message.contact_id) !== String(this.selectedContact.id)) return false;

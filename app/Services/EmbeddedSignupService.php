@@ -2,8 +2,14 @@
 
 namespace App\Services;
 
+use App\Jobs\RequestWhatsAppCoexistenceImport;
+use App\Models\User;
 use App\Models\WhatsAppAccount;
+use App\Models\WhatsAppCoexistenceImport;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -446,6 +452,43 @@ class EmbeddedSignupService
      */
     public function processSignup(int $userId, string $code, array $sessionInfo = []): array
     {
+        if (($sessionInfo['event'] ?? null) !== WhatsAppCoexistenceImportService::SIGNUP_EVENT) {
+            return $this->completeSignup($userId, $code, $sessionInfo);
+        }
+
+        $hash = hash('sha256', $code);
+        try {
+            return Cache::lock("wa-coexistence-signup:{$hash}", 120)->block(5, function () use ($userId, $code, $sessionInfo, $hash) {
+                $account = WhatsAppAccount::withoutGlobalScopes()->where('user_id', $userId)->first();
+                $previous = $account ? WhatsAppCoexistenceImport::where('whatsapp_account_id', $account->id)
+                    ->where('signup_hash', $hash)->first() : null;
+                if ($previous) {
+                    if (! $account->is_active || (int) $account->coexistence_import_id !== $previous->id) {
+                        return ['success' => false, 'error' => 'This WhatsApp signup is no longer active'];
+                    }
+
+                    if ($previous->subscribed_at || $this->subscribeToWebhooks($account->access_token, $account->waba_id)['success']) {
+                        $this->startCoexistenceImport($account);
+                    }
+
+                    return ['success' => true, 'account' => $account];
+                }
+
+                return $this->completeSignup($userId, $code, $sessionInfo, $hash);
+            });
+        } catch (LockTimeoutException) {
+            return ['success' => false, 'error' => 'WhatsApp signup is already being processed'];
+        }
+    }
+
+    private function completeSignup(int $userId, string $code, array $sessionInfo, ?string $signupHash = null): array
+    {
+        $onboardedAt = now();
+        if ($signupHash && (! ctype_digit($sessionInfo['waba_id'] ?? '')
+            || (isset($sessionInfo['phone_number_id']) && ! ctype_digit($sessionInfo['phone_number_id'])))) {
+            return ['success' => false, 'error' => 'WhatsApp signup did not return valid account IDs'];
+        }
+
         // Step 1: Exchange code for token
         $tokenResult = $this->exchangeCodeForToken($code);
         if (! $tokenResult['success']) {
@@ -506,9 +549,21 @@ class EmbeddedSignupService
             }
         }
 
-        // Fallback to first phone number if not found
+        if ($signupHash && ! $phoneNumber && ($phoneNumberId || count($phoneResult['phone_numbers']) !== 1)) {
+            return ['success' => false, 'error' => 'The signup phone number could not be verified for this business account'];
+        }
+
         if (! $phoneNumber) {
             $phoneNumber = $phoneResult['phone_numbers'][0];
+        }
+
+        if ($signupHash && ! $this->isBusinessAppNumber($accessToken, (string) $phoneNumber['id'])) {
+            return ['success' => false, 'error' => 'The signup phone number is not connected to the WhatsApp Business app'];
+        }
+
+        if (WhatsAppAccount::withoutGlobalScopes()->where('phone_number_id', $phoneNumber['id'])
+            ->where('user_id', '!=', $userId)->exists()) {
+            return ['success' => false, 'error' => 'This WhatsApp phone number is already connected to another account'];
         }
 
         // Step 4: Store credentials
@@ -519,7 +574,7 @@ class EmbeddedSignupService
             'display_name' => $phoneNumber['display_phone_number'] ?? null,
             'verified_name' => $phoneNumber['verified_name'] ?? null,
             'quality_rating' => $phoneNumber['quality_rating'] ?? null,
-            'coexistence_enabled' => true,
+            'coexistence_enabled' => $signupHash !== null,
         ];
 
         // Persist business_id from session info so catalog features work without separate OAuth
@@ -527,7 +582,27 @@ class EmbeddedSignupService
             $credentials['catalog_business_id'] = $sessionInfo['business_id'];
         }
 
-        $account = $this->storeCredentials($userId, $credentials);
+        $account = DB::transaction(function () use ($userId, $credentials, $signupHash, $onboardedAt) {
+            User::query()->lockForUpdate()->findOrFail($userId);
+            $account = $this->storeCredentials($userId, $credentials);
+            if ($signupHash) {
+                $import = WhatsAppCoexistenceImport::create([
+                    'whatsapp_account_id' => $account->id,
+                    'waba_id' => $account->waba_id,
+                    'phone_number_id' => $account->phone_number_id,
+                    'signup_hash' => $signupHash,
+                    'onboarded_at' => $onboardedAt,
+                ]);
+                $account->coexistence_import_id = $import->id;
+            } elseif ($account->coexistence_import_id) {
+                $account->coexistence_import_id = null;
+            }
+            if ($account->isDirty('coexistence_import_id')) {
+                $account->save();
+            }
+
+            return $account;
+        });
 
         // Step 5: Subscribe WABA to webhooks (for receiving template status updates, etc.)
         $webhookResult = $this->subscribeToWebhooks($accessToken, $wabaId);
@@ -543,11 +618,36 @@ class EmbeddedSignupService
                 'waba_id' => $wabaId,
                 'user_id' => $userId,
             ]);
+            $this->startCoexistenceImport($account);
         }
 
         return [
             'success' => true,
             'account' => $account,
         ];
+    }
+
+    public function startCoexistenceImport(WhatsAppAccount $account): void
+    {
+        if (! $account->coexistence_import_id) {
+            return;
+        }
+
+        WhatsAppCoexistenceImport::whereKey($account->coexistence_import_id)->whereNull('subscribed_at')
+            ->update(['subscribed_at' => now()]);
+        RequestWhatsAppCoexistenceImport::dispatch($account->coexistence_import_id)->afterCommit();
+    }
+
+    private function isBusinessAppNumber(string $token, string $phoneId): bool
+    {
+        try {
+            $response = Http::withToken($token)->timeout(10)
+                ->get($this->getBaseUrl().'/'.$phoneId, ['fields' => 'is_on_biz_app,platform_type']);
+        } catch (ConnectionException) {
+            return false;
+        }
+
+        return $response->successful() && $response->json('is_on_biz_app') === true
+            && $response->json('platform_type') === 'CLOUD_API';
     }
 }

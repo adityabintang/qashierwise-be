@@ -4,6 +4,7 @@ namespace App\Events;
 
 use App\Models\WhatsAppContact;
 use App\Models\WhatsAppMessage;
+use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
@@ -30,7 +31,7 @@ class NewWhatsAppMessage implements ShouldBroadcastNow
     /**
      * Get the channels the event should broadcast on.
      *
-     * @return array<int, \Illuminate\Broadcasting\Channel>
+     * @return array<int, Channel>
      */
     public function broadcastOn(): array
     {
@@ -91,6 +92,9 @@ class NewWhatsAppMessage implements ShouldBroadcastNow
             'location_address' => $message->location_address,
             'metadata' => $message->metadata,
             'status' => $message->status,
+            'is_read' => $message->is_read,
+            'is_history_import' => $message->is_history_import ?? false,
+            'sent_at' => $message->sent_at?->toISOString(),
             'created_at' => $message->created_at->toISOString(),
             'delivered_at' => $message->delivered_at?->toISOString(),
             'read_at' => $message->read_at?->toISOString(),

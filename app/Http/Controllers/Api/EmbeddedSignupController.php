@@ -49,6 +49,7 @@ class EmbeddedSignupController extends Controller
             'waba_id' => 'nullable|string',
             'phone_number_id' => 'nullable|string',
             'business_id' => 'nullable|string',
+            'event' => 'nullable|in:FINISH,FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING',
         ]);
 
         $userId = auth()->user()->getEffectiveUserId();
@@ -59,6 +60,7 @@ class EmbeddedSignupController extends Controller
             'waba_id' => $request->input('waba_id'),
             'phone_number_id' => $request->input('phone_number_id'),
             'business_id' => $request->input('business_id'),
+            'event' => $request->input('event'),
         ];
 
         Log::info('Processing Embedded Signup callback', [
@@ -221,6 +223,8 @@ class EmbeddedSignupController extends Controller
             'user_id' => $userId,
             'waba_id' => $account->waba_id,
         ]);
+
+        $this->embeddedSignupService->startCoexistenceImport($account);
 
         return response()->json([
             'success' => true,
