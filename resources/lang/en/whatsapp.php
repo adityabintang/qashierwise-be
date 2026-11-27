@@ -109,6 +109,10 @@ return [
 
     // Contact Empty States
     'no_contacts_found' => 'No contacts found',
+    'contacts_pagination' => 'Contact pages',
+    'contacts_range' => 'Showing :from–:to of :total contacts',
+    'contacts_load_failed' => 'Could not load contacts.',
+    'contacts_retry' => 'Try again',
     'contacts_will_appear' => 'Contacts will appear here when you receive or send messages.',
 
     // ========================================

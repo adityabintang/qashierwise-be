@@ -1642,12 +1642,16 @@ class WhatsAppController extends Controller
                 });
             }
 
-            // Keep conversations needing attention at the top, then sort by
-            // the most recent activity within each unread/read group.
-            $contacts = $query->orderByDesc('unread_messages_count')
-                ->orderByDesc('last_message_at')
-                ->orderByDesc('id')
-                ->paginate($perPage);
+            match ($request->query('sort')) {
+                'name_asc' => $query->orderByRaw("LOWER(COALESCE(name, '')) ASC")->orderBy('id'),
+                'name_desc' => $query->orderByRaw("LOWER(COALESCE(name, '')) DESC")->orderBy('id'),
+                'recent' => $query->orderByDesc('created_at')->orderByDesc('id'),
+                'oldest' => $query->orderBy('created_at')->orderBy('id'),
+                // Inbox callers prioritize unread conversations and recent activity.
+                default => $query->orderByDesc('unread_messages_count')->orderByDesc('last_message_at')->orderByDesc('id'),
+            };
+
+            $contacts = $query->paginate($perPage);
 
             $contacts->through(function (WhatsAppContact $contact) {
                 $contact->unread_count = $contact->unread_messages_count;

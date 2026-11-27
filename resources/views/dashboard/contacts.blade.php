@@ -24,13 +24,13 @@
                             <input
                                 type="text"
                                 x-model="searchQuery"
-                                @input="filterContacts"
+                                @input="scheduleSearch()"
                                 placeholder="{{ __('whatsapp.search_contacts') }}"
                                 class="input w-full"
                                 style="padding-left: 2.5rem;"
                             >
                         </div>
-                        <select x-model="sortBy" @change="sortContacts" class="input" style="width:210px;max-width:100%;min-width:min(100%,170px);flex:0 1 210px;">
+                        <select x-model="sortBy" @change="fetchContacts()" aria-label="{{ __('whatsapp.sort_by') }}" class="input" style="width:210px;max-width:100%;min-width:min(100%,170px);flex:0 1 210px;">
                             <option value="name_asc">{{ __('whatsapp.name_asc') }}</option>
                             <option value="name_desc">{{ __('whatsapp.name_desc') }}</option>
                             <option value="recent">{{ __('whatsapp.recently_added') }}</option>
@@ -76,7 +76,7 @@
 
                     <!-- Contact Cards -->
                     <template x-if="!loading">
-                        <template x-for="contact in filteredContacts" :key="contact.id">
+                        <template x-for="contact in contacts" :key="contact.id">
                             <div class="card contact-card p-5 cursor-pointer" @click="showContactDetails(contact)">
                                 <!-- Avatar & Name -->
                                 <div class="flex items-center gap-4 mb-4">
@@ -139,7 +139,7 @@
                 </div>
 
                 <!-- Empty State -->
-                <div x-show="filteredContacts.length === 0 && !loading" class="card">
+                <div x-show="contacts.length === 0 && !loading && !loadFailed" class="card">
                     <div class="empty-state py-16">
                         <div class="empty-state-icon">
                             <i class="fas fa-address-book text-2xl"></i>
@@ -148,6 +148,28 @@
                         <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">{{ __('whatsapp.contacts_will_appear') }}</p>
                     </div>
                 </div>
+
+                <div x-show="loadFailed" x-cloak class="card flex flex-wrap items-center gap-3 p-4">
+                    <p role="alert">{{ __('whatsapp.contacts_load_failed') }}</p>
+                    <button type="button" class="btn btn-outline" @click="fetchContacts(requestedPage)" :disabled="loading">
+                        {{ __('whatsapp.contacts_retry') }}
+                    </button>
+                </div>
+
+                <nav x-show="total > 0 && !loadFailed" x-cloak aria-label="{{ __('whatsapp.contacts_pagination') }}"
+                    class="card flex flex-wrap items-center justify-between gap-3 p-4">
+                    <p class="text-sm text-[hsl(var(--muted-foreground))]" aria-live="polite"
+                        data-label="{{ __('whatsapp.contacts_range') }}"
+                        x-text="$el.dataset.label.replace(':from', (page - 1) * perPage + 1).replace(':to', (page - 1) * perPage + contacts.length).replace(':total', total)"></p>
+                    <div x-show="lastPage > 1" class="flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-outline" @click="fetchContacts(page - 1)" :disabled="loading || page <= 1">
+                            {{ __('common.previous') }}
+                        </button>
+                        <button type="button" class="btn btn-outline" @click="fetchContacts(page + 1)" :disabled="loading || page >= lastPage">
+                            {{ __('common.next') }}
+                        </button>
+                    </div>
+                </nav>
 
                 <!-- Contact Details Modal -->
                 <div x-show="showModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -379,29 +401,69 @@ function contactsManager() {
     return {
         API_BASE_URL: window.location.origin + '/api',
         contacts: [],
-        filteredContacts: [],
         selectedContact: null,
         showModal: false,
         searchQuery: '',
         sortBy: 'name_asc',
         loading: true,
+        loadFailed: false,
+        page: 1,
+        lastPage: 1,
+        perPage: 15,
+        total: 0,
+        requestedPage: 1,
+        requestId: 0,
+        searchTimer: null,
 
         async init() {
             await this.fetchContacts();
         },
 
-        async fetchContacts() {
+        scheduleSearch() {
+            clearTimeout(this.searchTimer);
+            this.requestId++;
             this.loading = true;
+            this.loadFailed = false;
+            this.searchTimer = setTimeout(() => this.fetchContacts(), 250);
+        },
+
+        destroy() {
+            clearTimeout(this.searchTimer);
+            this.requestId++;
+        },
+
+        async fetchContacts(page = 1) {
+            clearTimeout(this.searchTimer);
+            const requestId = ++this.requestId;
+            this.requestedPage = page;
+            this.loading = true;
+            this.loadFailed = false;
             try {
                 const token = localStorage.getItem('token');
-                const response = await fetch(`${this.API_BASE_URL}/whatsapp/contacts`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                const params = new URLSearchParams({
+                    page, per_page: this.perPage, search: this.searchQuery.trim(), sort: this.sortBy,
+                });
+                const response = await fetch(`${this.API_BASE_URL}/whatsapp/contacts?${params}`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
                 });
                 const data = await response.json();
-                this.contacts = data.data || [];
-                this.filterContacts();
-            } catch (e) { console.error('Error:', e); }
-            finally { this.loading = false; }
+                if (requestId !== this.requestId) return;
+                if (!response.ok || !data.success) throw new Error('Failed to load WhatsApp contacts');
+                if (page > data.pagination.last_page) return this.fetchContacts(data.pagination.last_page);
+
+                this.contacts = data.data;
+                this.page = data.pagination.current_page;
+                this.lastPage = data.pagination.last_page;
+                this.total = data.total;
+            } catch (e) {
+                if (requestId === this.requestId) {
+                    this.contacts = [];
+                    this.loadFailed = true;
+                    console.error('Error:', e);
+                }
+            } finally {
+                if (requestId === this.requestId) this.loading = false;
+            }
         },
 
         async toggleAi(contact) {
@@ -414,33 +476,8 @@ function contactsManager() {
                 const data = await res.json();
                 if (data.success) {
                     contact.ai_active = data.data.ai_active;
-                    this.contacts = [...this.contacts];
-                    this.filterContacts();
                 }
             } catch (e) { console.error('Toggle AI error:', e); }
-        },
-
-        filterContacts() {
-            let filtered = this.contacts;
-            if (this.searchQuery) {
-                const query = this.searchQuery.toLowerCase();
-                filtered = filtered.filter(c =>
-                    (c.name && c.name.toLowerCase().includes(query)) ||
-                    (c.phone_number && c.phone_number.includes(query)) ||
-                    (c.profile_name && c.profile_name.toLowerCase().includes(query))
-                );
-            }
-            this.filteredContacts = filtered;
-            this.sortContacts();
-        },
-
-        sortContacts() {
-            switch(this.sortBy) {
-                case 'name_asc': this.filteredContacts.sort((a, b) => (a.name || '').localeCompare(b.name || '')); break;
-                case 'name_desc': this.filteredContacts.sort((a, b) => (b.name || '').localeCompare(a.name || '')); break;
-                case 'recent': this.filteredContacts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)); break;
-                case 'oldest': this.filteredContacts.sort((a, b) => new Date(a.created_at) - new Date(b.created_at)); break;
-            }
         },
 
         showContactDetails(contact) {

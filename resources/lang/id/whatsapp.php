@@ -110,6 +110,10 @@ return [
     // Contact Empty States
     'no_contacts_found' => 'Tidak ada kontak ditemukan',
     'contacts_will_appear' => 'Kontak akan muncul di sini ketika Anda menerima atau mengirim pesan.',
+    'contacts_pagination' => 'Halaman kontak',
+    'contacts_range' => 'Menampilkan :from–:to dari :total kontak',
+    'contacts_load_failed' => 'Kontak gagal dimuat.',
+    'contacts_retry' => 'Coba lagi',
 
     // ========================================
     // Messages & Chat
