@@ -1,15 +1,14 @@
 <?php
 
+use App\Http\Controllers\Admin\AnalyticsController as AdminAnalyticsController;
 use App\Http\Controllers\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Admin\BlogCategoryController as AdminBlogCategoryController;
 use App\Http\Controllers\Admin\BlogPostController as AdminBlogPostController;
 use App\Http\Controllers\Admin\BlogTagController as AdminBlogTagController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
-use App\Http\Controllers\Admin\AnalyticsController as AdminAnalyticsController;
 use App\Http\Controllers\Admin\UploadController as AdminUploadController;
 use App\Http\Controllers\AiAgentController;
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Middleware\EnsureCanAccessAdmin;
 use App\Http\Controllers\Api\BalanceController;
 use App\Http\Controllers\Api\BankAccountController;
 use App\Http\Controllers\Api\BroadcastAuthController;
@@ -37,13 +36,17 @@ use App\Http\Controllers\Api\ReservationConfigController;
 use App\Http\Controllers\Api\ReservationController;
 use App\Http\Controllers\Api\SubMerchantController;
 use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\TrackCtwaController;
+use App\Http\Controllers\Api\UserWebhookController;
+use App\Http\Controllers\Api\WhatsAppBroadcastController;
 use App\Http\Controllers\Api\WhatsAppController;
 use App\Http\Controllers\Api\WhatsAppExportController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
-use App\Http\Controllers\Api\UserWebhookController;
 use App\Http\Controllers\Api\WithdrawalController;
 use App\Http\Controllers\Api\XenditWebhookController;
+use App\Http\Controllers\Auth\GoogleOAuthController;
 use App\Http\Controllers\MonitoringDashboardController;
+use App\Http\Middleware\EnsureCanAccessAdmin;
 use App\Http\Middleware\LogBroadcastingAuth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -124,7 +127,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
 // Protected routes
 Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function () {
-    Route::prefix('track-ctwa')->controller(\App\Http\Controllers\Api\TrackCtwaController::class)->group(function () {
+    Route::prefix('track-ctwa')->controller(TrackCtwaController::class)->group(function () {
         Route::get('/', 'index');
         Route::get('/inbox', 'inbox');
         Route::put('/phones/{phone}', 'configurePhone')->whereNumber('phone');
@@ -178,6 +181,10 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
 
     // WhatsApp Business API routes
     Route::prefix('whatsapp')->group(function () {
+        Route::get('/broadcasts/options', [WhatsAppBroadcastController::class, 'options']);
+        Route::get('/broadcasts', [WhatsAppBroadcastController::class, 'index']);
+        Route::post('/broadcasts', [WhatsAppBroadcastController::class, 'store']);
+        Route::get('/broadcasts/{id}', [WhatsAppBroadcastController::class, 'show'])->whereNumber('id');
         Route::get('/exports/contacts', [WhatsAppExportController::class, 'contacts']);
         Route::get('/exports/messages', [WhatsAppExportController::class, 'messages']);
         // Embedded Signup routes
@@ -295,8 +302,8 @@ Route::middleware(['auth:sanctum', 'clear.permission.cache'])->group(function ()
         // Static segments must precede the /{id} wildcard below.
         Route::get('/catalog-products', [ReservationConfigController::class, 'catalogProducts']);
         Route::get('/google-calendar-status', [ReservationConfigController::class, 'googleCalendarStatus']);
-        Route::get('/google-calendar/connect-url', [\App\Http\Controllers\Auth\GoogleOAuthController::class, 'connectUrl']);
-        Route::delete('/google-calendar', [\App\Http\Controllers\Auth\GoogleOAuthController::class, 'disconnectCalendar']);
+        Route::get('/google-calendar/connect-url', [GoogleOAuthController::class, 'connectUrl']);
+        Route::delete('/google-calendar', [GoogleOAuthController::class, 'disconnectCalendar']);
         Route::post('/', [ReservationConfigController::class, 'store']);
         Route::get('/{id}', [ReservationConfigController::class, 'show']);
         Route::put('/{id}', [ReservationConfigController::class, 'update']);

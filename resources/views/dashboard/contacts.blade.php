@@ -3,6 +3,12 @@
 
 @section('title', __('dashboard.contacts_title'))
 
+@push('styles')
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+@endpush
+
 @section('content')
 <div x-data="contactsApp()" class="h-screen flex bg-[hsl(var(--muted)/0.4)] overflow-hidden">
     <!-- Sidebar -->
@@ -14,8 +20,8 @@
         @include('components.dashboard-header', ['title' => __('whatsapp.contacts_title'), 'description' => __('whatsapp.contacts_subtitle')])
 
         <!-- Page Content -->
-        <main class="flex-1 p-4 md:p-6">
-            <div class="max-w-7xl mx-auto space-y-6" x-data="contactsManager()">
+        <main class="flex-1 px-4 py-6 lg:px-8 lg:py-8">
+            <div class="max-w-6xl mx-auto space-y-6" x-data="contactsManager()">
                 <!-- Search & Filter -->
                 <div class="card p-3 md:p-4 -mx-4 md:mx-0 rounded-none md:rounded-lg shadow-sm">
                     <div class="flex flex-wrap items-center gap-3 md:gap-4" style="display:flex;flex-wrap:wrap;align-items:center;width:100%;box-sizing:border-box;">
@@ -48,6 +54,25 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="dashboard-ui dashboard-ui-card flex flex-wrap items-center justify-between gap-3 p-4">
+                    <div class="flex flex-wrap items-center gap-4">
+                        <label class="flex items-center gap-2 text-sm">
+                            <input type="checkbox" class="dashboard-ui-check" :checked="broadcastPageSelected" :disabled="loading || !contacts.length"
+                                x-effect="$el.indeterminate = !broadcastPageSelected && contacts.some(contact => contact.id in broadcastSelection)"
+                                @change="selectBroadcastPage($event.target.checked)">
+                            {{ __('whatsapp_broadcast.select_page') }}
+                        </label>
+                        <span class="dashboard-ui-muted text-sm" aria-live="polite" x-text="broadcastCopy('selected', { count: broadcastCounts.total })"></span>
+                        <button type="button" class="btn btn-ghost" x-cloak x-show="broadcastCounts.total" @click="broadcastSelection = {}">{{ __('whatsapp_broadcast.clear') }}</button>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-secondary" @click="openBroadcast('history')">{{ __('whatsapp_broadcast.history') }}</button>
+                        <button type="button" class="btn btn-primary" :disabled="!broadcastCounts.total" @click="openBroadcast('compose')">{{ __('whatsapp_broadcast.title') }}</button>
+                    </div>
+                </div>
+
+                @include('dashboard.partials.whatsapp-broadcast')
 
                 <!-- Contacts Grid -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -102,6 +127,9 @@
                                         <h3 class="font-semibold truncate" x-text="contact.name || 'Unknown'">Unknown</h3>
                                         <p class="text-sm text-[hsl(var(--muted-foreground))] truncate" x-text="contact.phone_number">-</p>
                                     </div>
+                                    <input type="checkbox" class="dashboard-ui dashboard-ui-check" :checked="contact.id in broadcastSelection"
+                                        :aria-label="broadcastCopy('select_contact', { name: contact.name || contact.phone_number })"
+                                        @click.stop @change="selectBroadcastContact(contact, $event.target.checked)">
                                 </div>
 
                                 <!-- Info -->
@@ -398,7 +426,7 @@ function contactsApp() {
 }
 
 function contactsManager() {
-    return {
+    return Object.assign(contactsBroadcast(), {
         API_BASE_URL: window.location.origin + '/api',
         contacts: [],
         selectedContact: null,
@@ -429,6 +457,7 @@ function contactsManager() {
 
         destroy() {
             clearTimeout(this.searchTimer);
+            this.closeBroadcast();
             this.requestId++;
         },
 
@@ -452,6 +481,9 @@ function contactsManager() {
                 if (page > data.pagination.last_page) return this.fetchContacts(data.pagination.last_page);
 
                 this.contacts = data.data;
+                for (const contact of this.contacts) {
+                    if (contact.id in this.broadcastSelection) this.selectBroadcastContact(contact, true);
+                }
                 this.page = data.pagination.current_page;
                 this.lastPage = data.pagination.last_page;
                 this.total = data.total;
@@ -512,7 +544,7 @@ function contactsManager() {
             if (digits) return digits[1];
             return '?';
         }
-    }
+    });
 }
 </script>
 @endsection

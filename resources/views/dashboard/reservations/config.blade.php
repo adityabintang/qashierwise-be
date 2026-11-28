@@ -484,22 +484,23 @@
                                                     <p class="text-xs text-muted-foreground">Memuat template...</p>
                                                 </div>
                                                 <div x-show="!loadingTemplates">
-                                                    <select x-model="form.reminder_template" @change="onTemplateChange()" class="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400 transition-colors">
-                                                        <option value="">Pilih template...</option>
-                                                        <template x-for="template in templates" :key="template.name">
-                                                            <option :value="template.name" x-text="template.name + ' (' + (template.body_examples?.length || 0) + ' params)'"></option>
+                                                    <select x-model="form.reminder_template" @change="onTemplateChange()" :disabled="templates.length === 0" class="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400 transition-colors">
+                                                        <option value="" :selected="!selectedTemplate">Pilih template...</option>
+                                                        <template x-for="name in templateNames" :key="name">
+                                                            <option :value="name" :selected="form.reminder_template === name" x-text="name"></option>
                                                         </template>
                                                     </select>
-                                                    <p class="text-xs text-muted-foreground mt-1.5" x-show="form.reminder_template === ''">Hanya menampilkan template dengan parameter</p>
+                                                    <p class="text-xs text-muted-foreground mt-1.5" x-show="templates.length === 0" x-text="templateLoadError || 'Belum ada template WhatsApp yang disetujui.'"></p>
                                                 </div>
                                             </div>
 
                                             <!-- Language -->
                                             <div x-show="form.reminder_template" class="space-y-1.5">
                                                 <label class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Bahasa Template</label>
-                                                <select x-model="form.reminder_template_language" class="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400 transition-colors">
-                                                    <option value="id">Bahasa Indonesia (id)</option>
-                                                    <option value="en">English (en)</option>
+                                                <select x-model="form.reminder_template_language" @change="onTemplateChange()" class="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400 transition-colors">
+                                                    <template x-for="template in templateVariants" :key="template.language">
+                                                        <option :value="template.language" :selected="form.reminder_template_language === template.language" x-text="({ id: 'Bahasa Indonesia (id)', en: 'English (en)' })[template.language] || template.language"></option>
+                                                    </template>
                                                 </select>
                                             </div>
 
@@ -934,6 +935,7 @@ function configApp() {
         loadingStats: false,
         loadingTemplates: false,
         templates: [],
+        templateLoadError: '',
         currentTemplateParams: [],
         reservationStats: {
             booked_capacity: 0,
@@ -1291,6 +1293,7 @@ function configApp() {
 
         async loadTemplates() {
             this.loadingTemplates = true;
+            this.templateLoadError = '';
             try {
                 const token = localStorage.getItem('token');
                 const response = await fetch('/api/whatsapp/templates?status=APPROVED', {
@@ -1302,66 +1305,52 @@ function configApp() {
 
                 if (!response.ok) throw new Error('Failed to load templates');
 
-                const data = await response.json();
-                if (data.success) {
-                    const allTemplates = data.data || [];
+                const { success, data } = await response.json();
+                if (!success) throw new Error('Failed to load templates');
 
-                    // Show templates whose body text contains at least one {{N}} parameter
-                    // placeholder. The `body_examples` field is often null even for
-                    // parametric templates, so we check the body text directly.
-                    this.templates = allTemplates.filter(t => /\{\{\d+\}\}/.test(t.body || ''));
-
-                    console.log('All templates:', allTemplates.map(t => t.name));
-                    console.log('Filtered (with params):', this.templates.map(t => t.name));
-
-                    // If a template is already selected, extract its params
-                    if (this.form.reminder_template) {
-                        setTimeout(() => {
-                            this.onTemplateChange();
-                        }, 100);
-                    }
-                }
+                this.templates = data || [];
+                this.onTemplateChange();
             } catch (error) {
                 console.error('Error loading templates:', error);
+                this.templates = [];
+                this.currentTemplateParams = [];
+                this.templateLoadError = 'Gagal memuat template WhatsApp.';
             } finally {
                 this.loadingTemplates = false;
             }
         },
 
-        onTemplateChange() {
-            const template = this.templates.find(t => t.name === this.form.reminder_template);
-            if (template) {
-                // Extract actual param names/keys from template body
-                // Use RegExp constructor to avoid Blade parsing {{}} as PHP
-                const varRegex = new RegExp('{' + '{' + '([^}]+)' + '}' + '}', 'g');
-                const body = template.body || '';
-                const params = [];
-                let m;
-                while ((m = varRegex.exec(body)) !== null) {
-                    params.push(m[1]); // e.g. 'nama', 'order_id', or '1', '2'
-                }
-                // Fallback to counting body_examples if body is unavailable
-                if (params.length === 0) {
-                    const paramCount = template.body_examples?.length || 0;
-                    for (let i = 1; i <= paramCount; i++) { params.push(String(i)); }
-                }
-                this.currentTemplateParams = params;
+        get templateNames() {
+            return [...new Set(this.templates.map(template => template.name))];
+        },
 
-                // Rebuild mapping with only current template's params, preserving existing values
-                const prevMapping = this.form.reminder_param_mapping;
-                const freshMapping = {};
-                this.currentTemplateParams.forEach(param => {
-                    freshMapping[param] = prevMapping[param] || '';
-                });
-                this.form.reminder_param_mapping = freshMapping;
-            } else {
-                this.currentTemplateParams = [];
+        get templateVariants() {
+            return this.templates.filter(template => template.name === this.form.reminder_template);
+        },
+
+        get selectedTemplate() {
+            return this.templateVariants.find(template => template.language === this.form.reminder_template_language)
+                ?? this.templateVariants[0];
+        },
+
+        onTemplateChange() {
+            const template = this.selectedTemplate;
+            const params = template?.body
+                ? Array.from(template.body.matchAll(/\{\{([^}]+)\}\}/g), match => match[1])
+                : (template?.body_examples || []).map((_, index) => String(index + 1));
+            this.currentTemplateParams = params;
+
+            if (template) {
+                this.form.reminder_template_language = template.language;
+                const previousMapping = this.form.reminder_param_mapping;
+                this.form.reminder_param_mapping = Object.fromEntries(params.map(param => [param, previousMapping[param] || '']));
+            } else if (!this.form.reminder_template) {
                 this.form.reminder_param_mapping = {};
             }
         },
 
         getPreviewBody() {
-            const template = this.templates.find(t => t.name === this.form.reminder_template);
+            const template = this.selectedTemplate;
             if (!template) return null;
 
             const fieldLabels = {
@@ -1384,7 +1373,9 @@ function configApp() {
                 reservation_notes: 'Catatan Reservasi',
             };
 
-            let body = template.body || '';
+            const text = document.createElement('span');
+            text.textContent = template.body || '';
+            let body = text.innerHTML;
 
             // Replace each placeholder with the mapped field label or a gray placeholder
             // Note: split with variable avoids Blade compiling curly braces as PHP
@@ -1396,7 +1387,8 @@ function configApp() {
                     : 'background:#f3f4f6;color:#9ca3af;font-weight:600;padding:1px 5px;border-radius:4px;font-size:0.8em;border:1px dashed #d1d5db;';
                 // Use the actual param name/key as the placeholder (works for both {{1}} and {{nama}})
                 const placeholder = '{' + '{' + param + '}' + '}';
-                body = body.split(placeholder).join('<span style="' + style + '">' + label + '</span>');
+                text.textContent = label;
+                body = body.split(placeholder).join('<span style="' + style + '">' + text.innerHTML + '</span>');
             });
 
             return body || null;
@@ -1548,16 +1540,9 @@ function configApp() {
                     : '/api/reservation-config';
                 const method = this.configId ? 'PUT' : 'POST';
 
-                // Filter reminder_param_mapping to only include keys for the current template's params
-                const filteredMapping = {};
-                this.currentTemplateParams.forEach(param => {
-                    filteredMapping[param] = this.form.reminder_param_mapping[param] || '';
-                });
-
                 const payload = {
                     ...this.form,
-                    store_id: this.selectedStoreId,
-                    reminder_param_mapping: filteredMapping
+                    store_id: this.selectedStoreId
                 };
 
                 const response = await fetch(url, {
@@ -1790,7 +1775,7 @@ function configApp() {
                 return;
             }
 
-            const template = this.templates.find(t => t.name === this.form.reminder_template);
+            const template = this.selectedTemplate;
             if (!template) {
                 Alpine.store('toast').addToast('Template tidak ditemukan.', 'error');
                 return;
@@ -1803,8 +1788,7 @@ function configApp() {
                 const payload = {
                     to: this.testMessagePhone,
                     template_name: this.form.reminder_template,
-                    // Use the template's actual registered language, not the form default.
-                    language: template.language || this.form.reminder_template_language || 'en',
+                    language: template.language,
                 };
 
                 // Build body_params using the configured parameter mapping with sample data.
@@ -1829,39 +1813,21 @@ function configApp() {
                     reservation_notes: 'Minta tempat dekat jendela',
                 };
 
-                const paramKeys = this.currentTemplateParams.length > 0
-                    ? this.currentTemplateParams
-                    : (template.body_examples || []).map((_, i) => String(i + 1));
+                const paramKeys = this.currentTemplateParams;
 
                 if (paramKeys.length > 0) {
-                    const isNamed = (template.variable_type || 'numeric') === 'named';
-                    let variableNames = [];
-
-                    if (isNamed && template.body) {
-                        // Extract variable names in order from the template body
-                        // Use RegExp constructor to avoid Blade parsing double-curly braces as PHP expressions
-                        const varRegex = new RegExp('{' + '{' + '([a-zA-Z_][a-zA-Z0-9_]*)' + '}' + '}', 'g');
-                        let match;
-                        while ((match = varRegex.exec(template.body)) !== null) {
-                            variableNames.push(match[1]);
-                        }
-                    }
-
                     payload.body_params = paramKeys.map((param, index) => {
                         const mappedField = this.form.reminder_param_mapping[param];
                         const value = (mappedField && sampleValues[mappedField])
                             ? sampleValues[mappedField]
                             : (template.body_examples?.[index] != null ? String(template.body_examples[index]) : `[param ${index + 1}]`);
                         const paramObj = { type: 'text', text: value };
-                        if (isNamed && variableNames[index]) {
-                            paramObj.parameter_name = variableNames[index];
+                        if (!/^\d+$/.test(param)) {
+                            paramObj.parameter_name = param;
                         }
                         return paramObj;
                     });
                 }
-
-                // Use the template's own language code, falling back to the configured one
-                payload.language = template.language || this.form.reminder_template_language || 'id';
 
                 const response = await fetch('/api/whatsapp/send/template', {
                     method: 'POST',

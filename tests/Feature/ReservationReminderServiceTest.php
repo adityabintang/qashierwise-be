@@ -5,13 +5,15 @@ namespace Tests\Feature;
 use App\Services\ReservationReminderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class ReservationReminderServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_schedule_reminders_uses_reservation_date_and_time_fields_not_null(): void
+    #[DataProvider('reminderMappings')]
+    public function test_schedule_reminders_uses_reservation_date_and_time_fields_not_null(array $mapping): void
     {
         $reservation = \App\Models\Reservation::factory()->create([
             'reservation_date' => now()->addDay(),
@@ -24,6 +26,7 @@ class ReservationReminderServiceTest extends TestCase
             ->create([
                 'user_id' => $reservation->user_id,
                 'store_id' => $reservation->store_id,
+                'reminder_param_mapping' => $mapping,
             ]);
 
         // Log all INFO entries
@@ -62,5 +65,13 @@ class ReservationReminderServiceTest extends TestCase
         // Verify that the datetime contains both date and time components
         $this->assertStringContainsString($reservation->reservation_date->toDateString(), $capturedDateTime);
         $this->assertStringContainsString('19:30', $capturedDateTime);
+    }
+
+    public static function reminderMappings(): array
+    {
+        return [
+            'with parameters' => [['nama' => 'customer_name']],
+            'without parameters' => [[]],
+        ];
     }
 }

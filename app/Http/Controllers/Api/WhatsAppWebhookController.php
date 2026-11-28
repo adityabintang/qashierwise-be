@@ -21,6 +21,7 @@ use App\Services\MediaStorageService;
 use App\Services\TrackCtwaService;
 use App\Services\WebhookForwardingService;
 use App\Services\WhatsAppAccountService;
+use App\Services\WhatsAppBroadcastSender;
 use App\Services\WhatsAppCoexistenceImportService;
 use App\Services\WhatsAppFlowService;
 use App\Services\WhatsAppMessageHistory;
@@ -199,6 +200,10 @@ class WhatsAppWebhookController extends Controller
                         // Handle status updates
                         if (isset($change['value']['statuses'])) {
                             foreach ($change['value']['statuses'] as $status) {
+                                if ($verified && (string) $wabaId === (string) ($whatsappAccount->waba_id ?: $whatsappAccount->business_account_id)
+                                    && app(WhatsAppBroadcastSender::class)->receipt($whatsappAccount, $status)) {
+                                    continue;
+                                }
                                 $this->handleMessageStatus($status, $userId);
                             }
                         }
@@ -996,6 +1001,10 @@ class WhatsAppWebhookController extends Controller
                 'actual_user_id' => $messageWithoutFilter?->user_id,
             ]);
 
+            return;
+        }
+
+        if (isset($message->metadata['broadcast_id'])) {
             return;
         }
 

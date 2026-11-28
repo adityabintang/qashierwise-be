@@ -90,6 +90,7 @@ class SendReservationReminder implements ShouldQueue
         // Get the template (bypass global auth scope — jobs run without an authenticated user)
         $template = WhatsAppTemplate::withoutGlobalScope('userTemplates')
             ->where('name', $config->reminder_template)
+            ->where('language', $config->reminder_template_language)
             ->where('whatsapp_account_id', function ($query) use ($reservation) {
                 $query->select('id')
                     ->from('whatsapp_accounts')
@@ -177,35 +178,24 @@ class SendReservationReminder implements ShouldQueue
             'access_token' => $whatsappAccount->access_token,
         ]);
 
-        // Get parameter structure from template to map correctly
-        $templateStructure = $parameterService->getParameterStructure($template);
-
-        // Build a mapping of parameter index to name
         $paramIndexToName = [];
-        foreach ($templateStructure as $param) {
-            if ($param['type'] === 'body' && isset($param['index']) && isset($param['name'])) {
+        foreach ($parameterService->getParameterStructure($template) as $param) {
+            if ($param['type'] === 'body' && ! ctype_digit($param['name'])) {
                 $paramIndexToName[$param['index']] = $param['name'];
             }
         }
 
-        // Format body parameters as WhatsApp API expects objects with parameter names
         $formattedBodyParams = [];
         foreach ($bodyParams as $index => $param) {
-            $paramIndex = $index + 1; // 0-based to 1-based
-            $formattedBodyParams[] = [
-                'type' => 'text',
-                'text' => $param,
-                'parameter_name' => $paramIndexToName[$paramIndex] ?? 'param'.$paramIndex,
-            ];
+            $parameter = ['type' => 'text', 'text' => $param];
+            if (isset($paramIndexToName[$index + 1])) {
+                $parameter['parameter_name'] = $paramIndexToName[$index + 1];
+            }
+            $formattedBodyParams[] = $parameter;
         }
 
         try {
-            // Create component with body parameters
-            $component = new Component(
-                [], // header_params
-                $formattedBodyParams,  // body_params
-                []  // button_params
-            );
+            $component = $formattedBodyParams ? new Component(body: $formattedBodyParams) : null;
 
             $response = $whatsapp->sendTemplate(
                 $reservation->phone,

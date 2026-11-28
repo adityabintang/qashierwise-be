@@ -152,7 +152,6 @@ class ReservationConfig extends Model
     {
         return $this->reminder_enabled
             && ! empty($this->reminder_template)
-            && ! empty($this->reminder_param_mapping)
             && ! empty($this->reminder_timing);
     }
 

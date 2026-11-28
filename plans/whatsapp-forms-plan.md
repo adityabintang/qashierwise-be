@@ -1,0 +1,25 @@
+# Pembuat Formulir WhatsApp Flows
+
+## Ringkasan
+
+Tambahkan menu **Formulir WhatsApp** di dashboard QashierWise. Merchant bisa memilih jenis formulir, menyesuaikan pertanyaan dan pilihan jawaban di beberapa layar, melihat pratinjau, lalu menerbitkannya ke WhatsApp. Formulir yang sudah terbit bisa dikirim ke satu kontak dari Inbox. Jawaban pelanggan tampil di daftar dan detail respons per formulir.
+
+## Pengalaman merchant
+
+- **Pilih jenis formulir.** Sediakan enam pilihan awal yang bisa diedit seluruhnya. **Survei** berisi penilaian dan masukan, **Minat pelanggan** berisi pilihan produk atau layanan, **Permintaan janji temu** berisi tanggal dan waktu preferensi, **Pendaftaran acara** berisi nama dan jumlah peserta, **Pendaftaran kontak** berisi nama dan email, dan **Formulir khusus** mulai dari layar kosong. Permintaan janji temu masuk sebagai respons untuk ditindaklanjuti merchant.
+- **Susun dan pratinjau.** Merchant bisa menambah, menghapus, dan mengurutkan layar, pertanyaan, serta opsi jawaban. Dukung teks pendek, teks panjang, angka, email, telepon, tanggal, pilihan tunggal, dropdown, dan pilihan ganda. Judul layar, label pertanyaan, pilihan jawaban, dan status wajib isi dapat diubah. Pratinjau ponsel mengikuti isi editor dan bisa berpindah layar. Gunakan komponen dashboard Blade dan Alpine yang sudah dipakai Inbox.
+- **Simpan dan terbitkan.** Draf disimpan di QashierWise dan bisa dilanjutkan. Setelah terbit, formulir dapat dibuka untuk dilihat atau diduplikat menjadi draf baru. Jawaban tetap terkait dengan formulir yang diterima pelanggan, termasuk ketika merchant menerbitkan hasil duplikat.
+- **Kirim dan lihat jawaban.** Tambahkan aksi **Kirim formulir** di Inbox untuk memilih formulir terbit dan mengirim pesan dengan tombol **Isi formulir**. Batasi pengiriman ke sesi 24 jam sejak pesan masuk langsung terakhir dari kontak, dengan pemeriksaan ulang di server. Halaman respons menampilkan kontak, waktu pengisian, dan detail jawaban dengan label pertanyaan dan opsi aslinya. [Aturan sesi WhatsApp](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages#customer-service-windows)
+
+## Implementasi
+
+- **Dashboard dan API.** Tambahkan `/dashboard/whatsapp-forms` serta API terautentikasi di `/api/whatsapp/forms` untuk daftar, detail, simpan draf, duplikasi, penerbitan, pengiriman berdasarkan `contact_id`, dan daftar serta detail respons. Batasi operasi ke pemilik data merchant yang sedang login. Penerbitan dan pengiriman memerlukan akun WhatsApp aktif. Kontak dan nomor pengirim harus berasal dari akun tersebut, dan Flow terbit hanya bisa dikirim dari akun bisnis WhatsApp tempat Flow diterbitkan.
+- **Penerbitan Meta.** Simpan definisi layar dan pertanyaan dalam JSON dengan ID layar, pertanyaan, dan opsi yang stabil saat label atau urutan berubah. Validasi draf saat disimpan, lalu cek kelengkapan dan batas komponen Meta sebelum menerbitkan. Generate Flow JSON 7.3 dengan `navigate` antarlayar dan `complete` pada layar terakhir yang membawa jawaban dari seluruh layar. Buat draf Meta, simpan Flow ID, unggah aset, lalu terbitkan. Tampilkan kesalahan validasi di editor dan gunakan kembali Flow ID saat mencoba ulang. Cegah penerbitan paralel dan periksa status atau cari nama Meta yang stabil setelah timeout sebelum mengulangi permintaan. [Flow JSON](https://developers.facebook.com/documentation/business-messaging/whatsapp/flows/guides/flowjson) · [Flows API](https://developers.facebook.com/documentation/business-messaging/whatsapp/flows/guides/flowsapi)
+- **Pengiriman dan respons.** Simpan catatan pengiriman dengan token acak sebelum memanggil Meta. Gunakan riwayat pesan Inbox yang sudah ada untuk mencatat pesan keluar. Untuk balasan `nfm_reply`, cocokkan token, akun, dan pengirim dari webhook bertanda tangan valid, lalu validasi jawaban terhadap definisi yang diterbitkan. Simpan maksimal satu respons per pengiriman dengan batas unik di database agar webhook ulang aman. Pastikan pencatatan respons tetap bisa diproses saat balasan yang sama sudah tercatat di Inbox. Formulir ini memakai `navigate` dan `complete` di klien WhatsApp serta webhook untuk menerima jawaban. [Pengiriman Flow interaktif](https://developers.facebook.com/documentation/business-messaging/whatsapp/flows/guides/sendingaflow#userinitiated)
+
+## Verifikasi
+
+- Uji keenam pilihan awal, urutan layar dan pertanyaan, pratinjau, validasi opsi, serta pengumpulan jawaban dari layar awal hingga akhir.
+- Dengan HTTP palsu, uji penolakan dan timeout Meta, percobaan ulang penerbitan, duplikasi draf, sesi lewat 24 jam, serta akses lintas merchant dan akun.
+- Uji webhook dengan token valid, token tidak dikenal, pengirim berbeda, jawaban rusak, dan pengiriman ulang webhook. Pastikan jawaban lama tetap terbaca setelah formulir diduplikat dan alur reservasi serta Inbox yang ada lolos pengujian regresi.
+- Jalankan PHPUnit dan Pint. Sebelum rilis, verifikasi alur penuh dari dashboard ke ponsel dan kembali ke daftar respons memakai akun Meta yang memenuhi syarat untuk menerbitkan Flow.

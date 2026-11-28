@@ -160,10 +160,6 @@ class ReservationReminderService
             $errors[] = 'At least one reminder timing is required';
         }
 
-        if (empty($config->reminder_param_mapping)) {
-            $errors[] = 'Parameter mapping is required';
-        }
-
         return $errors;
     }
 }

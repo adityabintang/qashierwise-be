@@ -16,6 +16,7 @@ use App\Services\MediaStorageService;
 use App\Services\TemplateService;
 use App\Services\TrackCtwaService;
 use App\Services\WhatsAppAccountService;
+use App\Services\WhatsAppBroadcastService;
 use App\Services\WhatsAppMessageHistory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -1653,8 +1654,12 @@ class WhatsAppController extends Controller
 
             $contacts = $query->paginate($perPage);
 
-            $contacts->through(function (WhatsAppContact $contact) {
+            $first = $contacts->getCollection()->first();
+            $optOuts = $first ? app(WhatsAppBroadcastService::class)
+                ->optOuts($first->user_id, $first->phone_number_id, $contacts->getCollection()->pluck('wa_id')->all()) : [];
+            $contacts->through(function (WhatsAppContact $contact) use ($optOuts) {
                 $contact->unread_count = $contact->unread_messages_count;
+                $contact->broadcast_opted_out = isset($optOuts[ltrim($contact->wa_id, '+')]);
                 unset($contact->unread_messages_count);
 
                 return $contact;
