@@ -358,7 +358,7 @@
                             <!-- Messages List -->
                             <template x-if="!loadingMessages">
                                 <div class="space-y-3">
-                                    <template x-for="(message, index) in messages" :key="message?.id || `msg-${index}`">
+                                    <template x-for="(message, index) in displayMessages" :key="message?.id || `msg-${index}`">
                                         <div x-show="message && message.id" class="flex" :class="message?.direction === 'outgoing' ? 'justify-end' : 'justify-start'">
                                             <!-- Message bubble max-width: 85% on mobile, 70% on desktop (Requirements 4.5) -->
                                             <div class="max-w-[85%] md:max-w-[70%]">
@@ -1478,15 +1478,41 @@ function messagesManager() {
                 const updated = { ...existing, ...message, ...status };
                 if (updated.is_revoked || existing?.is_revoked) {
                     updated.is_revoked = true;
-                    updated.type = 'revoke';
                     updated.body = message.is_revoked ? message.body : existing.body;
-                    updated.content = null;
-                    updated.interactive_details = null;
+                    updated.content = existing?.is_revoked ? existing.content : updated.content;
                 }
                 byId.set(id, updated);
             }
             const messageTime = message => Date.parse(message.sent_at || message.created_at) || 0;
             this.messages = Array.from(byId.values()).sort((a, b) => messageTime(a) - messageTime(b) || Number(a.id) - Number(b.id));
+        },
+        get displayMessages() {
+            const matches = new Map();
+            for (const message of this.messages) {
+                const sentAt = Date.parse(message.sent_at);
+                if (message.direction !== 'outgoing' || message.type !== 'text' ||
+                    !message.content || !Number.isFinite(sentAt) || typeof message.is_history_import !== 'boolean') continue;
+
+                const key = JSON.stringify([message.contact_id, sentAt, message.content]);
+                const group = matches.get(key) ?? { imported: [], live: [] };
+                group[message.is_history_import ? 'imported' : 'live'].push(message);
+                matches.set(key, group);
+            }
+
+            const hiddenIds = new Set();
+            for (const { imported, live } of matches.values()) {
+                // A single match across sources can be the same send under two IDs.
+                if (imported.length !== 1 || live.length !== 1) continue;
+                const [history] = imported;
+                const [current] = live;
+                hiddenIds.add(history.is_revoked && !current.is_revoked ? current.id : history.id);
+            }
+
+            return this.messages.filter(message => !hiddenIds.has(message.id)).map(message =>
+                message.is_revoked
+                    ? { ...message, type: 'revoke', content: null, interactive_details: null }
+                    : message
+            );
         },
         async downloadHistoryAttachment(message) {
             try {
@@ -1530,7 +1556,7 @@ function messagesManager() {
         cacheMessages(contactId) {
             try {
                 // Keep only the most recent 40 to bound storage.
-                const tail = this.messages.slice(-40);
+                const tail = this.displayMessages.slice(-40);
                 localStorage.setItem(this.cacheKey(contactId), JSON.stringify(tail));
             } catch (e) { /* quota / disabled — ignore */ }
         },
