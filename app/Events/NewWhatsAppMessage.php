@@ -78,6 +78,7 @@ class NewWhatsAppMessage implements ShouldBroadcastNow
             'type' => $message->type,
             'content' => $message->content,
             'body' => $message->body,
+            'is_revoked' => $message->is_revoked,
             'media_url' => $message->media_url,
             'caption' => $message->caption,
             'filename' => $message->filename,

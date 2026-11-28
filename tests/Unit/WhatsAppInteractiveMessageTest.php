@@ -61,6 +61,23 @@ class WhatsAppInteractiveMessageTest extends TestCase
         $this->assertSame('Konfirmasi', $button->interactive_details['selection']);
     }
 
+    public function test_only_explicit_revokes_get_the_deleted_message_label(): void
+    {
+        foreach (['unsupported', 'text'] as $type) {
+            $revoked = new WhatsAppMessage([
+                'type' => $type,
+                'metadata' => ['original_type' => 'revoke'],
+            ]);
+
+            $this->assertTrue($revoked->is_revoked);
+            $this->assertSame('You deleted this message', $revoked->body);
+        }
+
+        $unsupported = new WhatsAppMessage(['type' => 'unsupported', 'metadata' => ['original_type' => 'poll']]);
+        $this->assertFalse($unsupported->is_revoked);
+        $this->assertSame('Unsupported', $unsupported->body);
+    }
+
     public function test_details_can_be_recovered_from_unsupported_message_metadata(): void
     {
         $list = new WhatsAppMessage([

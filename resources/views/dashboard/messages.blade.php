@@ -514,7 +514,7 @@
                                                     <div x-show="message?.type === 'reaction'" class="text-2xl" x-text="message?.emoji || message?.body || '👍'"></div>
                                                     <!-- Unknown/Other -->
                                                     <div x-show="!message?.interactive_details && !['text', 'template', 'image', 'video', 'document', 'audio', 'location', 'sticker', 'contacts', 'contact', 'reaction'].includes(message?.type)">
-                                                        <p class="text-sm" x-text="message?.body || message?.content || (message?.type ? message.type + ' message' : 'Message')"></p>
+                                                        <p class="text-sm" :class="{ italic: message?.is_revoked }" x-text="message?.body || message?.content || (message?.type ? message.type + ' message' : 'Message')"></p>
                                                     </div>
                                                 </div>
                                                 <!-- Meta -->
@@ -1475,7 +1475,15 @@ function messagesManager() {
                     status = this.mergeMessageStatus(status, pending);
                     this.pendingMessageStatuses.delete(id);
                 }
-                byId.set(id, { ...existing, ...message, ...status });
+                const updated = { ...existing, ...message, ...status };
+                if (updated.is_revoked || existing?.is_revoked) {
+                    updated.is_revoked = true;
+                    updated.type = 'revoke';
+                    updated.body = message.is_revoked ? message.body : existing.body;
+                    updated.content = null;
+                    updated.interactive_details = null;
+                }
+                byId.set(id, updated);
             }
             const messageTime = message => Date.parse(message.sent_at || message.created_at) || 0;
             this.messages = Array.from(byId.values()).sort((a, b) => messageTime(a) - messageTime(b) || Number(a.id) - Number(b.id));

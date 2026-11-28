@@ -89,7 +89,7 @@ class StoreWhatsAppHistoryAttachment implements ShouldQueue
             }
 
             $message = WhatsAppMessage::withoutGlobalScopes()->lockForUpdate()->find($message->id);
-            if ($message?->is_history_import) {
+            if ($message?->is_history_import && ! $message->is_revoked) {
                 $details = json_decode($message->content, true) ?: [];
                 $data = [
                     'caption' => $media['caption'] ?? $details['caption'] ?? '',

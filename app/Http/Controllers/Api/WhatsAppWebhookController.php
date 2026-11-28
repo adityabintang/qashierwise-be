@@ -26,6 +26,7 @@ use App\Services\WhatsAppFlowService;
 use App\Services\WhatsAppMessageHistory;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -170,6 +171,13 @@ class WhatsAppWebhookController extends Controller
                         // Handle message events - pass account for user-specific credentials
                         if (isset($change['value']['messages'])) {
                             foreach ($change['value']['messages'] as $message) {
+                                if (($message['type'] ?? null) === 'revoke') {
+                                    if ($verified && (string) $wabaId === (string) $whatsappAccount->waba_id) {
+                                        $this->handleMessageRevoke($message, $whatsappAccount, 'incoming');
+                                    }
+
+                                    continue;
+                                }
                                 $this->handleIncomingMessage($message, $change['value'], $userId, $whatsappAccount);
                             }
                         }
@@ -177,6 +185,13 @@ class WhatsAppWebhookController extends Controller
                         // Handle SMB message echoes (outgoing messages from the business)
                         if (isset($change['value']['message_echoes'])) {
                             foreach ($change['value']['message_echoes'] as $message) {
+                                if (($message['type'] ?? null) === 'revoke') {
+                                    if ($verified && (string) $wabaId === (string) $whatsappAccount->waba_id) {
+                                        $this->handleMessageRevoke($message, $whatsappAccount, 'outgoing');
+                                    }
+
+                                    continue;
+                                }
                                 $this->handleMessageEcho($message, $change['value'], $userId, $whatsappAccount);
                             }
                         }
@@ -897,6 +912,54 @@ class WhatsAppWebhookController extends Controller
             'contact_id' => $contact->id,
             'direction' => 'outgoing',
         ]);
+    }
+
+    private function handleMessageRevoke(array $data, WhatsAppAccount $account, string $direction): void
+    {
+        $messageId = $data['revoke']['original_message_id'] ?? $data['id'] ?? null;
+        $contactKey = $direction === 'incoming' ? 'from' : 'to';
+        $waId = $data[$contactKey] ?? $data[$contactKey.'_user_id'] ?? null;
+        if (! is_string($messageId) || $messageId === '' || ! is_string($waId) || $waId === '') {
+            return;
+        }
+
+        $message = DB::transaction(function () use ($data, $account, $direction, $messageId, $waId) {
+            $scope = ['user_id' => $account->user_id, 'phone_number_id' => $account->phone_number_id];
+            $messages = WhatsAppMessage::withoutGlobalScopes();
+            $message = $messages->where('message_id', $messageId)->lockForUpdate()->first();
+
+            if (! $message) {
+                $contact = WhatsAppContact::withoutGlobalScopes()->firstOrCreate($scope + ['wa_id' => $waId], ['name' => $waId]);
+                $message = WhatsAppMessage::withoutGlobalScopes()->firstOrCreate(['message_id' => $messageId], $scope + [
+                    'contact_id' => $contact->id,
+                    'direction' => $direction,
+                    'type' => 'text',
+                    'metadata' => ['revoked' => true],
+                    'status' => $direction === 'incoming' ? 'delivered' : 'sent',
+                    'is_read' => true,
+                    'sent_at' => now()->timestamp((int) ($data['timestamp'] ?? now()->timestamp)),
+                ]);
+                if ($message->wasRecentlyCreated) {
+                    return $message;
+                }
+
+                $message = WhatsAppMessage::withoutGlobalScopes()->lockForUpdate()->findOrFail($message->id);
+            }
+
+            if ((int) $message->user_id !== (int) $account->user_id || $message->phone_number_id !== $account->phone_number_id
+                || $message->direction !== $direction || $message->is_revoked) {
+                return null;
+            }
+
+            $message->update(['metadata' => array_replace($message->metadata ?? [], ['revoked' => true])]);
+
+            return $message;
+        }, 3);
+
+        if ($message && ($contact = WhatsAppContact::withoutGlobalScopes()->find($message->contact_id))) {
+            WhatsAppMessageHistory::updateContactPreview($contact, $message);
+            rescue(fn () => NewWhatsAppMessage::dispatch($message, $contact));
+        }
     }
 
     /**

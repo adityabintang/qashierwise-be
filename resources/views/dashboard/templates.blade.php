@@ -59,13 +59,11 @@
                         <p class="text-sm text-[hsl(var(--muted-foreground))] hidden sm:block">{{ __('whatsapp.create_manage_templates') }}</p>
                     </div>
                     <div class="flex gap-2">
-                        @if(config('app.debug'))
                         <button @click="refreshTemplates()" :disabled="refreshing" class="btn btn-outline btn-md flex-1 sm:flex-none">
                             <i class="fas" :class="refreshing ? 'fa-spinner animate-spin' : 'fa-sync-alt'"></i>
                             <span class="hidden sm:inline" x-text="refreshing ? '{{ __('whatsapp.syncing') }}' : '{{ __('whatsapp.sync_from_meta') }}'"></span>
                             <span class="sm:hidden" x-text="refreshing ? '' : '{{ __('whatsapp.sync') }}'"></span>
                         </button>
-                        @endif
                         <button @click="openCreateModal()" class="btn btn-primary btn-md flex-1 sm:flex-none">
                             <i class="fas fa-plus sm:mr-2"></i>
                             <span class="hidden sm:inline">Create Template</span>

@@ -136,6 +136,61 @@ class WhatsAppCoexistenceImportTest extends TestCase
         $this->assertDatabaseHas('whatsapp_messages', ['message_id' => 'live-after-decline', 'is_history_import' => false]);
     }
 
+    public function test_revokes_replace_messages_in_the_inbox_and_survive_duplicate_or_late_delivery(): void
+    {
+        $this->fakeSignup();
+        $this->signup()->assertOk();
+        $this->live('original', 'Pesan sebelum ditarik')->assertOk();
+        $contact = WhatsAppContact::firstOrFail();
+        $url = "/api/whatsapp/contacts/{$contact->id}/messages";
+        $revoke = [
+            'id' => 'revoke-event',
+            'from' => $contact->wa_id,
+            'timestamp' => (string) now()->timestamp,
+            'type' => 'revoke',
+            'revoke' => ['original_message_id' => 'original'],
+        ];
+
+        $this->webhook('messages', ['messages' => [$revoke]], signature: null)->assertOk();
+        $this->getJson($url)->assertJsonPath('data.0.is_revoked', false);
+
+        $this->webhook('messages', ['messages' => [$revoke]])->assertOk();
+        $this->webhook('messages', ['messages' => [$revoke]])->assertOk();
+        $this->getJson($url)->assertOk()->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.message_id', 'original')
+            ->assertJsonPath('data.0.is_revoked', true)
+            ->assertJsonPath('data.0.body', 'You deleted this message');
+        $this->assertSame('You deleted this message', $contact->fresh()->last_message_text);
+
+        $this->webhook('messages', ['messages' => [array_replace($revoke, [
+            'id' => 'early-revoke',
+            'revoke' => ['original_message_id' => 'late-original'],
+        ])]])->assertOk();
+        $this->live('late-original', 'Terlambat diterima')->assertOk();
+
+        $this->getJson($url)->assertOk()->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.1.message_id', 'late-original')
+            ->assertJsonPath('data.1.is_revoked', true);
+
+        $echo = ['to' => $contact->wa_id, 'timestamp' => (string) now()->timestamp];
+        $this->webhook('smb_message_echoes', ['message_echoes' => [$echo + [
+            'id' => 'outgoing-original',
+            'type' => 'text',
+            'text' => ['body' => 'Pesan dari WhatsApp Business'],
+        ]]])->assertOk();
+        $this->webhook('smb_message_echoes', ['message_echoes' => [$echo + [
+            'id' => 'outgoing-revoke',
+            'type' => 'revoke',
+            'revoke' => ['original_message_id' => 'outgoing-original'],
+        ]]])->assertOk();
+
+        $this->getJson($url)->assertOk()->assertJsonCount(3, 'data')
+            ->assertJsonPath('data.2.message_id', 'outgoing-original')
+            ->assertJsonPath('data.2.direction', 'outgoing')
+            ->assertJsonPath('data.2.is_revoked', true)
+            ->assertJsonPath('data.2.body', 'You deleted this message');
+    }
+
     public function test_batches_are_encrypted_before_the_worker_and_contacts_keep_existing_names(): void
     {
         $this->fakeSignup();

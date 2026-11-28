@@ -104,8 +104,19 @@ class WhatsAppMessage extends Model
     }
 
     // Accessors for frontend
+    public function getIsRevokedAttribute(): bool
+    {
+        return $this->type === 'revoke'
+            || ($this->metadata['original_type'] ?? null) === 'revoke'
+            || ($this->metadata['revoked'] ?? false) === true;
+    }
+
     public function getBodyAttribute()
     {
+        if ($this->is_revoked) {
+            return 'You deleted this message';
+        }
+
         $content = $this->getParsedContent();
 
         // For text messages, return content directly
@@ -361,6 +372,7 @@ class WhatsAppMessage extends Model
 
     protected $appends = [
         'body',
+        'is_revoked',
         'media_url',
         'caption',
         'filename',

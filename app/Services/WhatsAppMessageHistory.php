@@ -38,6 +38,10 @@ class WhatsAppMessageHistory
                 return null;
             }
 
+            if ($message->is_revoked) {
+                return $message;
+            }
+
             if ($message->is_history_import) {
                 $message->update($attributes + [
                     'is_history_import' => false,
