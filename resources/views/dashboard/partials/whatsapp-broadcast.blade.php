@@ -1,7 +1,7 @@
-<dialog x-ref="broadcastDialog" @close="closeBroadcast()" @cancel.prevent="dismissBroadcast()"
+<dialog x-init="registerBroadcastDialog($el)" @close="if (!$el.open) closeBroadcast()" @cancel.prevent="dismissBroadcast()"
     aria-labelledby="broadcast-title" class="dashboard-ui dashboard-ui-dialog">
     <header class="flex items-center justify-between gap-3 border-b border-(--dashboard-divider) px-5 py-4">
-        <h2 id="broadcast-title" x-ref="broadcastHeading" tabindex="-1" autofocus class="dashboard-ui-title text-base font-semibold"
+        <h2 id="broadcast-title" tabindex="-1" autofocus class="dashboard-ui-title text-base font-semibold"
             x-text="broadcastCopy(broadcastView === 'compose' ? 'title' : broadcastView)"></h2>
         <button type="button" class="btn btn-ghost dashboard-ui-icon"
             aria-label="{{ __('whatsapp_broadcast.close') }}" :disabled="broadcastSubmitting" @click="dismissBroadcast()">
@@ -197,6 +197,7 @@
 function contactsBroadcast() {
     const copy = @js(__('whatsapp_broadcast'));
     const locale = @js(app()->getLocale());
+    let dialog;
 
     return {
         broadcastSelection: {},
@@ -311,8 +312,10 @@ function contactsBroadcast() {
         },
 
         async openBroadcast(view) {
+            if (!dialog?.isConnected || dialog.open) return;
+
             this.broadcastView = view;
-            this.$refs.broadcastDialog.showModal();
+            dialog.showModal();
             if (view === 'history') {
                 await this.loadBroadcastHistory();
                 return;
@@ -338,44 +341,69 @@ function contactsBroadcast() {
         },
 
         dismissBroadcast() {
-            if (!this.broadcastSubmitting) this.$refs.broadcastDialog.close();
+            if (!this.broadcastSubmitting && dialog?.open) {
+                dialog.close();
+                this.closeBroadcast();
+            }
+        },
+
+        registerBroadcastDialog(element) {
+            // History and compose controls can disappear while their requests are still running.
+            dialog = element;
+        },
+
+        focusBroadcastHeading() {
+            this.$nextTick(() => {
+                if (dialog?.open) dialog.querySelector('#broadcast-title')?.focus();
+            });
         },
 
         closeBroadcast() {
             clearTimeout(this.broadcastTimer);
+            this.broadcastTimer = null;
             this.broadcastRequest++;
+            this.broadcastLoading = false;
         },
 
         async loadBroadcastData(path, apply, silent = false) {
+            if (!dialog?.isConnected || !dialog.open) return false;
+
             clearTimeout(this.broadcastTimer);
+            this.broadcastTimer = null;
             const request = ++this.broadcastRequest;
+            const isActive = () => request === this.broadcastRequest && dialog.isConnected && dialog.open;
             if (!silent) this.broadcastLoading = true;
             this.broadcastError = '';
             this.broadcastLoadFailed = false;
             try {
                 const result = await this.broadcastApi(path);
-                if (request === this.broadcastRequest) apply(result);
+                if (isActive()) apply(result);
             } catch (error) {
-                if (request === this.broadcastRequest) {
+                if (isActive()) {
                     this.broadcastError = error.message;
                     this.broadcastLoadFailed = true;
                 }
             } finally {
-                if (request === this.broadcastRequest) this.broadcastLoading = false;
+                if (isActive()) this.broadcastLoading = false;
             }
-            return request === this.broadcastRequest && this.$refs.broadcastDialog.open;
+            return isActive();
         },
 
-        async loadBroadcastHistory(page = 1) {
+        async loadBroadcastHistory(page = 1, silent = false) {
             this.broadcastView = 'history';
             this.broadcastPage = page;
-            this.broadcastHistory = [];
-            this.$nextTick(() => this.$refs.broadcastHeading?.focus());
-            await this.loadBroadcastData(`?page=${page}`, (result) => {
+            if (!silent) {
+                this.broadcastHistory = [];
+                this.focusBroadcastHeading();
+            }
+            const active = await this.loadBroadcastData(`?page=${page}`, (result) => {
                 this.broadcastHistory = result.data;
                 this.broadcastPage = result.current_page;
                 this.broadcastLastPage = result.last_page;
-            });
+            }, silent);
+            if (active && dialog.open && this.broadcastHistory.length) {
+                this.broadcastTimer = setTimeout(() => this.loadBroadcastHistory(this.broadcastPage, true), 5000);
+            }
         },
 
         async viewBroadcast(id, page = 1, silent = false) {
@@ -384,7 +412,7 @@ function contactsBroadcast() {
             this.broadcastPage = page;
             if (!silent) {
                 this.broadcastDetail = null;
-                this.$nextTick(() => this.$refs.broadcastHeading?.focus());
+                this.focusBroadcastHeading();
             }
             const active = await this.loadBroadcastData(`/${id}?page=${page}`, (result) => {
                 this.broadcastDetail = result.data;
@@ -392,7 +420,9 @@ function contactsBroadcast() {
                 this.broadcastPage = result.recipients.current_page;
                 this.broadcastLastPage = result.recipients.last_page;
             }, silent);
-            if (active) this.broadcastTimer = setTimeout(() => this.viewBroadcast(id, page, true), 5000);
+            if (active && dialog.open) {
+                this.broadcastTimer = setTimeout(() => this.viewBroadcast(id, page, true), 5000);
+            }
         },
 
         async submitBroadcast() {

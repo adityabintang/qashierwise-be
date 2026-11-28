@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Exceptions\WhatsAppBroadcastException;
 use App\Http\Controllers\Controller;
+use App\Jobs\SendWhatsAppBroadcast;
 use App\Models\WhatsAppAccount;
 use App\Models\WhatsAppBroadcast;
 use App\Services\WhatsAppAccountService;
@@ -46,7 +47,14 @@ class WhatsAppBroadcastController extends Controller
             return $this->error($e);
         }
 
-        return response()->json(['data' => WhatsAppBroadcast::withProgress()->findOrFail($broadcast->id)], 202);
+        $progress = WhatsAppBroadcast::withProgress()->findOrFail($broadcast->id);
+        if ($progress->queued_count > 0 && config('queue.connections.'.config('queue.default').'.driver') !== 'sync') {
+            rescue(function () use ($broadcast) {
+                SendWhatsAppBroadcast::dispatch($broadcast->id)->afterCommit();
+            });
+        }
+
+        return response()->json(['data' => $progress], 202);
     }
 
     public function index(Request $request): JsonResponse

@@ -209,14 +209,34 @@ class WhatsAppBroadcastTest extends TestCase
         $this->assertCount(2, Http::recorded(fn (Request $request) => str_ends_with($request->url(), '/messages')));
     }
 
-    public function test_scheduler_dispatches_to_the_database_worker_and_recovers_uncertain_attempts(): void
+    public function test_submission_dispatches_to_the_worker_without_waiting_for_the_scheduler(): void
     {
         config(['queue.default' => 'database']);
         $account = WhatsAppAccount::factory()->create(['waba_id' => '100']);
         $this->actingAs($account->user, 'sanctum');
         $contact = $this->contact($account, '62800000001');
+        $draft = $this->draft([$contact->id]);
+
+        $id = $this->postJson(self::URL, $draft)->assertAccepted()->json('data.id');
+        $this->postJson(self::URL, $draft)->assertAccepted()->assertJsonPath('data.id', $id);
+        $this->assertDatabaseCount('jobs', 1);
+
+        $this->artisan('queue:work', ['connection' => 'database', '--once' => true])->assertSuccessful();
+
+        $this->getJson(self::URL)->assertOk()
+            ->assertJsonPath('data.0.queued_count', 0)->assertJsonPath('data.0.accepted_count', 1);
+        $this->assertCount(1, Http::recorded(fn (Request $request) => str_ends_with($request->url(), '/messages')));
+    }
+
+    public function test_scheduler_dispatches_to_the_database_worker_and_recovers_uncertain_attempts(): void
+    {
+        $account = WhatsAppAccount::factory()->create(['waba_id' => '100']);
+        $this->actingAs($account->user, 'sanctum');
+        $contact = $this->contact($account, '62800000001');
         $other = $this->contact($account, '62800000002');
         $id = $this->postJson(self::URL, $this->draft([$contact->id, $other->id]))->assertAccepted()->json('data.id');
+        $this->assertDatabaseCount('jobs', 0);
+        config(['queue.default' => 'database']);
         WhatsAppBroadcastRecipient::where('contact_id', $other->id)->update([
             'status' => 'sending',
             'attempted_at' => now()->subMinutes(6),
